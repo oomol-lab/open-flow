@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml/badge.svg)](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml)
 [![npm](https://img.shields.io/npm/v/%40oomol-lab%2Fopen-flow/next?label=%40oomol-lab%2Fopen-flow)](https://www.npmjs.com/package/@oomol-lab/open-flow)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../LICENSE)
+[![License: Open Flow](https://img.shields.io/badge/License-Open%20Flow-blue.svg)](../LICENSE)
 ![Node.js 26](https://img.shields.io/badge/Node.js-26-339933)
 ![Bun 1.4](https://img.shields.io/badge/Bun-1.4-000000)
 
@@ -19,7 +19,7 @@
 
 **AI 에이전트와 자동화를 만들고, 무엇이 실행될지 직접 확인하세요.**
 
-Open Flow는 AI로 빠르게 구축하면서도 시각적인 워크플로로 구조를 명확하게 파악할 수 있는 오픈 소스 워크플로 플랫폼입니다. Codex, Claude Code 또는 다른 에이전트에게 Flow 생성을 요청하고, Workbench에서 열어 같은 워크플로를 함께 개선하세요.
+Open Flow는 AI로 빠르게 구축하면서도 시각적인 워크플로로 구조를 명확하게 파악할 수 있는 소스 공개 워크플로 플랫폼입니다. Codex, Claude Code 또는 다른 에이전트에게 Flow 생성을 요청하고, Workbench에서 열어 같은 워크플로를 함께 개선하세요.
 
 하나의 캔버스에서 JavaScript, 앱 연동, AI, 조건 분기, 사람의 승인을 조합합니다. 입력을 확인하고 실행을 추적하며 어떤 버전을 실제로 운영할지 결정할 수 있습니다. OOMOL Hosted나 직접 관리하는 인프라에서 실행하세요.
 
@@ -110,7 +110,7 @@ Connector 작업과 LLM Task는 해당 서비스를 설정해야 사용할 수 �
 
 ## Open Flow를 기반으로 개발
 
-Open Flow는 Apache-2.0 라이선스로 제공됩니다. 저장소에는 워크플로 계약과 런타임, Workbench, CLI 명령 패키지, 직접 호스팅할 수 있는 Server가 포함됩니다. 버전 관리되는 Control API 덕분에 클라이언트는 배포 환경의 스토리지 및 실행 구현에 종속되지 않습니다.
+Open Flow는 Apache-2.0에 추가 조건을 적용한 Open Flow License로 제공됩니다. 저장소에는 워크플로 계약과 런타임, Workbench, CLI 명령 패키지, 직접 호스팅할 수 있는 Server가 포함됩니다. 버전 관리되는 Control API 덕분에 클라이언트는 배포 환경의 스토리지 및 실행 구현에 종속되지 않습니다.
 
 `.bun-version`과 `.node-version`에 고정된 Bun 및 Node.js 버전을 사용하세요.
 
@@ -150,7 +150,7 @@ Issue와 Pull Request를 환영합니다. 개발 환경 설정, 저장소 규칙
 
 ## 라이선스
 
-[Apache-2.0](../LICENSE). 번들된 자산의 서드파티 고지는 [NOTICE](../NOTICE)에 정리되어 있습니다.
+[Open Flow License](../LICENSE). 번들된 자산의 서드파티 고지는 [NOTICE](../NOTICE)에 정리되어 있습니다.
 
 ## 기여자
 

@@ -2,7 +2,7 @@
   "name": "@oomol-lab/open-flow-server",
   "version": "0.1.0-beta.19",
   "private": true,
-  "license": "Apache-2.0",
+  "license": "SEE LICENSE IN ../../LICENSE",
   "type": "module",
   "scripts": {
     "benchmark:runtime": "bun run build && node --expose-gc --no-node-snapshot scripts/benchmark-runtime.mjs",

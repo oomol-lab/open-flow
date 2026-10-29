@@ -24,7 +24,7 @@ function createManifest(version: string): object {
     name: '@oomol-lab/open-flow',
     version,
     description: 'TypeScript contracts and Browser runtime for Open Flow.',
-    license: 'Apache-2.0',
+    license: 'SEE LICENSE IN LICENSE',
     repository: {
       type: 'git',
       url: 'git+https://github.com/oomol-lab/open-flow.git',
@@ -198,5 +198,10 @@ The command uses process stdin/stdout/stderr and targets Bun 1.4.2 or newer.
 Importing it does not execute the CLI. Bundle it into the host at build time;
 runtime dependencies and the package version are included in the command entry.
 Skill templates ship in this same package under \`skills/open-flow/\`.
+
+## License
+
+[Open Flow License](LICENSE), based on Apache-2.0 with additional conditions.
+See [NOTICE](NOTICE) for third-party notices.
 `
 }

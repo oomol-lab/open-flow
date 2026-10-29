@@ -16,7 +16,7 @@
     "url": "git+https://github.com/oomol-lab/open-flow.git",
     "directory": "packages/open-flow"
   },
-  "license": "Apache-2.0",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "private": true,
   "exports": {

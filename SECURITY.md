@@ -164,7 +164,7 @@ responsibility for securing their deployment. At minimum:
   callback verifiers. Restrict access to the volume, let only one Server container write to it,
   and back it up quiesced together with its WAL and SHM files.
 - **Treat Variables as readable deployment configuration.** Every authenticated Operator can list
-  and read all Variable values, and the open-source Server stores them as plaintext in SQLite.
+  and read all Variable values, and the self-hosted Server stores them as plaintext in SQLite.
   Variables do not provide encryption at rest, per-value ACLs, automatic rotation, or an
   unexportable Secret Manager boundary. A Flow may explicitly return, log, or send a bound value.
 - **Keep resource limits in place.** Tune `OPEN_FLOW_MAX_PENDING_RUNS`,

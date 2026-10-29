@@ -1,6 +1,13 @@
 Open Flow
 Copyright 2024-2026 OOMOL contributors
 
+Open Flow is licensed under the Open Flow License, a modified version of the Apache License
+2.0 with additional conditions, except where otherwise noted. See LICENSE.
+
+Releases previously published under the unmodified Apache License 2.0 remain available under
+that license. Portions contributed under Apache License 2.0 remain subject to that license;
+its full text is included in LICENSE.
+
 This distribution includes third-party open source software.
 Licenses for dependencies included in generated bundles ship with each generated distribution
 (`dist/browser/licenses.md` and `dist/command/licenses.md` in the npm package).

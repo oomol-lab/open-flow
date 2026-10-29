@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml/badge.svg)](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml)
 [![npm](https://img.shields.io/npm/v/%40oomol-lab%2Fopen-flow/next?label=%40oomol-lab%2Fopen-flow)](https://www.npmjs.com/package/@oomol-lab/open-flow)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../LICENSE)
+[![License: Open Flow](https://img.shields.io/badge/License-Open%20Flow-blue.svg)](../LICENSE)
 ![Node.js 26](https://img.shields.io/badge/Node.js-26-339933)
 ![Bun 1.4](https://img.shields.io/badge/Bun-1.4-000000)
 
@@ -19,7 +19,7 @@
 
 **Создавайте автоматизацию вместе с ИИ-агентом. Проверяйте, что именно будет выполняться.**
 
-Open Flow — открытая платформа для рабочих процессов, которая сочетает скорость разработки с помощью ИИ и наглядность визуального графа. Попросите Codex, Claude Code или другого агента создать Flow, откройте его в Workbench и продолжайте совершенствовать тот же процесс вместе.
+Open Flow — платформа с доступным исходным кодом для рабочих процессов, которая сочетает скорость разработки с помощью ИИ и наглядность визуального графа. Попросите Codex, Claude Code или другого агента создать Flow, откройте его в Workbench и продолжайте совершенствовать тот же процесс вместе.
 
 Объединяйте JavaScript, подключённые приложения, ИИ, ветвления и согласование с человеком на одном холсте. Проверяйте входные данные, следите за выполнением и выбирайте версию для публикации. Запускайте процессы в OOMOL Hosted или на собственной инфраструктуре.
 
@@ -110,7 +110,7 @@ docker run --rm \
 
 ## Разрабатывайте на основе Open Flow
 
-Open Flow распространяется по лицензии Apache-2.0. Репозиторий содержит контракты и среду выполнения рабочих процессов, Workbench, пакет команд CLI и Server для самостоятельного размещения. Версионируемый Control API позволяет клиентам не зависеть от реализации хранилища и выполнения в конкретном развёртывании.
+Open Flow распространяется по Open Flow License на основе Apache-2.0 с дополнительными условиями. Репозиторий содержит контракты и среду выполнения рабочих процессов, Workbench, пакет команд CLI и Server для самостоятельного размещения. Версионируемый Control API позволяет клиентам не зависеть от реализации хранилища и выполнения в конкретном развёртывании.
 
 Используйте версии Bun и Node.js, закреплённые в `.bun-version` и `.node-version`:
 
@@ -131,7 +131,7 @@ Workbench для разработки доступен по адресу [http:/
 
 ## Связанные проекты
 
-- [OpenConnector](https://github.com/oomol-lab/open-connector): шлюз коннекторов с открытым исходным
+- [OpenConnector](https://github.com/oomol-lab/open-connector): шлюз коннекторов с доступным исходным
   кодом, который предоставляет каталог Provider, учётные данные и выполнение Action для узлов на базе
   Connector.
 - [oo CLI](https://github.com/oomol-lab/oo-cli): локальный набор инструментов для агентов, в котором
@@ -152,7 +152,7 @@ Issue и pull request приветствуются. Настройка окру�
 
 ## Лицензия
 
-[Apache-2.0](../LICENSE). Уведомления о сторонних компонентах для включённых ресурсов перечислены в
+[Open Flow License](../LICENSE). Уведомления о сторонних компонентах для включённых ресурсов перечислены в
 [NOTICE](../NOTICE).
 
 ## Участники

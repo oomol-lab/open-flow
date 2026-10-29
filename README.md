@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml/badge.svg)](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml)
 [![npm](https://img.shields.io/npm/v/%40oomol-lab%2Fopen-flow/next?label=%40oomol-lab%2Fopen-flow)](https://www.npmjs.com/package/@oomol-lab/open-flow)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![License: Open Flow](https://img.shields.io/badge/License-Open%20Flow-blue.svg)](LICENSE)
 ![Node.js 26](https://img.shields.io/badge/Node.js-26-339933)
 ![Bun 1.4](https://img.shields.io/badge/Bun-1.4-000000)
 
@@ -17,7 +17,7 @@
 
 **Build automation with your AI agent. See exactly what will run.**
 
-Open Flow is an open-source workflow platform for people who want the speed of AI-assisted building
+Open Flow is a source-available workflow platform for people who want the speed of AI-assisted building
 and the clarity of a visual workflow. Ask Codex, Claude Code, or another agent to build a Flow, open
 it in the Workbench, and keep refining the same workflow together.
 
@@ -142,7 +142,7 @@ silently fall back to another provider. Before exposing a deployment publicly, f
 
 ## Build on Open Flow
 
-Open Flow is Apache-2.0 licensed. The repository includes the workflow contracts and runtime,
+Open Flow uses the Open Flow License, based on Apache-2.0 with additional conditions. The repository includes the workflow contracts and runtime,
 Workbench, CLI command package, and self-hosted Server. The versioned Control API keeps clients
 independent of the deployment's storage and execution implementation.
 
@@ -167,7 +167,7 @@ creates an operator token in `apps/server/.open-flow-dev/operator-token`. See
 
 ## Related Projects
 
-- [OpenConnector](https://github.com/oomol-lab/open-connector): open-source connector gateway that
+- [OpenConnector](https://github.com/oomol-lab/open-connector): source-available connector gateway that
   provides the Provider catalog, credentials, and Action execution behind Connector-backed nodes.
 - [oo CLI](https://github.com/oomol-lab/oo-cli): local agent toolkit that hosts the `oo flow`
   command built from this repository.
@@ -187,7 +187,7 @@ disclosure process, what is in scope, and how to harden a self-hosted deployment
 
 ## License
 
-[Apache-2.0](LICENSE). Third-party notices for bundled assets are listed in [NOTICE](NOTICE).
+[Open Flow License](LICENSE). Third-party notices for bundled assets are listed in [NOTICE](NOTICE).
 
 ## Contributors
 
