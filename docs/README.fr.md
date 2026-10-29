@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml/badge.svg)](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml)
 [![npm](https://img.shields.io/npm/v/%40oomol-lab%2Fopen-flow/next?label=%40oomol-lab%2Fopen-flow)](https://www.npmjs.com/package/@oomol-lab/open-flow)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../LICENSE)
+[![License: Open Flow](https://img.shields.io/badge/License-Open%20Flow-blue.svg)](../LICENSE)
 ![Node.js 26](https://img.shields.io/badge/Node.js-26-339933)
 ![Bun 1.4](https://img.shields.io/badge/Bun-1.4-000000)
 
@@ -19,7 +19,7 @@
 
 **Créez vos automatisations avec votre agent IA. Voyez exactement ce qui sera exécuté.**
 
-Open Flow est une plateforme de workflows open source qui associe la rapidité de la création assistée par IA à la clarté d'un workflow visuel. Demandez à Codex, Claude Code ou à un autre agent de créer un Flow, ouvrez-le dans le Workbench et continuez à améliorer ensemble ce même workflow.
+Open Flow est une plateforme de workflows au code source accessible qui associe la rapidité de la création assistée par IA à la clarté d'un workflow visuel. Demandez à Codex, Claude Code ou à un autre agent de créer un Flow, ouvrez-le dans le Workbench et continuez à améliorer ensemble ce même workflow.
 
 Combinez JavaScript, applications connectées, IA, embranchements et validation humaine sur un même canevas. Inspectez les entrées, suivez l'exécution et choisissez la version à mettre en production. Utilisez OOMOL Hosted ou votre propre infrastructure.
 
@@ -110,7 +110,7 @@ Les actions Connector et les LLM Tasks nécessitent la configuration des service
 
 ## Développez avec Open Flow
 
-Open Flow est distribué sous licence Apache-2.0. Ce dépôt comprend les contrats et le runtime des workflows, le Workbench, le package de commandes CLI et le Server auto-hébergeable. Le Control API versionné rend les clients indépendants de l'implémentation du stockage et de l'exécution du déploiement.
+Open Flow est distribué sous Open Flow License, basée sur Apache-2.0 avec des conditions supplémentaires. Ce dépôt comprend les contrats et le runtime des workflows, le Workbench, le package de commandes CLI et le Server auto-hébergeable. Le Control API versionné rend les clients indépendants de l'implémentation du stockage et de l'exécution du déploiement.
 
 Utilisez les versions de Bun et Node.js fixées dans `.bun-version` et `.node-version` :
 
@@ -131,7 +131,7 @@ Le Workbench de développement est accessible sur [http://localhost:5174](http:/
 
 ## Projets liés
 
-- [OpenConnector](https://github.com/oomol-lab/open-connector) : passerelle de connecteurs open source
+- [OpenConnector](https://github.com/oomol-lab/open-connector) : passerelle de connecteurs au code source accessible
   qui fournit le catalogue de Providers, les identifiants et l'exécution des Actions derrière les nœuds
   adossés à un Connector.
 - [oo CLI](https://github.com/oomol-lab/oo-cli) : boîte à outils d'agent local qui héberge la commande
@@ -154,7 +154,7 @@ auto-hébergé.
 
 ## Licence
 
-[Apache-2.0](../LICENSE). Les mentions relatives aux ressources tierces embarquées figurent dans
+[Open Flow License](../LICENSE). Les mentions relatives aux ressources tierces embarquées figurent dans
 [NOTICE](../NOTICE).
 
 ## Contributeurs

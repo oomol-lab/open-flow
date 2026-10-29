@@ -232,7 +232,7 @@ Operator identity, Flow ownership, external execution authority, and callback id
 A scope change clears old sessions, requests, caches, and subscriptions.
 Server-side authorization covers every resource entry point. Clients cannot change ownership through IDs or parameters.
 
-In the open-source Server, the host owns accounts and administrative roles. Each Flow has a fixed account owner.
+In the self-hosted Server, the host owns accounts and administrative roles. Each Flow has a fixed account owner.
 Administrator status does not expand visibility into other accounts' Flows. Administrative permissions are independent of upstream Connector permissions.
 Claiming a deployment requires authorization held by its deployer. The first anonymous visitor must not become an administrator.
 Login verification, session signing, and callback identity use separate secrets and lifecycles.

@@ -59,6 +59,8 @@ assert.equal(
 const packedManifest = JSON.parse(readPackedText('package.json')) as Record<string, unknown>
 assert.equal(packedManifest.name, '@oomol-lab/open-flow')
 assert.equal(packedManifest.version, manifest.version)
+assert.equal(packedManifest.license, 'SEE LICENSE IN LICENSE')
+assert.equal(readPackedText('LICENSE'), await readFile(path.join(rootPath, '../../LICENSE'), 'utf8'))
 // Validate advertised targets without freezing the internal output layout or export inventory.
 assert.ok(packedManifest.exports && typeof packedManifest.exports == 'object')
 verifyExportTargets(packedManifest.exports)

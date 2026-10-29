@@ -100,7 +100,7 @@ Do not assume that every later call repeats the candidate assignment process.
 | `implicit`   | The deployment's configured scoped Connector authority                 | Both sets are empty; no fabricated Provider Access Binding                         |
 | `selectable` | Assignable account authorization candidates provided by the deployment | Fix the selected identities and resolve current permissions from them at execution |
 
-The open-source Server uses `implicit` for OpenConnector and `selectable` for supported OOMOL Connector endpoints.
+The self-hosted Server uses `implicit` for OpenConnector and `selectable` for supported OOMOL Connector endpoints.
 Empty sets in `implicit` mode mean neither deny-all nor unlimited permission.
 Calls remain subject to consumer declarations, account validity, and the deployment's Connector identity permissions.
 The host selects the deployment mode. A Flow or script cannot switch it.

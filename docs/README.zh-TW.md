@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml/badge.svg)](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml)
 [![npm](https://img.shields.io/npm/v/%40oomol-lab%2Fopen-flow/next?label=%40oomol-lab%2Fopen-flow)](https://www.npmjs.com/package/@oomol-lab/open-flow)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../LICENSE)
+[![License: Open Flow](https://img.shields.io/badge/License-Open%20Flow-blue.svg)](../LICENSE)
 ![Node.js 26](https://img.shields.io/badge/Node.js-26-339933)
 ![Bun 1.4](https://img.shields.io/badge/Bun-1.4-000000)
 
@@ -19,7 +19,7 @@
 
 **和 AI Agent 一起建立自動化，讓每一步執行清楚可見。**
 
-Open Flow 是一個開源工作流程平台，結合 AI 輔助建構的速度與視覺化工作流程的清晰結構。讓 Codex、Claude Code 或其他 Agent 建立一個 Flow，在 Workbench 中開啟，再一起持續完善同一個工作流程。
+Open Flow 是一個原始碼可用的工作流程平台，結合 AI 輔助建構的速度與視覺化工作流程的清晰結構。讓 Codex、Claude Code 或其他 Agent 建立一個 Flow，在 Workbench 中開啟，再一起持續完善同一個工作流程。
 
 在一張畫布上組合 JavaScript、應用程式整合、AI、條件分支和人工核准。檢視輸入、追蹤執行，並決定哪個版本正式上線。可以使用 OOMOL Hosted，也可以部署到自己的基礎設施。
 
@@ -110,7 +110,7 @@ Connector 操作和 LLM Task 需要設定對應的服務。Server 不會暗中�
 
 ## 以 Open Flow 為基礎開發
 
-Open Flow 採用 Apache-2.0 授權。儲存庫包含工作流程契約與執行環境、Workbench、CLI 指令套件和可自行部署的 Server。版本化的 Control API 讓用戶端不依賴部署內部的儲存和執行實作。
+Open Flow 採用 Open Flow License，以 Apache-2.0 為基礎並附加條款。儲存庫包含工作流程契約與執行環境、Workbench、CLI 指令套件和可自行部署的 Server。版本化的 Control API 讓用戶端不依賴部署內部的儲存和執行實作。
 
 請使用 `.bun-version` 和 `.node-version` 中固定的 Bun 與 Node.js 版本：
 
@@ -131,7 +131,7 @@ bun run dev
 
 ## 相關專案
 
-- [OpenConnector](https://github.com/oomol-lab/open-connector)：開源的 Connector 閘道，為 Connector 節點提供 Provider 目錄、憑證管理和
+- [OpenConnector](https://github.com/oomol-lab/open-connector)：原始碼可用的 Connector 閘道，為 Connector 節點提供 Provider 目錄、憑證管理和
   Action 執行。
 - [oo CLI](https://github.com/oomol-lab/oo-cli)：本機 Agent 工具組，承載由本儲存庫建置的 `oo flow` 命令。
 
@@ -147,7 +147,7 @@ Issue。[SECURITY.md](../SECURITY.md) 說明了受支援的版本、揭露流程
 
 ## 授權條款
 
-[Apache-2.0](../LICENSE)。打包資源涉及的第三方聲明請參閱 [NOTICE](../NOTICE)。
+[Open Flow License](../LICENSE)。打包資源涉及的第三方聲明請參閱 [NOTICE](../NOTICE)。
 
 ## 貢獻者
 

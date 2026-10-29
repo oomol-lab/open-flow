@@ -145,5 +145,6 @@ This project uses such references only for identification and interoperability.
 
 ## Contribution License
 
-By submitting a pull request, you agree that your contribution is provided under the Apache License,
-Version 2.0, unless you clearly mark it otherwise in writing.
+By submitting a pull request, you agree to the [Open Flow License](LICENSE), including its
+contributor terms: OOMOL may adjust the license to be more strict or more relaxed, and may use
+your contributed code for commercial purposes, including its hosted services.

@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml/badge.svg)](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml)
 [![npm](https://img.shields.io/npm/v/%40oomol-lab%2Fopen-flow/next?label=%40oomol-lab%2Fopen-flow)](https://www.npmjs.com/package/@oomol-lab/open-flow)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../LICENSE)
+[![License: Open Flow](https://img.shields.io/badge/License-Open%20Flow-blue.svg)](../LICENSE)
 ![Node.js 26](https://img.shields.io/badge/Node.js-26-339933)
 ![Bun 1.4](https://img.shields.io/badge/Bun-1.4-000000)
 
@@ -19,7 +19,7 @@
 
 **和 AI Agent 一起搭建自动化，让每一步执行清晰可见。**
 
-Open Flow 是一个开源工作流平台，把 AI 辅助构建的速度与可视化工作流的清晰结构结合起来。让 Codex、Claude Code 或其他 Agent 创建一个 Flow，在 Workbench 中打开它，然后继续一起完善同一个工作流。
+Open Flow 是一个源码可用的工作流平台，把 AI 辅助构建的速度与可视化工作流的清晰结构结合起来。让 Codex、Claude Code 或其他 Agent 创建一个 Flow，在 Workbench 中打开它，然后继续一起完善同一个工作流。
 
 在一张画布上组合 JavaScript、应用集成、AI、条件分支和人工审批。查看输入、跟踪执行，并决定哪个版本正式上线。可以使用 OOMOL Hosted，也可以部署到自己的基础设施。
 
@@ -110,7 +110,7 @@ Connector 操作和 LLM Task 需要配置相应的服务。Server 不会悄悄�
 
 ## 基于 Open Flow 开发
 
-Open Flow 使用 Apache-2.0 许可证。仓库包含工作流契约与运行时、Workbench、CLI 命令包和可自行部署的 Server。版本化的 Control API 让客户端不依赖部署内部的存储和执行实现。
+Open Flow 使用 Open Flow License，以 Apache-2.0 为基础并附加条款。仓库包含工作流契约与运行时、Workbench、CLI 命令包和可自行部署的 Server。版本化的 Control API 让客户端不依赖部署内部的存储和执行实现。
 
 请使用 `.bun-version` 和 `.node-version` 中固定的 Bun 与 Node.js 版本：
 
@@ -131,7 +131,7 @@ bun run dev
 
 ## 相关项目
 
-- [OpenConnector](https://github.com/oomol-lab/open-connector)：开源的 Connector 网关，为 Connector 节点提供 Provider 目录、凭据管理和
+- [OpenConnector](https://github.com/oomol-lab/open-connector)：源码可用的 Connector 网关，为 Connector 节点提供 Provider 目录、凭据管理和
   Action 执行。
 - [oo CLI](https://github.com/oomol-lab/oo-cli)：本地 Agent 工具集，承载由本仓库构建的 `oo flow` 命令。
 
@@ -147,7 +147,7 @@ Issue。[SECURITY.md](../SECURITY.md) 说明了受支持的版本、披露流程
 
 ## 许可证
 
-[Apache-2.0](../LICENSE)。打包资源涉及的第三方声明见 [NOTICE](../NOTICE)。
+[Open Flow License](../LICENSE)。打包资源涉及的第三方声明见 [NOTICE](../NOTICE)。
 
 ## 贡献者
 

@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml/badge.svg)](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml)
 [![npm](https://img.shields.io/npm/v/%40oomol-lab%2Fopen-flow/next?label=%40oomol-lab%2Fopen-flow)](https://www.npmjs.com/package/@oomol-lab/open-flow)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../LICENSE)
+[![License: Open Flow](https://img.shields.io/badge/License-Open%20Flow-blue.svg)](../LICENSE)
 ![Node.js 26](https://img.shields.io/badge/Node.js-26-339933)
 ![Bun 1.4](https://img.shields.io/badge/Bun-1.4-000000)
 
@@ -19,7 +19,7 @@
 
 **AI エージェントと自動化をつくる。実行する内容を、自分の目で確かめる。**
 
-Open Flow は、AI による構築の速さと、視覚的なワークフローのわかりやすさを両立するオープンソースのワークフロープラットフォームです。Codex、Claude Code などのエージェントに Flow の作成を依頼し、Workbench で開いて、同じワークフローを一緒に改善できます。
+Open Flow は、AI による構築の速さと、視覚的なワークフローのわかりやすさを両立するソースコードを公開しているワークフロープラットフォームです。Codex、Claude Code などのエージェントに Flow の作成を依頼し、Workbench で開いて、同じワークフローを一緒に改善できます。
 
 JavaScript、アプリ連携、AI、条件分岐、人による承認を一つのキャンバスで組み合わせます。入力を確認し、実行を追跡し、どのバージョンを本番で動かすかを決められます。OOMOL Hosted でも、自分で管理するインフラでも実行できます。
 
@@ -110,7 +110,7 @@ Connector の操作や LLM Task には、対応するサービスの設定が必
 
 ## Open Flow を基盤に開発する
 
-Open Flow は Apache-2.0 ライセンスで公開されています。このリポジトリには、ワークフローの契約とランタイム、Workbench、CLI コマンドパッケージ、セルフホスト用 Server が含まれます。バージョン管理された Control API により、クライアントはデプロイ環境のストレージや実行の実装に依存しません。
+Open Flow は Apache-2.0 に追加条件を設けた Open Flow License で公開されています。このリポジトリには、ワークフローの契約とランタイム、Workbench、CLI コマンドパッケージ、セルフホスト用 Server が含まれます。バージョン管理された Control API により、クライアントはデプロイ環境のストレージや実行の実装に依存しません。
 
 `.bun-version` と `.node-version` に固定された Bun と Node.js のバージョンを使ってください。
 
@@ -132,7 +132,7 @@ bun run dev
 ## 関連プロジェクト
 
 - [OpenConnector](https://github.com/oomol-lab/open-connector)：Connector を利用するノードの背後で Provider カタログ、認証情報、Action の実行を提供する
-  オープンソースの Connector ゲートウェイ。
+  ソースコードを公開している Connector ゲートウェイ。
 - [oo CLI](https://github.com/oomol-lab/oo-cli)：このリポジトリからビルドされる `oo flow` コマンドをホストするローカル Agent ツールキット。
 
 ## コントリビューション
@@ -147,7 +147,7 @@ Issue と Pull Request を歓迎します。開発環境のセットアップ、
 
 ## ライセンス
 
-[Apache-2.0](../LICENSE)。同梱アセットに関するサードパーティの通知は [NOTICE](../NOTICE) に記載されています。
+[Open Flow License](../LICENSE)。同梱アセットに関するサードパーティの通知は [NOTICE](../NOTICE) に記載されています。
 
 ## コントリビューター
 

@@ -1,3 +1,39 @@
+# Open Flow License
+
+Open Flow is licensed under a modified version of the Apache License 2.0, with the following
+additional conditions:
+
+1. Open Flow may be used commercially, including running it within your own organization,
+   deploying it for a client to use within that client's own organization, and embedding it in
+   your own products. A commercial license must be obtained from OOMOL when the condition below
+   applies:
+
+   a. Hosted workflow service: Unless explicitly authorized by OOMOL in writing, you may not
+   provide Open Flow, or a modified version of it, to third parties as a hosted or managed
+   service whose primary value is Open Flow's functionality, such as a workflow automation
+   platform, an integration platform, or an API that lets third parties create and run workflows.
+
+   Embedding Open Flow in a product whose primary value lies elsewhere, so that the product's
+   own users create and run workflows as part of using that product, is not a hosted workflow
+   service under this condition.
+
+2. As a contributor, you agree that:
+
+   a. OOMOL may adjust the license of Open Flow to be more strict or more relaxed as it deems
+   necessary.
+
+   b. Your contributed code may be used for commercial purposes, including but not limited to
+   OOMOL's hosted services.
+
+Apart from the specific conditions above, all other rights and restrictions follow the Apache
+License 2.0. Its full text is included below and at
+http://www.apache.org/licenses/LICENSE-2.0.
+
+Open Flow releases previously published under the unmodified Apache License 2.0 remain
+available under that license.
+
+Copyright 2024-2026 OOMOL contributors
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/

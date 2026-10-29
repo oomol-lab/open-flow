@@ -33,7 +33,7 @@ is not exported by this package.
 
 ## License
 
-[Apache-2.0](LICENSE)
+[Open Flow License](LICENSE)
 
 ## Open an import confirmation
 

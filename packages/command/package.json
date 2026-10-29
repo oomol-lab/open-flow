@@ -2,7 +2,7 @@
   "name": "@oomol-lab/open-flow-command",
   "version": "0.1.0-beta.73",
   "description": "Open Flow command runtime and npm entry builder.",
-  "license": "Apache-2.0",
+  "license": "SEE LICENSE IN ../../LICENSE",
   "type": "module",
   "private": true,
   "scripts": {
