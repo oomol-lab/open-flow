@@ -93,7 +93,7 @@ export function runtimeAssertions(
     )
       errors.push('Execute both configured tasks once without external calls.')
   }
-  if (id == 'workflow-call') {
+  if (id == 'workflow-call' || id == 'workflow-tools') {
     const terminal = events.findLast((event) => event.kind == 'run.completed')
     const result = terminal?.kind == 'run.completed' ? terminal.payload.result : undefined
     if (
@@ -104,8 +104,11 @@ export function runtimeAssertions(
       !isDeepStrictEqual(result.outputs, { total: Number(sample.outputs?.amount) * 2 })
     )
       errors.push('Return the called workflow business output.')
-    if (events.some((event) => event.kind == 'node.log')) errors.push('Child logs must remain in the child Run.')
-    if (!events.some((event) => event.kind == 'node.started' && event.payload.nodeKind == 'workflow')) errors.push('Execute the workflow call node.')
+    if (id == 'workflow-call' && events.some((event) => event.kind == 'node.log')) errors.push('Child logs must remain in the child Run.')
+    if (id == 'workflow-call' && !events.some((event) => event.kind == 'node.started' && event.payload.nodeKind == 'workflow'))
+      errors.push('Execute the workflow call node.')
+    if (id == 'workflow-tools' && (modelCalls.length != 2 || !JSON.stringify(modelCalls[1]).includes('stored-result')))
+      errors.push('Call the workflow from the Agent and forward its stored result to the model.')
   }
   if (id == 'workflow-outputs') {
     const terminal = events.findLast((event) => event.kind == 'run.completed')

@@ -1,5 +1,6 @@
 import { decisionTaskIssues } from '../../decision/common/decision.ts'
 import { openApiIssues, authHandles } from '../../openapi/common/openapi.ts'
+import { nodeWorkflowReferences } from '../../workflow/common/workflow.ts'
 import { isTriggerNode } from './change.ts'
 export { renderPrompt } from './promptTemplate.ts'
 export { connectionUsage, removeConnectionUsage } from './connectionUsage.ts'
@@ -13,7 +14,7 @@ import type { ConnectorActionCapability, ConnectorCapability, Graph, InputMappin
 
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'
-import { decodeConnectorCapabilities } from './change.ts'
+import { decodeTaskCapabilities } from './change.ts'
 import { canonicalJsonBytes, canonicalModule, canonicalRevisionGraph, digestBytes } from './encoding.ts'
 import { nodeInputPorts, validateFlowGraph } from './graph.ts'
 import { inputValue } from './inputValue.ts'
@@ -145,9 +146,9 @@ export function flowResourceReferences(content: RevisionContent): FlowResourceRe
     calledFlowIds: [
       ...new Set(
         Object.values(content.document.graph.nodes).flatMap((node) =>
-          node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'workflow' && node.task.executor.flowId
-            ? [node.task.executor.flowId]
-            : [],
+          nodeWorkflowReferences(node)
+            .map(({ target }) => target.flowId)
+            .filter(Boolean),
         ),
       ),
     ].toSorted(),
@@ -245,7 +246,7 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
       })
     }
     try {
-      decodeConnectorCapabilities(node.task.capabilities === undefined ? [] : node.task.capabilities)
+      decodeTaskCapabilities(node.task.capabilities === undefined ? [] : node.task.capabilities)
     } catch {
       checked.diagnostics.push({
         code: 'task.capability-incomplete',
@@ -387,6 +388,8 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
 export async function prepareFlow(revision: RevisionContent, engineContract: string, triggerId?: string): Promise<PrepareFlowResult> {
   const engine = findEngineContract(engineContract)
   if (engine == null) return { kind: 'engine-unsupported' }
+  if (!engine.workflowTools && Object.values(revision.document.graph.nodes).some((node) => nodeWorkflowReferences(node).some((ref) => ref.tool != null)))
+    return { kind: 'engine-unsupported' }
   if (triggerId != null) {
     const trigger = revision.document.graph.nodes[triggerId]
     if (trigger == null || !isTriggerNode(trigger))
@@ -454,7 +457,7 @@ export function agentActions(flow: Pick<PreparedFlow, 'graph'>): readonly Connec
     const task = node.task
     if (task.executor.kind != 'agent') return []
     const notice = task.executor.notification
-    return [...task.executor.tools, ...(notice != null ? [notice] : [])]
+    return [...task.executor.tools.filter((tool) => tool.kind != 'workflow'), ...(notice != null ? [notice] : [])]
       .filter((tool) => tool.connectionId !== '')
       .map((tool) => ({
         kind: 'connector' as const,
@@ -465,5 +468,7 @@ export function agentActions(flow: Pick<PreparedFlow, 'graph'>): readonly Connec
 }
 
 export function codeActions(flow: Pick<PreparedFlow, 'graph'>): readonly ConnectorCapability[] {
-  return Object.values(flow.graph.nodes).flatMap((node) => (node.kind == 'task' && 'moduleId' in node.task ? (node.task.capabilities ?? []) : []))
+  return Object.values(flow.graph.nodes).flatMap((node) =>
+    node.kind == 'task' && 'moduleId' in node.task ? (node.task.capabilities ?? []).filter((item) => item.kind == 'connector') : [],
+  )
 }

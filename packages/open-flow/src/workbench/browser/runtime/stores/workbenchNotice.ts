@@ -71,7 +71,7 @@ export function errorNotice(error: unknown, t: TFunction): Notice {
     if (
       error.code == controlErrorCode.flowInvalid &&
       typeof error.details?.reason == 'string' &&
-      ['workflow.unpublished', 'workflow.disabled', 'workflow.retiring', 'workflow.recursive'].includes(error.details.reason)
+      ['workflow.unpublished', 'workflow.missing-start', 'workflow.disabled', 'workflow.retiring', 'workflow.recursive'].includes(error.details.reason)
     )
       return { kind: 'error', message: t(`diagnostics.messages.${error.details.reason}`) }
     const key = (errorKeys as Readonly<Record<string, string>>)[error.code]

@@ -15,6 +15,13 @@ export const scenarios = [
     task: 'Create a Gmail Poll with Mail test account and default Gmail settings, read its events output, change only its name, and connect it to Outputs returning the complete messages array from events. Preserve the account and configuration. Check the Flow. Each deterministic draft Run receives a batch of messages.',
   },
   {
+    id: 'workflow-tools',
+    entry: { kind: 'start' },
+    name: 'Use workflows as Agent and Code tools',
+    version: 1,
+    task: 'Find the published workflow Lab double. Create Start with required number amount. Add a Code node with workflow tool alias double and call it using context.workflows.call, passing amount from Start. Add an Agent using lab-model with workflow tool double_workflow, map its amount parameter from the Agent input, and ask it to call the tool. Return the Code result total through Outputs after both nodes complete. Rename both nodes, refresh both workflow tools explicitly and preserve their input bindings.',
+  },
+  {
     id: 'webhook-response-node',
     entry: { kind: 'webhook' },
     name: 'Respond before the workflow completes',
@@ -199,6 +206,7 @@ export function initialOperations(id: string): ChangeOperation[] {
     id == 'node-errors' ||
     id == 'node-retries' ||
     id == 'workflow-call' ||
+    id == 'workflow-tools' ||
     id == 'workflow-outputs' ||
     id == 'start-parameters' ||
     id == 'connector-responses' ||
@@ -391,7 +399,8 @@ export function samples(id: string, stage = 0): Sample[] {
     }))
   if (id == 'node-errors') return [{ name: 'handled-and-successful', orders: [], order }]
   if (id == 'node-retries') return [{ name: 'configured-and-cleared', orders: [], order }]
-  if (id == 'workflow-call') return [0, -2.5, 12.5].map((amount) => ({ name: String(amount), orders: [], order, outputs: { amount } }))
+  if (id == 'workflow-call' || id == 'workflow-tools')
+    return [0, -2.5, 12.5].map((amount) => ({ name: String(amount), orders: [], order, outputs: { amount } }))
   if (id == 'workflow-outputs' || id == 'start-parameters') {
     const cases: Pick<Sample, 'name' | 'outputs'>[] = [
       { name: 'zero-and-omitted', outputs: { message: 'Created', amount: 0 } },
@@ -508,6 +517,21 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
       cleared.retry === undefined
       ? []
       : ['Preserve the configured retry count and explicitly clear the other retry policy.']
+  }
+  if (id == 'workflow-tools') {
+    const nodes = Object.values(current.document.graph.nodes)
+    return nodes.some(
+      (candidate) => candidate.kind == 'task' && 'moduleId' in candidate.task && candidate.task.capabilities?.some((item) => item.kind == 'workflow'),
+    ) &&
+      nodes.some(
+        (candidate) =>
+          candidate.kind == 'task' &&
+          'executor' in candidate.task &&
+          candidate.task.executor.kind == 'agent' &&
+          candidate.task.executor.tools.some((tool) => tool.kind == 'workflow'),
+      )
+      ? []
+      : ['Configure workflow tools on both Agent and Code nodes.']
   }
   if (id == 'workflow-call')
     return Object.values(current.document.graph.nodes).filter(

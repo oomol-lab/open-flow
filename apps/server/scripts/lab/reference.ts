@@ -173,6 +173,75 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
     await call('flow_check', { flowId, revisionId: savedRevision })
     return
   }
+  if (id == 'workflow-tools') {
+    await call('flow_schema', { type: 'code' })
+    await call('flow_schema', { type: 'agent' })
+    const catalog = await call('flow_list', {})
+    const target = (catalog.flows as { flowId: string; name: string }[]).find((flow) => flow.name == 'Lab double')
+    if (target == null) throw new Error('Published target not found')
+    const before = await read()
+    await submit(before.revision, [
+      { op: 'node.add', as: 'start', type: 'start', name: 'Start', config: { inputDefs: { amount: { schema: { type: 'number' }, nullable: false } } } },
+      {
+        op: 'node.add',
+        as: 'code',
+        type: 'code',
+        name: 'Code workflow',
+        config: {
+          outputs: { total: { schema: { type: 'number' }, nullable: false } },
+          capabilities: [{ kind: 'workflow', name: 'double', flowId: target.flowId }],
+        },
+        code: "export default async ({ amount }, context) => context.workflows.call('double', { amount })",
+        inputs: { amount: { kind: 'output', node: '$start', port: 'amount' } },
+      },
+      {
+        op: 'node.add',
+        as: 'agent',
+        type: 'agent',
+        name: 'Agent workflow',
+        config: {
+          model: 'lab-model',
+          inputs: { amount: { schema: { type: 'number' }, nullable: false } },
+          tools: [
+            {
+              kind: 'workflow',
+              name: 'double_workflow',
+              flowId: target.flowId,
+              description: 'Double the supplied amount.',
+              approval: false,
+              inputs: { amount: { kind: 'input', input: 'amount' } },
+            },
+          ],
+        },
+        prompt: 'Call double_workflow once and summarize the result.',
+        inputs: { amount: { kind: 'output', node: '$start', port: 'amount' } },
+      },
+      {
+        op: 'node.add',
+        as: 'outputs',
+        type: 'outputs',
+        name: 'Outputs',
+        config: { outputDefs: { total: { schema: { type: 'number' }, nullable: false } } },
+        inputs: { total: { kind: 'output', node: '$code', port: 'total' } },
+      },
+      { op: 'edge.connect', source: '$start', target: '$code' },
+      { op: 'edge.connect', source: '$start', target: '$agent' },
+      { op: 'edge.connect', source: '$code', target: '$outputs' },
+      { op: 'edge.connect', source: '$agent', target: '$outputs' },
+    ])
+    const code = await find('Code workflow'),
+      agent = await find('Agent workflow')
+    const saved = await read()
+    await submit(saved.revision, [
+      { op: 'node.update', node: code, set: { name: 'Code workflow updated' } },
+      { op: 'node.update', node: agent, set: { name: 'Agent workflow updated' } },
+      { op: 'node.refresh', node: code, tool: 'double' },
+      { op: 'node.refresh', node: agent, tool: 'double_workflow' },
+    ])
+    await read([code, agent])
+    await call('flow_check', { flowId, revisionId: savedRevision })
+    return
+  }
   if (id == 'workflow-call') {
     await call('flow_schema', { type: 'workflow' })
     const catalog = await call('flow_list', {})

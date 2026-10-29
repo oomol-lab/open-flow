@@ -76,6 +76,7 @@ export function authoringDiagnosticField(node: GraphNode | undefined, parts: rea
           if (tool == null) return 'config.tools'
           const base = `config.tools.${location[2]}`
           if (location[3] == 'id') return base
+          if (tool.kind == 'workflow' && (location[3] == 'revisionId' || location[3] == 'outputs')) return `${base}.flowId`
           if (location[3] == 'inputs') {
             const input = tool.inputs[Number(location[4])]
             if (input == null) return `${base}.inputs`
@@ -86,6 +87,13 @@ export function authoringDiagnosticField(node: GraphNode | undefined, parts: rea
       }
       return ['config', ...location.slice(1)].join('.')
     }
+    if (
+      head == 'capabilities' &&
+      'moduleId' in task &&
+      task.capabilities?.[Number(location[1])]?.kind == 'workflow' &&
+      ['revisionId', 'inputs', 'outputs'].includes(location[2] ?? '')
+    )
+      return `config.capabilities.${location[1]}.flowId`
     if (head == 'capabilities') return ['config', ...location].join('.')
     if (head == 'name') return 'name'
     return 'config'

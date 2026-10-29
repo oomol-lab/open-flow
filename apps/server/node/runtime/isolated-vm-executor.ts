@@ -1,4 +1,4 @@
-import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { TaskCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { RuntimeCapabilityResponse, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
 import type { FlowRunOutcome, SchedulerEvent, TaskInvocation, WaitOperation, WaitResolution } from '@oomol-lab/open-flow/scheduler'
 import type * as Scope from 'effect/Scope'
@@ -6,7 +6,7 @@ import type IsolatedVM from 'isolated-vm'
 import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, IsolatedVmLimits, ParentMessage } from './isolated-vm.ts'
 
 import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
-import { createActions, findEngineContract, snapshotRuntimeResult } from '@oomol-lab/open-flow/runtime-contract'
+import { createActions, createWorkflows, findEngineContract, snapshotRuntimeResult } from '@oomol-lab/open-flow/runtime-contract'
 import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
@@ -209,10 +209,13 @@ async function invoke(kind, payload) {
   }
   return result.value
 }
+const snapshotRuntimeResult = ${snapshotRuntimeResult.toString()}
+const createWorkflows = ${createWorkflows.toString()}
 const createActions = ${createActions.toString()}
 export const capability = Object.freeze({
   getPrevious: () => invoke('previous', null),
   actions: createActions((payload) => invoke('connector', payload)),
+  workflows: createWorkflows((payload) => invoke('workflow', payload)),
   artifact: Object.freeze({
     open: (reference) => invoke('artifact.open', reference),
     put: (input) => invoke('artifact.put', input),
@@ -224,8 +227,8 @@ function installGlobals(
   ivm: typeof IsolatedVM,
   context: IsolatedVM.Context,
   request: { readonly invocationId: string; readonly limits: IsolatedVmLimits },
-  call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
-  capabilities: readonly ConnectorCapability[],
+  call: (invocationId: string, capabilities: readonly TaskCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
+  capabilities: readonly TaskCapability[],
   log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
 ): { readonly close: () => boolean; readonly failure: () => unknown; readonly flush: () => Promise<void> } {
   const timers = new Map<number, { readonly fire: IsolatedVM.Reference<() => void>; readonly timer: ReturnType<typeof setTimeout> }>()
@@ -316,7 +319,8 @@ function installGlobals(
         void call(request.invocationId, capabilities, capabilityCall.kind, capabilityCall.payload).then(
           (result) => settleResult({ id: 0, ok: true, type: 'capability.result', value: result }),
           (error) => {
-            if (['runtime.limit-exceeded', 'connector.indeterminate'].includes(String(Reflect.get(Object(error), 'schedulerCode')))) capabilityFailure = error
+            if (['runtime.limit-exceeded', 'connector.indeterminate', 'workflow.indeterminate'].includes(String(Reflect.get(Object(error), 'schedulerCode'))))
+              capabilityFailure = error
             settleResult({
               code: (error as { code?: string; schedulerCode?: string }).schedulerCode ?? (error as { code?: string }).code,
               catchable: Reflect.get(Object(error), 'catchable') === true,
@@ -471,7 +475,7 @@ function readResult(
     readonly void?: boolean
   }
   if (capabilityFailure != null) {
-    if (Reflect.get(Object(capabilityFailure), 'schedulerCode') == 'connector.indeterminate') throw capabilityFailure
+    if (['connector.indeterminate', 'workflow.indeterminate'].includes(Reflect.get(Object(capabilityFailure), 'schedulerCode'))) throw capabilityFailure
     throw new IsolatedVmError('limit-exceeded', normalizedError(capabilityFailure).message)
   }
   const returnedValue = Object.hasOwn(result, 'value') && result.void === undefined
@@ -493,8 +497,8 @@ function readResult(
 async function execute(
   request: InvokeRequest,
   canceled: AbortSignal,
-  call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
-  capabilities: readonly ConnectorCapability[] = [],
+  call: (invocationId: string, capabilities: readonly TaskCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
+  capabilities: readonly TaskCapability[] = [],
   preserveCapabilityFailure = false,
   log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
 ): Promise<JsonValue | undefined> {
@@ -557,8 +561,8 @@ async function execute(
 
 function executeEffect(
   request: InvokeRequest,
-  call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Effect.Effect<BridgeResponse, Error>,
-  capabilities: readonly ConnectorCapability[] = [],
+  call: (invocationId: string, capabilities: readonly TaskCapability[], kind: string, payload: JsonValue) => Effect.Effect<BridgeResponse, Error>,
+  capabilities: readonly TaskCapability[] = [],
   preserveCapabilityFailure = false,
   log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Effect.Effect<void, Error>,
 ): Effect.Effect<JsonValue | undefined, Error, Scope.Scope> {
@@ -585,10 +589,12 @@ function executeFlow(
   call: (
     message:
       | {
-          readonly capabilities?: readonly ConnectorCapability[]
+          readonly capabilities?: readonly TaskCapability[]
           readonly invocationId: string
           readonly kind: string
           readonly payload: JsonValue
+          readonly nodeId?: string
+          readonly jobId?: string
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
@@ -645,7 +651,7 @@ function executeFlow(
               },
               (invocationId, capabilities, kind, payload) => {
                 if (kind == 'previous') return Effect.sync(invocation.getPrevious)
-                return remote(call({ capabilities, invocationId, kind, payload, type: 'capability' })).pipe(
+                return remote(call({ capabilities, invocationId, nodeId: invocation.nodeId, jobId: invocation.jobId, kind, payload, type: 'capability' })).pipe(
                   Effect.map((response) => response as RuntimeCapabilityResponse),
                 )
               },
@@ -689,10 +695,12 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
   const call = (
     message:
       | {
-          readonly capabilities?: readonly ConnectorCapability[]
+          readonly capabilities?: readonly TaskCapability[]
           readonly invocationId: string
           readonly kind: string
           readonly payload: JsonValue
+          readonly nodeId?: string
+          readonly jobId?: string
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }

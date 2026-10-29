@@ -37,7 +37,7 @@ export function connectionUsage(document: FlowDocument): readonly ConnectionUsag
       }
     }
     if (task?.executor.kind == 'agent') {
-      for (const tool of task.executor.tools) add('agent', tool.action, tool.connectionId)
+      for (const tool of task.executor.tools) if (tool.kind != 'workflow') add('agent', tool.action, tool.connectionId)
       const notification = task.executor.notification
       if (notification != null) add('notification', notification.action, notification.connectionId)
     }
@@ -93,6 +93,7 @@ export function clearNodeConnections(graph: FlowDocument['graph'], connectionId?
           return [id, node]
         }
         const capabilities = node.task.capabilities?.map((capability) => {
+          if (capability.kind == 'workflow') return capability
           if (!('mode' in capability)) {
             if ('action' in capability) {
               const { connectionId: selected, ...rest } = capability

@@ -1,13 +1,15 @@
 import type { ComponentProps, ReactElement, ReactNode, SetStateAction } from 'react'
+import type { AgentTool } from '../../../../flow/common/change.ts'
 import type { InputPort, ManagedTaskDefinition, ManagedTaskExecutor } from '../../../../flow/common/change.ts'
 import type { ConnectorConnection } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
+import type { WorkflowToolSelection } from './workflowToolSelection.tsx'
 
 import { dequal } from 'dequal/lite'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { currentFlowModelVersion } from '../../../../flow/common/change.ts'
@@ -17,11 +19,13 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel, FieldDescription } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
+import { workflowAgentTool } from '../../../../workflow/common/workflow.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
 import { agentFixedValuesValid } from './agentChanges.ts'
 import { AgentTools } from './agentTools.tsx'
 import { PromptEditor } from './promptEditor.tsx'
 import { TaskExecutorChanges } from './taskExecutorChanges.ts'
+import { availableWorkflowToolName } from './workflowToolSelection.tsx'
 
 const AgentSettingsContext = createContext<{ prompt: ReactNode; advanced: ReactNode } | null>(null)
 
@@ -111,6 +115,15 @@ function EditableAgentSettingsProvider({
     renderConfig(changes.value)
     if (commit) save()
   }
+  const workflowTools = useMemo<WorkflowToolSelection<AgentTool>>(
+    () => ({
+      list: (signal) => store.listWorkflowTargets(signal),
+      load: (targetId, signal) => store.loadWorkflowContract(targetId, signal),
+      create: (target, entries) => workflowAgentTool(crypto.randomUUID(), availableWorkflowToolName(target, entries), target),
+      refresh: (entry, target) => (entry.kind == 'workflow' ? workflowAgentTool(entry.id, entry.name, target, entry) : entry),
+    }),
+    [store],
+  )
   const revision = useVal(store.$.revision)
   if (config.kind != 'agent' || revision == null) return <>{children}</>
   return (
@@ -120,6 +133,7 @@ function EditableAgentSettingsProvider({
       config={config}
       nodeId={nodeId}
       toolsEditor={{
+        workflows: workflowTools,
         connectors,
         prepareAction,
         notify: store.notify,

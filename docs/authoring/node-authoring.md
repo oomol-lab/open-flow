@@ -30,6 +30,20 @@ Start owns `inputDefs`, edited through its public `config.inputDefs` named field
 
 Call Workflow has public type `workflow` and config `{ flowId }`. The platform reads the target's current published interface snapshot and stores capability-derived Task ports. Ordinary updates preserve that snapshot; `node.refresh` reloads it. A changed Revision with an equal interface remains callable without mutating the caller. Changed interfaces require refresh; named schemas and nullability determine equality, while descriptions and port ordering do not. Refresh matches fields by exact name and retains unresolved output references for diagnostics. Callers do not reconstruct executor identities or inspect another workflow's graph.
 
+Agent `config.tools` also accepts `{ kind: "workflow", flowId, name, description, approval, inputs }`.
+`inputs` maps target parameter names to fixed values, node inputs or model arguments, using the same
+sources as connector tools. Code `config.capabilities` accepts `{ kind: "workflow", flowId, name }`
+alongside existing connector declarations. The platform derives both input and output definitions.
+`context.workflows.call(name, input)` returns business outputs, or `{}` when the target has no Outputs.
+The code editor uses the saved interface for alias, input and output completion. Undeclared aliases
+and unknown parameters are rejected at runtime; code text does not grant access to workflows.
+
+Ordinary edits retain each tool's interface snapshot. Use
+`{ op: "node.refresh", node: "NODE_ID", tool: "TOOL_NAME" }` to refresh one selected tool.
+Refresh preserves Agent parameter sources by exact parameter name. Renaming an unambiguous tool
+preserves its saved interface and inputs. Read responses expose business configuration rather than
+Revision IDs or derived ports. Tool declarations participate in references and dependency checks.
+
 A workflow cannot target itself; draft writes reject direct self-references, including disconnected calls.
 Selection may retain an owned unpublished, disabled or Start-less target as an incomplete draft. Interface reads and checks report the unavailable target; execution rechecks current Live admission. A missing saved snapshot requires explicit refresh. No Outputs node means no declared business outputs and does not prevent calling a Start entry.
 

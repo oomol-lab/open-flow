@@ -9,7 +9,7 @@ import type {
   FlowCanvasViewOutput,
   FlowCanvasViewTriggerNode,
 } from '../../../canvas/browser/graph/FlowCanvas/model.ts'
-import type { ConditionOperand } from '../../../flow/common/change.ts'
+import type { ConditionOperand, WorkflowCapability } from '../../../flow/common/change.ts'
 import type { ConnectorProvider, Diagnostic, Draft, GraphNode, Group, JsonValue, Run, RunDetails, RunEvent, TaskDefinition, TriggerNode } from './api.ts'
 import type { Point, DesignerViewport } from './canvasPresentation.ts'
 import type { ConnectionCatalog, ConnectorActionView } from './connectionCatalog.ts'
@@ -623,7 +623,9 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
         ...(task != null && 'moduleId' in task
           ? {
               actionSummary: actionSummary(
-                (task.capabilities ?? []).flatMap((capability) => ('mode' in capability && capability.mode === 'independent' ? capability.actions : [])),
+                (task.capabilities ?? []).flatMap((capability): readonly ({ readonly action: string } | WorkflowCapability)[] =>
+                  capability.kind == 'workflow' ? [capability] : 'mode' in capability && capability.mode === 'independent' ? capability.actions : [],
+                ),
                 context.connectorActions,
                 Object.values(context.providers),
               ),

@@ -1,4 +1,4 @@
-import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { TaskCapability, WorkflowCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-lab/open-flow/runtime-contract'
@@ -21,9 +21,11 @@ import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
 import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { OpenApiTaskError, executeOpenApi } from '../deployment/openapi.ts'
+import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { errorKind } from '../logger.ts'
 import { supportsIsolatedVmEngine, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
+import { workflowRunOutcome } from './workflow.ts'
 
 const encoder = new TextEncoder()
 const nodeFailureCodes: ReadonlySet<string> = new Set([
@@ -39,6 +41,10 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'connector.unconfigured',
   'llm.output-invalid',
   'llm.unavailable',
+  'workflow.failed',
+  'workflow.canceled',
+  'workflow.indeterminate',
+  'workflow.unavailable',
   'node.failed',
   'node.input-invalid',
   'webhook.response-status-invalid',
@@ -78,6 +84,13 @@ export class RunExecutor {
   readonly #runChanged: (flowId: string, runId: string) => void
   readonly #wakeMaintenance: () => void
   readonly #invokeWorkflow: RunControl['invokeWorkflow']
+  readonly #invokeWorkflowTarget: RunControl['invokeWorkflowTarget']
+  readonly #subscribeRun: (flowId: string, runId: string, changed: () => void) => () => void
+  readonly waitingWorkflows = new Set<string>()
+  readonly #pendingWorkflowCalls = new Map<string, number>()
+  readonly workflowResumptions = new Map<string, () => void>()
+  readonly #workflowResumeWaiters = new Map<string, Set<() => void>>()
+  readonly #toolCalls = new Map<string, { runId: string; jobId: string; abort: AbortController }>()
 
   constructor(
     store: Store,
@@ -90,7 +103,11 @@ export class RunExecutor {
     runChanged: (flowId: string, runId: string) => void,
     wakeMaintenance: () => void,
     invokeWorkflow: RunControl['invokeWorkflow'],
+    invokeWorkflowTarget: RunControl['invokeWorkflowTarget'],
+    subscribeRun: (flowId: string, runId: string, changed: () => void) => () => void,
   ) {
+    this.#invokeWorkflowTarget = invokeWorkflowTarget
+    this.#subscribeRun = subscribeRun
     this.#invokeWorkflow = invokeWorkflow
     this.#store = store
     this.#isolatedVm = isolatedVm
@@ -256,9 +273,10 @@ export class RunExecutor {
       }
       yield* this.#isolatedVm
         .run(flow, {
-          capability: (capabilities, call) => this.#invokeCapability(capabilities, call, this.#connectorContext(run, 'execute')),
+          capability: (capabilities, call) => this.#invokeCapability(capabilities, call, this.#connectorContext(run, 'execute'), run, flow),
           emit: async (event) => {
             if (event.type == 'run.started' && event.runId == run.runId) return
+            if ((event.type == 'node.completed' || event.type == 'node.failed') && 'jobId' in event) this.#cancelNodeTools(run.runId, event.jobId)
             const projected = await projectEvent(event)
             if (projected != null && this.#store.runs.append(run.runId, projected)) this.#runChanged(run.flowId, run.runId)
           },
@@ -304,8 +322,14 @@ export class RunExecutor {
             })
           },
           projectFailure: (error) => {
-            if (error instanceof ConnectorTaskError || error instanceof OpenApiTaskError) indeterminate ||= error.indeterminate
-            if (error instanceof ConnectorTaskError || error instanceof TaskHostError || error instanceof OpenApiTaskError)
+            if (error instanceof ConnectorTaskError || error instanceof OpenApiTaskError || error instanceof WorkflowToolError)
+              indeterminate ||= error.indeterminate
+            if (
+              error instanceof ConnectorTaskError ||
+              error instanceof TaskHostError ||
+              error instanceof OpenApiTaskError ||
+              error instanceof WorkflowToolError
+            )
               return { code: error.code, message: error.message, retryable: error.retryable, catchable: error.catchable }
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
           },
@@ -397,6 +421,7 @@ export class RunExecutor {
           },
           { providerId: 'gateway', modelId: executor.model, url: new URL('v1/', model.origin).href, apiKey: model.token },
           async (tool, input, callId, signal) => {
+            if (tool.kind == 'workflow') return this.#invokeWorkflowTool(run, invocation.nodeId, invocation.jobId, callId, tool, input, signal, node.timeoutMs)
             if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
             await checkCodeActions(
               [{ kind: 'connector', action: tool.action, connections: tool.connectionId == null ? [] : [{ connectionId: tool.connectionId }] }],
@@ -476,14 +501,51 @@ export class RunExecutor {
   }
 
   async #invokeCapability(
-    capabilities: readonly ConnectorCapability[],
+    capabilities: readonly TaskCapability[],
     call: RuntimeCapabilityCall,
     access: Exclude<ConnectorAccessContext, { readonly scope: 'catalog' }>,
+    run: StoredRun,
+    flow: PreparedFlow,
   ): Promise<RuntimeCapabilityResponse> {
+    if (call.kind == 'workflow') {
+      const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
+      if (node?.kind != 'task' || !('moduleId' in node.task) || call.jobId == null)
+        throw new TaskHostError('capability.denied', 'Workflow tools require a Code node invocation.')
+      const payload = call.payload as { name?: unknown; input?: unknown } | null
+      if (
+        payload == null ||
+        typeof payload != 'object' ||
+        Array.isArray(payload) ||
+        typeof payload.name != 'string' ||
+        payload.input == null ||
+        typeof payload.input != 'object' ||
+        Array.isArray(payload.input)
+      )
+        throw new TaskHostError('capability.invalid', 'Workflow name and input object are required.')
+      const target = node.task.capabilities?.find((item) => item.kind == 'workflow' && item.name == payload.name)
+      if (target?.kind != 'workflow') throw new TaskHostError('capability.denied', 'The workflow is not declared for this Code node.')
+      return {
+        status: 200,
+        body: await this.#invokeWorkflowTool(
+          run,
+          call.nodeId!,
+          call.jobId,
+          call.callId,
+          target,
+          payload.input as Readonly<Record<string, JsonValue>>,
+          call.signal,
+          node.timeoutMs,
+        ),
+      }
+    }
+
     if (call.kind != 'connector') throw new TaskHostError('capability.denied', 'The Runtime Capability is not declared for this Task.')
     let payload: ReturnType<typeof resolveAction>
     try {
-      payload = resolveAction(capabilities, call.payload)
+      payload = resolveAction(
+        capabilities.filter((item) => item.kind == 'connector'),
+        call.payload,
+      )
     } catch (error) {
       const failure = error as Error & { code: TaskErrorCode }
       if (failure.code == 'capability.denied' || failure.code == 'capability.invalid') throw new TaskHostError(failure.code, failure.message)
@@ -512,6 +574,103 @@ export class RunExecutor {
         providerId: payload.action.split('.')[0],
       }),
       status: 200,
+    }
+  }
+
+  #resumeWorkflowCaller(runId: string, signal: AbortSignal): Promise<void> {
+    if (!this.waitingWorkflows.has(runId)) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const waiters = this.#workflowResumeWaiters.get(runId) ?? new Set<() => void>()
+      const finish = () => {
+        signal.removeEventListener('abort', finish)
+        waiters.delete(finish)
+        if (!waiters.size) {
+          this.#workflowResumeWaiters.delete(runId)
+          this.workflowResumptions.delete(runId)
+          if (!this.#pendingWorkflowCalls.has(runId)) this.waitingWorkflows.delete(runId)
+        }
+        resolve()
+      }
+      waiters.add(finish)
+      this.#workflowResumeWaiters.set(runId, waiters)
+      this.workflowResumptions.set(runId, () => {
+        if (!this.#pendingWorkflowCalls.has(runId)) this.waitingWorkflows.delete(runId)
+        for (const resume of waiters) resume()
+      })
+      signal.addEventListener('abort', finish, { once: true })
+      if (signal.aborted) finish()
+      this.#wakeMaintenance()
+    })
+  }
+
+  #cancelNodeTools(runId: string, jobId: string): void {
+    for (const call of this.#toolCalls.values()) if (call.runId == runId && call.jobId == jobId) call.abort.abort(new Error('Calling node ended.'))
+  }
+
+  async #invokeWorkflowTool(
+    run: StoredRun,
+    nodeId: string,
+    jobId: string,
+    callId: string,
+    target: WorkflowCapability,
+    input: Readonly<Record<string, JsonValue>>,
+    parentSignal: AbortSignal,
+    timeoutMs?: number,
+  ): Promise<Readonly<Record<string, JsonValue>>> {
+    const key = JSON.stringify([run.runId, jobId, callId])
+    const abort = new AbortController()
+    const signal = AbortSignal.any([parentSignal, abort.signal])
+    this.#toolCalls.set(key, { runId: run.runId, jobId, abort })
+    let childRunId: string | undefined
+    try {
+      signal.throwIfAborted()
+      const result = await this.#invokeWorkflowTarget(run, nodeId, jobId, input, target, { callId, timeoutMs })
+      if (result.kind == 'completed') return result.outputs
+      childRunId = result.childRunId
+      signal.throwIfAborted()
+      this.#pendingWorkflowCalls.set(run.runId, (this.#pendingWorkflowCalls.get(run.runId) ?? 0) + 1)
+      this.waitingWorkflows.add(run.runId)
+      this.#wakeMaintenance()
+      try {
+        return await new Promise<Readonly<Record<string, JsonValue>>>((resolve, reject) => {
+          let unsubscribe: (() => void) | undefined
+          let settled = false
+          const finish = (error?: Error, output?: Readonly<Record<string, JsonValue>>) => {
+            if (settled) return
+            settled = true
+            unsubscribe?.()
+            signal.removeEventListener('abort', canceled)
+            if (error) reject(error)
+            else resolve(output ?? {})
+          }
+          const canceled = () => finish(new WorkflowToolError('workflow.canceled', 'Workflow tool call was canceled.'))
+          const inspect = () => {
+            const child = this.#store.runViews.controlRun(childRunId!)
+            if (child == null) return finish(new WorkflowToolError('workflow.unavailable', 'Called Run is unavailable.'))
+            const outcome = workflowRunOutcome(child)
+            if (outcome.kind == 'completed') return finish(undefined, outcome.outputs)
+            if (outcome.kind != 'calling') finish(new WorkflowToolError(`workflow.${outcome.kind}`, outcome.message))
+          }
+          unsubscribe = this.#subscribeRun(target.flowId, childRunId!, inspect)
+          if (settled) unsubscribe()
+          else {
+            signal.addEventListener('abort', canceled, { once: true })
+            if (signal.aborted) canceled()
+            else inspect()
+          }
+        })
+      } finally {
+        const pending = (this.#pendingWorkflowCalls.get(run.runId) ?? 1) - 1
+        if (pending == 0) this.#pendingWorkflowCalls.delete(run.runId)
+        else this.#pendingWorkflowCalls.set(run.runId, pending)
+        await this.#resumeWorkflowCaller(run.runId, signal)
+      }
+    } finally {
+      this.#toolCalls.delete(key)
+      if (childRunId != null && this.#store.runs.cancel(childRunId)) {
+        this.#runChanged(target.flowId, childRunId)
+        this.#wakeMaintenance()
+      }
     }
   }
 

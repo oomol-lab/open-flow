@@ -1,7 +1,7 @@
 import type { ReadonlyVal } from 'value-enhancer'
 import type { EventSource } from '../../../../control/common/api.ts'
 import type { WaitAutoContinue } from '../../../../flow/common/change.ts'
-import type { ConnectorCapability } from '../../../../flow/common/change.ts'
+import type { TaskCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { GraphNode, InputPort, Port, JsonValue, TriggerSchedule } from '../api.ts'
 import type { ConditionSettings, TaskPorts, FlowChanges, TaskSettings, ValueSettings, WebhookSettings } from '../editor/flowChanges.ts'
@@ -221,7 +221,7 @@ export class NodeEdits {
     return changes.length == 0 || (await this.save(changes))
   }
 
-  public async setCodeActions(nodeId: string, capabilities: readonly ConnectorCapability[]): Promise<boolean> {
+  public async setCodeActions(nodeId: string, capabilities: readonly TaskCapability[]): Promise<boolean> {
     const revision = this.revision.value
     if (revision == null) return false
     const changes = changeCodeActions(revision.revision.content, nodeId, capabilities)

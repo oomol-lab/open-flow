@@ -1,7 +1,7 @@
 # Node compatibility runtime contract
 
-`open-flow-engine/v7/nodejs-compat-v1` extends the v2 execution model with a fixed builtin module
-allowlist. The existing `open-flow-engine/v7` contract is unchanged. Deployments advertise this
+`open-flow-engine/v8/nodejs-compat-v1` extends the v2 execution model with a fixed builtin module
+allowlist. The base `open-flow-engine/v8` contract remains available. Deployments advertise this
 additional contract only when they implement it; Server does not automatically opt into it.
 
 The published `open-flow-engine/v6` and `open-flow-engine/v6/nodejs-compat-v1` remain supported for
@@ -40,3 +40,13 @@ AI Decision Tasks. Hosts preserve trusted `catchable` separately from `retryable
 classification forbids handling. Resource limits, cancellation, deadlines, protocol/isolation and
 indeterminate failures cannot be handled. System outputs use an independent namespace and are
 available to downstream inputs and `getPrevious().systemOutputs`; they do not add execution ports.
+
+## Workflow tools
+
+Engine v8 exposes `context.workflows.call(alias, input)` for explicitly declared workflow
+capabilities. Each call creates an independently identified child Run against current Live, after
+ownership, interface, input and recursion checks. Results contain only workflow business outputs;
+a workflow without Outputs returns `{}`. Concurrent calls, including `Promise.all`, are supported.
+The calling node remains active and its deadline continues during child Wait or approval. These
+in-memory calls are not restartable JavaScript checkpoints. Ending the node or parent cancels
+unfinished calls; unconfirmed execution remains indeterminate after restart.

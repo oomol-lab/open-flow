@@ -242,7 +242,7 @@ export const workflowCallStories: FrontendStory[] = [
     group: 'Node Workflow',
     title: 'Select workflow',
     description:
-      'Targets exclude the current workflow. Group status dots are green for available, amber for published without Start, and gray for unpublished or unavailable. Toggle available targets and reopen the list to inspect the persistent empty group. Search filters each group. Unavailable targets remain selectable; publish the draft target to test recovery.',
+      'Targets exclude the current workflow. Check compact spacing between each heading and its first item or empty state, shared with the Agent and Code tool picker. Group status dots are green for available, amber for published without Start, and gray for unpublished or unavailable. Toggle available targets and reopen the list to inspect the persistent empty group. Search filters each group. Unavailable targets remain selectable; publish the draft target to test recovery.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory empty log={log} dark={dark} language={language} />,
   },

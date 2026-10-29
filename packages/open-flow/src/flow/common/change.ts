@@ -6,7 +6,7 @@ import type { RetryConfiguration } from './retry.ts'
 import type { WebhookMethod } from './webhookMethod.ts'
 
 import { dequal } from 'dequal/lite'
-import { currentFlowModelVersion, decodeRevisionContent } from './changeSchema.ts'
+import { authoringDefinitionSchemas, currentFlowModelVersion, decodeRevisionContent } from './changeSchema.ts'
 import { nodeInputMappings, setConditionInput } from './condition.ts'
 import { supportsNodeErrorHandling } from './errorHandling.ts'
 import { supportsNodeRetry } from './retry.ts'
@@ -190,14 +190,56 @@ export type ManagedTaskExecutor =
 
 export type AgentInput = { readonly kind: 'value'; readonly value: JsonValue } | { readonly kind: 'input'; readonly input: string } | { readonly kind: 'model' }
 
-export interface AgentTool {
+interface AgentToolBase {
   readonly id: string
   readonly name: string
   readonly description: string
-  readonly action: string
-  readonly connectionId?: string
   readonly approval: boolean
   readonly inputs: readonly (InputPort & { readonly source: AgentInput })[]
+}
+
+export interface AgentConnectorTool extends AgentToolBase {
+  readonly kind?: 'connector'
+  readonly action: string
+  readonly connectionId?: string
+}
+
+export interface WorkflowCapability {
+  readonly kind: 'workflow'
+  readonly name: string
+  readonly flowId: string
+  readonly revisionId: string
+  readonly inputs: readonly Port[]
+  readonly outputs: readonly Port[] | null
+}
+
+export interface AgentWorkflowTool extends AgentToolBase, Omit<WorkflowCapability, 'inputs'> {
+  readonly action?: never
+  readonly connectionId?: never
+}
+
+export type AgentTool = AgentConnectorTool | AgentWorkflowTool
+export type TaskCapability = ConnectorCapability | WorkflowCapability
+
+export const workflowToolNamePattern = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/
+
+export function workflowToolNameIssue(name: string, otherNames: Iterable<string> = []): 'invalid' | 'duplicate' | undefined {
+  if (!workflowToolNamePattern.test(name)) return 'invalid'
+  for (const other of otherNames) if (other == name) return 'duplicate'
+}
+
+export function decodeTaskCapabilities(value: unknown): readonly TaskCapability[] {
+  if (!Array.isArray(value)) throw new TypeError('Task capabilities must be an array.')
+  const parsed = authoringDefinitionSchemas.capabilities.parse(value)
+  const connectors = decodeConnectorCapabilities(parsed.filter((item) => item.kind == 'connector'))
+  const names = new Set<string>()
+  for (const item of parsed) {
+    if (item.kind != 'workflow') continue
+    if (workflowToolNameIssue(item.name, names)) throw new TypeError('Workflow tool names must be unique provider-compatible names.')
+    names.add(item.name)
+  }
+  let connectorIndex = 0
+  return parsed.map((item) => (item.kind == 'connector' ? connectors[connectorIndex++]! : item)) as readonly TaskCapability[]
 }
 
 export interface ConnectorAccessCapability {
@@ -353,7 +395,7 @@ interface TaskDefinitionBase {
 }
 
 export interface InlineTaskDefinition extends TaskDefinitionBase {
-  readonly capabilities?: readonly ConnectorCapability[]
+  readonly capabilities?: readonly TaskCapability[]
   readonly moduleId: string
 }
 
@@ -488,7 +530,7 @@ export interface CodeModule {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 
@@ -550,11 +592,11 @@ export function nodeNameIssue(graph: Graph, nodeId: string, value: string): 'dup
 export type ChangeOperation =
   | { readonly kind: 'graph.node.replace'; readonly nodeId: string; readonly before: GraphNode; readonly node: GraphNode }
   | {
-      readonly before?: readonly ConnectorCapability[]
+      readonly before?: readonly TaskCapability[]
       readonly kind: 'graph.node.task.capabilities.set'
       readonly nodeId: string
 
-      readonly value?: readonly ConnectorCapability[]
+      readonly value?: readonly TaskCapability[]
     }
   | { readonly kind: 'graph.trigger.sources.set'; readonly nodeId: string; readonly before?: readonly string[]; readonly value?: readonly string[] }
   | { readonly binding: FlowDocument['bindings'][string]; readonly bindingId: string; readonly kind: 'binding.create' }
@@ -759,7 +801,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (!dequal(graph.nodes[operation.nodeId], operation.before)) invalid('The Node changed before this operation was applied.')
         if (operation.node.kind != operation.before.kind) invalid('Replacing a Node cannot change its kind.')
         if (operation.node.kind == 'task' && 'moduleId' in operation.node.task && operation.node.task.capabilities !== undefined)
-          decodeConnectorCapabilities(operation.node.task.capabilities)
+          decodeTaskCapabilities(operation.node.task.capabilities)
         const name = normalizeNodeName(operation.node.name ?? '')
         const issue = nodeNameIssue(graph, operation.nodeId, name)
         if (issue != null) invalid(`Node name is ${issue}.`)
@@ -779,7 +821,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
           invalid('A graph can contain only one Start Trigger.')
         }
         if (operation.node.kind == 'task' && 'moduleId' in operation.node.task && operation.node.task.capabilities !== undefined)
-          decodeConnectorCapabilities(operation.node.task.capabilities)
+          decodeTaskCapabilities(operation.node.task.capabilities)
         if (operation.node.name == null) invalid('A Node name cannot be empty.')
         if (operation.node.kind == 'outputs' && Object.values(graph.nodes).some((node) => node.kind == 'outputs'))
           invalid('A graph can contain only one Outputs node.')
@@ -861,7 +903,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (!dequal(node.task.capabilities, operation.before)) invalid('The inline Task capabilities changed before this operation was applied.')
         const task = { ...node.task }
         if (operation.value === undefined) delete task.capabilities
-        else task.capabilities = decodeConnectorCapabilities(operation.value)
+        else task.capabilities = decodeTaskCapabilities(operation.value)
         Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, task } } } })
         break
       }

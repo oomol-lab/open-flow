@@ -1,15 +1,34 @@
-import type { ConnectorAccessCapability, ConnectorCapability } from '../../../../flow/common/change.ts'
+import type { ConnectorAccessCapability, TaskCapability, Port } from '../../../../flow/common/change.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { TaskPorts } from './flowChanges.ts'
 
 import { generateTyping, typescriptOf } from './generateTyping.ts'
 
+function workflowPortType(ports: readonly Port[]) {
+  return typescriptOf(
+    {
+      type: 'object',
+      properties: Object.fromEntries(ports.map((port) => [port.handle, port.nullable ? { anyOf: [port.jsonSchema, { type: 'null' }] } : port.jsonSchema])),
+      required: ports.filter((port) => !port.nullable).map((port) => port.handle),
+      additionalProperties: false,
+    },
+    false,
+  )
+}
+
 export function codeTyping(
   ports: TaskPorts,
-  capabilities: readonly ConnectorCapability[] = [],
+  allCapabilities: readonly TaskCapability[] = [],
   catalog: Readonly<Record<string, ConnectorActionView>> = {},
   providerIds: readonly string[] = [],
 ): string {
+  const capabilities = allCapabilities.filter((item) => item.kind == 'connector')
+  const workflows = allCapabilities.filter((item) => item.kind == 'workflow')
+  const workflowCalls = workflows.map((item) => {
+    const input = workflowPortType(item.inputs)
+    return `(name: ${JSON.stringify(item.name)}, ...args: {} extends ${input} ? [input?: ${input}] : [input: ${input}]): Promise<${workflowPortType(item.outputs ?? [])}>`
+  })
+  const workflowTyping = `{ call: { ${workflowCalls.length ? workflowCalls.join('; ') : '(name: never): Promise<never>'} } }`
   const typing = generateTyping(
     'javascript',
     ports.inputs.flatMap((port) => ('handle' in port ? [{ handle: port.handle, json_schema: port.jsonSchema, nullable: port.nullable }] : [])),
@@ -88,5 +107,6 @@ export function codeTyping(
       : `<Action extends string>(actionId: Action extends ${hinted} ? never : Action, input?: Record<string, unknown>, options?: ${dynamicOptions}): Promise<unknown>`
   fields.push(`call: { ${calls.join('; ')}${calls.length == 0 ? '' : '; '}${permissions == null ? fallback : ''} }`)
   if (permissions == null) fields.push('[key: string]: any')
-  return `${typing}/** @typedef {import("@oomol-lab/open-flow").TaskContext<{ ${fields.join('; ').replaceAll('*/', '*\\/')} }>} TaskContext */\n`
+  const contextType = `import("@oomol-lab/open-flow").TaskContext<{ ${fields.join('; ')} }, ${workflowTyping}>`
+  return `${typing}/** @typedef {${contextType.replaceAll('*/', '*\\/')}} TaskContext */\n`
 }

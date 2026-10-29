@@ -273,7 +273,10 @@ export function createInspectorTransport(
       return Response.json({ version: 2, locale: url.searchParams.get('locale') ?? 'en', definitions: [], display: {} })
     if (url.pathname === '/v1/flows')
       return Response.json({
-        flows: [{ ...flow, draftRevisionId: revision().revisionId }, ...(options.workflows?.() ?? []).map((target) => Object.assign({}, flow, target))],
+        flows: [
+          { ...flow, draftRevisionId: revision().revisionId, referenceCount: 0 },
+          ...(options.workflows?.() ?? []).map((target) => Object.assign({}, flow, target, { referenceCount: 0 })),
+        ],
         total: 1 + (options.workflows?.().length ?? 0),
         version: 1,
       })

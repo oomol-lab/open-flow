@@ -203,6 +203,40 @@ export function createMocks() {
       .digest('hex')
       .slice(0, 16)}.`
     modelCalls.push({ request: body, response: { text: completion } })
+    const workflowTool =
+      body.tools?.some((tool: { function?: { name?: string } }) => tool.function?.name == 'double_workflow') &&
+      !body.messages?.some((message: { role?: string }) => message.role == 'tool')
+    if (body.stream && workflowTool) {
+      const chunks = [
+        {
+          id: 'lab-tool',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'lab-model',
+          choices: [
+            {
+              index: 0,
+              delta: {
+                role: 'assistant',
+                tool_calls: [{ index: 0, id: 'workflow-call', type: 'function', function: { name: 'double_workflow', arguments: '{}' } }],
+              },
+              finish_reason: null,
+            },
+          ],
+        },
+        {
+          id: 'lab-tool',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'lab-model',
+          choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }],
+          usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        },
+      ]
+      return context.body(chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', 200, {
+        'content-type': 'text/event-stream',
+      })
+    }
     if (body.stream) {
       const chunks = [
         {

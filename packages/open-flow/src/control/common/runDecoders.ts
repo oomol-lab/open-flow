@@ -55,7 +55,13 @@ function runWaiting(value: unknown) {
 
 function workflowIdentity(value: unknown) {
   const ref = record(value)
-  return { flowId: string(ref.flowId), runId: string(ref.runId), nodeId: string(ref.nodeId), executionId: string(ref.executionId) }
+  return {
+    flowId: string(ref.flowId),
+    runId: string(ref.runId),
+    nodeId: string(ref.nodeId),
+    executionId: string(ref.executionId),
+    ...(ref.callId == null ? {} : { callId: string(ref.callId) }),
+  }
 }
 
 function runInitiator(value: unknown): RunInitiator {

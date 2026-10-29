@@ -10,6 +10,18 @@ function digest(value: Uint8Array | string): string {
   return createHash('sha256').update(value).digest('hex')
 }
 
+function inputDigest(tool: ResultCall, input: Readonly<Record<string, JsonValue>>): string {
+  return digest(
+    canonicalJsonBytes(
+      tool.kind == 'connector'
+        ? { action: tool.action, connectionId: tool.connectionId ?? null, input }
+        : tool.kind == 'workflow'
+          ? { kind: 'workflow', flowId: tool.flowId, input }
+          : { kind: 'code', input },
+    ),
+  )
+}
+
 interface Row extends Omit<ResultInfo, 'source'> {
   readonly source: string
 }
@@ -33,14 +45,17 @@ export class ResultStore {
     const content = JSON.stringify(value)
     const bytes = Buffer.byteLength(content)
     if (bytes > 32 * 1024 * 1024) throw new Error('The completed tool result exceeds the 32 MiB storage limit.')
-    const inputDigest = digest(
-      canonicalJsonBytes(tool.kind == 'connector' ? { action: tool.action, connectionId: tool.connectionId ?? null, input } : { kind: 'code', input }),
-    )
+    const expectedInputDigest = inputDigest(tool, input)
     const result: ResultInfo = {
       resultId: randomUUID(),
       callId,
       toolId: tool.id,
-      source: tool.kind == 'code' ? { kind: 'code' } : { kind: 'connector', action: tool.action },
+      source:
+        tool.kind == 'code'
+          ? { kind: 'code' }
+          : tool.kind == 'workflow'
+            ? { kind: 'workflow', flowId: tool.flowId }
+            : { kind: 'connector', action: tool.action },
       bytes,
       digest: digest(content),
       createdAt: new Date().toISOString(),
@@ -52,7 +67,7 @@ export class ResultStore {
         .prepare(`SELECT ${columns}, input_digest AS inputDigest FROM run_results WHERE run_id = ? AND invocation_id = ? AND call_id = ?`)
         .get(runId, invocationId, callId) as (Row & { inputDigest: string }) | undefined
       if (previous != null) {
-        if (previous.inputDigest != inputDigest || previous.digest != result.digest || previous.toolId != tool.id)
+        if (previous.inputDigest != expectedInputDigest || previous.digest != result.digest || previous.toolId != tool.id)
           throw new Error('Stored tool call identity changed.')
         const { inputDigest: _inputDigest, ...row } = previous
         return info(row)
@@ -66,7 +81,7 @@ export class ResultStore {
         call_id: callId,
         tool_id: tool.id,
         source: JSON.stringify(result.source),
-        input_digest: inputDigest,
+        input_digest: expectedInputDigest,
         digest: result.digest,
         bytes,
         content,
@@ -83,9 +98,7 @@ export class ResultStore {
       )
       .get(runId, invocationId, callId)
     if (row == null) return
-    const expected = digest(
-      canonicalJsonBytes(tool.kind == 'connector' ? { action: tool.action, connectionId: tool.connectionId ?? null, input } : { kind: 'code', input }),
-    )
+    const expected = inputDigest(tool, input)
     if (row.inputDigest != expected || row.toolId != tool.id) throw new Error('Stored tool call identity changed.')
     return this.get(runId, String(row.resultId), invocationId)
   }

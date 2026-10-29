@@ -486,6 +486,7 @@ export type ErrorDispatch =
   | { readonly status: 'failed'; readonly flowId: string; readonly message: string }
 
 export interface WorkflowCaller {
+  readonly callId?: string
   readonly flowId: string
   readonly runId: string
   readonly nodeId: string

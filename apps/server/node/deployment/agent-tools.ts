@@ -9,6 +9,7 @@ import { agentToolInput, agentToolSchema } from '@oomol-lab/open-flow/flow-seman
 import { z } from 'zod'
 import { IsolatedVmError } from '../runtime/isolated-vm.ts'
 import { ConnectorTaskError } from './connector-contract.ts'
+import { WorkflowToolError } from './workflow-contract.ts'
 
 export interface ResultHost {
   find(callId: string, tool: ResultCall, input: Readonly<Record<string, JsonValue>>): { result: ResultInfo; content: string } | undefined
@@ -104,12 +105,15 @@ export function createAgentTools(config: Extract<ManagedTaskExecutor, { readonly
               return fail(new Error('Approved Agent arguments changed.'))
             }
             await report({ kind: 'tool', status: 'started', callId, toolId: tool.id, input })
-            const call: ResultCall = {
-              id: tool.id,
-              kind: 'connector',
-              action: tool.action,
-              ...(tool.connectionId == null ? {} : { connectionId: tool.connectionId }),
-            }
+            const call: ResultCall =
+              tool.kind == 'workflow'
+                ? { id: tool.id, kind: 'workflow', flowId: tool.flowId }
+                : {
+                    id: tool.id,
+                    kind: 'connector',
+                    action: tool.action,
+                    ...(tool.connectionId == null ? {} : { connectionId: tool.connectionId }),
+                  }
             let executed = false
             try {
               const previous = results.find(callId, call, input)
@@ -123,10 +127,11 @@ export function createAgentTools(config: Extract<ManagedTaskExecutor, { readonly
                 kind: 'tool',
                 status: 'failed',
                 executed: executed ? true : error instanceof ConnectorTaskError && error.code != 'connector.indeterminate' ? false : null,
-                message: error instanceof ConnectorTaskError ? error.message : 'The Agent tool result could not be processed.',
+                message:
+                  error instanceof ConnectorTaskError || error instanceof WorkflowToolError ? error.message : 'The Agent tool result could not be processed.',
                 callId,
                 toolId: tool.id,
-                code: error instanceof ConnectorTaskError ? error.code : 'agent.tool-result-invalid',
+                code: error instanceof ConnectorTaskError || error instanceof WorkflowToolError ? error.code : 'agent.tool-result-invalid',
               })
               if (error instanceof ConnectorTaskError && error.code == 'connector.input-invalid') throw error
               return fail(error)

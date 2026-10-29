@@ -3,6 +3,7 @@ import type { AgentTool, InputPort, ManagedTaskExecutor } from '../../../../flow
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
 import type { ActionSettingsProps, PrepareAction } from './actionSelectionDialog.tsx'
+import type { WorkflowToolSelection } from './workflowToolSelection.tsx'
 
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
@@ -12,6 +13,7 @@ import { IconStack } from '../../../../ui/browser/icon-stack.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { PopoverDescription } from '../../../../ui/browser/popover.tsx'
 import { Popover, PopoverTrigger, PopoverContent } from '../../../../ui/browser/popover.tsx'
+import { Switch } from '../../../../ui/browser/switch.tsx'
 import { actionSummary } from '../actionSummary.ts'
 import { ActionSelectionDialog } from './actionSelectionDialog.tsx'
 import { agentFixedValuesValid } from './agentChanges.ts'
@@ -25,6 +27,7 @@ function EditableAgentTools({
   inputs,
   connectors,
   prepareAction,
+  workflows,
   onSave,
   notify,
 }: {
@@ -33,6 +36,7 @@ function EditableAgentTools({
   readonly inputs: readonly InputPort[]
   readonly connectors: ConnectorStore
   readonly prepareAction?: PrepareAction
+  readonly workflows?: WorkflowToolSelection<AgentTool>
   readonly notify: SetNotice
   readonly onSave: (tools: readonly AgentTool[]) => Promise<boolean>
 }) {
@@ -43,7 +47,13 @@ function EditableAgentTools({
     <ActionSelectionDialog
       notify={notify}
       title={t('agent.tools')}
-      triggerHint={summary.count > 0 ? t('actionPicker.selectionSummary', { actions: summary.count, providers: summary.providers.length }) : undefined}
+      triggerHint={
+        summary.count > 0
+          ? summary.workflows > 0
+            ? t('toolPicker.summary', { tools: summary.count, workflows: summary.workflows })
+            : t('actionPicker.selectionSummary', { actions: summary.count, providers: summary.providers.length })
+          : undefined
+      }
       trigger={
         <Button type="button" variant="ghost" size="sm" className="gap-1.5 font-normal text-muted-foreground">
           {summary.count == 0 ? (
@@ -59,6 +69,7 @@ function EditableAgentTools({
       entries={config.tools}
       connectors={connectors}
       prepareAction={prepareAction}
+      workflows={workflows}
       disabled={disabled}
       createEntry={(action) => agentTool(action, crypto.randomUUID())}
       onSave={async (tools) => {
@@ -95,6 +106,15 @@ function AgentToolSettings({
           onChange={(event) => onChange?.({ ...tool, name: event.target.value })}
         />
       </Field>
+      <Field orientation="horizontal">
+        <FieldLabel>{t('toolPicker.approval')}</FieldLabel>
+        <Switch
+          checked={tool.approval}
+          disabled={disabled}
+          aria-label={t('toolPicker.approval')}
+          onCheckedChange={(approval) => onChange?.({ ...tool, approval })}
+        />
+      </Field>
       <PurposeField compact readOnly={disabled} value={tool.description} onChange={(event) => onChange?.({ ...tool, description: event.target.value })} />
       {tool.inputs.length > 0 && <div className="h-px bg-border/50" />}
       {tool.inputs.map((port) => (
@@ -115,7 +135,7 @@ function AgentToolSettings({
 
 export function AgentTools(
   props: Pick<ComponentProps<typeof EditableAgentTools>, 'config' | 'disabled' | 'inputs'> & {
-    readonly editor?: Pick<ComponentProps<typeof EditableAgentTools>, 'connectors' | 'notify' | 'prepareAction' | 'onSave'>
+    readonly editor?: Pick<ComponentProps<typeof EditableAgentTools>, 'connectors' | 'notify' | 'prepareAction' | 'workflows' | 'onSave'>
   },
 ) {
   const t = useTranslate()
@@ -128,9 +148,9 @@ export function AgentTools(
         <div className="grid max-h-96 gap-4 overflow-auto">
           {props.config.tools.map((tool) => (
             <details key={tool.id}>
-              <summary>{tool.name || tool.action}</summary>
+              <summary>{tool.name || (tool.kind == 'workflow' ? tool.flowId : tool.action)}</summary>
               <p className="reference-value">
-                {tool.action}
+                {tool.kind == 'workflow' ? tool.flowId : tool.action}
                 {tool.connectionId == null ? '' : ` · ${tool.connectionId === '' ? t('inspector.account.deferred') : tool.connectionId}`}
               </p>
               <AgentToolSettings entry={tool} disabled inputs={props.inputs} />

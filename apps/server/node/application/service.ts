@@ -148,8 +148,16 @@ export class ServerService {
       runtime.runTimeoutMs ?? defaultRunTimeoutMs,
       this.#logger,
       (flowId, runId) => this.#runChanged(flowId, runId),
-      () => this.#maintenance.wake(),
+      () => {
+        this.#maintenance.wake()
+        this.#supervisor.signal()
+      },
       (...args) => this.control.runs.invokeWorkflow(...args),
+      (...args) => this.control.runs.invokeWorkflowTarget(...args),
+      (flowId, runId, changed) =>
+        this.#watchFlow(flowId, (event) => {
+          if (event.kind == 'run.changed' && event.runId == runId) changed()
+        }),
     )
     const pollDefinitions = triggerDefinitions.filter((definition): definition is PollDefinition => definition.snapshot.type == 'poll')
     const integrationDefinitions = triggerDefinitions.filter((definition): definition is IntegrationDefinition => definition.snapshot.type == 'integration')

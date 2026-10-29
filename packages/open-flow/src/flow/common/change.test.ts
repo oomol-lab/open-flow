@@ -5,7 +5,7 @@ import type { ChangeOperation, GraphNode, RevisionContent } from './change.ts'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { assert, describe, expect, it } from 'vitest'
 import { createAuthoringId } from './authoring.ts'
-import { applyFlowChanges, decodeChangeOperations, FlowChangeError, nextNodeName } from './change.ts'
+import { applyFlowChanges, decodeChangeOperations, decodeTaskCapabilities, FlowChangeError, nextNodeName } from './change.ts'
 import { connect } from './edgeChanges.ts'
 import { imports as moduleImports, replaceSource } from './moduleChanges.ts'
 import { createCodeTask, repairNodeNames } from './nodeChanges.ts'
@@ -428,4 +428,25 @@ describe('Flow changes', () => {
       ]),
     ).toThrow(FlowChangeError)
   })
+})
+
+it.each([0, 1])('preserves normalized Connector capabilities at index %i beside workflow tools', (index) => {
+  const workflow = { kind: 'workflow', name: 'child', flowId: 'target', revisionId: 'snapshot', inputs: [], outputs: null }
+  const capabilities: unknown[] = [workflow]
+  capabilities.splice(index, 0, { kind: 'connector', actionHints: [], connectionHints: [] })
+  const expected: unknown[] = [workflow]
+  expected.splice(index, 0, { kind: 'connector' })
+  expect(decodeTaskCapabilities(capabilities)).toEqual(expected)
+})
+
+it.each(['', '1bad', 'with space', 'écho', 'a'.repeat(65)])('rejects invalid workflow tool name %j', (name) => {
+  expect(() => decodeTaskCapabilities([{ kind: 'workflow', name, flowId: 'child', revisionId: 'snapshot', inputs: [], outputs: [] }])).toThrow(
+    'Workflow tool names must be unique provider-compatible names.',
+  )
+})
+
+it('validates workflow name uniqueness and accepts the 64-character boundary', () => {
+  const workflow = { kind: 'workflow', name: `A${'_-2'.repeat(21)}`, flowId: 'child', revisionId: 'snapshot', inputs: [], outputs: [] }
+  expect(decodeTaskCapabilities([workflow])).toEqual([workflow])
+  expect(() => decodeTaskCapabilities([workflow, { ...workflow, flowId: 'other' }])).toThrow('Workflow tool names must be unique provider-compatible names.')
 })

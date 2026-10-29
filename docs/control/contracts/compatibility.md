@@ -1,5 +1,28 @@
 # Public contracts and version evolution
 
+## Workflow tools: Flow model v11 and Engine v8
+
+The published `@oomol-lab/open-flow@0.1.0-beta.71` establishes Model v10 and Engine v7 as
+compatibility boundaries. Model v11 adds workflow variants to Agent tool and Code capability
+declarations, including saved Revision and interface snapshots. Older model envelopes reject these
+variants. Engine v8 adds `context.workflows.call` and Agent workflow execution; v7 rejects workflow
+tools while retaining its existing behavior. The isolation digest includes this capability change.
+Historical Revision and Publication content is read without rewriting it; v7 execution and its
+published digest remain supported.
+
+SQLite migration 55 preserves existing workflow call relationships and adds an independent call ID
+to their unique key. Ordinary Call Workflow uses the historical empty call identity. Tool calls use
+one ID per invocation, allowing multiple and concurrent calls in one node execution. Reprocessing
+the same identity reuses its accepted child Run.
+
+Workflow tools retain the calling node in memory while the child runs or waits. Committed child Run
+notifications drive completion; the caller continues to consume its node and Run deadlines.
+Waiting callers lend scheduling slots to dependent children and re-enter scheduling before returning
+results. Pending dependencies retain that lending relationship for concurrent calls. This does not
+add persistent JavaScript suspension: server restart uses existing interrupted/indeterminate Run
+handling and never replays an unconfirmed tool call. Node completion, timeout and parent termination
+cancel unfinished child calls. Child failures, cancellations and indeterminate results remain distinct.
+
 ## Dynamic Webhook responses: Flow model v10 and Engine v7
 
 Model v10 adds optional Webhook `options.responseBody` with
@@ -88,9 +111,9 @@ Public entry points, serialization formats, Control API, and execution semantics
 | ----------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | npm package       | Exact version in the package manifest                             | Pins implementation, types, Workbench assets, and the conformance suite. Deployments pin the same version. |
 | Revision envelope | `kind: open-flow-flow-revision`, `version: 1`                     | UTF-8 JSON envelope fields and canonical byte rules.                                                       |
-| Flow model        | `modelVersion: 10`                                                | Serialization of documents, modules, nodes, and ports.                                                     |
+| Flow model        | `modelVersion: 11`                                                | Serialization of documents, modules, nodes, and ports.                                                     |
 | Control API       | `/v1`; Run creation request `version: 2`, all others `version: 1` | Request fields, responses, error codes, CAS, and idempotency.                                              |
-| Engine Contract   | `open-flow-engine/v7`                                             | Execution, Trigger, Task return, Wait, and cancellation semantics.                                         |
+| Engine Contract   | `open-flow-engine/v8`                                             | Execution, Trigger, Task return, Wait, and cancellation semantics.                                         |
 | MCP               | `2026-07-28`                                                      | Streamable HTTP negotiation; tool product semantics reuse Control API.                                     |
 
 Equal or different version numbers do not establish compatibility. Older formats may also have used `modelVersion: 1`; do not accept content based only on this field. Decode the complete structure before semantic validation and execution. Reject execution of Revisions that do not match the current structure. Do not rewrite them or recompute their original digest on read. Create a new Revision through a separate, auditable migration or rebuild.

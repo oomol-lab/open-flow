@@ -15,6 +15,7 @@ import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { CodeTaskSection } from '../../src/workbench/browser/runtime/editor/codeTaskSection.tsx'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { WorkbenchLinkContext } from '../../src/workbench/browser/runtime/linkContext.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
 import { TriggerStore } from '../../src/workbench/browser/runtime/stores/triggerStore.ts'
 import { WorkspaceStore } from '../../src/workbench/browser/runtime/stores/workspaceStore.ts'
@@ -154,7 +155,50 @@ function createSession(language: UiLanguage, log: LogAction) {
         throw new Error('Simulated catalog request failure')
       }
     }
-    if (url.pathname === '/v1/flows') return Response.json({ flows: [{ ...flow, referenceCount: 0 }], total: 1, version: 1 })
+    const workflowTargets = [
+      {
+        ...flow,
+        flowId: 'lab-workflow',
+        name: 'Summarize records',
+        referenceCount: 0,
+        live: { enabled: true, hasStart: true, publicationId: 'published', revisionId: 'workflow-revision' },
+      },
+      {
+        ...flow,
+        flowId: 'lab-no-start',
+        name: 'Event workflow',
+        referenceCount: 0,
+        live: { enabled: true, hasStart: false, publicationId: 'events', revisionId: 'events-revision' },
+      },
+      { ...flow, flowId: 'lab-draft-workflow', name: 'Draft workflow', referenceCount: 0 },
+    ]
+    if (url.pathname === '/v1/flows') return Response.json({ flows: [{ ...flow, referenceCount: 0 }, ...workflowTargets], total: 4, version: 1 })
+    if (url.pathname.endsWith('/call-contract')) {
+      if (!url.pathname.includes('/lab-workflow/'))
+        return Response.json(
+          {
+            error: {
+              code: 'flow.invalid',
+              message: 'Publish a workflow with Start before calling it.',
+              details: { reason: url.pathname.includes('/lab-no-start/') ? 'workflow.missing-start' : 'workflow.unpublished' },
+            },
+            version: 1,
+          },
+          { status: 422 },
+        )
+      return Response.json({
+        version: 1,
+        flowId: 'lab-workflow',
+        name: 'Summarize records',
+        publicationId: 'published',
+        revisionId: 'workflow-revision',
+        inputs: [
+          { handle: 'query', jsonSchema: { type: 'string' }, nullable: false },
+          { handle: 'limit', jsonSchema: { type: 'number' }, nullable: true },
+        ],
+        outputs: [{ handle: 'summary', jsonSchema: { type: 'string' }, nullable: false }],
+      })
+    }
     if (url.pathname.endsWith('/editor'))
       return Response.json({
         flow: { ...flow, draftRevisionId: `revision-${sequence}` },
@@ -329,56 +373,60 @@ function AgentSession({ session, dark, code }: { session: ReturnType<typeof crea
   ])
   return (
     <I18nProvider i18n={session.i18n}>
-      <div
-        className="open-flow-workbench open-flow-theme"
-        data-theme={dark ? 'dark' : 'light'}
-        style={code ? { padding: 24, maxWidth: 620, width: '100%' } : { height: '100%', width: '100%' }}
-      >
-        {code && selection?.kind == 'task' && (
-          <CodeTaskSection
-            selection={selection}
-            store={session.workspace}
-            connectors={session.connectors}
-            prepareAction={prepareAction}
-            disabled={disabled}
-            theme={dark ? 'dark' : 'light'}
-          />
-        )}
-        {!code && revision != null && selection?.kind == 'task' && (
-          <InspectorSamplePanel
-            disabled={disabled}
-            revision={revision}
-            selection={selection}
-            store={session.workspace}
-            theme={dark ? 'dark' : 'light'}
-            resizable
-          >
-            <NodeInspector
-              variables={{ enabled: false, names: [], loaded: true, loading: false, onOpen: () => {} }}
-              connectorAuthorizationPending={false}
-              connectorLoading={false}
-              connectors={session.connectors}
-              prepareConnectorAction={prepareAction}
+      <WorkbenchLinkContext.Provider value={({ flowId }) => `?story=workflow-properties&flow=${encodeURIComponent(flowId ?? '')}`}>
+        <div
+          className="open-flow-workbench open-flow-theme"
+          data-theme={dark ? 'dark' : 'light'}
+          style={code ? { padding: 24, maxWidth: 620, width: '100%' } : { height: '100%', width: '100%' }}
+        >
+          {code && selection?.kind == 'task' && (
+            <div className="editor-context-panel open-flow-property-panel">
+              <CodeTaskSection
+                selection={selection}
+                store={session.workspace}
+                connectors={session.connectors}
+                prepareAction={prepareAction}
+                disabled={disabled}
+                theme={dark ? 'dark' : 'light'}
+              />
+            </div>
+          )}
+          {!code && revision != null && selection?.kind == 'task' && (
+            <InspectorSamplePanel
               disabled={disabled}
               revision={revision}
               selection={selection}
               store={session.workspace}
               theme={dark ? 'dark' : 'light'}
+              resizable
+            >
+              <NodeInspector
+                variables={{ enabled: false, names: [], loaded: true, loading: false, onOpen: () => {} }}
+                connectorAuthorizationPending={false}
+                connectorLoading={false}
+                connectors={session.connectors}
+                prepareConnectorAction={prepareAction}
+                disabled={disabled}
+                revision={revision}
+                selection={selection}
+                store={session.workspace}
+                theme={dark ? 'dark' : 'light'}
 
-              triggerAuthorizationPending={false}
-              triggerConnectionLoading={false}
-              triggers={session.triggers}
-            />
-          </InspectorSamplePanel>
-        )}
-      </div>
+                triggerAuthorizationPending={false}
+                triggerConnectionLoading={false}
+                triggers={session.triggers}
+              />
+            </InspectorSamplePanel>
+          )}
+        </div>
+      </WorkbenchLinkContext.Provider>
     </I18nProvider>
   )
 }
 
 export const agentStory: FrontendStory = {
   description:
-    'Edit the Prompt after Purpose, insert {{request}}, and save with blur or Cmd/Ctrl+S. Compare empty and referenced prompts, read-only and save retry. Fail next save reports failure in the action log and keeps a Retry save button without inline error text; retry preserves the edited value. Expand Advanced settings to review model, computation, rounds and node limits. Browse services, check actions without removing them from the list, and choose accounts in the selected rows. Select Hosted tools to check the localized OOMOL Built-in account name and verification icon. Use slow preparation and failure controls to check immediate selection, independent row loading, removal and retry. Arm a request failure before selecting a tool, then click Retry immediately and check connector.request logs for a fresh read. Save a selected account, enable slow preparation and reopen the dialog: the cached account name stays visible while preparation finishes. Open a tool’s settings gear to edit its name, description and parameters, or remove it. Unset parameters are filled by the Agent. Check text, numbers, booleans, choices and collections; clear values and switch sources. Close and reopen settings with an invalid draft, then compare Save, Cancel and retry.',
+    'Select connector and workflow tools together. Check target links, unavailable drafts, explicit interface refresh, approval and parameter sources. Compare normal and failed interface status strips with their icons and inline refresh in both themes; status must remain distinct from tool names and configuration. Error refresh actions use the same danger color with a tinted hover state. Refresh must preserve mappings; Escape returns focus to settings. Edit the Prompt after Purpose, insert {{request}}, and save with blur or Cmd/Ctrl+S. Compare empty and referenced prompts, read-only and save retry. Fail next save reports failure in the action log and keeps a Retry save button without inline error text; retry preserves the edited value. Expand Advanced settings to review model, computation, rounds and node limits. Browse services, check actions without removing them from the list, and choose accounts in the selected rows. Select Hosted tools to check the localized OOMOL Built-in account name and verification icon. Use slow preparation and failure controls to check immediate selection, independent row loading, removal and retry. Arm a request failure before selecting a tool, then click Retry immediately and check connector.request logs for a fresh read. Save a selected account, enable slow preparation and reopen the dialog: the cached account name stays visible while preparation finishes. Connector and workflow settings gears share their tooltip and editor behavior. Open either gear to edit its name, description and parameters, or remove it; Escape must return focus to that gear. Unset parameters are filled by the Agent. Check text, numbers, booleans, choices and collections; clear values and switch sources. Close and reopen settings with an invalid draft, then compare Save, Cancel and retry.',
   group: 'Node Agent',
   id: 'agent-tools',
   propertyPanel: false,
@@ -389,9 +437,8 @@ export const agentStory: FrontendStory = {
 
 export const codeActionsStory: FrontendStory = {
   ...agentStory,
-  propertyPanel: true,
   description:
-    'Open Actions from the plus button in the Code heading; saved selections show up to three distinct overlapping provider icons with the total action count as the final circle. Select multiple actions from one service to check icon deduplication and the tooltip counts. Browse services grouped by connected, built-in account, no setup and not connected, then check tools grouped by read, write, high-risk and other. Lab catalog covers all four categories, including filtered and empty results. Scroll provider and action lists to check sticky group headings and transitions between groups. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent. Selected rows use an unlabeled account selector aligned with the action title in the middle column, leaving the delete button in its own column, with the property panel control surface; the header refreshes accounts and trash buttons remove actions. Icon buttons have tooltips. Use slow preparation and failure controls to check immediate selection, concurrent rows, removal and retry. Arm a request failure before selecting a tool, then click Retry immediately and check connector.request logs for a fresh read. Check opening with 1,000 sample services, the centered empty state, text-only provider header, shared node-picker icons, selected action hierarchy, overlay scrolling, 13px type, saving without accounts, danger on the Code Actions button for account issues, warning account controls, an Add account button for empty accounts, issues sorted first only on initial load, stable order while editing, original selection order preserved on Save, Cancel and account-free actions.',
+    'Use the Connectors and Workflows categories in the same tool dialog. Selected workflows and connectors share the icon, title and action columns; each row uses a singular type label while category tabs use plural labels. Hover anywhere across the single-line Code workflow title to check full-width feedback and the text cursor. The subtle hover background extends horizontally and vertically beyond the text while the title stays aligned with its subtitle and the row height stays unchanged; click to overlay its input without moving the title or surrounding content. The dialog portals into the Workbench outside the property-panel scope, matching the product; its title editor owns its compact control radius. Enter or blur finishes valid edits; Escape restores the previous name. Empty, malformed, overlong and duplicate aliases stay in the input with an error and block Save. During interface refresh, rename the tool or remove an earlier item and check that the completed refresh preserves the current selection and edits. The title remains mounted underneath; the subtitle keeps the target workflow name and link, including unavailable targets. Renaming must not change that target name. Check workflow aliases, interface status strips with icons and inline refresh, and removal beside a connector in both themes; unavailable targets use localized diagnostics. Connectors and workflows share the search with a compact 8px corner radius, sticky group headings, virtual list, option cards and loading, retry and empty states. Click group headings or use Enter/Space to return to the group start; check row clicks and keyboard toggles. Connector application navigation restores its scroll position; workflow status dots occupy a separate leading column, keeping headings, option cards and empty messages aligned in the content column. Search for Event to check the empty available group and its content alignment. Select Summarize records together with a connector, edit its call name, refresh its interface, and retain unavailable workflow choices. Open Actions from the plus button in the Code heading; saved selections show up to three distinct overlapping provider icons with the total action count as the final circle. Select multiple actions from one service to check icon deduplication and the tooltip counts. Browse services grouped by connected, built-in account, no setup and not connected, then check tools grouped by read, write, high-risk and other. Lab catalog covers all four categories, including filtered and empty results. Scroll provider and action lists to check sticky group headings and transitions between groups. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent. Selected rows use an unlabeled account selector aligned with the action title in the middle column, leaving the delete button in its own column, with the property panel control surface; the header refreshes accounts and trash buttons remove actions. Icon buttons have tooltips. Use slow preparation and failure controls to check immediate selection, concurrent rows, removal and retry. Arm a request failure before selecting a tool, then click Retry immediately and check connector.request logs for a fresh read. Check opening with 1,000 sample services, the centered empty state, text-only provider header, shared node-picker icons, selected action hierarchy, overlay scrolling, 13px type, saving without accounts, danger on the Code Actions button for account issues, warning account controls, an Add account button for empty accounts, issues sorted first only on initial load, stable order while editing, original selection order preserved on Save, Cancel and account-free actions. After changing tools, close with Cancel, Escape, the close button or the backdrop to check discard confirmation. Check the confirmation’s generous content inset and plain action row in both themes. Continue editing must retain the draft; discarding must restore saved tools on reopening. Reload with edits to check browser protection; unchanged or saved selections must not prompt.',
   group: 'Node Task',
   id: 'code-actions',
   title: 'Select tools',

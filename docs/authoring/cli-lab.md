@@ -376,3 +376,11 @@ bun run lab test wait-auto-continue --mcp
 Draft Runs with two Gmail events each. Run `bun run lab test poll-batch` and
 `bun run lab test poll-batch --mcp`. Both events must reach Outputs together as a messages array.
 Provider polling, page admission, deduplication and restart behavior are covered by Server Poll tests.
+
+## Workflow tool regression
+
+`workflow-tools` declares the same published target on an Agent and a Code node through public
+configuration, preserves explicit numeric input types, renames the nodes, refreshes each tool by
+name, and verifies outputs for zero, negative and positive numbers. The deterministic model requests
+the Agent tool and receives the persisted result reference. This verifies forwarding, not model
+quality. Run `bun run lab test workflow-tools` and `bun run lab test workflow-tools --mcp`.

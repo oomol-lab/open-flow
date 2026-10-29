@@ -50,7 +50,12 @@ function executeAgent(
           resultId: callId,
           callId,
           toolId: tool.id,
-          source: tool.kind == 'code' ? { kind: 'code' as const } : { kind: 'connector' as const, action: tool.action },
+          source:
+            tool.kind == 'workflow'
+              ? { kind: 'workflow' as const, flowId: tool.flowId }
+              : tool.kind == 'code'
+                ? { kind: 'code' as const }
+                : { kind: 'connector' as const, action: tool.action },
           bytes: Buffer.byteLength(content),
           digest: createHash('sha256').update(content).digest('hex'),
           createdAt: new Date().toISOString(),
@@ -309,7 +314,10 @@ describe('Agent streaming adapter', () => {
         source,
         invocation,
         model,
-        (tool, input, callId, signal) => connector.execute(tool.action, undefined, input, callId, signal),
+        (tool, input, callId, signal) => {
+          if (tool.kind == 'workflow') throw new Error('Expected connector tool')
+          return connector.execute(tool.action, undefined, input, callId, signal)
+        },
         async (event) => {
           events.push(event)
         },
@@ -852,16 +860,15 @@ it('does not expose code when disabled and does not recover from a CPU limit', a
 
 it.each([false, true])('filters deferred Agent tools before sending tools to the model (all=%s)', async (all) => {
   if (task.executor.kind != 'agent') throw new Error('Expected Agent')
+  const firstTool = task.executor.tools[0]!
+  if (firstTool.kind == 'workflow') throw new Error('Expected connector tool')
   const external = vi.fn()
   const { model, toolOptions } = fixture(['Done'])
   const source: ManagedTaskDefinition = {
     ...task,
     executor: {
       ...task.executor,
-      tools: [
-        { ...task.executor.tools[0]!, connectionId: '', name: 'deferred' },
-        ...(all ? [] : [{ ...task.executor.tools[0]!, id: 'active', name: 'active', connectionId: 'work' }]),
-      ],
+      tools: [{ ...firstTool, connectionId: '', name: 'deferred' }, ...(all ? [] : [{ ...firstTool, id: 'active', name: 'active', connectionId: 'work' }])],
     },
   }
   await expect(executeAgent(source, invocation, model, external)).resolves.toEqual({ kind: 'completed', output: 'Done' })
@@ -870,4 +877,44 @@ it.each([false, true])('filters deferred Agent tools before sending tools to the
   expect(sent.tools.some((tool) => tool.name === 'active')).toBe(!all)
   expect(external).not.toHaveBeenCalled()
   expect(source.executor).toMatchObject({ tools: [{ connectionId: '' }, ...(all ? [] : [{ connectionId: 'work' }])] })
+})
+
+it.each([false, true])('executes workflow tools through Agent result storage and approval (approval=%s)', async (approval) => {
+  if (task.executor.kind != 'agent') throw new Error('Expected Agent')
+  const source: ManagedTaskDefinition = {
+    ...task,
+    executor: {
+      ...task.executor,
+      tools: [
+        {
+          kind: 'workflow',
+          id: 'workflow-tool',
+          flowId: 'target',
+          revisionId: 'target-revision',
+          name: 'double_workflow',
+          description: 'Double a number',
+          approval,
+          inputs: [{ handle: 'amount', jsonSchema: { type: 'number' }, nullable: false, source: { kind: 'value', value: -2 } }],
+          outputs: [{ handle: 'total', jsonSchema: { type: 'number' }, nullable: false }],
+        },
+      ],
+    },
+  }
+  const { model, prompts } = fixture([[{ id: 'call', toolName: 'double_workflow', input: '{}' }], 'Doubled'])
+  const execute = vi.fn(async () => ({ total: -4 }))
+  let result = await executeAgent(source, invocation, model, execute)
+  if (approval) {
+    expect(execute).not.toHaveBeenCalled()
+    result = await executeAgent(source, { ...invocation, resume: { checkpoint: checkpoint(result), action: 'approve' } }, model, execute)
+  }
+  expect(result).toEqual({ kind: 'completed', output: 'Doubled' })
+  expect(execute).toHaveBeenCalledTimes(1)
+  expect(execute).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: 'workflow', flowId: 'target' }),
+    { amount: -2 },
+    expect.any(String),
+    expect.any(AbortSignal),
+  )
+  expect([...savedResults.values()][0]?.result.source).toEqual({ kind: 'workflow', flowId: 'target' })
+  expect(JSON.stringify(prompts)).toContain('stored-result')
 })

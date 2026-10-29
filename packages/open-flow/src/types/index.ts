@@ -80,7 +80,11 @@ export interface TaskLogger {
   error(message: string, data?: unknown): void
 }
 
-export interface TaskContext<Actions extends object = Record<string, never>> {
+export interface TaskContext<
+  Actions extends object = Record<string, never>,
+  Workflows extends object = { call: (name: never, input?: never) => Promise<never> },
+> {
+  readonly workflows: Workflows
   readonly actions: Actions
   readonly signal: AbortSignal
   readonly flowId: string
@@ -102,6 +106,7 @@ export interface Task<
   Inputs extends object = Record<string, unknown>,
   Outputs extends object = Record<string, unknown>,
   Actions extends object = Record<string, never>,
+  Workflows extends object = TaskContext['workflows'],
 > {
-  (inputs: Inputs, context: TaskContext<Actions>): TaskResult<Outputs> | Promise<TaskResult<Outputs>>
+  (inputs: Inputs, context: TaskContext<Actions, Workflows>): TaskResult<Outputs> | Promise<TaskResult<Outputs>>
 }

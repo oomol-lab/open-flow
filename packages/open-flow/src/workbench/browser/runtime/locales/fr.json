@@ -1066,6 +1066,10 @@
     "defaultOutputDescription": "Le résultat final produit par l’Agent."
   },
   "actionPicker": {
+    "discardTitle": "Ignorer les modifications des outils ?",
+    "discardDescription": "Vos modifications des outils n’ont pas été enregistrées.",
+    "continueEditing": "Continuer à modifier",
+    "discardChanges": "Ignorer les modifications",
     "saveFailed": "Impossible d’enregistrer les outils. Réessayez.",
     "selectionSummary": "Actions : {{actions}} · Services : {{providers}}",
     "preparing": "Préparation de l’action…",
@@ -1668,5 +1672,17 @@
     "unavailable": "Ce formulaire n’est plus accessible. Choisissez-en un autre.",
     "failed": "Impossible de charger les formulaires.",
     "retry": "Réessayer"
+  },
+  "toolPicker": {
+    "type": "Type d’outil",
+    "connectors": "Connecteurs",
+    "workflows": "Workflows",
+    "alias": "Nom d’appel",
+    "approval": "Approbation requise",
+    "current": "Interface à jour",
+    "summary": "{tools} outils · {workflows} workflows",
+    "aliasInvalid": "Utilisez un nom d’appel unique de 1 à 64 caractères, commençant par une lettre et contenant uniquement des lettres ASCII, chiffres, tirets ou traits de soulignement.",
+    "connector": "Connecteur",
+    "workflow": "Workflow"
   }
 }

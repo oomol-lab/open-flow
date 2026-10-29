@@ -1,4 +1,13 @@
-import type { TaskNode, ManagedTaskDefinition, Port, JsonValue, RevisionContent } from '../../flow/common/change.ts'
+import type {
+  TaskNode,
+  ManagedTaskDefinition,
+  Port,
+  JsonValue,
+  RevisionContent,
+  GraphNode,
+  WorkflowCapability,
+  AgentWorkflowTool,
+} from '../../flow/common/change.ts'
 
 import { dequal } from 'dequal/lite'
 import { z } from 'zod'
@@ -119,36 +128,8 @@ export function workflowCompatibility(
     reason?: 'snapshot-missing' | 'interface-required' | 'revision-stale'
   }[] = []
   if ('executor' in node.task && node.task.executor.kind == 'workflow') {
-    const saved = node.task.executor.revisionId
-    if (!saved)
-      return [
-        {
-          side: 'revision',
-          field: 'revisionId',
-          reason: 'interface-required',
-          message: 'The called workflow interface has not been loaded. Refresh the interface definition.',
-        },
-      ]
-    if (saved != contract.revisionId) {
-      if (previous == null)
-        return [
-          {
-            side: 'revision',
-            field: 'revisionId',
-            reason: 'snapshot-missing',
-            message: 'The saved workflow interface snapshot is unavailable. Refresh the interface definition.',
-          },
-        ]
-      if (!sameWorkflowInterface(previous, contract))
-        return [
-          {
-            side: 'revision',
-            field: 'revisionId',
-            reason: 'revision-stale',
-            message: 'The called workflow interface has changed. Update the interface definition.',
-          },
-        ]
-    }
+    const interfaceIssues = workflowInterfaceIssues(node.task.executor, contract, previous)
+    if (interfaceIssues.length) return interfaceIssues
   }
 
   for (const port of contract.inputs) {
@@ -201,3 +182,92 @@ export const workflowReferencesSchema = z.object({
   ),
 })
 export type WorkflowReferences = z.infer<typeof workflowReferencesSchema>
+
+/** Workflow declarations share discovery across authoring, admission and resource indexing. */
+export function nodeWorkflowReferences(node: GraphNode): readonly {
+  readonly target: Omit<WorkflowCapability, 'kind' | 'name'>
+  readonly path: string
+  readonly tool?: string
+}[] {
+  if (node.kind != 'task') return []
+  if ('moduleId' in node.task)
+    return (node.task.capabilities ?? []).flatMap((item, index) =>
+      item.kind == 'workflow' ? [{ target: item, path: `task/capabilities/${index}`, tool: item.name }] : [],
+    )
+  if (node.task.executor.kind == 'workflow')
+    return [
+      {
+        target: {
+          ...node.task.executor,
+          inputs: node.task.inputs.filter((port) => 'handle' in port),
+          outputs: node.task.outputs.filter((port) => 'handle' in port),
+        },
+        path: 'task/executor',
+      },
+    ]
+  if (node.task.executor.kind == 'agent')
+    return node.task.executor.tools.flatMap((item, index) =>
+      item.kind == 'workflow' ? [{ target: item, path: `task/executor/tools/${index}`, tool: item.name }] : [],
+    )
+  return []
+}
+
+export function workflowCapability(name: string, target: WorkflowContract | WorkflowCandidate): WorkflowCapability {
+  return {
+    kind: 'workflow',
+    name,
+    flowId: target.flowId,
+    revisionId: 'inputs' in target ? target.revisionId : '',
+    inputs: 'inputs' in target ? target.inputs : [],
+    outputs: 'inputs' in target ? target.outputs : null,
+  }
+}
+
+export function workflowAgentTool(id: string, name: string, target: WorkflowContract | WorkflowCandidate, previous?: AgentWorkflowTool): AgentWorkflowTool {
+  const capability = workflowCapability(name, target)
+  return {
+    ...capability,
+    id,
+    description: previous?.description ?? target.name,
+    approval: previous?.approval ?? false,
+    inputs: capability.inputs.map((port) =>
+      Object.assign({}, port, { source: previous?.inputs.find((old) => old.handle == port.handle)?.source ?? { kind: 'model' as const } }),
+    ),
+  }
+}
+
+export function workflowInterfaceIssues(
+  target: { readonly revisionId: string },
+  contract: WorkflowContract,
+  previous?: PublishedWorkflowInterface,
+): readonly { side: 'revision'; field: string; message: string; reason: 'snapshot-missing' | 'interface-required' | 'revision-stale' }[] {
+  if (!target.revisionId)
+    return [
+      {
+        side: 'revision',
+        field: 'revisionId',
+        reason: 'interface-required',
+        message: 'The called workflow interface has not been loaded. Refresh the interface definition.',
+      },
+    ]
+  if (target.revisionId == contract.revisionId) return []
+  if (previous == null)
+    return [
+      {
+        side: 'revision',
+        field: 'revisionId',
+        reason: 'snapshot-missing',
+        message: 'The saved workflow interface snapshot is unavailable. Refresh the interface definition.',
+      },
+    ]
+  if (!sameWorkflowInterface(previous, contract))
+    return [
+      {
+        side: 'revision',
+        field: 'revisionId',
+        reason: 'revision-stale',
+        message: 'The called workflow interface has changed. Update the interface definition.',
+      },
+    ]
+  return []
+}
