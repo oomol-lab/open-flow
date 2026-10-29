@@ -1,3 +1,4 @@
+import type { InputPort } from './change.ts'
 import type {
   BindingSource,
   FlowDocument,
@@ -14,6 +15,7 @@ import type {
 } from './change.ts'
 import type { Diagnostic } from './semantics.ts'
 
+import { httpHeaderNameIssue } from '../../http/common/headers.ts'
 import { missingTriggerConfig, resolveTriggerConfig } from '../../trigger/common/config.ts'
 import { triggerOutputDefinitions, triggerOutputPorts, webhookSupportsBody } from '../../trigger/common/contract.ts'
 import { isTriggerNode, portsByHandle, validVariableName } from './change.ts'
@@ -27,7 +29,6 @@ import {
   webhookResponseInputs,
   validWebhookStatus,
   webhookHeaderValues,
-  webhookHeaderNameIssue,
   webhookHeaderValuePort,
   webhookHeadersPort,
   webhookResponseAllowsBody,
@@ -92,7 +93,7 @@ export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path
     ] as const) {
       const names: string[] = []
       for (const name of Object.keys(headers ?? {})) {
-        if (webhookHeaderNameIssue(name, names) != null)
+        if (httpHeaderNameIssue(name, names) != null)
           diagnostics.push(graphDiagnostic('trigger.webhook-response-header-name', 'Use valid, unique HTTP header names.', location))
         names.push(name)
       }
@@ -615,9 +616,14 @@ export function checkInputSources(
 }
 
 /** Enumerate structurally available outputs while retaining their compatibility with one input. */
-export function inputSourceCandidates(graph: Graph, target: string, handle: string): Readonly<Record<string, readonly InputSourceCandidate[]>> {
+export function inputSourceCandidates(
+  graph: Graph,
+  target: string,
+  handle: string,
+  inputPort?: InputPort,
+): Readonly<Record<string, readonly InputSourceCandidate[]>> {
   const targetNode = graph.nodes[target]
-  const input = targetNode == null ? undefined : nodeInputPorts(targetNode)[handle]
+  const input = inputPort ?? (targetNode == null ? undefined : nodeInputPorts(targetNode)[handle])
   if (input == null) return {}
   const analysis = graphPaths(graph)
   return Object.fromEntries(

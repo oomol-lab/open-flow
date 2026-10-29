@@ -1,5 +1,7 @@
 import type { InputPort, JsonValue, Port, PortDefinition } from './change.ts'
 
+import { httpHeaderNameIssue } from '../../http/common/headers.ts'
+
 export const webhookResponseTimeout = {
   defaultMs: 30_000,
   minMs: 1000,
@@ -30,12 +32,6 @@ export function workflowOutputsPort(outputs: readonly Port[]): PortDefinition {
   } as const
 }
 
-/** Header names are case-insensitive; never silently combine duplicate business fields. */
-export function webhookHeaderNameIssue(name: string, names: readonly string[]): 'invalid' | 'duplicate' | undefined {
-  if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name)) return 'invalid'
-  if (names.some((candidate) => candidate.toLowerCase() === name.toLowerCase())) return 'duplicate'
-}
-
 /** Fixed inputs belong to the node, not author-supplied definitions. */
 export const webhookResponseInputs: readonly InputPort[] = [
   { handle: 'body', jsonSchema: {}, nullable: true, value: '' },
@@ -60,7 +56,7 @@ export function webhookHeaderValues(source: unknown): Readonly<Record<string, st
   const headers: Record<string, string> = {}
   const names: string[] = []
   for (const [name, value] of Object.entries(source)) {
-    if (webhookHeaderNameIssue(name, names) != null) return
+    if (httpHeaderNameIssue(name, names) != null) return
     if (typeof value !== 'string' && typeof value !== 'boolean' && !(typeof value === 'number' && Number.isFinite(value))) return
     const text = String(value)
     if ([...text].some((character) => character.charCodeAt(0) > 255 || /[\0\r\n]/.test(character))) return

@@ -384,3 +384,12 @@ configuration, preserves explicit numeric input types, renames the nodes, refres
 name, and verifies outputs for zero, negative and positive numbers. The deterministic model requests
 the Agent tool and receives the persisted result reference. This verifies forwarding, not model
 quality. Run `bun run lab test workflow-tools` and `bun run lab test workflow-tools --mcp`.
+
+## HTTP Request regression
+
+`http-request` creates a POST request through public authoring, binds URL/body/Bearer credentials
+from Start, sends named query/header inputs, and returns the actual response body and status.
+It changes only the name and response format in a later edit. Verification sends JSON null and an
+object to a local HTTP fixture and checks authentication, encoding and credential omission in the
+HTTP node start event. Run `bun run lab test http-request` and
+`bun run lab test http-request --mcp`. These are deterministic reference runs, not model trials.

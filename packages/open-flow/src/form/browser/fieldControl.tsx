@@ -8,7 +8,7 @@ export function ValueEditorFeedback({ children, error }: { readonly children: (e
   const id = useId()
   const errorId = error == null ? undefined : `${id}-error`
   return (
-    <div className={styles.errorAnchor}>
+    <div className={styles.errorAnchor} data-feedback={error != null || undefined}>
       {children(errorId)}
       {error != null && (
         <div id={errorId} className={styles.error} role="alert">

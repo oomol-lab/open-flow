@@ -3,8 +3,8 @@ import type { NodeInputField } from './nodeInputs.tsx'
 import type { InputVariables, NodeInputUpstreamSources } from './sourceValueEditor.tsx'
 
 import { useTranslate } from 'val-i18n-react'
-import { webhookHeaderNameIssue } from '../../../../flow/common/webhookResponse.ts'
 import { FieldTable } from '../../../../form/browser/fieldTable.tsx'
+import { httpHeaderNameIssue } from '../../../../http/common/headers.ts'
 import { Field, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { InspectorSection } from './inspectorSection.tsx'
 import { NodeInputValue } from './nodeInputValue.tsx'
@@ -64,7 +64,7 @@ export function WebhookResponseEditor({
                       hideChildTypes: true,
                       expansionPolicy: expanded,
                       validateObjectFieldName: (next, current) =>
-                        webhookHeaderNameIssue(
+                        httpHeaderNameIssue(
                           next,
                           Object.keys(value != null && typeof value === 'object' && !Array.isArray(value) ? value : {}).filter((key) => key !== current),
                         ) == null,

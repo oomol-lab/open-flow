@@ -1,6 +1,6 @@
 import type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
 
-import { assertOpenApiAuthBindings } from '../../openapi/common/authBindings.ts'
+import { assertHttpAuthBindings } from '../../http/common/authBindings.ts'
 export { fixedInputValue, inputValue, inputValues } from './inputValue.ts'
 import type { RetryConfiguration } from './retry.ts'
 import type { WebhookMethod } from './webhookMethod.ts'
@@ -167,6 +167,7 @@ export interface ConditionNode extends GraphNodeBase {
 }
 
 export type ManagedTaskExecutor =
+  | import('../../http/common/httpRequest.ts').HttpRequestExecutor
   | import('../../workflow/common/workflow.ts').WorkflowExecutor
   | import('../../decision/common/decision.ts').DecisionExecutor
   | import('../../openapi/common/openapi.ts').OpenApiExecutor
@@ -1031,6 +1032,6 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       }
     }
   }
-  assertOpenApiAuthBindings(document)
+  assertHttpAuthBindings(document)
   return upgradeDecodedRevisionContent({ document, modelVersion: currentFlowModelVersion, modules })
 }

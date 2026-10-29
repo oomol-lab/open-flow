@@ -233,3 +233,22 @@ belongs to the selected Trigger's reachable execution path or its dependencies; 
 unrelated branches do not block that Draft Run. Public authoring inputs still require valid timing.
 Approval remains manual. See the Control API's Wait automatic continuation contract for recovery,
 competition and event metadata.
+
+## HTTP Request
+
+Public type `http-request` calls an HTTP(S) endpoint without an OpenAPI document. The product
+owns generated ports, encoding and response parsing. Configure `method`, `bodyFormat`,
+`responseFormat`, `statusPolicy`, `authentication`, and `query`/`headers` parameter modes.
+URL and request data belong in `inputs`, including fixed values. Query/Header named fields use
+`query.<name>`/`header.<name>`; whole-object mode uses `query`/`headers`. Authentication accepts
+only variables or upstream outputs, through `auth.token` or Basic `auth.username`/`auth.password`.
+
+Query/Header configuration is `{ mode: "fields" | "object", names: string[] }`, defaulting to
+empty named fields. Changing mode removes bindings for removed ports; configured names remain
+saved. A single named-parameter rename within the same group preserves its source. Authentication
+is replaced as one complete choice. Other updates retain the ordinary merge/clear contract.
+
+Outputs are always `body`, `statusCode`, and `headers`. JSON arrays remain a single body value.
+The node supports ordinary `retry` and `onError`; it has no separate error execution edge.
+Use `statusPolicy: "all"` to inspect non-2xx responses with a Condition node. Network and parsing
+failures still fail. See the Control API HTTP Request contract for wire formats and limits.

@@ -11,6 +11,7 @@ import {
   createValue,
   createWait,
 } from '../../flow/common/nodeChanges.ts'
+import { httpRequestTask } from '../../http/common/httpRequest.ts'
 import { openApiTask, selectOperation } from '../../openapi/common/openapi.ts'
 
 const descriptions = {
@@ -22,6 +23,7 @@ const descriptions = {
   'poll': 'Gmail polling by key; replace CONNECTION_ID with an active Gmail connection.',
   'integration': 'Telegram webhook integration by key; replace CONNECTION_ID with an active Telegram connection.',
   'decision': 'AI Decision evaluates named questions against target and returns a complete answer object per output. Configure target before running.',
+  'http-request': 'A single HTTP request. Bind url and request inputs; outputs are body, statusCode and headers.',
   'openapi': 'A fixed JSON API operation. Replace the example document and URL before running.',
   'connector':
     'A Connector Task and its node. Replace ACTION_ID, CONNECTION_ID and port definitions using connector_get / connector show. Set connectionId to an empty string to defer account configuration; execution will require an account.',
@@ -54,6 +56,12 @@ export function authoringExample(name: string): { version: 1; operations: readon
       operations = createDecisionTask({ nodeId: 'decision' }, 'AI Decision', [
         { name: 'needs_support', type: 'noul', instructions: 'Does the customer need support?' },
       ])
+      break
+    case 'http-request':
+      operations = [
+        ...createManagedTask({ nodeId: 'http' }, httpRequestTask()),
+        { kind: 'graph.node.input.set', nodeId: 'http', handle: 'url', value: { kind: 'value', value: 'https://example.com' } },
+      ]
       break
     case 'openapi': {
       const document = {

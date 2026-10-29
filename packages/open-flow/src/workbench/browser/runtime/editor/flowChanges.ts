@@ -50,6 +50,7 @@ import {
 import { remapInputMappings, renamedPort, renameOutputMapping } from '../../../../flow/common/portChanges.ts'
 import { renamePromptInput } from '../../../../flow/common/promptTemplate.ts'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
+import { httpRequestTask, httpRequestInputs, withHttpParameterFields, withHttpParameterSource } from '../../../../http/common/httpRequest.ts'
 import { withWorkflowTask } from '../../../../workflow/common/workflow.ts'
 import { feishuResourceKind, supportsFeishuChatFilter } from './feishuEventConfig.ts'
 
@@ -132,6 +133,7 @@ interface TaskSettingsBase {
 export type TaskSettings =
   | (TaskSettingsBase & { readonly kind: 'workflow'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'decision'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
+  | (TaskSettingsBase & { readonly kind: 'http-request'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'openapi'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'agent'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'code' })
@@ -144,6 +146,7 @@ export type AddNodeIntent =
   | { readonly kind: 'webhook-response'; readonly name: string }
   | { readonly kind: 'outputs'; readonly name: string }
   | { readonly kind: 'decision'; readonly name: string }
+  | { readonly kind: 'http-request'; readonly name: string }
   | { readonly kind: 'openapi'; readonly name: string }
   | { readonly kind: 'workflow'; readonly name: string }
   | { readonly kind: 'agent'; readonly name: string; readonly prompt?: string; readonly outputDescription?: string }
@@ -210,6 +213,9 @@ export function addNode(revision: RevisionView, nodeId: string, intent: AddNodeI
       break
     case 'decision':
       changes = createDecisionTask({ nodeId }, intent.name)
+      break
+    case 'http-request':
+      changes = createManagedTask({ nodeId }, httpRequestTask(undefined, intent.name))
       break
     case 'openapi':
       changes = createManagedTask(
@@ -417,6 +423,7 @@ export function updateTask(revision: RevisionView, nodeId: string, settings: Tas
       return [{ kind: 'graph.node.replace', nodeId, before: node, node: next }]
     }
     case 'decision':
+    case 'http-request':
     case 'openapi':
     case 'agent': {
       if (!dequal(node.task, settings.before)) return
@@ -592,7 +599,9 @@ function replaceTaskPorts(
     if (isTriggerNode(node)) continue
     const inputs =
       currentNodeId == nodeId
-        ? updatedInputMappings(revision.inputMappings(node), previous.inputs, task.inputs, inputRename, values)
+        ? 'executor' in task && task.executor.kind == 'http-request' && 'executor' in previous
+          ? httpRequestInputs(revision.inputMappings(node), previous, task)
+          : updatedInputMappings(revision.inputMappings(node), previous.inputs, task.inputs, inputRename, values)
         : { ...revision.inputMappings(node) }
 
     for (const [name, mapping] of Object.entries(inputs)) {
@@ -660,4 +669,39 @@ export function updateOutputPorts(
   }))
   const next = updatedInputMappings(node.outputMappings, node.outputDefs, ports, renamedPort(node.outputDefs, ports), values)
   return updateOutputsDefs(content, nodeId, ports, next)
+}
+
+export type HttpParameterEdit = (
+  | { kind: 'fields'; value: Record<string, JsonValue> }
+  | { kind: 'source'; source: import('../../../../flow/common/change.ts').NodeSource; fields: Record<string, JsonValue> }
+  | { kind: 'variable'; name: string; fields: Record<string, JsonValue> }
+) & { field?: string }
+export function updateHttpParameters(
+  revision: RevisionView,
+  nodeId: string,
+  group: 'query' | 'headers',
+  edit: HttpParameterEdit,
+  bindingId: string,
+): FlowChanges | undefined {
+  const node = revision.graph().nodes[nodeId]
+  if (node?.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'http-request') return
+  const handle = edit.field == null ? group : `${group === 'query' ? 'query' : 'header'}.${edit.field}`
+  let next =
+    edit.kind === 'fields'
+      ? withHttpParameterFields(node, group, edit.value)
+      : edit.field != null
+        ? withHttpParameterFields(node, group, edit.fields)
+        : withHttpParameterSource(node, group, edit.kind === 'source' ? { kind: 'sources', sources: [edit.source] } : undefined)
+  if (edit.field != null && edit.kind !== 'variable')
+    next = {
+      ...next,
+      inputs: {
+        ...next.inputs,
+        [handle]: edit.kind === 'source' ? { kind: 'sources', sources: [edit.source] } : { kind: 'value', value: edit.value[edit.field] ?? null },
+      },
+    }
+  const operations: FlowChanges = [{ kind: 'graph.node.replace', nodeId, before: node, node: next }]
+  const content = revision.revision.content
+  const binding = edit.kind === 'variable' ? (setGraphInputVariable(reduceFlowChanges(content, operations), nodeId, handle, edit.name, bindingId) ?? []) : []
+  return cleanVariableBindings(content, [...operations, ...binding])
 }

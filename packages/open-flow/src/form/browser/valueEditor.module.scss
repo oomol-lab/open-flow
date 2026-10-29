@@ -155,10 +155,11 @@
 $summary-focus: '> .summary:focus-visible, > :is(.valueTools) :focus-visible';
 $feedback-targets: '#{$summary-focus}, > .body:not([hidden]) :focus-visible';
 $feedback-focus: ':has(#{$feedback-targets})';
-:global([data-value-editor-scope]):has(#{selector.nest('.root', $feedback-targets)}),
-// Custom controls also own feedback when placed in a row header, outside .body.
-:global([data-value-editor-scope]):has(.errorAnchor :focus-visible),
-.root#{$feedback-focus} {
+// A valid focused control has no feedback to take priority over hovered errors.
+:global([data-value-editor-scope]):has([data-feedback] :focus-visible),
+:global([data-value-editor-scope]):has(#{selector.nest('.root[data-summary-feedback]', $summary-focus)}),
+.root:has([data-feedback] :focus-visible),
+.root[data-summary-feedback]:has(#{$summary-focus}) {
   --error-hover-opacity: 0;
   --error-hover-visibility: hidden;
 }

@@ -1,3 +1,4 @@
+import type { HttpRequestExecutor } from '@oomol-lab/open-flow/http-request'
 import type { WorkflowContract, WorkflowExecutor } from '@oomol-lab/open-flow/workflow'
 import type { CanvasCommand, CanvasBroadcast } from '@oomol-lab/open-flow/control-api'
 // Compiled against the installed tarball by check-npm-package.ts; this template is not executed.
@@ -221,3 +222,5 @@ void canvasResult
 
 export const workflowKind: WorkflowExecutor['kind'] = 'workflow'
 export type CalledWorkflow = WorkflowContract
+
+export const httpRequestKind: HttpRequestExecutor['kind'] = 'http-request'

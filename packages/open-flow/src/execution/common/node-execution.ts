@@ -108,6 +108,7 @@ function nodeKind(
   | 'decision'
   | 'javascript'
   | 'openapi'
+  | 'http-request'
   | 'llm'
   | 'value'
   | 'wait'
@@ -319,7 +320,8 @@ export function executeNode(
     const title = nodeTitle(node)
     const projectedInputs = Object.fromEntries(
       Object.entries(nodeInputs).filter(([handle]) => {
-        if (node.kind == 'task' && 'executor' in node.task && node.task?.executor.kind == 'openapi' && handle.startsWith('auth.')) return false
+        if (node.kind == 'task' && 'executor' in node.task && ['openapi', 'http-request'].includes(node.task.executor.kind) && handle.startsWith('auth.'))
+          return false
         const mapping = nodeInputMappings(node)[handle]
         return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
       }),
@@ -365,7 +367,7 @@ export function executeNode(
             Object.entries(nodeInputs).filter(([handle]) => {
               if (additional.has(handle)) return false
               const task = 'executor' in node.task ? node.task : undefined
-              if (task?.executor.kind != 'openapi') return true
+              if (task == null || !['openapi', 'http-request'].includes(task.executor.kind)) return true
               const mapping = node.inputs[handle]
               return (
                 mapping?.kind != 'unset' &&

@@ -167,6 +167,17 @@ export function createMocks() {
     trigger: async () => unknown(),
   }
   const model = new Hono()
+  model.post('/http-request', async (context) =>
+    context.json(
+      {
+        body: await context.req.json(),
+        tags: new URL(context.req.url).searchParams.getAll('tag'),
+        header: context.req.header('X-Test'),
+        authenticated: context.req.header('Authorization') == 'Bearer lab-token',
+      },
+      201,
+    ),
+  )
   model.get('/v1/providers', (c) =>
     c.json({ success: true, data: providers.map((p) => ({ service: p.serviceId, displayName: p.serviceName, authTypes: ['oauth'] })) }),
   )

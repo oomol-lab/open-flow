@@ -42,6 +42,7 @@ import {
   renameFlowOutputSources,
 } from '../../flow/common/nodeChanges.ts'
 import { retryConfigurationSchema } from '../../flow/common/retry.ts'
+import { httpRequestTask, httpRequestConfigSchema, httpRequestInputs } from '../../http/common/httpRequest.ts'
 import { withWorkflowTask, workflowTask, workflowSelectionTask, workflowCapability, workflowAgentTool } from '../../workflow/common/workflow.ts'
 import { conditionConfigurationView, prepareConditionConfiguration } from './authoringCondition.ts'
 import { authoringDiagnosticField } from './authoringDiagnosticFields.ts'
@@ -145,7 +146,10 @@ export function authoringNode(content: RevisionContent, ref: string) {
         ),
       }
     else if (task.executor.kind == 'workflow') config = { flowId: task.executor.flowId }
-    else if (task.executor.kind == 'openapi') {
+    else if (task.executor.kind == 'http-request') {
+      const { kind: _kind, ...settings } = task.executor
+      config = settings
+    } else if (task.executor.kind == 'openapi') {
       config = { ...openApiConfigView(task.executor) }
     }
   } else if (node.kind == 'task' && 'moduleId' in node.task) {
@@ -442,7 +446,8 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       const timing = record(record(patch.config).autoContinue)
       if (Object.hasOwn(timing, 'kind') && timing.kind != record(record(view.config).autoContinue).kind) record(update.config).autoContinue = timing
     }
-    if (type == 'openapi' && Object.hasOwn(record(patch.config), 'authentication')) record(update.config).authentication = record(patch.config).authentication
+    if ((type == 'openapi' || type == 'http-request') && Object.hasOwn(record(patch.config), 'authentication'))
+      record(update.config).authentication = record(patch.config).authentication
     for (const path of clear) clearPath(update, path)
     if (typeof update.name != 'string') fail('node.name-required', 'Node name cannot be cleared.')
     const config = authoringConfigurations[type].parse(update.config) as Record<string, unknown>
@@ -516,7 +521,10 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
           task = { ...before, name: String(update.name), executor: { ...executor, ...config } } as ManagedTaskDefinition
         } else task = await connectorTask(config, String(update.name))
       } else if (type == 'decision') task = decisionTask(config.questions as Parameters<typeof decisionTask>[0], String(update.name))
-      else if (type == 'openapi') {
+      else if (type == 'http-request') {
+        task = httpRequestTask(httpRequestConfigSchema.parse(config), String(update.name), before)
+        next = { ...next, inputs: httpRequestInputs(node.inputs, before, task) } as GraphNode
+      } else if (type == 'openapi') {
         task = await prepareOpenApiTask(config as AuthoringOpenApiConfig, before, (url) => host.openapi(url), String(update.name), {
           authentication: explicit('authentication'),
           serverUrl: explicit('serverUrl'),
@@ -765,6 +773,9 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
               break
             case 'connector':
               changes = createManagedTask(identity, await connectorTask(config, name))
+              break
+            case 'http-request':
+              changes = createManagedTask(identity, httpRequestTask(httpRequestConfigSchema.parse(config), name))
               break
             case 'openapi':
               changes = createManagedTask(

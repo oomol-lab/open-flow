@@ -121,6 +121,7 @@ function nodeIcon(node: ResolvedNode): string | undefined {
       if ('moduleId' in task) return ':carbon:code:'
       if (task.executor.kind == 'decision') return ':carbon:ml-model-reference:'
       if (task.executor.kind == 'workflow') return ':lucide-light:workflow:'
+      if (task.executor.kind == 'http-request') return ':lucide-light:globe:'
       if (task.executor.kind == 'openapi') return ':logos:openapi-icon:'
       return task.executor.kind == 'connector' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
     }
@@ -352,6 +353,7 @@ function executorName(task: TaskDefinition | undefined, providerName: string | u
   if (task.executor.kind == 'agent') return t?.('addNode.agent') ?? 'AI Agent'
   if (task.executor.kind == 'decision') return t?.('addNode.decision') ?? 'AI Decision'
   if (task.executor.kind == 'workflow') return t?.('addNode.workflow') ?? 'Call Workflow'
+  if (task.executor.kind == 'http-request') return `${t?.('httpRequest.title') ?? 'HTTP Request'} · ${task.executor.method}`
   if (task.executor.kind == 'openapi') return 'OpenAPI'
   if (task.executor.kind == 'llm') return t?.('designer.executorLlm') ?? 'LLM'
   return `${t?.('designer.executorConnector') ?? 'Connector'} · ${providerName ?? task.executor.action.split('.')[0]}`

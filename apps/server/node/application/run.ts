@@ -20,7 +20,9 @@ import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
 import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector-contract.ts'
-import { OpenApiTaskError, executeOpenApi } from '../deployment/openapi.ts'
+import { executeHttpRequest } from '../deployment/http-request.ts'
+import { HttpTaskError } from '../deployment/http-transport.ts'
+import { executeOpenApi } from '../deployment/openapi.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { errorKind } from '../logger.ts'
 import { supportsIsolatedVmEngine, IsolatedVmHost } from '../runtime/isolated-vm.ts'
@@ -50,6 +52,11 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'webhook.response-status-invalid',
   'webhook.response-headers-invalid',
   'node.output-invalid',
+  'http-request.input-invalid',
+  'http-request.response-invalid',
+  'http-request.http-failed',
+  'http-request.indeterminate',
+  'http-request.limit-exceeded',
   'openapi.input-invalid',
   'openapi.response-invalid',
   'openapi.http-failed',
@@ -322,14 +329,9 @@ export class RunExecutor {
             })
           },
           projectFailure: (error) => {
-            if (error instanceof ConnectorTaskError || error instanceof OpenApiTaskError || error instanceof WorkflowToolError)
+            if (error instanceof ConnectorTaskError || error instanceof HttpTaskError || error instanceof WorkflowToolError)
               indeterminate ||= error.indeterminate
-            if (
-              error instanceof ConnectorTaskError ||
-              error instanceof TaskHostError ||
-              error instanceof OpenApiTaskError ||
-              error instanceof WorkflowToolError
-            )
+            if (error instanceof ConnectorTaskError || error instanceof TaskHostError || error instanceof HttpTaskError || error instanceof WorkflowToolError)
               return { code: error.code, message: error.message, retryable: error.retryable, catchable: error.catchable }
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
           },
@@ -405,6 +407,8 @@ export class RunExecutor {
     switch (executor.kind) {
       case 'workflow':
         return this.#invokeWorkflow(run, invocation.nodeId, invocation.jobId, invocation.input, node, invocation.workflowRunId)
+      case 'http-request':
+        return executeHttpRequest(executor, invocation.input, invocation.signal)
       case 'openapi':
         return executeOpenApi(executor, invocation.input, invocation.signal)
       case 'agent': {
