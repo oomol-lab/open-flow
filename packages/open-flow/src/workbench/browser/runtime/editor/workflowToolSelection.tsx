@@ -3,7 +3,7 @@ import type { WorkflowCapability } from '../../../../flow/common/change.ts'
 import type { WorkflowCandidate, WorkflowContract } from '../../../../workflow/common/workflow.ts'
 import type { ToolPickerGroup } from './toolPickerList.tsx'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -24,24 +24,14 @@ export interface WorkflowToolSelection<T> {
   refresh(entry: T, target: WorkflowContract): T
 }
 
-export function WorkflowToolPicker({
-  list,
-  selected,
-  disabled,
-  onToggle,
-}: {
-  readonly list: WorkflowToolSelection<unknown>['list']
-  readonly selected: readonly string[]
-  readonly disabled: boolean
-  readonly onToggle: (target: WorkflowCandidate) => void
-}) {
+export function useWorkflowToolCatalog(list?: WorkflowToolSelection<unknown>['list']) {
   const t = useTranslate()
   const [choices, setChoices] = useState<readonly WorkflowCandidate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
   const [attempt, setAttempt] = useState(0)
-  const [query, setQuery] = useState('')
   useEffect(() => {
+    if (list == null) return
     const controller = new AbortController()
     setLoading(true)
     setError(undefined)
@@ -59,6 +49,23 @@ export function WorkflowToolPicker({
       })
     return () => controller.abort()
   }, [list, attempt, t])
+  return { choices, loading: list != null && loading, error, retry: () => setAttempt((value) => value + 1) }
+}
+
+export function WorkflowToolPicker({
+  catalog,
+  selected,
+  disabled,
+  onToggle,
+}: {
+  readonly catalog: ReturnType<typeof useWorkflowToolCatalog>
+  readonly selected: readonly string[]
+  readonly disabled: boolean
+  readonly onToggle: (target: WorkflowCandidate) => void
+}) {
+  const t = useTranslate()
+  const [query, setQuery] = useState('')
+  const { choices, loading, error, retry } = catalog
   const groups = useMemo<ToolPickerGroup<WorkflowCandidate>[]>(() => {
     const visible = choices.filter((item) => `${item.name} ${item.flowId}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     return (['published', 'missingStart', 'other'] as const).flatMap((group) => {
@@ -94,7 +101,7 @@ export function WorkflowToolPicker({
       searchLabel={t('workflow.search')}
       loading={loading}
       error={error}
-      onRetry={() => setAttempt((value) => value + 1)}
+      onRetry={retry}
       disabled={disabled}
       onChoose={onToggle}
     />
@@ -103,6 +110,7 @@ export function WorkflowToolPicker({
 
 export function SelectedWorkflowTool({
   entry,
+  workflowName,
   disabled,
   load,
   onRefresh,
@@ -111,6 +119,7 @@ export function SelectedWorkflowTool({
   children,
   portalRoot,
 }: {
+  readonly workflowName?: string
   readonly entry: WorkflowCapability
   readonly disabled: boolean
   readonly load?: WorkflowToolSelection<unknown>['load']
@@ -154,8 +163,8 @@ export function SelectedWorkflowTool({
       })
     return () => controller.abort()
   }, [flowId, revisionId, interfaceKey, load, attempt, t])
-  const title = target?.name ?? entry.name
-  const removeLabel = t('actionPicker.remove', { action: title })
+  const targetName = target?.name ?? workflowName ?? entry.flowId
+  const removeLabel = t('actionPicker.remove', { action: targetName })
   return (
     <SelectedToolRow
       icon={
@@ -163,10 +172,12 @@ export function SelectedWorkflowTool({
           <i aria-hidden="true" className="i-lucide-light:workflow size-4 text-muted-foreground" />
         </ProviderAppIcon>
       }
-      title={title}
+      title={children == null ? <WorkflowToolTitle name={entry.name} disabled={disabled} onChange={onChange} /> : entry.name}
       subtitle={
         <>
-          <span>{t('toolPicker.workflows')}</span>
+          <span className="truncate" title={targetName}>
+            {t('toolPicker.workflows')} · {targetName}
+          </span>
           <OpenWorkflowLink flowId={entry.flowId} />
         </>
       }
@@ -185,57 +196,45 @@ export function SelectedWorkflowTool({
         )
       }
     >
-      <div className="open-flow-property-panel flex min-w-0 flex-col gap-1">
-        {children == null && (
-          <Input
-            controlSize="field"
-            aria-label={t('toolPicker.alias')}
-            placeholder={t('toolPicker.alias')}
-            value={entry.name}
-            disabled={disabled}
-            onChange={(event) => onChange(event.target.value)}
+      <div className={`open-flow-property-panel flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 ${issue && !busy ? 'bg-destructive/5' : 'bg-muted/60'}`}>
+        <p
+          role="status"
+          className={`m-0 flex min-w-0 flex-1 items-start gap-1.5 py-0.5 text-xs leading-5 ${issue && !busy ? 'text-destructive' : 'text-muted-foreground'}`}
+        >
+          <span aria-hidden="true" className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
+            {busy ? <Spinner /> : <i className={issue ? 'i-lucide-light:circle-alert size-4' : 'i-lucide-light:circle-check size-4'} />}
+          </span>
+          <span className="min-w-0 break-words">{busy ? t('workflow.loading') : (issue ?? t('toolPicker.current'))}</span>
+        </p>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                size="icon-xs"
+                variant={issue && !busy ? 'destructive-ghost' : 'ghost'}
+                className={issue && !busy ? undefined : 'text-muted-foreground'}
+                aria-label={t('workflow.refresh')}
+                disabled={disabled || busy || load == null}
+                onClick={async () => {
+                  setBusy(true)
+                  try {
+                    const contract = await load!(entry.flowId)
+                    onRefresh(contract)
+                    setAttempt((value) => value + 1)
+                  } catch (cause) {
+                    setIssue(errorNotice(cause, t).message)
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                <i aria-hidden="true" className="i-lucide-light:rotate-cw size-4" />
+              </Button>
+            }
           />
-        )}
-        <div className={`flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 ${issue && !busy ? 'bg-destructive/5' : 'bg-muted/60'}`}>
-          <p
-            role="status"
-            className={`m-0 flex min-w-0 flex-1 items-start gap-1.5 py-0.5 text-xs leading-5 ${issue && !busy ? 'text-destructive' : 'text-muted-foreground'}`}
-          >
-            <span aria-hidden="true" className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
-              {busy ? <Spinner /> : <i className={issue ? 'i-lucide-light:circle-alert size-4' : 'i-lucide-light:circle-check size-4'} />}
-            </span>
-            <span className="min-w-0 break-words">{busy ? t('workflow.loading') : (issue ?? t('toolPicker.current'))}</span>
-          </p>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant={issue && !busy ? 'destructive-ghost' : 'ghost'}
-                  className={issue && !busy ? undefined : 'text-muted-foreground'}
-                  aria-label={t('workflow.refresh')}
-                  disabled={disabled || busy || load == null}
-                  onClick={async () => {
-                    setBusy(true)
-                    try {
-                      const contract = await load!(entry.flowId)
-                      onRefresh(contract)
-                      setAttempt((value) => value + 1)
-                    } catch (cause) {
-                      setIssue(errorNotice(cause, t).message)
-                    } finally {
-                      setBusy(false)
-                    }
-                  }}
-                >
-                  <i aria-hidden="true" className="i-lucide-light:rotate-cw size-4" />
-                </Button>
-              }
-            />
-            <TooltipContent container={portalRoot}>{t('workflow.refresh')}</TooltipContent>
-          </Tooltip>
-        </div>
+          <TooltipContent container={portalRoot}>{t('workflow.refresh')}</TooltipContent>
+        </Tooltip>
       </div>
     </SelectedToolRow>
   )
@@ -251,4 +250,46 @@ export function availableWorkflowToolName(target: WorkflowCandidate | WorkflowCo
   let suffix = 2
   while (entries.some((entry) => entry.name == name)) name = `${base}_${suffix++}`
   return name
+}
+
+function WorkflowToolTitle({ name, disabled, onChange }: { readonly name: string; readonly disabled: boolean; readonly onChange: (name: string) => void }) {
+  const t = useTranslate()
+  const [originalName, setOriginalName] = useState<string>()
+  const trigger = useRef<HTMLButtonElement>(null)
+  return (
+    <span className="open-flow-property-panel relative -mx-2 flex">
+      <button
+        ref={trigger}
+        type="button"
+        className="-my-0.5 block w-full cursor-text truncate rounded-[var(--ui-control-radius)] px-2 py-0.5 text-left outline-none enabled:hover:bg-accent/50 focus-visible:bg-accent/50 disabled:cursor-default"
+        aria-label={t('toolPicker.alias')}
+        title={name}
+        disabled={disabled}
+        onClick={() => setOriginalName(name)}
+      >
+        {name || t('toolPicker.alias')}
+      </button>
+      {originalName != null && (
+        <Input
+          autoFocus
+          controlSize="field"
+          className="absolute inset-x-0 -inset-y-0.5 h-auto py-0 text-[13px] font-medium"
+          aria-label={t('toolPicker.alias')}
+          value={name}
+          disabled={disabled}
+          onFocus={(event) => event.currentTarget.select()}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={() => setOriginalName(undefined)}
+          onKeyDown={(event) => {
+            if (event.key != 'Enter' && event.key != 'Escape') return
+            event.preventDefault()
+            event.stopPropagation()
+            if (event.key == 'Escape') onChange(originalName)
+            setOriginalName(undefined)
+            trigger.current?.focus()
+          }}
+        />
+      )}
+    </span>
+  )
 }

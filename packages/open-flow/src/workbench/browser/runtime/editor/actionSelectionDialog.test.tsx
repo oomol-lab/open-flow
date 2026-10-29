@@ -5,6 +5,7 @@ import type { WorkflowCapability } from '../../../../flow/common/change.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { ActionSettingsProps, SelectedTool } from './actionSelectionDialog.tsx'
+import type { WorkflowToolSelection } from './workflowToolSelection.tsx'
 
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -52,6 +53,7 @@ afterEach(async () => {
 async function render(
   entries: readonly SelectedTool[] = [],
   settings?: { readonly title: string; readonly render: (props: ActionSettingsProps<SelectedTool>) => ReactNode },
+  workflows?: WorkflowToolSelection<SelectedTool>,
 ) {
   const connectors = {
     $: { actions: val({}), connections: val([]) },
@@ -69,6 +71,7 @@ async function render(
           onSave={onSave}
           notify={vi.fn()}
           settings={settings}
+          workflows={workflows}
         />
       </I18nProvider>,
     ),
@@ -98,12 +101,16 @@ function confirming() {
   return document.body.textContent!.includes('Discard tool changes?')
 }
 async function rename(value: string) {
+  if (document.querySelector('input[aria-label="Call name"]') == null) await click('Call name')
   const input = document.querySelector<HTMLInputElement>('input[aria-label="Call name"]')!
   expect(input).not.toBeNull()
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
+}
+async function pressAliasKey(key: string) {
+  await act(async () => document.querySelector('input[aria-label="Call name"]')!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })))
 }
 it('does not warn for unchanged tools or a reverted selection', async () => {
   await render()
@@ -139,6 +146,44 @@ it('tracks workflow alias changes and stops warning when reverted', async () => 
   expect(unloadBlocked()).toBe(true)
   await rename('original')
   expect(unloadBlocked()).toBe(false)
+})
+it('finishes title editing with Enter or blur and cancels with Escape without closing the dialog', async () => {
+  await render([workflow])
+  expect(document.querySelector('input[aria-label="Call name"]')).toBeNull()
+  await rename('canceled')
+  await pressAliasKey('Escape')
+  expect(findButton('Call name').textContent).toBe('original')
+  expect(document.activeElement).toBe(findButton('Call name'))
+  expect(unloadBlocked()).toBe(false)
+  expect(confirming()).toBe(false)
+  await rename('accepted')
+  await pressAliasKey('Enter')
+  expect(document.querySelector('input[aria-label="Call name"]')).toBeNull()
+  expect(findButton('Call name').textContent).toBe('accepted')
+  await rename('blurred')
+  await act(async () => document.querySelector<HTMLInputElement>('input[aria-label="Call name"]')!.blur())
+  expect(document.querySelector('input[aria-label="Call name"]')).toBeNull()
+  expect(findButton('Call name').textContent).toBe('blurred')
+  expect(unloadBlocked()).toBe(true)
+  await click('Save')
+  expect(onSave).toHaveBeenCalledWith([{ ...workflow, name: 'blurred' }])
+})
+it('keeps the target workflow name when editing and saving an unavailable workflow alias', async () => {
+  const list = vi.fn(async () => [{ flowId: 'child', name: 'Original workflow', problem: 'unpublished' as const }])
+  await render([workflow], undefined, {
+    list,
+    load: async () => {
+      throw new Error('Unpublished')
+    },
+    create: () => workflow,
+    refresh: (entry) => entry,
+  })
+  expect(document.body.textContent).toContain('Workflows · Original workflow')
+  await rename('renamed')
+  expect(document.body.textContent).toContain('Workflows · Original workflow')
+  expect(list).toHaveBeenCalledTimes(1)
+  await click('Save')
+  expect(onSave).toHaveBeenCalledWith([{ ...workflow, name: 'renamed' }])
 })
 it('keeps protection after a failed save and clears it after a successful save', async () => {
   await render()

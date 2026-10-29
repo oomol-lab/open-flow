@@ -24,7 +24,7 @@ import { ActionPicker } from './actionPicker.tsx'
 import { AccountControlButton, AccountSelect } from './connectionSettings.tsx'
 import { ProviderAppIcon } from './providerAppIcon.tsx'
 import { SelectedToolRow } from './selectedToolRow.tsx'
-import { WorkflowToolPicker, SelectedWorkflowTool } from './workflowToolSelection.tsx'
+import { WorkflowToolPicker, SelectedWorkflowTool, useWorkflowToolCatalog } from './workflowToolSelection.tsx'
 
 export interface SelectedAction {
   readonly kind?: 'connector'
@@ -219,6 +219,7 @@ function ActionSelectionEditor<T extends SelectedTool>({
   const [draft, setDraft] = useState(entries)
   const [category, setCategory] = useState<'connectors' | 'workflows'>('connectors')
   const [workflowPending, setWorkflowPending] = useState(false)
+  const workflowCatalog = useWorkflowToolCatalog(workflows?.list)
   const actions = useVal(connectors.$.actions)
   const connections = useVal(connectors.$.connections)
   const [initialEntries] = useState(entries)
@@ -414,7 +415,7 @@ function ActionSelectionEditor<T extends SelectedTool>({
           )}
           {category == 'workflows' && workflows ? (
             <WorkflowToolPicker
-              list={workflows.list}
+              catalog={workflowCatalog}
               disabled={disabled || workflowPending}
               selected={draft.flatMap((entry) => (entry.kind == 'workflow' ? [entry.flowId] : []))}
               onToggle={async (candidate) => {
@@ -502,6 +503,7 @@ function ActionSelectionEditor<T extends SelectedTool>({
                       <SelectedWorkflowTool
                         key={entry.id ?? entryKey(entry)}
                         entry={entry}
+                        workflowName={workflowCatalog.choices.find((item) => item.flowId == entry.flowId)?.name}
                         disabled={disabled}
                         load={workflows?.load}
                         onChange={(name) => replace(index, { ...entry, name })}
