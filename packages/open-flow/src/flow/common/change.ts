@@ -224,7 +224,7 @@ export type TaskCapability = ConnectorCapability | WorkflowCapability
 export function decodeTaskCapabilities(value: unknown): readonly TaskCapability[] {
   if (!Array.isArray(value)) throw new TypeError('Task capabilities must be an array.')
   const parsed = authoringDefinitionSchemas.capabilities.parse(value)
-  decodeConnectorCapabilities(parsed.filter((item) => item.kind == 'connector'))
+  const connectors = decodeConnectorCapabilities(parsed.filter((item) => item.kind == 'connector'))
   const names = new Set<string>()
   for (const item of parsed) {
     if (item.kind != 'workflow') continue
@@ -232,7 +232,8 @@ export function decodeTaskCapabilities(value: unknown): readonly TaskCapability[
       throw new TypeError('Workflow tool names must be unique provider-compatible names.')
     names.add(item.name)
   }
-  return parsed as readonly TaskCapability[]
+  let connectorIndex = 0
+  return parsed.map((item) => (item.kind == 'connector' ? connectors[connectorIndex++]! : item)) as readonly TaskCapability[]
 }
 
 export interface ConnectorAccessCapability {

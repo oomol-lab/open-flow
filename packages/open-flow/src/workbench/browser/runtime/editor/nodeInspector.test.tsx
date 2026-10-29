@@ -223,6 +223,7 @@ function codeFixture(mode: 'shared' | 'independent' | 'missing') {
   const actions = vi.fn(() => data)
   const moduleEditor = val({ moduleId: 'code', source: '', status: 'saved' })
   const store = {
+    listWorkflowTargets: vi.fn().mockResolvedValue([]),
     catalogs: {
       providers: {
         get: () =>

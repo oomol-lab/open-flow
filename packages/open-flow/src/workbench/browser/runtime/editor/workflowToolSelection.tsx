@@ -258,17 +258,19 @@ function WorkflowToolTitle({ name, disabled, onChange }: { readonly name: string
   const trigger = useRef<HTMLButtonElement>(null)
   return (
     <span className="open-flow-property-panel relative -mx-2 flex">
-      <button
+      <Button
         ref={trigger}
         type="button"
-        className="-my-0.5 block w-full cursor-text truncate rounded-[var(--ui-control-radius)] px-2 py-0.5 text-left outline-none enabled:hover:bg-accent/50 focus-visible:bg-accent/50 disabled:cursor-default"
+        variant="ghost"
+        size="xs"
+        className="-my-0.5 block w-full cursor-text truncate border-0 py-0.5 text-left text-[13px] leading-5 hover:bg-accent/50 focus-visible:bg-accent/50 disabled:cursor-default dark:hover:bg-accent/50"
         aria-label={t('toolPicker.alias')}
         title={name}
         disabled={disabled}
         onClick={() => setOriginalName(name)}
       >
         {name || t('toolPicker.alias')}
-      </button>
+      </Button>
       {originalName != null && (
         <Input
           autoFocus

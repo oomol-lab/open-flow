@@ -107,5 +107,6 @@ export function codeTyping(
       : `<Action extends string>(actionId: Action extends ${hinted} ? never : Action, input?: Record<string, unknown>, options?: ${dynamicOptions}): Promise<unknown>`
   fields.push(`call: { ${calls.join('; ')}${calls.length == 0 ? '' : '; '}${permissions == null ? fallback : ''} }`)
   if (permissions == null) fields.push('[key: string]: any')
-  return `${typing}/** @typedef {import("@oomol-lab/open-flow").TaskContext<{ ${fields.join('; ').replaceAll('*/', '*\\/')} }, ${workflowTyping}>} TaskContext */\n`
+  const contextType = `import("@oomol-lab/open-flow").TaskContext<{ ${fields.join('; ')} }, ${workflowTyping}>`
+  return `${typing}/** @typedef {${contextType.replaceAll('*/', '*\\/')}} TaskContext */\n`
 }

@@ -330,11 +330,31 @@ it('completes workflow aliases and validates saved input and output types', () =
   expect(diagnostics("export default async (_, ctx) => (await ctx.workflows.call('double', { amount: 0, note: null })).total.toFixed(2)", workflows)).toEqual(
     [],
   )
-  for (const invalid of [
-    "ctx.workflows.call('missing', {})",
-    "ctx.workflows.call('double')",
-    "ctx.workflows.call('double', { amount: 'wrong' })",
-    "(await ctx.workflows.call('double', { amount: -2 })).total.toUpperCase()",
+  for (const [invalid, expected] of [
+    ["ctx.workflows.call('missing', {})", `Argument of type '"missing"' is not assignable to parameter of type '"double"'.`],
+    ["ctx.workflows.call('double')", 'Expected 2 arguments, but got 1.'],
+    ["ctx.workflows.call('double', { amount: 'wrong' })", "Type 'string' is not assignable to type 'number'."],
+    ["(await ctx.workflows.call('double', { amount: -2 })).total.toUpperCase()", "Property 'toUpperCase' does not exist on type 'number'."],
   ])
-    expect(diagnostics(`export default async (_, ctx) => ${invalid}`, workflows).length).toBeGreaterThan(0)
+    expect(diagnostics(`export default async (_, ctx) => ${invalid}`, workflows)).toContain(expected)
+})
+
+it('escapes workflow handles and enum values throughout the TaskContext JSDoc', () => {
+  const workflows: readonly TaskCapability[] = [
+    {
+      kind: 'workflow',
+      name: 'echo',
+      flowId: 'target',
+      revisionId: 'snapshot',
+      inputs: [{ handle: 'input*/', jsonSchema: { type: 'string', enum: ['value*/'] }, nullable: false }],
+      outputs: [{ handle: 'output*/', jsonSchema: { type: 'string', enum: ['result*/'] }, nullable: false }],
+    },
+  ]
+  const source = "export default async (_, ctx) => (await ctx.workflows.call('echo', { 'input*/': 'value*/' }))['output*/'].toUpperCase()"
+  const { service } = editorService(source, workflows)
+  expect(service.getSyntacticDiagnostics('/module.js')).toEqual([])
+  expect(diagnostics(source, workflows)).toEqual([])
+  expect(diagnostics(source.replace('toUpperCase()', 'toFixed()'), workflows)).toEqual([
+    expect.stringContaining(`Property 'toFixed' does not exist on type '"result*/"'.`),
+  ])
 })

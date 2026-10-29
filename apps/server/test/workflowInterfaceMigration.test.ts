@@ -176,7 +176,7 @@ it('upgrades full and delta Revisions, preserves identities and Live history, an
   })
   await closeService(service)
   const reopened = Database.open(file)
-  expect(reopened.connection.prepare('PRAGMA user_version').get()).toEqual({ user_version: 54 })
+  expect(reopened.connection.prepare('PRAGMA user_version').get()).toEqual({ user_version: 55 })
   reopened.close()
 })
 

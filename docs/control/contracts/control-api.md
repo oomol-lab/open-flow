@@ -417,7 +417,7 @@ interface FlowCheck {
 }
 ```
 
-Check bodies use `{ engineContract: 'open-flow-engine/v7', version: 1 }` and always validate the Flow Revision pinned in the path. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
+Check bodies use `{ engineContract: 'open-flow-engine/v8', version: 1 }` and always validate the Flow Revision pinned in the path. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
 
 Publication `liveEnd` records enabled state and end time when a new Live replaces that version. The ordinary publish/rollback transaction writes it atomically. Asynchronous preparation does not write it; failure and idempotent replay do not rewrite it. A new rollback Publication does not inherit its source’s end state. Current Publications and older records without history omit it. It does not indicate Trigger health.
 
@@ -1225,7 +1225,7 @@ Flow terminal results use `{ kind: 'node-results', nodes }`. `nodes` contains on
 
 ## 10. Code Action contract
 
-The script contract is `open-flow-engine/v7`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints use version 6; old development checkpoint shapes are rejected without conversion. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
+The script contract is `open-flow-engine/v8`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints use version 6; old development checkpoint shapes are rejected without conversion. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.workflows.call(name, input)` calls a declared workflow tool and returns its business outputs. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
 
 ### Revision and edit operations
 
@@ -1341,7 +1341,7 @@ Agent uses a Managed Task with `executor.kind: "agent"`, stored directly in `nod
 }
 ```
 
-`model` is a deployment model-gateway ID with no fallback. `maxRounds` is an integer from 1–100. There are at most 64 Connector tools; tools and code computation are optional. Tool `id` is nonempty and unique within the Task. `name` is unique and matches `[A-Za-z][A-Za-z0-9_-]{0,63}`. Final output `jsonSchema` and `description` go to the model. If final JSON parsing or schema validation fails, the model receives the specific error and corrects its answer without tools or replaying executed operations.
+`model` is a deployment model-gateway ID with no fallback. `maxRounds` is an integer from 1–100. There are at most 64 declared Agent tools in total, including Connector and workflow tools; tools and code computation are optional. Tool `id` is nonempty and unique within the Task. `name` is unique and matches `[A-Za-z][A-Za-z0-9_-]{0,63}`. Final output `jsonSchema` and `description` go to the model. If final JSON parsing or schema validation fails, the model receives the specific error and corrects its answer without tools or replaying executed operations.
 
 Corrections count toward `maxRounds`. `read_result` and `run_code` are reserved. Optional `executor.code` defaults to false and is pinned in Revision. Action/Connection are pinned; unauthenticated Actions may omit `connectionId`. Tool inputs cannot declare port `value`; their `source` must be `{ kind: "value", value }`, `{ kind: "input", input }`, or `{ kind: "model" }`. `prompt` is a string template using `{{inputName}}` for node inputs. Strings insert unchanged; other JSON serializes.
 
@@ -1390,7 +1390,7 @@ Each retained result belongs to one Run and invocation. `resultId` is an opaque 
 - `GET /v1/runs/:runId/results/:resultId?pointer=&offset=0&limit=20&maxBytes=15000` returns `{ version: 1, runId, result, page }`. `pointer` is a JSON Pointer up to 4096 characters, defaulting to root. `offset` is a nonnegative integer. `limit` is 1–100 for object/array members. `maxBytes` is 1–1,048,576, default 15,000, limiting complete UTF-8 `page` JSON; outer result metadata is separate. String offsets count Unicode code points. Fragment size follows page budget without a separate 8192-byte cap. Reject budgets that cannot fit metadata plus one character/member. Model `read_result` permits at most 65,536 bytes, still defaulting to 15,000. Invalid pointers, out-of-range offsets, or invalid arguments return `run.invalid`.
 - `GET /v1/runs/:runId/results/:resultId/content` returns complete JSON with `application/json`, attachment download, and `no-store` headers.
 
-Result metadata is `{ resultId, callId, toolId, source, bytes, digest, createdAt }`. `source` is `{ kind: "connector", action }` or `{ kind: "code" }`, never inferred from tool names. `bytes` counts stored JSON UTF-8 bytes; `digest` is its SHA-256 hexadecimal digest; `createdAt` is an ISO timestamp.
+Result metadata is `{ resultId, callId, toolId, source, bytes, digest, createdAt }`. `source` is `{ kind: "connector", action }`, `{ kind: "workflow", flowId }`, or `{ kind: "code" }`, never inferred from tool names. `bytes` counts stored JSON UTF-8 bytes; `digest` is its SHA-256 hexadecimal digest; `createdAt` is an ISO timestamp.
 
 Pages use `{ pointer, type, complete, value?, length?, offset, nextOffset?, entries? }`. `type` is a JSON type. Small values return complete `value`; larger objects/arrays return `entries` with `{ pointer, type, complete, value?, length? }`. Entries without values can be read through their pointers. String offset/nextOffset count Unicode code points; value is the current contiguous fragment, limited by encoded size. `complete: false` means value/entries are not the complete original JSON. Continue with nextOffset when present.
 
