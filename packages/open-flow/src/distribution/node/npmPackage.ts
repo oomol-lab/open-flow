@@ -1,5 +1,13 @@
+import { execFile } from 'node:child_process'
 import { copyFile, cp, mkdir, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import path from 'node:path'
+import { promisify } from 'node:util'
+import sourceManifest from '../../../package.json' with { type: 'json' }
+
+const sourceEntries = Object.entries(sourceManifest.exports).filter(
+  ([, target]) => target.startsWith('./src/') && !target.includes('/browser/') && !target.includes('/node/'),
+)
 
 interface StageNpmPackageOptions {
   readonly packageRoot: string
@@ -11,12 +19,50 @@ export async function stageNpmPackage(options: StageNpmPackageOptions): Promise<
   const { packageRoot, sourceRoot, version } = options
   await mkdir(path.join(packageRoot, 'dist'), { recursive: true })
   await Promise.all([
+    stageSources(options),
     cp(path.join(sourceRoot, 'skills'), path.join(packageRoot, 'skills'), { recursive: true }),
     copyFile(path.join(sourceRoot, 'LICENSE'), path.join(packageRoot, 'LICENSE')),
     copyFile(path.join(sourceRoot, 'NOTICE'), path.join(packageRoot, 'NOTICE')),
     writeFile(path.join(packageRoot, 'README.md'), renderReadme()),
     writeFile(path.join(packageRoot, 'package.json'), `${JSON.stringify(createManifest(version), undefined, 2)}\n`),
   ])
+}
+
+async function stageSources({ packageRoot, sourceRoot }: StageNpmPackageOptions): Promise<void> {
+  const compiler = path.join(path.dirname(createRequire(import.meta.url).resolve('typescript/package.json')), 'bin/tsc')
+  const { stdout } = await promisify(execFile)(
+    process.execPath,
+    [
+      compiler,
+      '--ignoreConfig',
+      '--listFilesOnly',
+      '--noEmit',
+      '--module',
+      'preserve',
+      '--moduleResolution',
+      'bundler',
+      '--target',
+      'esnext',
+      '--resolveJsonModule',
+      '--allowImportingTsExtensions',
+      '--types',
+      'node',
+      path.join(sourceRoot, 'src/types/index.ts'),
+      ...sourceEntries.map(([, target]) => path.join(sourceRoot, target)),
+    ],
+    { cwd: sourceRoot, maxBuffer: 10 * 1024 * 1024 },
+  )
+  const sources = stdout
+    .trim()
+    .split(/\r?\n/)
+    .filter((file) => file.startsWith(path.join(sourceRoot, 'src') + path.sep))
+  await Promise.all(
+    sources.map(async (file) => {
+      const target = path.join(packageRoot, path.relative(sourceRoot, file))
+      await mkdir(path.dirname(target), { recursive: true })
+      await copyFile(file, target)
+    }),
+  )
 }
 
 function createManifest(version: string): object {
@@ -84,12 +130,12 @@ function createManifest(version: string): object {
         import: './dist/common/provider-triggers.js',
       },
       './flow-authoring': {
-        types: './dist/browser/flow-authoring.d.ts',
-        import: './dist/browser/flow-authoring.js',
+        types: './dist/common/flow-authoring.d.ts',
+        import: './dist/common/flow-authoring.js',
       },
       './flow-change': {
-        types: './dist/browser/flow-change.d.ts',
-        import: './dist/browser/flow-change.js',
+        types: './dist/common/flow-change.d.ts',
+        import: './dist/common/flow-change.js',
       },
       './flow-encoding': {
         types: './dist/common/flow-encoding.d.ts',
@@ -137,7 +183,7 @@ function createManifest(version: string): object {
         default: './dist/browser/theme.css',
       },
     },
-    files: ['dist', 'skills', 'README.md', 'NOTICE', 'LICENSE'],
+    files: ['dist', 'src', 'skills', 'README.md', 'NOTICE', 'LICENSE'],
     peerDependencies: {
       'effect': '4.0.0-rc.112',
       'zod': '^4.6.5',
@@ -198,6 +244,18 @@ The command uses process stdin/stdout/stderr and targets Bun 1.4.2 or newer.
 Importing it does not execute the CLI. Bundle it into the host at build time;
 runtime dependencies and the package version are included in the command entry.
 Skill templates ship in this same package under \`skills/open-flow/\`.
+
+## Public implementation sources
+
+The package includes the original sources for its platform-neutral public entries and their
+local dependencies under \`src/\`, matching this package version. Browser UI sources are excluded.
+These files are for reading implementation logic; import the public package entries as usual.
+Source paths are not public import APIs. Source maps and declaration maps are not included.
+
+| Public entry | Source |
+| --- | --- |
+| \`@oomol-lab/open-flow\` (types) | [src/types/index.ts](src/types/index.ts) |
+${sourceEntries.map(([entry, target]) => `| \`@oomol-lab/open-flow/${entry.slice(2)}\` | [${target.slice(2)}](${target.slice(2)}) |`).join('\n')}
 
 ## License
 
