@@ -3,9 +3,10 @@ import type { PropertyDeletion } from './propertyDeletion.ts'
 import type { WorkflowResponseOutputs } from './webhookStatusSource.tsx'
 
 import { useTranslate } from 'val-i18n-react'
-import { webhookHeaderNameIssue, webhookHeaderValuePort, webhookHeadersPort } from '../../../../flow/common/webhookResponse.ts'
+import { webhookHeaderValuePort, webhookHeadersPort } from '../../../../flow/common/webhookResponse.ts'
 import { FieldTable } from '../../../../form/browser/fieldTable.tsx'
 import { FieldValueEditor } from '../../../../form/browser/fieldValueEditor.tsx'
+import { httpHeaderNameIssue } from '../../../../http/common/headers.ts'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { SourceValueControl } from './sourceValueEditor.tsx'
@@ -110,7 +111,7 @@ export function WebhookHeadersEditor({
           valueAddon={source()}
           editor={whole == null ? undefined : selected(whole.output, issue('/responseHeadersSource'))}
           validateObjectFieldName={(name, current) =>
-            webhookHeaderNameIssue(
+            httpHeaderNameIssue(
               name,
               Object.keys(headers).filter((candidate) => candidate !== current),
             ) == null

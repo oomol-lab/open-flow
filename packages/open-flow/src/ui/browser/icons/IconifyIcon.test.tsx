@@ -4,7 +4,7 @@ import { fetchIcon, getInlineIconifyIcon, IconifyIcon } from './IconifyIcon.tsx'
 
 afterEach(() => vi.unstubAllGlobals())
 
-it.each(['log-out', 'workflow', 'reply'])('resolves the %s node icon locally without waiting for a collection or network', (name) => {
+it.each(['log-out', 'workflow', 'reply', 'globe'])('resolves the %s node icon locally without waiting for a collection or network', (name) => {
   const icon = getInlineIconifyIcon('lucide-light', name)
   expect(icon).toMatch(/^data:image\/svg\+xml/)
   expect(renderToStaticMarkup(<IconifyIcon collection="lucide-light" icon={name} />)).toContain('data:image/svg+xml')

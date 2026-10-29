@@ -22,6 +22,7 @@ const nodeKinds = new Set([
   'decision',
   'javascript',
   'openapi',
+  'http-request',
   'llm',
   'value',
   'wait',
@@ -54,6 +55,7 @@ function nodeKind(
   | 'decision'
   | 'javascript'
   | 'openapi'
+  | 'http-request'
   | 'llm'
   | 'value'
   | 'wait'
@@ -73,6 +75,7 @@ function nodeKind(
     | 'decision'
     | 'javascript'
     | 'openapi'
+    | 'http-request'
     | 'llm'
     | 'value'
     | 'wait'

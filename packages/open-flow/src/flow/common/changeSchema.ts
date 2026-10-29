@@ -3,7 +3,8 @@ import type { ChangeOperation, FlowDocument, JsonValue, RevisionContent } from '
 import { dequal } from 'dequal/lite'
 import { z } from 'zod'
 import { limitDecisionTask } from '../../decision/common/decision.ts'
-import { assertOpenApiAuthBindings } from '../../openapi/common/authBindings.ts'
+import { assertHttpAuthBindings } from '../../http/common/authBindings.ts'
+import { httpRequestExecutorSchema } from '../../http/common/httpRequest.ts'
 import { checkJsonDepth } from './json.ts'
 import { retryConfigurationSchema } from './retry.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
@@ -118,6 +119,7 @@ const managedFields = z.object({
         .optional(),
     }),
     z.strictObject({ kind: z.literal('workflow'), flowId: text, revisionId: text }),
+    httpRequestExecutorSchema,
   ]),
 })
 
@@ -591,7 +593,7 @@ export function decodeRevisionContent(value: unknown): RevisionContent {
   checkJsonDepth(value)
   const content = revision.parse(value) as RevisionContent
   checkModelVersion(content)
-  assertOpenApiAuthBindings(content.document)
+  assertHttpAuthBindings(content.document)
   return content
 }
 
@@ -601,7 +603,7 @@ export function decodeRevisionEnvelope(value: unknown): RevisionContent {
   const candidate = revisionSource.modelVersion == 2 ? { ...revisionSource, document: upgradeLegacyDocument(revisionSource.document) } : value
   const content = envelope.parse(candidate) as RevisionContent
   checkModelVersion(content)
-  assertOpenApiAuthBindings(content.document)
+  assertHttpAuthBindings(content.document)
   return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
 }
 
@@ -711,6 +713,13 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 }
 
 function checkModelVersion(content: RevisionContent): void {
+  if (
+    content.modelVersion < 11 &&
+    Object.values(content.document.graph.nodes).some(
+      (candidateNode) => candidateNode.kind == 'task' && 'executor' in candidateNode.task && candidateNode.task.executor.kind == 'http-request',
+    )
+  )
+    throw new TypeError('HTTP Request requires Flow model version 11.')
   if (
     content.modelVersion < 11 &&
     Object.values(content.document.graph.nodes).some(

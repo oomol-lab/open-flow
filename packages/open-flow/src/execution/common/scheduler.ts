@@ -69,6 +69,7 @@ export type SchedulerEvent =
         | 'decision'
         | 'javascript'
         | 'openapi'
+        | 'http-request'
         | 'llm'
         | 'value'
         | 'wait'

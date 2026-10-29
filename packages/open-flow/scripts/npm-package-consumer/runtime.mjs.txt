@@ -170,3 +170,8 @@ for (const name of ['SKILL.md', 'references/flow-authoring.md', 'references/flow
 const workflow = await import('@oomol-lab/open-flow/workflow')
 const workflowContract = { version: 1, flowId: 'target', name: 'Target', revisionId: 'r1', publicationId: 'p1', inputs: [], outputs: [] }
 assert.deepEqual(workflow.workflowTask(workflowContract), { name: 'Target', executor: { kind: 'workflow', flowId: 'target', revisionId: 'r1' }, inputs: [], outputs: [] })
+
+const httpRequest = await import('@oomol-lab/open-flow/http-request')
+const httpConfig = httpRequest.httpRequestConfigSchema.parse({ method: 'POST', bodyFormat: 'json' })
+assert.equal(httpRequest.buildHttpRequest(httpConfig, { url: 'https://example.test', body: null }).init.body, 'null')
+assert.deepEqual(httpRequest.parseHttpResponse(httpConfig, 200, new Headers({ 'content-type': 'application/json' }), '[1,2]').body, [1, 2])

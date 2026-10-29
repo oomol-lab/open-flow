@@ -25,6 +25,15 @@ export function runtimeAssertions(
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id == 'http-request') {
+    const result = events.find((event) => event.kind == 'run.completed')?.payload.result
+    const expected = { body: { body: sample.outputs?.payload, tags: ['a b', 'c'], header: 'lab', authenticated: true }, statusCode: 201 }
+    if (result == null || typeof result != 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, expected))
+      errors.push('Return the actual HTTP response body and status, preserving JSON null and dynamic inputs.')
+    const starts = events.filter((event) => event.kind == 'node.started' && event.payload.nodeKind == 'http-request')
+    if (starts.length != 1 || JSON.stringify(starts).includes('lab-token')) errors.push('Execute HTTP once and omit authentication from its start event.')
+    return errors
+  }
   if (id === 'poll-batch') {
     const completed = events.find((event) => event.kind === 'run.completed')
     const result = completed?.payload.result

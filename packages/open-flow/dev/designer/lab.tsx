@@ -30,6 +30,7 @@ const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
   'Node Approval': 'i-carbon:stamp',
   'Node AI Decision': 'i-carbon:ml-model-reference',
   'Node Workflow': 'i-lucide-light:workflow',
+  'Node HTTP Request': 'i-lucide-light:globe',
   'Node OpenAPI': 'i-logos:openapi-icon',
   'Node LLM': 'i-carbon:machine-learning-model',
   'Node Agent': 'i-carbon:machine-learning-model',

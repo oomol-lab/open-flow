@@ -1445,6 +1445,48 @@ snapshot, not a deletion lock: subscriptions can change after the query. Deletio
 still retires the source and eventually removes its subscriptions; handler draft
 references remain available for manual removal.
 
+## HTTP Request Tasks
+
+Public authoring type and executor kind are `http-request`. Public configuration excludes the
+executor discriminator. Generated inputs and outputs are owned by the node; callers do not provide
+Task definitions. `@oomol-lab/open-flow/http-request` exports shared configuration, construction,
+encoding and parsing functions.
+
+Configuration defaults are `method: "GET"`, `bodyFormat: "none"`, `responseFormat: "auto"`,
+`statusPolicy: "success"`, `authentication: { type: "none" }`, and
+`query`/`headers: { mode: "fields", names: [] }`. Methods are GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS.
+Authentication also accepts `{ type: "bearer" }`, `{ type: "basic" }`, or
+`{ type: "apiKey", name, in: "header" | "query" }`. Authentication updates replace the whole choice.
+Query/Header modes are `fields` or `object`; named fields generate `query.<name>` and
+`header.<name>`, whole-object mode generates `query` and `headers` inputs. Switching modes removes
+obsolete bindings without treating a field-to-object switch as a rename. Names remain saved.
+
+`url` is a required HTTP(S) URL without embedded credentials. Query accepts string/number/boolean
+values or arrays of them; arrays encode as repeated parameters. Explicit query entries replace all
+same-name URL parameters. Optional unset/null parameter inputs are omitted; nested query values
+are rejected. Headers accept text and reject case-insensitive duplicate names. Authentication values
+use source-only `auth.token` or Basic `auth.username`/`auth.password`; literals are rejected and
+start events omit these inputs. Credential injection conflicts with ordinary parameters fail.
+
+Body formats are `none`, `json`, `text`, and `form` (URL-encoded field object). Selected body formats
+require an explicitly supplied `body`; JSON null encodes as `null`, empty text remains empty, and no
+body remains absent. GET/HEAD bodies are rejected. JSON/Form supply Content-Type and reject
+conflicting media types; text defaults to text/plain and accepts an explicit Content-Type.
+
+Fixed outputs are `body`, integer `statusCode`, and `headers` with lowercase names excluding
+set-cookie. Body parsing is Auto (Content-Type), JSON or Text. JSON parse errors fail rather than
+fall back to text. Empty bodies and HEAD/204/205/304 yield null. JSON arrays are not expanded into
+multiple node executions. The node does not infer a permanent schema from response samples.
+
+Only 2xx succeeds by default. `statusPolicy: "all"` accepts any HTTP status, without changing network
+or parsing failure handling. Ordinary node retry and onError policies apply; there is no transport
+retry. HTTP 429/5xx and GET/HEAD/OPTIONS transport failures are retryable when enabled. Unconfirmed
+side effects are indeterminate and cannot be caught or replayed. Cancellation and response size limits
+remain terminal. Requests use deployment networking, never forward Operator credentials, do not
+follow redirects, and retain TLS verification. The total request/read timeout is 30 seconds bounded
+by shorter node/Run deadlines; responses are capped at 4 MiB. There is no file, streaming, pagination,
+batching, proxy or connection-credential feature in this version.
+
 ## OpenAPI documents and Tasks
 
 `POST /v1/openapi/document` requires Operator authentication. Request: `{ "version": 1, "url": "https://example.com/openapi.json" }`. Response: `{ "version": 1, "document": <OpenAPI JSON> }`. URLs must use HTTP(S) without embedded credentials. Only public OpenAPI 3.0/3.1 JSON is supported. Redirects are not followed; reads are limited to 4 MiB and 15 seconds. Invalid requests/loading failures return `flow.invalid` without upstream bodies. The operation changes no Flow.

@@ -353,12 +353,13 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
   )
   const firstName = objectFieldNames(schema, value)[0]
   const firstSchema = firstName == null ? undefined : (objectValue(source.properties)?.[firstName] ?? source.additionalProperties ?? {})
+  const firstEditorSchema = !definitionEditable && editorComponent(firstSchema) === 'json' ? defaultValueEditorSchema(firstSchema) : firstSchema
   const firstValue = firstName == null ? undefined : objectValue(value)?.[firstName]
   const childMarker =
     type === 'array'
       ? array.length > 0
       : firstName != null &&
-        ((sorting && props.onDefinitionChange != null) || fieldValueShape(firstSchema, firstValue, { objectChild: true, depth: depth + 1 }).expandable)
+        ((sorting && props.onDefinitionChange != null) || fieldValueShape(firstEditorSchema, firstValue, { objectChild: true, depth: depth + 1 }).expandable)
   const shouldMountBody = !compactValue || !expandable || expanded || bodyMounted
   const body = shouldMountBody && !uncreatedText && (
     <FieldBody
@@ -368,6 +369,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
       id={`${id}-body`}
       className={styles.body}
       data-value-body
+      data-feedback={(anchor === 'body' && messages.length > 0) || undefined}
       hidden={(compactValue && expandable && !expanded) || (expandable && !hasExpandedContent)}
     >
       {!showUnset && !compactValue && valueEditable && presence !== 'value' && (
@@ -503,6 +505,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
       aria-label={label}
       aria-describedby={messages.length ? `${id}-error` : undefined}
       ref={setContainer}
+      data-summary-feedback={(anchor === 'summary' && messages.length > 0) || undefined}
       data-inline={(props.hideOptions && !hasHeader) || undefined}
       data-compact={props.compact || undefined}
       data-value-tools={canReset || canClear || canToggleJson || (inlineExpansion && hasExpandedContent) || undefined}

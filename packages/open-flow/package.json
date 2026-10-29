@@ -61,7 +61,8 @@
     "./skills/open-flow/SKILL.md": "./skills/open-flow/SKILL.md",
     "./skills/open-flow/references/flow-authoring.md": "./skills/open-flow/references/flow-authoring.md",
     "./skills/open-flow/references/flow-n8n-conversion.md": "./skills/open-flow/references/flow-n8n-conversion.md",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./http-request": "./src/http/common/httpRequest.ts"
   },
   "scripts": {
     "build": "bun scripts/build.ts",

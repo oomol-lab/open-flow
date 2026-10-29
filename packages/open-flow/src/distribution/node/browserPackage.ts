@@ -56,6 +56,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   const commonOutputPath = path.join(options.packageRoot, 'dist/common')
   await buildRuntime(options, commonOutputPath, connectorProxyEntryPath, 'connector-proxy', true)
   await buildRuntime(options, commonOutputPath, 'src/decision/common/decision.ts', 'decision', false)
+  await buildRuntime(options, commonOutputPath, 'src/http/common/httpRequest.ts', 'http-request', false)
   await buildRuntime(options, commonOutputPath, 'src/openapi/common/openapi.ts', 'openapi', false)
   await buildRuntime(options, commonOutputPath, 'src/workflow/common/workflow.ts', 'workflow', false)
   await buildRuntime(options, commonOutputPath, connectorActionEntryPath, 'connector-action', false)
@@ -276,6 +277,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./change.ts'", "'./flow-change.js'")
     const flowChangeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/change.d.ts'), 'utf8'))
       .replaceAll("'../../decision/common/decision.ts'", "'./decision.js'")
+      .replaceAll("'../../http/common/httpRequest.ts'", "'./http-request.js'")
       .replaceAll("'../../openapi/common/openapi.ts'", "'./openapi.js'")
       .replaceAll("'../../workflow/common/workflow.ts'", "'./workflow.js'")
       .replaceAll("'../../types/index.ts'", "'../index.js'")
@@ -483,6 +485,10 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(
         path.join(commonOutputPath, 'decision.d.ts'),
         (await readFile(path.join(declarationRoot, 'decision/common/decision.d.ts'), 'utf8')).replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
+      ),
+      writeFile(
+        path.join(commonOutputPath, 'http-request.d.ts'),
+        (await readFile(path.join(declarationRoot, 'http/common/httpRequest.d.ts'), 'utf8')).replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
       ),
       writeFile(
         path.join(commonOutputPath, 'openapi.d.ts'),
