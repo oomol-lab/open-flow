@@ -338,7 +338,8 @@
       "source": "Source",
       "structuredJson": "JSON structuré",
       "retrySave": "Réessayer",
-      "additionalInputs": "Entrées supplémentaires"
+      "additionalInputs": "Entrées supplémentaires",
+      "httpHostsUpdated": "Les hôtes ont été modifiés ailleurs. La dernière configuration est chargée ; vérifiez-la avant d’enregistrer."
     },
     "wait": {
       "approval": "Approuver ou refuser",

@@ -338,7 +338,8 @@
       "source": "原始碼",
       "structuredJson": "結構化 JSON",
       "retrySave": "重試儲存",
-      "additionalInputs": "附加輸入"
+      "additionalInputs": "附加輸入",
+      "httpHostsUpdated": "主機設定已在別處更新。已載入最新設定，請檢查後再儲存。"
     },
     "wait": {
       "approval": "通過或拒絕",

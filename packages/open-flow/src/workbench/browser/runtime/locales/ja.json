@@ -338,7 +338,8 @@
       "source": "ソースコード",
       "structuredJson": "構造化 JSON",
       "retrySave": "保存を再試行",
-      "additionalInputs": "追加入力"
+      "additionalInputs": "追加入力",
+      "httpHostsUpdated": "ホスト設定が別の場所で更新されました。最新の設定を読み込みました。確認してから保存してください。"
     },
     "wait": {
       "approval": "承認または拒否",

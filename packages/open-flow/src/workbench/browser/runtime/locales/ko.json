@@ -338,7 +338,8 @@
       "source": "소스",
       "structuredJson": "구조화된 JSON",
       "retrySave": "저장 재시도",
-      "additionalInputs": "추가 입력"
+      "additionalInputs": "추가 입력",
+      "httpHostsUpdated": "다른 곳에서 호스트 설정이 변경되었습니다. 최신 설정을 불러왔습니다. 확인 후 저장하세요."
     },
     "wait": {
       "approval": "승인 또는 거부",

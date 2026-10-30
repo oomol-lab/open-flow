@@ -1,6 +1,8 @@
 # Code 节点运行时对齐计划
 
-状态：2026-10-30 审阅修订。阶段 0–5 与 A 已在公共包和 Server 提交；Cloud 在分支 `feat/engine-v9` 上以本地 tarball 接入 v9、`context.fetch` 与公共 guest bundle，artifact 仍拒绝。决策见末尾。
+历史记录：本文保留 Code 运行时对齐工作当时的设计、版本基线和阶段记录，不作为后续工作的发布基线。阶段记录中的“未提交”等描述仅反映当时进度；最终状态以本段为准。当前 Flow State 工作以 [交接文档](flow-state-handoff.md) 和 [运行时契约](contracts/nodejs-runtime.md) 为准：beta.76 已发布 Model v12 / Engine v9，Flow State 使用未发布的 Model v13 / Engine v10。
+
+最终状态：2026-10-30 审阅修订。阶段 0–5 与 A 已在公共包和 Server 提交；Cloud 在分支 `feat/engine-v9` 上以本地 tarball 接入 v9、`context.fetch` 与公共 guest bundle，artifact 仍拒绝。决策见末尾。
 
 ## 目标
 

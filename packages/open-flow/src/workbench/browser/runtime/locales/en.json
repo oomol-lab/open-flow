@@ -338,7 +338,8 @@
       "source": "Source",
       "structuredJson": "Structured JSON",
       "retrySave": "Retry save",
-      "additionalInputs": "Additional inputs"
+      "additionalInputs": "Additional inputs",
+      "httpHostsUpdated": "Hosts changed elsewhere. The latest configuration is loaded; review it before saving."
     },
     "wait": {
       "approval": "Approve or reject",

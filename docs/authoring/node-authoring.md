@@ -280,3 +280,4 @@ history. Bind the fixed `items` array input. Outputs `items` and `duplicates` re
 History records immediately: downstream failure does not roll it back, so later Runs skip those
 items. New node IDs start independent histories; renaming preserves history. Deleted node spaces
 remain until explicitly cleared. Limits belong to the deployment, not node configuration.
+The node supports `onError: "stop" | "error"` but does not support retries.

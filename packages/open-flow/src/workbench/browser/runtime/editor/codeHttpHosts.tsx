@@ -21,6 +21,7 @@ export function CodeHttpHosts({
   const id = useId()
   const saved = hosts.join('\n')
   const [draft, setDraft] = useState(saved)
+  const [openedHosts, setOpenedHosts] = useState(saved)
   const [error, setError] = useState<string>()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -29,6 +30,12 @@ export function CodeHttpHosts({
     setContainer(element?.closest<HTMLElement>('.open-flow-workbench') ?? element?.closest<HTMLElement>('.open-flow-theme') ?? null)
   }, [])
   const commit = async () => {
+    if (openedHosts !== saved) {
+      setOpenedHosts(saved)
+      setDraft(saved)
+      setError(t('inspector.task.httpHostsUpdated'))
+      return
+    }
     const next = [...new Set(draft.split(/[\s,]+/).flatMap((host) => (host == '' ? [] : [host.toLowerCase()])))]
     const invalid = next.find((host) => !isHttpHost(host))
     if (invalid != null) return setError(t('inspector.task.httpHostsInvalid', { host: invalid }))
@@ -48,6 +55,7 @@ export function CodeHttpHosts({
         onOpenChange={(next) => {
           if (pending) return
           if (next) {
+            setOpenedHosts(saved)
             setDraft(saved)
             setError(undefined)
           }

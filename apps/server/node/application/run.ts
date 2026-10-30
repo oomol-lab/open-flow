@@ -17,7 +17,7 @@ import { decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { hashIdentities, itemIdentities, StateError } from '@oomol-lab/open-flow/flow-state'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
-import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
+import { findEngineContract, resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
@@ -564,8 +564,8 @@ export class RunExecutor {
   ): Promise<RuntimeCapabilityResponse> {
     if (call.kind.startsWith('state.') || call.kind.startsWith('dedupe.')) {
       const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
-      if (run.engineContract !== 'open-flow-engine/v10' || node?.kind !== 'task' || !('moduleId' in node.task))
-        throw new StateError('capability.denied', 'State requires an Engine v10 Code Task.')
+      if (findEngineContract(run.engineContract)?.flowState !== true || node?.kind !== 'task' || !('moduleId' in node.task))
+        throw new StateError('capability.denied', 'State requires a Code Task and an engine with Flow State support.')
       return this.#state.invoke(run, call)
     }
     if (call.kind.startsWith('artifact.')) {
