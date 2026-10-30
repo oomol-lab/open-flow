@@ -285,6 +285,8 @@ export class FlowStore {
       this.#database.prepare('DELETE FROM poll_bindings WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM integration_bindings WHERE flow_id = ?').run(flowId)
       this.#references.delete(flowId)
+      for (const table of ['flow_state_values', 'flow_dedupe_identities', 'flow_dedupe_spaces', 'flow_state_usage'])
+        this.#database.prepare(`DELETE FROM ${table} WHERE flow_id = ?`).run(flowId)
       this.#database.prepare('DELETE FROM flow_live WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM publications WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM flow_presentations WHERE flow_id = ?').run(flowId)

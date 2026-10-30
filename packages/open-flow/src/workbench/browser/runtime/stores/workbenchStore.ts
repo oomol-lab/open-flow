@@ -90,6 +90,7 @@ const blockedExternalPages: Pick<WorkbenchHost, 'openExternalPage'> = {
 }
 
 export class WorkbenchStore {
+  readonly state: Pick<WorkbenchClient, 'getFlowState' | 'clearFlowState' | 'clearFlowDedupe'>
   readonly results: Pick<WorkbenchClient, 'listRunResults' | 'readRunResult' | 'downloadRunResult'>
   readonly #client: WorkbenchClient
   readonly #externalRuns = new Latest()
@@ -137,6 +138,7 @@ export class WorkbenchStore {
     this.interactiveMode$ = val(readCanvasInteractiveMode(preferences))
     this.interactiveMode$.reaction((mode) => writeCanvasInteractiveMode(preferences, mode), true)
     this.#client = client
+    this.state = client
     this.results = client
     this.#i18n = i18n
     this.#variables = variables

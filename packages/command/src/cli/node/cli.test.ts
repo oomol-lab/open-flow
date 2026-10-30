@@ -941,3 +941,29 @@ it('exports only indented workflow JSON and imports files or stdin with stable r
   expect(await runCli(['import', '--file', 'bad.json', '--json'], host, broken.value)).not.toBe(0)
   expect(requests).toHaveLength(before)
 })
+
+it.each([
+  ['state', 'show', 'flow-1'],
+  ['state', 'clear', 'flow-1', '--yes'],
+  ['dedupe', 'clear', 'flow-1', '--space', 'flow', '--yes'],
+  ['state', 'clear', 'flow-1', '--scope', 'live'],
+  ['state', 'show', 'flow-1', '--scope', 'other'],
+])('rejects ambiguous or unconfirmed state management before contacting the server: %j', async (...args) => {
+  const output = runtime()
+  const request = vi.fn()
+  expect(await runCli(args, { request }, output.value)).toBe(1)
+  expect(output.stderr()).toContain('cli.invalid-arguments')
+  expect(request).not.toHaveBeenCalled()
+})
+
+it('forwards explicit scope and encoded keys when clearing Flow State', async () => {
+  const output = runtime()
+  const request = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === '/v1/flows/flow-1') return Response.json(flow)
+    expect(url).toBe('/v1/flows/flow-1/state?scope=live&key=a%26b')
+    expect(init?.method).toBe('DELETE')
+    return Response.json({ version: 1, cleared: true })
+  })
+  expect(await runCli(['state', 'clear', 'flow-1', '--scope', 'live', '--key', 'a&b', '--yes'], { request }, output.value)).toBe(0)
+  expect(request).toHaveBeenCalledTimes(2)
+})

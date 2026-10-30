@@ -11,6 +11,7 @@ import {
   createArtifacts,
   createBase64,
   createFetch,
+  createState,
   createWorkflows,
   findEngineContract,
   snapshotRuntimeResult,
@@ -235,11 +236,13 @@ const createActions = ${createActions.toString()}
 const createBase64 = ${createBase64.toString()}
 const createArtifacts = ${createArtifacts.toString()}
 const createFetch = ${createFetch.toString()}
+const createState = ${createState.toString()}
 export const capability = Object.freeze({
   getPrevious: () => invoke('previous', null),
   actions: createActions((payload) => invoke('connector', payload)),
   workflows: createWorkflows((payload) => invoke('workflow', payload)),
   artifact: createArtifacts(invoke),
+  ...createState(invoke),
   fetch: createFetch(invoke),
   egress: (url) => invoke('egress', { url }),
 })`
@@ -357,7 +360,11 @@ function installGlobals(
         void call(request.invocationId, capabilities, capabilityCall.kind, capabilityCall.payload).then(
           (result) => settleResult({ id: 0, ok: true, type: 'capability.result', value: result }),
           (error) => {
-            if (['runtime.limit-exceeded', 'connector.indeterminate', 'workflow.indeterminate'].includes(String(Reflect.get(Object(error), 'schedulerCode'))))
+            if (
+              ['runtime.limit-exceeded', 'limit-exceeded', 'connector.indeterminate', 'workflow.indeterminate'].includes(
+                String(Reflect.get(Object(error), 'schedulerCode')),
+              )
+            )
               capabilityFailure = error
             settleResult({
               code: (error as { code?: string; schedulerCode?: string }).schedulerCode ?? (error as { code?: string }).code,
@@ -437,7 +444,7 @@ async function compileProgram(
 import { capability, capabilityFailure } from './capability.mjs'
 const snapshotResult = ${snapshotRuntimeResult.toString()}
 // Engine v9 replaces the always-denied egress placeholder with context.fetch.
-const { ${contract.codeFetch ? 'egress' : 'fetch'}: _omitted, ...engineCapability } = capability
+const { ${contract.codeFetch ? 'egress' : 'fetch'}: _omitted, ${contract.flowState ? '' : 'state: _state, dedupe: _dedupe,'} ...engineCapability } = capability
 // The host terminates a canceled Task by disposing its isolate; no guest code runs after cancellation.
 const cancellation = new AbortController()
 export async function invoke(source) {
@@ -550,7 +557,8 @@ function readResult(
     readonly void?: boolean
   }
   if (capabilityFailure != null) {
-    if (['connector.indeterminate', 'workflow.indeterminate'].includes(Reflect.get(Object(capabilityFailure), 'schedulerCode'))) throw capabilityFailure
+    if (['limit-exceeded', 'connector.indeterminate', 'workflow.indeterminate'].includes(Reflect.get(Object(capabilityFailure), 'schedulerCode')))
+      throw capabilityFailure
     throw new IsolatedVmError('limit-exceeded', normalizedError(capabilityFailure).message)
   }
   const returnedValue = Object.hasOwn(result, 'value') && result.void === undefined

@@ -112,6 +112,7 @@ function fallbackIcon(item: LibraryNodeItem): IconName {
       return 'condition'
     case 'decision':
       return 'decision'
+    case 'dedupe':
     case 'http-request':
     case 'openapi':
     case 'connector':

@@ -276,6 +276,33 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(202, service.flows.retireFlow(context.get('actorId'), context.req.param('flowId')))
   })
 
+  app.get('/flows/:flowId/state', (context) => {
+    query(context.req.raw, ['scope', 'values'], controlErrorCode.flowInvalid)
+    const values = context.req.query('values')
+    if (values != null && values !== 'true' && values !== 'false') throw new ControlError(controlErrorCode.flowInvalid, 'values must be true or false.')
+    return response(
+      200,
+      service.state.read(context.get('actorId'), context.req.param('flowId'), {
+        scope: context.req.query('scope'),
+        ...(values == null ? {} : { values: values === 'true' }),
+      }),
+    )
+  })
+  app.delete('/flows/:flowId/state', (context) => {
+    query(context.req.raw, ['scope', 'key'], controlErrorCode.flowInvalid)
+    return response(
+      200,
+      service.state.clear(context.get('actorId'), context.req.param('flowId'), { scope: context.req.query('scope'), key: context.req.query('key') }),
+    )
+  })
+  app.delete('/flows/:flowId/dedupe', (context) => {
+    query(context.req.raw, ['scope', 'space'], controlErrorCode.flowInvalid)
+    return response(
+      200,
+      service.state.clearDedupe(context.get('actorId'), context.req.param('flowId'), { scope: context.req.query('scope'), space: context.req.query('space') }),
+    )
+  })
+
   app.get('/flows/:flowId/editor', async (context) => response(200, await service.flows.getEditor(context.get('actorId'), context.req.param('flowId'))))
   app.get('/flows/:flowId/connector-access', (context) => {
     query(context.req.raw, ['publicationId'], controlErrorCode.connectorAccessInvalid)

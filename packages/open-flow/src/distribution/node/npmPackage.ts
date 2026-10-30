@@ -88,6 +88,7 @@ function createManifest(version: string): object {
         types: './dist/index.d.ts',
       },
       './decision': { types: './dist/common/decision.d.ts', import: './dist/common/decision.js' },
+      './flow-state': { types: './dist/common/flow-state.d.ts', import: './dist/common/flow-state.js' },
       './http-request': { types: './dist/common/http-request.d.ts', import: './dist/common/http-request.js' },
       './openapi': { types: './dist/common/openapi.d.ts', import: './dist/common/openapi.js' },
       './workflow': { types: './dist/common/workflow.d.ts', import: './dist/common/workflow.js' },

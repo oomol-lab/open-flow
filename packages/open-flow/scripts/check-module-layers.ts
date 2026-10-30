@@ -17,7 +17,7 @@ const layers: readonly (readonly [name: string, patterns: readonly RegExp[]])[] 
       /^event-source\/common\//,
     ],
   ],
-  ['node families', [/^decision\//, /^http\//, /^openapi\//, /^trigger\/(?:common|providers)\//, /^runtime\//]],
+  ['node families', [/^state\//, /^decision\//, /^http\//, /^openapi\//, /^trigger\/(?:common|providers)\//, /^runtime\//]],
   ['flow', [/^flow\//]],
   ['workflow calls', [/^workflow\//]],
   ['execution', [/^execution\//]],

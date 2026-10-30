@@ -48,6 +48,7 @@ import { RunControl } from './run-control.ts'
 import { runEnvironment } from './run-environment.ts'
 import { RunExecutor } from './run.ts'
 import { validateCapabilities, validateRuntime } from './service-options.ts'
+import { StateControl } from './state-control.ts'
 import { Supervisor } from './supervisor.ts'
 import { VariableControl } from './variable-control.ts'
 import { WaitActions } from './wait-actions.ts'
@@ -299,6 +300,7 @@ export class ServerService {
       eventSources,
       drafts,
       publications,
+      state: new StateControl(access, store.state),
       flows: new FlowControl(access, flowChanged, drafts, store, resolveConnectorTeam, this.#clock, flowCatalogChanged, triggersChanged, publications),
       variables: new VariableControl(store),
       runs: new RunControl(
@@ -337,6 +339,7 @@ export class ServerService {
             now,
             runtime.runEventRetentionMs,
             runtime.maxPendingRuns,
+            runtime.stateLimits,
           ),
         catch: (error) => (error instanceof Error ? error : new Error(String(error))),
       })
