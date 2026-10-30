@@ -41,6 +41,39 @@ export interface ArtifactCapability {
   open(ref: ArtifactRef): Promise<Uint8Array>
 }
 
+export interface TaskFetchInit {
+  /** GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS. */
+  readonly method?: string
+  readonly headers?: Readonly<Record<string, string>> | Iterable<readonly [string, string]>
+  /** At most 1 MiB; strings are sent as UTF-8 text/plain unless a content-type header is supplied. */
+  readonly body?: string | Uint8Array | ArrayBuffer
+  readonly signal?: AbortSignal
+}
+
+export interface TaskFetchHeaders extends Iterable<[string, string]> {
+  get(name: string): string | null
+  has(name: string): boolean
+  entries(): IterableIterator<[string, string]>
+  keys(): IterableIterator<string>
+  values(): IterableIterator<string>
+  forEach(callback: (value: string, name: string) => void): void
+}
+
+/** A read-only subset of the Fetch Response; the body is buffered, at most 1 MiB, and readable once. */
+export interface TaskFetchResponse {
+  readonly status: number
+  readonly statusText: string
+  readonly ok: boolean
+  readonly redirected: false
+  readonly url: string
+  readonly headers: TaskFetchHeaders
+  readonly bodyUsed: boolean
+  bytes(): Promise<Uint8Array>
+  arrayBuffer(): Promise<ArrayBuffer>
+  text(): Promise<string>
+  json(): Promise<unknown>
+}
+
 export interface MediaPreviewPayload {
   readonly type: 'video' | 'audio' | 'markdown' | 'iframe' | 'html'
   readonly data: string
@@ -89,6 +122,11 @@ export interface TaskContext<
   readonly artifact: ArtifactCapability
   /** Reads the selected direct predecessors, sorted by node ID; empty for a graph root. */
   getPrevious(): Promise<readonly PreviousNode[]>
+  /**
+   * Calls an HTTP(S) URL whose host the node declares in its `http` Capability. Redirects are returned, not followed,
+   * and no platform credentials are added. Network failures reject with a TypeError.
+   */
+  fetch(input: string | URL, init?: TaskFetchInit): Promise<TaskFetchResponse>
 }
 
 export type TaskResult<Outputs extends object> = keyof Outputs extends never ? Outputs | void : Outputs

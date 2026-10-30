@@ -20,6 +20,7 @@ import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
+import { executeCodeFetch } from '../deployment/code-fetch.ts'
 import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { executeHttpRequest } from '../deployment/http-request.ts'
 import { HttpTaskError } from '../deployment/http-transport.ts'
@@ -64,6 +65,9 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'openapi.http-failed',
   'openapi.indeterminate',
   'openapi.limit-exceeded',
+  'http.input-invalid',
+  'http.http-failed',
+  'http.limit-exceeded',
 ])
 
 type TaskErrorCode = 'capability.denied' | 'capability.invalid' | 'llm.output-invalid' | 'llm.unavailable'
@@ -531,6 +535,12 @@ export class RunExecutor {
       const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
       if (node?.kind != 'task' || !('moduleId' in node.task)) throw new TaskHostError('capability.denied', 'Artifacts require a Code node invocation.')
       return await this.#artifacts.invoke(run.runId, call, emit)
+    }
+    if (call.kind == 'http.fetch') {
+      const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
+      const hosts = node?.kind == 'task' && 'moduleId' in node.task ? node.task.capabilities?.find((item) => item.kind == 'http')?.hosts : undefined
+      if (hosts == null) throw new TaskHostError('capability.denied', 'HTTP access is not declared for this Code node.')
+      return { status: 200, body: await executeCodeFetch(hosts, call.payload, call.signal) }
     }
     if (call.kind == 'workflow') {
       const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]

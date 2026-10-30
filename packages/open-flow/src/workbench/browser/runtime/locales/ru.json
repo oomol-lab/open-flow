@@ -315,6 +315,10 @@
     "task": {
       "sharedPermissions": "Использовать общую группу разрешений Flow",
       "sharedPermissionsHint": "Используйте все Actions, разрешённые общей группой Flow. Добавлять их в узел по отдельности не нужно.",
+      "httpHosts": "HTTP-хосты",
+      "httpHostsHint": "Хосты, к которым Code может обращаться через context.fetch, по одному в строке. *.example.com соответствует поддоменам.",
+      "httpHostsInvalid": "«{{host}}» — недопустимый хост. Укажите имя хоста, например api.example.com.",
+      "httpHostsLimit": "Можно объявить не более {{count}} хостов.",
       "addAction": "Добавить Action",
       "removeAction": "Удалить Action",
       "actionAccount": "Аккаунт",

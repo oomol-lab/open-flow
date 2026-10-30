@@ -6,7 +6,15 @@ import type IsolatedVM from 'isolated-vm'
 import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, IsolatedVmLimits, ParentMessage } from './isolated-vm.ts'
 
 import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
-import { createActions, createArtifacts, createWorkflows, findEngineContract, snapshotRuntimeResult } from '@oomol-lab/open-flow/runtime-contract'
+import {
+  createActions,
+  createArtifacts,
+  createBase64,
+  createFetch,
+  createWorkflows,
+  findEngineContract,
+  snapshotRuntimeResult,
+} from '@oomol-lab/open-flow/runtime-contract'
 import {
   createNodejsPrimitives,
   nodejsBuiltinGroupModule,
@@ -224,12 +232,15 @@ async function invoke(kind, payload) {
 const snapshotRuntimeResult = ${snapshotRuntimeResult.toString()}
 const createWorkflows = ${createWorkflows.toString()}
 const createActions = ${createActions.toString()}
+const createBase64 = ${createBase64.toString()}
 const createArtifacts = ${createArtifacts.toString()}
+const createFetch = ${createFetch.toString()}
 export const capability = Object.freeze({
   getPrevious: () => invoke('previous', null),
   actions: createActions((payload) => invoke('connector', payload)),
   workflows: createWorkflows((payload) => invoke('workflow', payload)),
   artifact: createArtifacts(invoke),
+  fetch: createFetch(invoke),
   egress: (url) => invoke('egress', { url }),
 })`
 
@@ -425,13 +436,15 @@ async function compileProgram(
     `import task from '../user/${program.entryModuleId}.mjs'
 import { capability, capabilityFailure } from './capability.mjs'
 const snapshotResult = ${snapshotRuntimeResult.toString()}
+// Engine v9 replaces the always-denied egress placeholder with context.fetch.
+const { ${contract.codeFetch ? 'egress' : 'fetch'}: _omitted, ...engineCapability } = capability
 // The host terminates a canceled Task by disposing its isolate; no guest code runs after cancellation.
 const cancellation = new AbortController()
 export async function invoke(source) {
   let executing = false
   try {
     const inputs = JSON.parse(source)
-    const context = Object.freeze(Object.assign({}, capability, {
+    const context = Object.freeze(Object.assign({}, engineCapability, {
       blockId: ${JSON.stringify(taskContext?.blockId)},
       flowId: ${JSON.stringify(taskContext?.flowId)},
       runId: ${JSON.stringify(taskContext?.runId)},

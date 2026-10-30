@@ -227,6 +227,9 @@ export function decodeTaskCapabilities(value: unknown): readonly TaskCapability[
     if (workflowToolNameIssue(item.name, names)) throw new TypeError('Workflow tool names must be unique provider-compatible names.')
     names.add(item.name)
   }
+  const http = parsed.filter((item) => item.kind == 'http')
+  if (http.length > 1 || http.some((item) => new Set(item.hosts).size != item.hosts.length))
+    throw new TypeError('Code declares HTTP hosts once, without duplicates.')
   let connectorIndex = 0
   return parsed.map((item) => (item.kind == 'connector' ? connectors[connectorIndex++]! : item)) as readonly TaskCapability[]
 }

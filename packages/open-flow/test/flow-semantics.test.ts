@@ -194,11 +194,12 @@ describe('Schema value matching', () => {
 
 describe('Flow semantics', () => {
   it('accepts only the Node compatibility contract builtins without adding them to the user closure', () => {
-    const compatible = findEngineContract(nodejsEngineContract)!
+    const compatible = findEngineContract(currentEngineContract)!
     const source = revision(`import { Buffer } from 'node:buffer'; import path from 'path'; import fs from 'node:fs/promises';
 export default () => Buffer.from(path.join('/tmp', 'file'));`)
     expect(validateModules(source, ['module-main'], compatible)).toEqual([])
-    expect(validate(source, ['module-main']).map((diagnostic) => diagnostic.code)).toEqual([
+    expect(validateModules(source, ['module-main'], findEngineContract(nodejsEngineContract)!)).toEqual([])
+    expect(validateModules(source, ['module-main'], findEngineContract('open-flow-engine/v8')!).map((diagnostic) => diagnostic.code)).toEqual([
       'module.unsupported-import',
       'module.unsupported-import',
       'module.unsupported-import',
@@ -261,7 +262,7 @@ export function run() { return identity({ engineContract, value }) }`,
   it('rejects npm, Node, remote, dynamic and undeclared imports deterministically', () => {
     const unsupported = validate(
       revision(`import react from "react"
-import fs from "node:fs"
+import fs from "node:child_process"
 import remote from "https://example.com/module.mjs"
 export async function run(name) { return await import(name) }
 export { react, fs, remote }`),

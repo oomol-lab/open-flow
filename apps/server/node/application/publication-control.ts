@@ -20,7 +20,7 @@ import type { DraftControl } from './draft-control.ts'
 
 import { controlErrorCode, flowInputDefinitions, liveEntries } from '@oomol-lab/open-flow/control-api'
 import { flowClosure } from '@oomol-lab/open-flow/flow-semantics'
-import { currentEngineContract, findEngineContract, nodejsEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
 import { ControlAccess, notFound } from './control-access.ts'
@@ -218,8 +218,7 @@ export class PublicationControl {
   ): Promise<PublishOperation> {
     this.access.authorize(actorId, { flowId })
 
-    if (engineContract != currentEngineContract && engineContract != nodejsEngineContract)
-      throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
+    if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     const revision = readRevisionOrRepair(() => this.store.flows.revision(flowId, revisionId))
     if (revision == null) notFound()
     return await this.commitPublishOperation({

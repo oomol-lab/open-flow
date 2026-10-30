@@ -1,7 +1,7 @@
 import type { CodeModule, ConnectorCapability, TaskCapability, JsonValue } from '../../flow/common/model.ts'
 
 import { dequal } from 'dequal/lite'
-import { currentEngineContract, nodejsEngineContract } from './engineContract.ts'
+import { currentEngineContract } from './engineContract.ts'
 
 export { currentEngineContract, nodejsEngineContract, findEngineContract, type EngineContract } from './engineContract.ts'
 
@@ -44,10 +44,9 @@ export const nodejsRuntimeConformanceCases: readonly RuntimeConformanceCase[] = 
         capability: async () => ({ body: null, status: 403 }),
         input: null,
         invocationId: 'nodejs-files',
-        program: {
-          ...program(
-            harness,
-            `import assert from 'node:assert/strict';
+        program: program(
+          harness,
+          `import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer'; import path from 'node:path'; import fs from 'node:fs/promises';
 export default async () => {
   const file = path.join('/tmp', 'conformance.txt');
@@ -57,9 +56,7 @@ export default async () => {
   await fs.unlink(file);
   return { text, bytes: Buffer.byteLength(text) };
 }`,
-          ),
-          engineContract: nodejsEngineContract,
-        },
+        ),
       })
       equal(value, { text: '你好', bytes: 6 }, 'Node virtual files')
     },
@@ -71,10 +68,9 @@ export default async () => {
         capability: async () => ({ body: null, status: 403 }),
         input: null,
         invocationId: 'nodejs-abort',
-        program: {
-          ...program(
-            harness,
-            `import { setTimeout } from 'node:timers/promises';
+        program: program(
+          harness,
+          `import { setTimeout } from 'node:timers/promises';
 export default async () => {
   const controller = new AbortController(); const reason = { message: 'stop' };
   const combined = AbortSignal.any([controller.signal]);
@@ -85,9 +81,7 @@ export default async () => {
     return { sameReason: combined.reason === reason && thrown === reason, name: error.name };
   }
 }`,
-          ),
-          engineContract: nodejsEngineContract,
-        },
+        ),
       })
       equal(value, { sameReason: true, name: 'AbortError' }, 'Node cancellation')
     },
@@ -190,7 +184,7 @@ export default async () => { const timeout = AbortSignal.timeout(1); await delay
           capability: async () => ({ body: null, status: 403 }),
           input: null,
           invocationId,
-          program: { ...program(harness, source), engineContract: nodejsEngineContract },
+          program: program(harness, source),
         })
       await invoke(
         'nodejs-isolation-write',
@@ -270,7 +264,7 @@ function nodejsCase(name: string, source: string, expected: JsonValue): RuntimeC
         capability: async () => ({ body: null, status: 403 }),
         input: null,
         invocationId: `nodejs-${name}`,
-        program: { ...program(harness, source), engineContract: nodejsEngineContract },
+        program: program(harness, source),
       })
       equal(value, expected, name)
     },
@@ -529,8 +523,8 @@ export default (input) => ({ engineContract, value: identity(double(input.value)
           invocationId: 'closed-linker',
           program: program(
             harness,
-            `import fs from 'node:fs'
-export default () => fs.readFileSync('/etc/passwd', 'utf8')`,
+            `import { execSync } from 'node:child_process'
+export default () => execSync('cat /etc/passwd').toString()`,
           ),
         }),
         /invalid|unsupported|cannot import|not part of/i,
@@ -644,6 +638,85 @@ export default () => fs.readFileSync('/etc/passwd', 'utf8')`,
         'Artifact validation',
       )
       equal(host.kinds(), [], 'Artifact dispatch')
+    },
+  },
+  {
+    name: 'calls declared HTTP hosts through context.fetch',
+    async verify(harness) {
+      const calls: JsonValue[] = []
+      const value = await harness.invoke({
+        capability: async (call) => {
+          calls.push({ kind: call.kind, payload: call.payload })
+          return {
+            status: 200,
+            body: {
+              status: 201,
+              statusText: 'Created',
+              url: 'https://api.example.com/items?q=1',
+              headers: [
+                ['content-type', 'application/json'],
+                ['x-tag', 'a'],
+                ['x-tag', 'b'],
+              ],
+              body: btoa('{"id":7}'),
+            },
+          }
+        },
+        input: null,
+        invocationId: 'code-fetch',
+        program: program(
+          harness,
+          `export default async (_input, context) => {
+  const response = await context.fetch(new URL('https://api.example.com/items?q=1'), { method: 'post', headers: [['X-Trace', '1']], body: '{"name":"a"}' })
+  const json = await response.json()
+  let reused; try { await response.text() } catch (error) { reused = error instanceof TypeError }
+  const codes = []
+  for (const call of [() => context.fetch('https://api.example.com', { method: 'TRACE' }), () => context.fetch('https://api.example.com', { body: 'x' }),
+    () => context.fetch('https://api.example.com', { method: 'POST', body: {} }), () => context.fetch('https://api.example.com', { headers: { 'bad header': 'x' } }),
+    () => context.fetch('https://api.example.com', { method: 'PUT', body: new Uint8Array(1024 * 1024 + 1) })]) {
+    try { await call() } catch (error) { codes.push(error.code) }
+  }
+  return { status: response.status, ok: response.ok, statusText: response.statusText, url: response.url, redirected: response.redirected, json, reused,
+    tag: response.headers.get('X-Tag'), has: response.headers.has('content-type'), names: [...response.headers.keys()], codes, egress: typeof context.egress }
+}`,
+        ),
+      })
+      equal(
+        value,
+        {
+          status: 201,
+          ok: true,
+          statusText: 'Created',
+          url: 'https://api.example.com/items?q=1',
+          redirected: false,
+          json: { id: 7 },
+          reused: true,
+          tag: 'a, b',
+          has: true,
+          names: ['content-type', 'x-tag', 'x-tag'],
+          codes: Array.from({ length: 5 }, () => 'capability.invalid'),
+          egress: 'undefined',
+        },
+        'Fetch response',
+      )
+      equal(
+        calls,
+        [
+          {
+            kind: 'http.fetch',
+            payload: {
+              url: 'https://api.example.com/items?q=1',
+              method: 'POST',
+              headers: [
+                ['x-trace', '1'],
+                ['content-type', 'text/plain;charset=UTF-8'],
+              ],
+              body: btoa('{"name":"a"}'),
+            },
+          },
+        ],
+        'Fetch request',
+      )
     },
   },
   {
@@ -821,28 +894,64 @@ export interface DecisionTaskInvocation {
 export type InvokeDecisionTask = (invocation: DecisionTaskInvocation) => Promise<LlmTaskResult>
 
 /**
+ * Serialized into the sandbox before the Capability helpers that use it; keep it self-contained. Encodes in guest
+ * JavaScript, because Node compatibility `atob`/`btoa` route through bounded Host primitives.
+ */
+export function createBase64() {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  const values = new Uint8Array(128).fill(255)
+  for (let index = 0; index < alphabet.length; index++) values[alphabet.charCodeAt(index)] = index
+  return Object.freeze({
+    encode(bytes: Uint8Array): string {
+      const parts: string[] = []
+      for (let start = 0; start < bytes.length; start += 0x6000) {
+        let text = ''
+        for (let index = start; index < Math.min(start + 0x6000, bytes.length); index += 3) {
+          const value = (bytes[index]! << 16) | ((bytes[index + 1] ?? 0) << 8) | (bytes[index + 2] ?? 0)
+          text +=
+            alphabet[value >> 18]! +
+            alphabet[(value >> 12) & 63]! +
+            (index + 1 < bytes.length ? alphabet[(value >> 6) & 63]! : '=') +
+            (index + 2 < bytes.length ? alphabet[value & 63]! : '=')
+        }
+        parts.push(text)
+      }
+      return parts.join('')
+    },
+    decode(text: unknown): Uint8Array {
+      if (typeof text != 'string' || text.length % 4 != 0) throw new TypeError('Base64 content is invalid.')
+      const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0
+      const bytes = new Uint8Array((text.length / 4) * 3 - padding)
+      for (let index = 0, offset = 0; index < text.length; index += 4) {
+        const digits = [0, 1, 2, 3].map((position) => {
+          const code = text.charCodeAt(index + position)
+          if (code == 61 && index + position >= text.length - padding) return 0
+          const value = code < 128 ? values[code]! : 255
+          if (value == 255) throw new TypeError('Base64 content is invalid.')
+          return value
+        })
+        const value = (digits[0]! << 18) | (digits[1]! << 12) | (digits[2]! << 6) | digits[3]!
+        if (offset < bytes.length) bytes[offset++] = value >> 16
+        if (offset < bytes.length) bytes[offset++] = (value >> 8) & 255
+        if (offset < bytes.length) bytes[offset++] = value & 255
+      }
+      return bytes
+    },
+  })
+}
+
+/**
  * Serialized into the sandbox; keep it self-contained. Transfers bytes as base64 chunks through
  * `artifact.write`, `artifact.put` and `artifact.read` so each Capability message stays bounded.
  */
-export function createArtifacts(invoke: (kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>) {
+export function createArtifacts(
+  invoke: (kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>,
+  { decode, encode }: ReturnType<typeof createBase64> = createBase64(),
+) {
   const chunkBytes = 512 * 1024
   // Keep helpers inside the function serialized into the isolated runtime.
   // eslint-disable-next-line unicorn/consistent-function-scoping
   const invalid = (message: string): Error => Object.assign(new TypeError(message), { code: 'capability.invalid' })
-  // eslint-disable-next-line unicorn/consistent-function-scoping
-  const encode = (bytes: Uint8Array): string => {
-    let text = ''
-    for (let offset = 0; offset < bytes.length; offset += 0x8000) text += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
-    return btoa(text)
-  }
-  // eslint-disable-next-line unicorn/consistent-function-scoping
-  const decode = (text: unknown): Uint8Array => {
-    if (typeof text != 'string') throw new TypeError('Artifact content is invalid.')
-    const binary = atob(text)
-    const bytes = new Uint8Array(binary.length)
-    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
-    return bytes
-  }
   return Object.freeze({
     async put(data: unknown, options: unknown): Promise<JsonValue> {
       const settings = options as { readonly name?: unknown; readonly mediaType?: unknown } | null
@@ -893,6 +1002,115 @@ export function createArtifacts(invoke: (kind: string, payload: JsonValue) => Pr
       return bytes
     },
   })
+}
+
+/**
+ * Serialized into the sandbox; keep it self-contained. `context.fetch` sends one `http.fetch` Capability call per request.
+ * The Host authorizes the URL against the node's `http` Capability, does not follow redirects and adds no credentials.
+ * Request and response bodies are limited to 1 MiB; the response is a read-only subset of the Fetch `Response`.
+ */
+export function createFetch(
+  invoke: (kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>,
+  { decode, encode }: ReturnType<typeof createBase64> = createBase64(),
+) {
+  const maximumBytes = 1024 * 1024
+  const methods = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
+  // Keep helpers inside the function serialized into the isolated runtime.
+  // eslint-disable-next-line unicorn/consistent-function-scoping
+  const invalid = (message: string): Error => Object.assign(new TypeError(message), { code: 'capability.invalid' })
+  // eslint-disable-next-line unicorn/consistent-function-scoping
+  const headerList = (value: unknown): [string, string][] => {
+    if (value == null) return []
+    const pairs =
+      typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] == 'function'
+        ? Array.from(value as Iterable<unknown>, (pair) => {
+            if (!Array.isArray(pair) || pair.length != 2) throw invalid('Headers must be name/value pairs.')
+            return pair
+          })
+        : typeof value == 'object'
+          ? Object.entries(value as Record<string, unknown>)
+          : undefined
+    if (pairs == null) throw invalid('Headers must be an object or name/value pairs.')
+    return pairs.map(([name, text]) => {
+      if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(String(name))) throw invalid(`Invalid header name "${String(name)}".`)
+      return [String(name).toLowerCase(), String(text)]
+    })
+  }
+  return async function fetch(input: unknown, init: unknown = {}): Promise<unknown> {
+    const options = (init ?? {}) as { readonly method?: unknown; readonly headers?: unknown; readonly body?: unknown; readonly signal?: unknown }
+    if (typeof options != 'object') throw invalid('Fetch options must be an object.')
+    const url = String(input instanceof Object && 'href' in input ? (input as { href: unknown }).href : input)
+    const method = String(options.method ?? 'GET').toUpperCase()
+    if (!methods.has(method)) throw invalid(`Unsupported HTTP method "${method}".`)
+    const headers = headerList(options.headers)
+    const body =
+      options.body == null
+        ? undefined
+        : typeof options.body == 'string'
+          ? new TextEncoder().encode(options.body)
+          : options.body instanceof Uint8Array
+            ? options.body
+            : options.body instanceof ArrayBuffer
+              ? new Uint8Array(options.body)
+              : undefined
+    if (options.body != null && body == null) throw invalid('Fetch body must be a string, Uint8Array or ArrayBuffer.')
+    if (body != null && (method == 'GET' || method == 'HEAD')) throw invalid(`A ${method} request cannot have a body.`)
+    if (body != null && body.length > maximumBytes) throw invalid('Fetch request body exceeds 1 MiB.')
+    if (typeof options.body == 'string' && !headers.some(([name]) => name == 'content-type')) headers.push(['content-type', 'text/plain;charset=UTF-8'])
+    const signal = options.signal as { readonly aborted?: boolean; readonly reason?: unknown; addEventListener?: Function } | undefined
+    if (signal?.aborted) throw signal.reason
+    const request = invoke('http.fetch', { url, method, headers, ...(body == null ? {} : { body: encode(body) }) })
+    const result = (
+      signal?.addEventListener == null
+        ? await request
+        : await Promise.race([request, new Promise<never>((_, reject) => signal.addEventListener!('abort', () => reject(signal.reason), { once: true }))])
+    ).body as { readonly status?: unknown; readonly statusText?: unknown; readonly url?: unknown; readonly headers?: unknown; readonly body?: unknown } | null
+    if (
+      result == null ||
+      typeof result.status != 'number' ||
+      typeof result.url != 'string' ||
+      typeof result.body != 'string' ||
+      !Array.isArray(result.headers) ||
+      result.headers.some((pair) => !Array.isArray(pair) || typeof pair[0] != 'string' || typeof pair[1] != 'string')
+    )
+      throw new TypeError('The HTTP response is invalid.')
+    const status = result.status
+    const entries = result.headers as [string, string][]
+    const content = decode(result.body)
+    let used = false
+    const consume = (): Uint8Array => {
+      if (used) throw new TypeError('Response body has already been used.')
+      used = true
+      return content.slice()
+    }
+    const responseHeaders = Object.freeze({
+      get: (name: string) => {
+        const values = entries.filter(([key]) => key == String(name).toLowerCase()).map(([, value]) => value)
+        return values.length == 0 ? null : values.join(', ')
+      },
+      has: (name: string) => entries.some(([key]) => key == String(name).toLowerCase()),
+      entries: () => entries.map(([name, value]) => [name, value])[Symbol.iterator](),
+      keys: () => entries.map(([name]) => name)[Symbol.iterator](),
+      values: () => entries.map(([, value]) => value)[Symbol.iterator](),
+      forEach: (callback: (value: string, name: string) => void) => entries.forEach(([name, value]) => callback(value, name)),
+      [Symbol.iterator]: () => entries.map(([name, value]) => [name, value])[Symbol.iterator](),
+    })
+    return Object.freeze({
+      status,
+      statusText: typeof result.statusText == 'string' ? result.statusText : '',
+      ok: status >= 200 && status < 300,
+      redirected: false,
+      url: result.url,
+      headers: responseHeaders,
+      get bodyUsed() {
+        return used
+      },
+      bytes: async () => consume(),
+      arrayBuffer: async () => consume().buffer,
+      text: async () => new TextDecoder().decode(consume()),
+      json: async () => JSON.parse(new TextDecoder().decode(consume())) as unknown,
+    })
+  }
 }
 
 /** Serialized into the sandbox alongside the strict JSON snapshot helper. */

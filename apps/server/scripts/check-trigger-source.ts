@@ -3,7 +3,7 @@ import type { ConnectorHost } from '../node/deployment/connector-contract.ts'
 import { decodeEventSource } from '@oomol-lab/open-flow/control-api'
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
-import { nodejsEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Scope from 'effect/Scope'
@@ -108,7 +108,7 @@ try {
       },
     },
   ])
-  const operation = await service.control.publications.publishFlow('operator', flowId, draft.revision.revisionId, nodejsEngineContract, null, 'publish')
+  const operation = await service.control.publications.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, 'publish')
   await service.tickIntegration()
   await service.tickMaintenance()
   assert.equal(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status, 'succeeded')

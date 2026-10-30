@@ -315,6 +315,10 @@
     "task": {
       "sharedPermissions": "Use Flow shared permission group",
       "sharedPermissionsHint": "Use all Actions authorized by the Flow permission group. No need to add them to this node.",
+      "httpHosts": "HTTP hosts",
+      "httpHostsHint": "Hosts Code may call with context.fetch, one per line. *.example.com matches subdomains.",
+      "httpHostsInvalid": "\"{{host}}\" is not a valid host. Use a host name such as api.example.com.",
+      "httpHostsLimit": "Declare at most {{count}} hosts.",
       "addAction": "Add Action",
       "removeAction": "Remove Action",
       "actionAccount": "Account",

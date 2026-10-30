@@ -1,24 +1,30 @@
 # Public contracts and version evolution
 
-## Artifacts and Node compatibility within Engine v8
+## Code runtime alignment: pending Flow model v12 and Engine v9
 
 The latest published next-tag artifact `@oomol-lab/open-flow@0.1.0-beta.75` (gitHead
-`611c3a3d`) establishes Model v11 and Engine v8. Without a new contract revision, Engine v8 gains
-working `context.artifact` and Server support for `open-flow-engine/v8/nodejs-compat-v1`. Under the
-beta.75 isolation digest, Artifact calls were always denied and builtin imports failed to resolve,
-so the change is additive. Server's isolation digest adds `artifact/1 nodejs-compat/1`. It still
-accepts the beta.75 v8 digest and executes those Runs with the current implementation.
+`611c3a3d`) establishes Model v11 and Engine v8. The changes below are cumulative against it.
 
-SQLite migration 56 adds Run-owned Artifact storage, deleted with Run event retention and with the
-Flow. The guest implementation of the builtin modules is part of the public package
-(`@oomol-lab/open-flow/runtime-nodejs-compat`), shared by Server and Cloud. Public clients now
-check, run and publish with `nodejs-compat-v1`. Server accepts both v8 contracts; older Servers
-reject the compatibility contract, so upgrade Server before its clients.
+Engine `open-flow-engine/v9` is a single contract: the Node compatibility builtins of
+`v8/nodejs-compat-v1`, `context.fetch`, and no `context.egress`. Public clients check, run and
+publish with v9; Server accepts only v9 for new Draft Runs and Publications, so upgrade Server and
+clients together. Model v12 adds the Code Capability `{ kind: "http", hosts }`; older model
+envelopes reject it and Engines before v9 cannot prepare it. Historical Revisions, Publications and
+Runs are not rewritten, and checkpoint structure is unchanged.
 
-The public `TaskContext` type drops `fetch`, `logger`, `preview` and `reportProgress`; no runtime
-provided them, so only type-checked callers that referenced them need changes. The Code editor
-declares ECMAScript, the Web globals of the runtime and the Node types of the builtin allowlist,
-without DOM declarations. Imports outside the allowlist have no types, matching their rejection.
+Published v8 Publications keep their contract and the beta.75 isolation digest. Server executes
+them with the current implementation: their Artifact calls were always denied and builtin imports
+failed to resolve, so working Artifacts and builtins are additive, and v8 retains the
+always-denied `context.egress`. SQLite migration 56 adds Run-owned Artifact storage, deleted with
+Run event retention and with the Flow. The guest implementation of the builtin modules is part of
+the public package (`@oomol-lab/open-flow/runtime-nodejs-compat`) for every deployment.
+
+The public `TaskContext` type drops `logger`, `preview` and `reportProgress`, which no runtime
+provided, and its `fetch` now describes the v9 API. The Code editor declares ECMAScript, the Web
+globals of the runtime and the Node types of the builtin allowlist, without DOM declarations.
+
+Cloud must implement v9, Artifacts and the shared guest bundle before a package with this revision
+is published, because published clients would send v9.
 
 ## HTTP Request: pending Flow model v11 and Engine v8
 

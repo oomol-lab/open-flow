@@ -445,6 +445,13 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
     Object.values(revision.document.graph.nodes).some((node) => node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'http-request')
   )
     return { kind: 'engine-unsupported' }
+  if (
+    !engine.codeFetch &&
+    Object.values(revision.document.graph.nodes).some(
+      (node) => node.kind == 'task' && 'moduleId' in node.task && node.task.capabilities?.some((item) => item.kind == 'http'),
+    )
+  )
+    return { kind: 'engine-unsupported' }
   if (!engine.workflowTools && Object.values(revision.document.graph.nodes).some((node) => nodeWorkflowReferences(node).some((ref) => ref.tool != null)))
     return { kind: 'engine-unsupported' }
   if (triggerId != null) {

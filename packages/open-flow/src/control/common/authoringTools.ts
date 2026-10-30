@@ -17,7 +17,7 @@ export type AuthoringCapability = Exclude<TaskCapability, WorkflowCapability> | 
 export type WorkflowLookup = (flowId: string) => Promise<WorkflowContract | WorkflowCandidate>
 
 interface ToolIdentity {
-  readonly kind?: 'connector' | 'workflow'
+  readonly kind?: string
   readonly name?: string
   readonly flowId?: string
 }

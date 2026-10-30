@@ -216,25 +216,40 @@ describe('isolated-vm runtime conformance', () => {
     it(conformance.name, async () => await conformance.verify(harness))
   }
 
-  it('does not expose Node or network globals to the user realm', async () => {
+  it.each([
+    ['open-flow-engine/v8', false],
+    [currentEngineContract, true],
+  ])('does not expose host or network globals to the user realm under %s', async (engineContract, nodejs) => {
     await expect(
-      invoke(`export default () => ({
+      host.invoke({
+        capability: async () => ({ body: null, status: 200 }),
+        input: null,
+        invocationId: 'realm-globals',
+        program: {
+          ...program(`export default (_, context) => ({
         AbortController: typeof AbortController,
         AbortSignal: typeof AbortSignal,
         Buffer: typeof Buffer,
+        env: typeof process == 'object' ? Object.keys(process.env) : [],
         fetch: typeof fetch,
         process: typeof process,
         require: typeof require,
         WebSocket: typeof WebSocket,
+        egress: typeof context.egress,
       })`),
+          engineContract,
+        },
+      }),
     ).resolves.toEqual({
       AbortController: 'function',
       AbortSignal: 'function',
-      Buffer: 'undefined',
+      Buffer: nodejs ? 'function' : 'undefined',
+      env: [],
       fetch: 'undefined',
-      process: 'undefined',
+      process: nodejs ? 'object' : 'undefined',
       require: 'undefined',
       WebSocket: 'undefined',
+      egress: nodejs ? 'undefined' : 'function',
     })
   })
 

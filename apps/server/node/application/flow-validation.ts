@@ -3,7 +3,7 @@ import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 
 import { digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
-import { nodejsEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { AcceptanceError } from '../error.ts'
 
 export interface ValidatedFlow {
@@ -18,7 +18,7 @@ export type RevisionValidator = (revision: RevisionContent) => Promise<Validated
 export async function validatedFlow(revision: RevisionContent): Promise<ValidatedFlow> {
   let prepared: Awaited<ReturnType<typeof prepareFlow>>
   try {
-    prepared = await prepareFlow(revision, nodejsEngineContract)
+    prepared = await prepareFlow(revision, currentEngineContract)
   } catch {
     throw new AcceptanceError('revision-invalid', 'Flow Revision is not structurally valid.')
   }

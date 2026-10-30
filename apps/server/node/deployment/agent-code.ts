@@ -1,8 +1,10 @@
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { IsolatedVmHost } from '../runtime/isolated-vm.ts'
 
-import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { IsolatedVmError, isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
+
+// Agent code computes JSON only: no builtins, globals beyond ECMAScript, or Capabilities.
+const agentCodeEngineContract = 'open-flow-engine/v8'
 
 const wrapper = `import compute from './code.mjs'
 export default async function (inputs) {
@@ -38,7 +40,7 @@ export async function executeCode(host: IsolatedVmHost, code: string, input: Jso
           throw new Error('Code computation cannot access host capabilities.')
         },
         program: {
-          engineContract: currentEngineContract,
+          engineContract: agentCodeEngineContract,
           engineDigest: isolatedVmEngineDigest,
           entryModuleId: 'main',
           modules: { main: { imports: ['code'], source: wrapper }, code: { imports: [], source: code } },

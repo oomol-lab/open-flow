@@ -1,7 +1,7 @@
 import { createSystem, createVirtualTypeScriptEnvironment } from '@typescript/vfs'
 import ts from 'typescript-lsp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { findEngineContract, nodejsEngineContract } from '../../runtime/common/engineContract.ts'
+import { findEngineContract, currentEngineContract } from '../../runtime/common/engineContract.ts'
 import { codeCompilerOptions, codeTypeFiles, codeTypeRoots } from './codeTypes.ts'
 
 const moduleUri = 'file:///module.js'
@@ -24,7 +24,7 @@ function diagnostics(source: string): string[] {
 
 describe('Code type environment', () => {
   it('declares every builtin module of the default Engine Contract', () => {
-    const builtins = [...findEngineContract(nodejsEngineContract)!.builtinModules!]
+    const builtins = [...findEngineContract(currentEngineContract)!.builtinModules!]
     const source = builtins.map((name, index) => `import * as module${index} from ${JSON.stringify(name)}`).join('\n')
     expect(diagnostics(`${source}\nexport {}`)).toEqual([])
   })
@@ -39,7 +39,8 @@ export default async function (_, context) {
   setTimeout(() => controller.abort(), 1)
   console.info(url.href, bytes.length, AbortSignal.timeout(10).aborted, new ReadableStream())
   const ref = await context.artifact.put('text', { name: 'a.txt' })
-  return { ref, previous: await context.getPrevious(), signal: context.signal.aborted }
+  const response = await context.fetch(url, { method: 'POST', headers: { accept: 'application/json' }, body: bytes })
+  return { ref, previous: await context.getPrevious(), signal: context.signal.aborted, json: await response.json(), type: response.headers.get('content-type') }
 }`),
     ).toEqual([])
   })
@@ -49,7 +50,7 @@ export default async function (_, context) {
       diagnostics(`import http from 'node:http'
 /** @param {unknown} _ @param {import('@oomol-lab/open-flow').TaskContext} context */
 export default async function (_, context) {
-  return [http, fetch, document, window, XMLHttpRequest, require, context.fetch, context.logger]
+  return [http, fetch, document, window, XMLHttpRequest, require, context.egress, context.logger]
 }`),
     ).toEqual(
       [
@@ -59,7 +60,7 @@ export default async function (_, context) {
         "name 'window'",
         "name 'XMLHttpRequest'",
         "name 'require'",
-        "'fetch' does not exist",
+        "'egress' does not exist",
         "'logger' does not exist",
       ].map((text) => expect.stringContaining(text)),
     )

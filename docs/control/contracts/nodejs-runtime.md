@@ -1,8 +1,9 @@
 # Node compatibility runtime contract
 
-`open-flow-engine/v8/nodejs-compat-v1` extends the v2 execution model with a fixed builtin module
-allowlist. It is the default contract for new checks, Draft Runs and Publications; the base
-`open-flow-engine/v8` contract remains available. Server and Cloud implement both.
+`open-flow-engine/v9` is the single current contract. It includes the fixed builtin module allowlist
+below and `context.fetch` (see [Code HTTP access](#code-http-access)). The published
+`open-flow-engine/v8/nodejs-compat-v1` has the same allowlist without `context.fetch`, and the base
+`open-flow-engine/v8` has no builtins; both remain supported for existing Publications and Runs.
 
 The public package owns the guest implementation of the builtin modules as
 `@oomol-lab/open-flow/runtime-nodejs-compat`. A deployment supplies the bridge described there:
@@ -65,6 +66,25 @@ or to durable storage. Node compatibility does not grant additional business cap
 subclasses and library initialization may use mutable guest intrinsics. The runtime must isolate
 these intrinsics from other Task invocations. Task termination revokes associated asynchronous work
 and capabilities.
+
+## Code HTTP access
+
+Engine v9 Code calls HTTP(S) APIs with `context.fetch(input, init?)` only for hosts its node declares
+in the Model v12 Capability `{ kind: "http", hosts }`. Hosts are lowercase DNS names or IPv4
+addresses, at most 20; `*.example.com` matches subdomains, not the apex. Deployments deny other
+hosts with `capability.denied` and URLs with credentials or other schemes before any request.
+
+`init` accepts `method` (GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS), `headers` as an object or
+name/value pairs, `body` as a string, `Uint8Array` or `ArrayBuffer`, and `signal`. Bodies are at
+most 1 MiB in each direction. Deployments manage `host`, `content-length` and hop-by-hop headers,
+add no platform credentials, return redirects instead of following them, drop `set-cookie`, and
+bound each request in time. The result is a read-only subset of the Fetch `Response`: `status`,
+`statusText`, `ok`, `url`, `redirected: false`, `headers` (`get`, `has` and iteration), and a
+buffered body read once through `text()`, `json()`, `bytes()` or `arrayBuffer()`. Network failures
+and oversized bodies reject the call. The guest sends one `http.fetch` Capability call per request;
+`createFetch` owns that protocol, and runtime conformance covers it.
+
+Engine v9 removes the always-denied `context.egress` placeholder.
 
 ## Handled task failures
 

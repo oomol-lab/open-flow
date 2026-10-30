@@ -287,7 +287,7 @@ it('shows only current module diagnostics and exposes recovery after a failed sa
   const view = render(
     <CodeTaskSection {...fixture.props} diagnostics={[diagnostic, { ...diagnostic, path: '/modules/other/source', message: 'Other module error' }]} />,
   )
-  const editor = view.container.querySelector('textarea')!
+  const editor = view.container.querySelector('textarea[aria-label="Source"]')!
   expect(editor.getAttribute('aria-invalid')).toBe('true')
   expect(document.getElementById(editor.getAttribute('aria-describedby')!)!.textContent).toContain('invalid JavaScript syntax')
   expect(view.container.textContent).not.toContain('Other module error')

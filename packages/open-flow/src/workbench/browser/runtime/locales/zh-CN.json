@@ -315,6 +315,10 @@
     "task": {
       "sharedPermissions": "使用 Flow 共享权限组",
       "sharedPermissionsHint": "直接使用 Flow 共享权限组已授权的全部 Actions，无需逐个添加。",
+      "httpHosts": "HTTP 主机",
+      "httpHostsHint": "Code 可通过 context.fetch 访问的主机，每行一个。*.example.com 匹配其子域名。",
+      "httpHostsInvalid": "“{{host}}”不是有效的主机，请填写 api.example.com 这样的主机名。",
+      "httpHostsLimit": "最多声明 {{count}} 个主机。",
       "addAction": "添加 Action",
       "removeAction": "移除 Action",
       "actionAccount": "账号",
