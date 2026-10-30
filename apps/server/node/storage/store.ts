@@ -58,7 +58,8 @@ export class Store {
 
     this.state = new StateStore(connection, transaction, clock, {
       maxValueBytes: limits.maxValueBytes ?? stateLimits.maxValueBytes,
-      maxBytes: limits.maxBytes ?? stateLimits.maxBytes,
+      maxValues: limits.maxValues ?? stateLimits.maxValues,
+      maxSpaces: limits.maxSpaces ?? stateLimits.maxSpaces,
       maxIdentities: limits.maxIdentities ?? stateLimits.maxIdentities,
       maxRunWrites: limits.maxRunWrites ?? stateLimits.maxRunWrites,
     })

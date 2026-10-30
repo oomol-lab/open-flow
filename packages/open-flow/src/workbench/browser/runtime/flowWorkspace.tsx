@@ -290,7 +290,7 @@ export function FlowEditor({
   const connections = useVal(store.connectors.$.pickerConnections)
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
-  const [historyNodeId, setHistoryNodeId] = useState<string>()
+  const [stateTarget, setStateTarget] = useState<{ space?: string }>()
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
   const diagnostics = useVal(store.$.diagnostics)
@@ -452,7 +452,7 @@ export function FlowEditor({
         const node = revision?.graph().nodes[nodeId]
         if (flowId == null || node?.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'dedupe') return undefined
         const space = node.task.executor.space === 'flow' ? 'flow' : `node:${nodeId}`
-        return { label: t('flowState.history'), onClick: () => setHistoryNodeId(space) }
+        return { label: t('flowState.history'), onClick: () => setStateTarget({ space }) }
       }}
     >
       <CanvasHistoryScope
@@ -464,29 +464,26 @@ export function FlowEditor({
         role="region"
         tabIndex={0}
       >
-        {flowId != null && historyNodeId != null && (
+        {flowId != null && stateTarget != null && (
           <FlowStateButton
-            key={`${flowId}:${historyNodeId}`}
+            key={`${flowId}:${stateTarget.space ?? 'all'}`}
             client={store.state}
             flowId={flowId}
             nodeIds={designer.nodes.map((node) => node.id)}
-            space={historyNodeId}
-            onClose={() => setHistoryNodeId(undefined)}
+            space={stateTarget.space}
+            onClose={() => setStateTarget(undefined)}
           />
         )}
         <WorkbenchCanvas
           interactiveMode$={store.interactiveMode$}
           connectionControl={
-            <>
-              {flowId != null && <FlowStateButton key={flowId} client={store.state} flowId={flowId} nodeIds={designer.nodes.map((node) => node.id)} />}
-              <ConnectionUsageButton
-                connectionHref={connectionHref}
-                key={flowId}
-                onManage={onManageConnectorAccess}
-                onSelectReference={setAccountReference}
-                store={store}
-              />
-            </>
+            <ConnectionUsageButton
+              connectionHref={connectionHref}
+              key={flowId}
+              onManage={onManageConnectorAccess}
+              onSelectReference={setAccountReference}
+              store={store}
+            />
           }
           topLeftTools={navigationIsland}
           bottomRightTools={<RunStatusIslandContainer onToggle={onToggleRuns} open={runDrawerOpen} panelId={RUN_LOG_PANEL_ID} store={store} />}
@@ -527,6 +524,7 @@ export function FlowEditor({
                 hasPublications={live == null ? undefined : live.publication != null}
                 onOpenPublications={onOpenPublications}
                 onOpenRuns={onOpenRuns}
+                onOpenState={flowId == null ? undefined : () => setStateTarget({})}
                 onPublish={() => void store.publications.publish()}
                 state={publishState}
               />

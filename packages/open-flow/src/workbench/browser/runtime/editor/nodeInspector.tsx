@@ -131,7 +131,7 @@ function nodePurposePlaceholder(
         case 'workflow':
           return t('workflow.description')
         case 'dedupe':
-          return t('flowState.warning')
+          return undefined
         case 'http-request':
           return t('httpRequest.description')
         case 'openapi':

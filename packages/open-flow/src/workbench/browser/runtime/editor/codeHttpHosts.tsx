@@ -63,7 +63,7 @@ export function CodeHttpHosts({
             <DialogTitle>{t('inspector.task.httpHosts')}</DialogTitle>
           </DialogHeader>
           <Field data-inspector-section="code-http">
-            <FieldLabel className="text-xs font-normal" htmlFor={`${id}-hosts`}>
+            <FieldLabel className="sr-only" htmlFor={`${id}-hosts`}>
               {t('inspector.task.httpHosts')}
             </FieldLabel>
             <ValueEditorFeedback error={error}>

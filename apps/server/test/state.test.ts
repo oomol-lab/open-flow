@@ -2,6 +2,7 @@ import { hashIdentities } from '@oomol-lab/open-flow/flow-state'
 import { afterEach, describe, expect, it } from 'vitest'
 import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
+import { migrate } from '../node/storage/migrate.ts'
 import { StateStore, stateLimits } from '../node/storage/state-store.ts'
 import { Store } from '../node/storage/store.ts'
 
@@ -28,7 +29,7 @@ describe('Flow State storage', () => {
     expect(store.get('b', 'draft', 'key')).toBeNull()
     store.set('a', 'draft', 'run2', 'key', null)
     expect(store.list('a', 'draft')).toEqual([])
-    expect(store.view('a', 'draft').bytes).toBe(0)
+    expect(store.view('a', 'draft').values).toEqual([])
   })
   it('rolls back the complete batch on capacity and permits duplicate-only batches at capacity', async () => {
     const store = setup({ ...stateLimits, maxIdentities: 2 })
@@ -38,9 +39,9 @@ describe('Flow State storage', () => {
     expect(() => store.insert('f', 'draft', 'flow', 'new', ids, hashes)).toThrow('full')
     expect(store.has('f', 'draft', 'flow', hashes)).toEqual([true, true, false])
     expect(store.insert('f', 'draft', 'flow', 'new', ['b', 'b'], [hashes[1]!, hashes[1]!])).toEqual([false, false])
-    expect(store.view('f', 'draft').bytes).toBe(192)
+    expect(store.dedupeCount('f', 'draft')).toBe(2)
     store.clearSpace('f', 'draft', 'flow')
-    expect(store.view('f', 'draft').bytes).toBe(0)
+    expect(store.dedupeCount('f', 'draft')).toBe(0)
   })
   it('changes modes atomically and leaves prior history intact after invalid watermarks', async () => {
     const store = setup()
@@ -53,22 +54,61 @@ describe('Flow State storage', () => {
     expect(store.insert('f', 'draft', 'flow', 'increasing', [9, 11], [])).toEqual([false, true])
     expect(() => store.has('f', 'draft', 'flow', hashes)).toThrow()
     expect(store.insert('f', 'draft', 'flow', 'new', ids, hashes)).toEqual([true])
-    expect(store.view('f', 'draft').bytes).toBe(96)
+    expect(store.dedupeCount('f', 'draft')).toBe(1)
   })
-  it('enforces total bytes without changing stored values or dedupe history', async () => {
-    const store = setup({ ...stateLimits, maxBytes: 100 })
+  it('limits distinct keys while allowing updates, conditional inserts, deletions and independent scopes', () => {
+    const store = setup({ ...stateLimits, maxValues: 1, maxValueBytes: 9 })
     store.set('f', 'draft', 'r', 'k', 'x')
-    expect(() => store.set('f', 'draft', 'r', 'other', 'x')).toThrow('size limit')
-    const hashes = await hashIdentities(['a'])
-    expect(() => store.insert('f', 'draft', 'flow', 'new', ['a'], hashes)).toThrow('size limit')
-    expect(store.view('f', 'draft').spaces).toEqual([])
-    expect(store.list('f', 'draft')).toEqual(['k'])
+    expect(() => store.set('f', 'draft', 'r', 'other', 'x')).toThrow('entry limit')
+    store.set('f', 'draft', 'r', 'k', 'updated')
+    expect(store.set('f', 'draft', 'r', 'k', 'ignored', true)).toBe(false)
+    expect(() => store.set('f', 'draft', 'r', 'k', 'too large')).toThrow('size limit')
+    expect(store.get('f', 'draft', 'k')).toBe('updated')
+    store.set('f', 'live', 'r', 'other', 1)
+    store.set('other', 'draft', 'r', 'k', 1)
+    store.set('f', 'draft', 'r', 'k', null)
+    expect(store.set('f', 'draft', 'r', 'other', 1, true)).toBe(true)
     store.clearValues('f', 'draft')
-    expect(store.view('f', 'draft').bytes).toBe(0)
+    expect(store.list('f', 'draft')).toEqual([])
+  })
+  it('shares identity capacity across spaces and frees it on clearing or switching to a watermark', async () => {
+    const store = setup({ ...stateLimits, maxIdentities: 2 })
+    const hashes = await hashIdentities(['a', 'b'])
+    store.insert('f', 'draft', 'flow', 'new', ['a'], [hashes[0]!])
+    store.insert('f', 'draft', 'node:a', 'new', ['a'], [hashes[0]!])
+    expect(() => store.insert('f', 'draft', 'node:b', 'new', ['b'], [hashes[1]!])).toThrow('full')
+    expect(store.view('f', 'draft').spaces).toHaveLength(2)
+    store.insert('f', 'live', 'flow', 'new', ['a', 'b'], hashes)
+    store.insert('f', 'draft', 'node:a', 'increasing', [1], [])
+    store.insert('f', 'draft', 'node:b', 'new', ['b'], [hashes[1]!])
+    expect(() => store.insert('f', 'draft', 'node:a', 'new', ['a'], [hashes[0]!])).toThrow('full')
+    expect(store.view('f', 'draft').spaces.find((item) => item.space === 'node:a')?.watermark).toBe(1)
+    store.clearSpace('f', 'draft', 'flow')
+    store.insert('f', 'draft', 'node:a', 'new', ['a'], [hashes[0]!])
+    expect(store.dedupeCount('f', 'draft')).toBe(2)
+  })
+  it('bounds watermark spaces, including empty switched spaces, and releases slots on clearing', async () => {
+    const store = setup({ ...stateLimits, maxSpaces: 1 })
+    store.insert('f', 'draft', 'node:a', 'increasing', [1], [])
+    expect(() => store.insert('f', 'draft', 'node:b', 'increasing', [2], [])).toThrow('space limit')
+    expect(store.insert('f', 'draft', 'node:b', 'increasing', [], [])).toEqual([])
+    store.insert('f', 'draft', 'node:a', 'increasing', [2], [])
+    store.insert('f', 'draft', 'node:a', 'new', [], [])
+    expect(() => store.insert('f', 'draft', 'node:b', 'increasing', [2], [])).toThrow('space limit')
+    store.clearSpace('f', 'draft', 'node:a')
+    expect(() => store.insert('f', 'draft', 'node:' + 'x'.repeat(252), 'increasing', [1], [])).toThrow('256')
+    store.insert('f', 'draft', 'node:b', 'increasing', [2], [])
+    expect(store.view('f', 'draft').spaces).toHaveLength(1)
+  })
+  it('accepts values beyond the retired total byte quota when each value and the entry count fit', () => {
+    const store = setup()
+    const value = 'x'.repeat(stateLimits.maxValueBytes - 2)
+    Array.from({ length: 33 }, (_, index) => store.set('f', 'draft', 'r', String(index), value))
+    expect(store.list('f', 'draft')).toHaveLength(33)
   })
 })
 
-it('removes values, spaces, hashes and accounting for both scopes when a Flow is physically deleted', async () => {
+it('removes values, spaces, hashes for both scopes when a Flow is physically deleted', async () => {
   const database = Database.open(':memory:')
   databases.push(database)
   const store = new Store(database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined })
@@ -91,7 +131,7 @@ it('removes values, spaces, hashes and accounting for both scopes when a Flow is
   }
   store.flows.retire('flow', 2)
   expect(store.flows.delete('flow')).toBe(true)
-  for (const table of ['flow_state_values', 'flow_dedupe_spaces', 'flow_dedupe_identities', 'flow_state_usage']) {
+  for (const table of ['flow_state_values', 'flow_dedupe_spaces', 'flow_dedupe_identities']) {
     expect(database.connection.prepare(`SELECT * FROM ${table} WHERE flow_id = ?`).all('flow')).toEqual([])
   }
 })
@@ -101,7 +141,7 @@ it('resets a changed mode even when the first batch is empty', async () => {
   const hashes = await hashIdentities(['a'])
   store.insert('f', 'draft', 'flow', 'new', ['a'], hashes)
   expect(store.insert('f', 'draft', 'flow', 'increasing', [], [])).toEqual([])
-  expect(store.view('f', 'draft')).toMatchObject({ bytes: 0, spaces: [{ mode: 'increasing', watermark: null, count: 0 }] })
+  expect(store.view('f', 'draft')).toMatchObject({ spaces: [{ mode: 'increasing', watermark: null, count: 0 }] })
 })
 
 it('allows deletion even when the configured value limit is smaller than serialized null', () => {
@@ -109,5 +149,19 @@ it('allows deletion even when the configured value limit is smaller than seriali
   store.set('f', 'draft', 'run', 'k', 0)
   store.set('f', 'draft', 'run', 'k', null)
   expect(store.get('f', 'draft', 'k')).toBeNull()
-  expect(store.view('f', 'draft').bytes).toBe(0)
+  expect(store.dedupeCount('f', 'draft')).toBe(0)
+})
+
+it('migrates byte-accounted data without losing values or history', async () => {
+  const database = Database.open(':memory:')
+  databases.push(database)
+  const store = new StateStore(database.connection, (operation) => database.transaction(operation))
+  store.set('f', 'draft', 'r', 'key', '你好')
+  store.insert('f', 'draft', 'flow', 'new', ['a'], await hashIdentities(['a']))
+  database.connection.exec(
+    'CREATE TABLE flow_state_usage (flow_id TEXT, scope TEXT, bytes INTEGER); UPDATE flow_state_values SET size = 999; PRAGMA user_version = 57',
+  )
+  migrate(database)
+  expect(store.view('f', 'draft', true)).toMatchObject({ values: [{ key: 'key', value: '你好', size: 8 }], spaces: [{ count: 1 }] })
+  expect(database.connection.prepare("SELECT name FROM sqlite_master WHERE name = 'flow_state_usage'").get()).toBeUndefined()
 })
