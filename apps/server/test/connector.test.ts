@@ -654,10 +654,10 @@ describe('Server Connector host', () => {
         listConnections: async () => [{ connectionId: 'connection-work', displayName: 'Work', isDefault: true, serviceId: 'example', status: 'active' }],
       }),
     )
-    const runId = await run(service, capabilityFlow(true, "capability.egress('https://example.com')"))
+    const runId = await run(service, capabilityFlow(true, "capability.fetch('https://example.com')"))
 
     expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'capability.denied', message: 'The Runtime Capability is not declared for this Task.' } },
+      payload: { error: { code: 'capability.denied', message: 'HTTP access is not declared for this Code node.' } },
     })
     expect(execute).not.toHaveBeenCalled()
   })

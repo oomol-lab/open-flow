@@ -31,6 +31,7 @@ import { resourceData, resourceValue } from '../stores/resource.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
 import { ActionSelectionDialog } from './actionSelectionDialog.tsx'
 import { CodeEditor } from './codeEditor.tsx'
+import { CodeHttpHosts } from './codeHttpHosts.tsx'
 import { codeTyping } from './codeTyping.ts'
 import { diagnosticMessage } from './diagnostics.ts'
 import { availableWorkflowToolName } from './workflowToolSelection.tsx'
@@ -162,7 +163,8 @@ function EditableCodeTaskSection({
           : value == null
             ? []
             : [value]
-      if (!(await store.nodes.setCodeActions(selection.id, [...connectorCapabilities, ...workflows]))) return false
+      const http = task != null && 'moduleId' in task ? (task.capabilities ?? []).filter((item) => item.kind == 'http') : []
+      if (!(await store.nodes.setCodeActions(selection.id, [...connectorCapabilities, ...workflows, ...http]))) return false
       setPermission(value)
       return true
     } catch (cause) {
@@ -193,6 +195,16 @@ function EditableCodeTaskSection({
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   if (!('moduleId' in task)) return null
+  const httpHosts = (task.capabilities ?? []).find((item) => item.kind == 'http')?.hosts ?? []
+  const saveHttpHosts = async (hosts: readonly string[]) => {
+    try {
+      const others = (task.capabilities ?? []).filter((item) => item.kind != 'http')
+      return await store.nodes.setCodeActions(selection.id, hosts.length == 0 ? others : [...others, { kind: 'http', hosts }])
+    } catch (cause) {
+      store.notify(errorNotice(cause, t))
+      return false
+    }
+  }
   const selectedActions = permission?.mode == 'independent' ? permission.actions : []
   const selectedTools: readonly SelectedTool[] = [...selectedActions, ...(task.capabilities ?? []).filter((item) => item.kind == 'workflow')]
   const summary = actionSummary(selectedTools, hintedCatalog, providers.data ?? [])
@@ -210,7 +222,7 @@ function EditableCodeTaskSection({
   const typingFor = (shared: Readonly<Record<string, ConnectorActionView>>) =>
     codeTyping(
       task,
-      permission == null ? task.capabilities : [permission, ...(task.capabilities ?? []).filter((item) => item.kind == 'workflow')],
+      permission == null ? task.capabilities : [permission, ...(task.capabilities ?? []).filter((item) => item.kind != 'connector')],
       permission?.mode == 'shared' ? shared : { ...hintedCatalog, ...shared },
       providerIds,
     )
@@ -350,6 +362,7 @@ function EditableCodeTaskSection({
           )}
         </div>
       )}
+      <CodeHttpHosts disabled={disabled || pending} hosts={httpHosts} onSave={saveHttpHosts} />
       <ValueEditorFeedback
         error={
           moduleDiagnostics.length > 0

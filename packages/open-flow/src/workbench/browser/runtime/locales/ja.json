@@ -315,6 +315,10 @@
     "task": {
       "sharedPermissions": "Flow の共有権限グループを使用",
       "sharedPermissionsHint": "Flow の共有権限グループで許可されたすべての Action を使用します。個別の追加は不要です。",
+      "httpHosts": "HTTP ホスト",
+      "httpHostsHint": "Code が context.fetch で呼び出せるホストを 1 行に 1 つ入力します。*.example.com はサブドメインに一致します。",
+      "httpHostsInvalid": "「{{host}}」は有効なホストではありません。api.example.com のようなホスト名を入力してください。",
+      "httpHostsLimit": "宣言できるホストは最大 {{count}} 個です。",
       "addAction": "Action を追加",
       "removeAction": "Action を削除",
       "actionAccount": "アカウント",

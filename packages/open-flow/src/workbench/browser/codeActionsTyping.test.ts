@@ -4,11 +4,10 @@ import type { ConnectorCapability, TaskCapability } from '../../flow/common/chan
 import { createSystem, createVirtualTypeScriptEnvironment } from '@typescript/vfs'
 import ts from 'typescript-lsp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { codeCompilerOptions, codeTypeFiles, codeTypeRoots } from './codeTypes.ts'
 import { codeTyping } from './runtime/editor/codeTyping.ts'
 import { contextName, ShadowDocument } from './typeScriptShadow.ts'
 
-const libraries = import.meta.glob<string>('../../../node_modules/typescript-lsp/lib/lib.*.d.ts', { eager: true, query: '?raw', import: 'default' })
-const platform = import.meta.glob<string>('../../types/index.ts', { eager: true, query: '?raw', import: 'default' })
 const declaration: ConnectorCapability = {
   kind: 'connector',
   action: 'example.echo',
@@ -29,23 +28,10 @@ const definition: ConnectorAction = {
 
 let environment: ReturnType<typeof createVirtualTypeScriptEnvironment>
 beforeAll(() => {
-  const files = new Map(Object.entries(libraries).map(([path, text]) => [`/${path.split('/').at(-1)}`, text]))
-  const roots = [...files.keys()]
-  const types = platform['../../types/index.ts']
-  if (types == null) throw new Error('Public Task types are missing.')
-  files.set('/node_modules/@oomol-lab/open-flow/index.d.ts', types)
-  files.set('/node_modules/@oomol-lab/open-flow/package.json', '{ "types": "index.d.ts" }')
-  files.set('/module.js', 'export {}')
+  const files = new Map(codeTypeFiles)
+  files.set('file:///module.js', 'export {}')
   const compiler = ts as unknown as Parameters<typeof createVirtualTypeScriptEnvironment>[2]
-  environment = createVirtualTypeScriptEnvironment(createSystem(files), [...roots, '/module.js'], compiler, {
-    allowJs: true,
-    checkJs: true,
-    strict: true,
-    noEmit: true,
-    target: ts.ScriptTarget.ES2024,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-  })
+  environment = createVirtualTypeScriptEnvironment(createSystem(files), [...codeTypeRoots, 'file:///module.js'], compiler, codeCompilerOptions)
 })
 afterAll(() => environment?.languageService.dispose())
 
@@ -56,7 +42,7 @@ function editorService(
   providerIds: readonly string[] = ['example'],
 ) {
   const shadow = new ShadowDocument(source, codeTyping({ inputs: [], outputs: [] }, declarations, catalog, providerIds))
-  environment.updateFile('/module.js', shadow.text)
+  environment.updateFile('file:///module.js', shadow.text)
   return { service: environment.languageService, text: shadow.text }
 }
 
@@ -66,7 +52,7 @@ function diagnostics(
   catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition },
 ) {
   return editorService(source, declarations, catalog)
-    .service.getSemanticDiagnostics('/module.js')
+    .service.getSemanticDiagnostics('file:///module.js')
     .map((diagnostic: ts.Diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
 }
 
@@ -91,7 +77,7 @@ describe('Code Action editor types', () => {
   it('completes every available Provider without requiring inserted Action hints', () => {
     const { service, text } = editorService('export default async (_, ctx) => { ctx.actions. }', [], {}, ['github', 'gmail', 'sheets'])
     const position = text.indexOf('ctx.actions.') + 'ctx.actions.'.length
-    const names = service.getCompletionsAtPosition('/module.js', position, {})?.entries.map((entry: ts.CompletionEntry) => entry.name)
+    const names = service.getCompletionsAtPosition('file:///module.js', position, {})?.entries.map((entry: ts.CompletionEntry) => entry.name)
     expect(names).toEqual(expect.arrayContaining(['call', 'github', 'gmail', 'sheets']))
   })
 
@@ -104,7 +90,7 @@ describe('Code Action editor types', () => {
       }
       const { service, text } = editorService('export default async (_, ctx) => { ctx.actions. }', [declaration], catalog, providerIds)
       const names = service
-        .getCompletionsAtPosition('/module.js', text.indexOf('ctx.actions.') + 'ctx.actions.'.length, {})
+        .getCompletionsAtPosition('file:///module.js', text.indexOf('ctx.actions.') + 'ctx.actions.'.length, {})
         ?.entries.map((entry: ts.CompletionEntry) => entry.name)
       expect(names).toContain('call')
       expect(names).not.toContain('example')
@@ -112,7 +98,7 @@ describe('Code Action editor types', () => {
       expect(names?.includes('gmail')).toBe(providerIds.length > 0)
       const call = editorService("export default async (_, ctx) => { ctx.actions.call('') }", [declaration], catalog, providerIds)
       const actions = call.service
-        .getCompletionsAtPosition('/module.js', call.text.indexOf("call('") + "call('".length, {})
+        .getCompletionsAtPosition('file:///module.js', call.text.indexOf("call('") + "call('".length, {})
         ?.entries.map((entry: ts.CompletionEntry) => entry.name)
       expect(actions ?? []).not.toContain('example.echo')
     },
@@ -121,7 +107,7 @@ describe('Code Action editor types', () => {
   it('completes catalog Actions and checks their schemas without saved hints', () => {
     const { service, text } = editorService('export default async (_, ctx) => { ctx.actions.example. }', [], { 'example.echo': definition }, ['example'])
     const names = service
-      .getCompletionsAtPosition('/module.js', text.indexOf('ctx.actions.example.') + 'ctx.actions.example.'.length, {})
+      .getCompletionsAtPosition('file:///module.js', text.indexOf('ctx.actions.example.') + 'ctx.actions.example.'.length, {})
       ?.entries.map((entry: ts.CompletionEntry) => entry.name)
     expect(names).toContain('echo')
     expect(diagnostics('export default async (_, ctx) => ctx.actions.example.echo({ any: 123 })', [], { 'example.echo': definition }).length).toBeGreaterThan(0)
@@ -134,7 +120,7 @@ describe('Code Action editor types', () => {
     const source = `export default async (_, ctx) => { ctx.actions.call('example.') }`
     const { service, text } = editorService(source)
     const position = text.indexOf("'example.") + "'example.".length
-    const completions = service.getCompletionsAtPosition('/module.js', position, {})
+    const completions = service.getCompletionsAtPosition('file:///module.js', position, {})
     const span = completions?.optionalReplacementSpan
 
     expect(completions?.entries.map((entry: ts.CompletionEntry) => entry.name)).toContain('example.echo')
@@ -171,7 +157,7 @@ describe('Code Action editor types', () => {
       ['example', 'other'],
     )
     const names = service
-      .getCompletionsAtPosition('/module.js', text.indexOf('ctx.actions.') + 'ctx.actions.'.length, {})
+      .getCompletionsAtPosition('file:///module.js', text.indexOf('ctx.actions.') + 'ctx.actions.'.length, {})
       ?.entries.map((entry: ts.CompletionEntry) => entry.name)
     expect(names).toContain('example')
     expect(names).not.toContain('other')
@@ -324,7 +310,7 @@ it('completes workflow aliases and validates saved input and output types', () =
   ]
   const call = editorService("export default async (_, ctx) => ctx.workflows.call('')", workflows)
   const names = call.service
-    .getCompletionsAtPosition('/module.js', call.text.indexOf("call('") + "call('".length, {})
+    .getCompletionsAtPosition('file:///module.js', call.text.indexOf("call('") + "call('".length, {})
     ?.entries.map((entry: ts.CompletionEntry) => entry.name)
   expect(names).toContain('double')
   expect(diagnostics("export default async (_, ctx) => (await ctx.workflows.call('double', { amount: 0, note: null })).total.toFixed(2)", workflows)).toEqual(
@@ -352,7 +338,7 @@ it('escapes workflow handles and enum values throughout the TaskContext JSDoc', 
   ]
   const source = "export default async (_, ctx) => (await ctx.workflows.call('echo', { 'input*/': 'value*/' }))['output*/'].toUpperCase()"
   const { service } = editorService(source, workflows)
-  expect(service.getSyntacticDiagnostics('/module.js')).toEqual([])
+  expect(service.getSyntacticDiagnostics('file:///module.js')).toEqual([])
   expect(diagnostics(source, workflows)).toEqual([])
   expect(diagnostics(source.replace('toUpperCase()', 'toFixed()'), workflows)).toEqual([
     expect.stringContaining(`Property 'toFixed' does not exist on type '"result*/"'.`),

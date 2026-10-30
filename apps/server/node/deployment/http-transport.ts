@@ -1,7 +1,7 @@
 export type HttpFailure = 'input-invalid' | 'response-invalid' | 'http-failed' | 'indeterminate' | 'limit-exceeded'
 export class HttpTaskError extends Error {
   readonly retryable: boolean
-  readonly code: `http-request.${HttpFailure}` | `openapi.${HttpFailure}`
+  readonly code: `http-request.${HttpFailure}` | `openapi.${HttpFailure}` | `http.${HttpFailure}`
   constructor(code: HttpTaskError['code'], message: string, retryable = false) {
     super(message)
     this.name = 'HttpTaskError'
@@ -17,29 +17,40 @@ export class HttpTaskError extends Error {
 }
 type FailureFactory = (code: HttpFailure, message: string, retryable?: boolean) => HttpTaskError
 const maximumBytes = 4 * 1024 * 1024
-export async function readHttpBody(response: Response, failure: FailureFactory): Promise<string> {
-  if (Number(response.headers.get('content-length')) > maximumBytes) {
-    await response.body?.cancel()
-    throw failure('limit-exceeded', 'Response exceeds 4 MiB.')
+/** Reads a complete response body, failing with `limit-exceeded` once it exceeds `limit` bytes. */
+export async function readHttpBytes(response: Response, failure: FailureFactory, limit = maximumBytes): Promise<Uint8Array> {
+  const message = `Response exceeds ${limit / 1024 / 1024} MiB.`
+  // HEAD and 304 responses declare the resource length without carrying a body.
+  if (response.body == null) return new Uint8Array()
+  if (Number(response.headers.get('content-length')) > limit) {
+    await response.body.cancel()
+    throw failure('limit-exceeded', message)
   }
-  const reader = response.body?.getReader()
-  if (reader == null) return ''
-  const decoder = new TextDecoder('utf-8', { fatal: true })
+  const reader = response.body.getReader()
+  const parts: Uint8Array[] = []
   let size = 0
-  let text = ''
   try {
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
       size += value.byteLength
-      if (size > maximumBytes) throw failure('limit-exceeded', 'Response exceeds 4 MiB.')
-      text += decoder.decode(value, { stream: true })
+      if (size > limit) throw failure('limit-exceeded', message)
+      parts.push(value)
     }
-    return text + decoder.decode()
   } finally {
     await reader.cancel()
     reader.releaseLock()
   }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const part of parts) {
+    bytes.set(part, offset)
+    offset += part.byteLength
+  }
+  return bytes
+}
+export async function readHttpBody(response: Response, failure: FailureFactory): Promise<string> {
+  return new TextDecoder('utf-8', { fatal: true }).decode(await readHttpBytes(response, failure))
 }
 /** Server-side HTTP policy shared by explicit HTTP nodes and OpenAPI operations. */
 export async function executeHttpTransport(

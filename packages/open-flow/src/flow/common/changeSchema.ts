@@ -4,6 +4,7 @@ import { dequal } from 'dequal/lite'
 import { z } from 'zod'
 import { limitDecisionTask } from '../../decision/common/decision.ts'
 import { assertHttpAuthBindings } from '../../http/common/authBindings.ts'
+import { isHttpHost, maxHttpHosts } from '../../http/common/hosts.ts'
 import { httpRequestExecutorSchema } from '../../http/common/httpRequest.ts'
 import { checkJsonDepth } from './json.ts'
 import { retryConfigurationSchema } from './retry.ts'
@@ -12,7 +13,7 @@ import { waitAutoContinueDraftSchema, waitAutoContinueSchema } from './wait.ts'
 import { webhookMethods } from './webhookMethod.ts'
 import { webhookResponseTimeout } from './webhookResponse.ts'
 
-export const currentFlowModelVersion = 11
+export const currentFlowModelVersion = 12
 const text = z.string()
 const actionConnection = text.describe(
   'Account selection: omit while unconfigured; use an account ID to select it; use "" to explicitly defer configuration. Deferred Actions fail if called; deferred Agent tools are excluded from the callable tool set. Not supported by Triggers.',
@@ -57,7 +58,15 @@ export const workflowCapabilitySchema = z.strictObject({
   inputs: z.array(port),
   outputs: z.array(port).nullable(),
 })
-const capability = z.union([connectorCapabilitySchema, workflowCapabilitySchema])
+export const httpCapabilitySchema = z.strictObject({
+  kind: z.literal('http'),
+  hosts: z
+    .array(text.refine(isHttpHost, 'Use a lowercase host name or IPv4 address, optionally prefixed by "*." for subdomains.'))
+    .min(1)
+    .max(maxHttpHosts)
+    .describe('Hosts Code may call with context.fetch. "*.example.com" matches subdomains only.'),
+})
+const capability = z.union([connectorCapabilitySchema, workflowCapabilitySchema, httpCapabilitySchema])
 const inline = z.object({ ...ports, name: text, moduleId: text, capabilities: z.array(capability).optional() })
 const agentValue = z.union([z.object({ kind: z.literal('value'), value: json }), z.object({ kind: z.literal('input'), input: text })])
 const agentInput = z.union([agentValue, z.object({ kind: z.literal('model') })])
@@ -308,6 +317,7 @@ const revision = z.object({
     z.literal(8),
     z.literal(9),
     z.literal(10),
+    z.literal(11),
     z.literal(currentFlowModelVersion),
   ]),
   document,
@@ -713,6 +723,14 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 }
 
 function checkModelVersion(content: RevisionContent): void {
+  if (
+    content.modelVersion < 12 &&
+    Object.values(content.document.graph.nodes).some(
+      (candidateNode) =>
+        candidateNode.kind == 'task' && 'moduleId' in candidateNode.task && candidateNode.task.capabilities?.some((item) => item.kind == 'http'),
+    )
+  )
+    throw new TypeError('Code HTTP access requires Flow model version 12.')
   if (
     content.modelVersion < 11 &&
     Object.values(content.document.graph.nodes).some(

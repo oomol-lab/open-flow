@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
 export interface IsolatedVmLimits {
+  /** CPU time accumulated by one Task invocation across all of its entries into the isolate. */
   readonly cpuMs: number
   readonly maxCapabilityCalls: number
   readonly maxCapabilityResponseBytes: number
@@ -20,13 +21,15 @@ export interface IsolatedVmLimits {
   readonly maxProgramBytes: number
   readonly maxResultBytes: number
   readonly memoryMb: number
+  /** Wall time of a standalone invocation; Flow Tasks use node and Run deadlines instead. */
   readonly wallMs: number
 }
 
 export const isolatedVmLimits: IsolatedVmLimits = {
-  cpuMs: 1_000,
+  cpuMs: 10_000,
   maxCapabilityCalls: 100,
-  maxCapabilityResponseBytes: 1024 * 1024,
+  // Fetch bodies and Artifact chunks of up to 1 MiB arrive base64-encoded inside their JSON envelope.
+  maxCapabilityResponseBytes: 2 * 1024 * 1024,
   maxInputBytes: 1024 * 1024,
   maxProgramBytes: 4 * 1024 * 1024,
   maxResultBytes: 1024 * 1024,
@@ -36,15 +39,23 @@ export const isolatedVmLimits: IsolatedVmLimits = {
 
 const v7EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1').digest('hex')}`
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1').digest('hex')}`
+const v8EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1').digest('hex')}`
+
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1').digest('hex')}`
 
 const v6EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1').digest('hex')}`
 
-/** v8 adds workflow tools and HTTP Request; published v7 and v6 retain their execution contracts and digests. */
+/**
+ * v9 is the single contract with Node compatibility builtins and `context.fetch`. Published v8 Runs keep the beta.75 digest
+ * and execute with the current implementation: their Artifact calls were always denied and builtin imports failed to
+ * resolve, so working Artifacts and builtins are additive, and v8 retains `context.egress`. Published v7 and v6 retain
+ * their execution contracts and digests.
+ */
 export function supportsIsolatedVmEngine(engineContract: string, engineDigest: string): boolean {
   return (
     findEngineContract(engineContract) != null &&
     (engineDigest === isolatedVmEngineDigest ||
+      ((engineContract === 'open-flow-engine/v8' || engineContract === 'open-flow-engine/v8/nodejs-compat-v1') && engineDigest === v8EngineDigest) ||
       ((engineContract === 'open-flow-engine/v7' || engineContract === 'open-flow-engine/v7/nodejs-compat-v1') && engineDigest === v7EngineDigest) ||
       ((engineContract === 'open-flow-engine/v6' || engineContract === 'open-flow-engine/v6/nodejs-compat-v1') && engineDigest === v6EngineDigest))
   )
@@ -183,8 +194,13 @@ export class IsolatedVmHost {
   #executionId = 0
   readonly #pending = new Map<number, PendingInvocation>()
   #stderr = ''
+  readonly limits: IsolatedVmLimits
 
-  async invoke(invocation: RuntimeInvocation, limits: IsolatedVmLimits = isolatedVmLimits): Promise<JsonValue | undefined> {
+  constructor(limits: IsolatedVmLimits = isolatedVmLimits) {
+    this.limits = limits
+  }
+
+  async invoke(invocation: RuntimeInvocation, limits: IsolatedVmLimits = this.limits): Promise<JsonValue | undefined> {
     return await Effect.runPromise(
       Effect.suspend(() => {
         if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
@@ -259,7 +275,7 @@ export class IsolatedVmHost {
       readonly projectFailure: (error: unknown) => SchedulerFailure
       readonly runId: string
     },
-    limits: IsolatedVmLimits = isolatedVmLimits,
+    limits: IsolatedVmLimits = this.limits,
   ): Effect.Effect<FlowRunOutcome, Error> {
     const { capability, emit, invokeTask, projectFailure, wait, ...flow } = options
     return Effect.suspend(() => {

@@ -1,5 +1,31 @@
 # Public contracts and version evolution
 
+## Code runtime alignment: pending Flow model v12 and Engine v9
+
+The latest published next-tag artifact `@oomol-lab/open-flow@0.1.0-beta.75` (gitHead
+`611c3a3d`) establishes Model v11 and Engine v8. The changes below are cumulative against it.
+
+Engine `open-flow-engine/v9` is a single contract: the Node compatibility builtins of
+`v8/nodejs-compat-v1`, `context.fetch`, and no `context.egress`. Public clients check, run and
+publish with v9; Server accepts only v9 for new Draft Runs and Publications, so upgrade Server and
+clients together. Model v12 adds the Code Capability `{ kind: "http", hosts }`; older model
+envelopes reject it and Engines before v9 cannot prepare it. Historical Revisions, Publications and
+Runs are not rewritten, and checkpoint structure is unchanged.
+
+Published v8 Publications keep their contract and the beta.75 isolation digest. Server executes
+them with the current implementation: their Artifact calls were always denied and builtin imports
+failed to resolve, so working Artifacts and builtins are additive, and v8 retains the
+always-denied `context.egress`. SQLite migration 56 adds Run-owned Artifact storage, deleted with
+Run event retention and with the Flow. The guest implementation of the builtin modules is part of
+the public package (`@oomol-lab/open-flow/runtime-nodejs-compat`) for every deployment.
+
+The public `TaskContext` type drops `logger`, `preview` and `reportProgress`, which no runtime
+provided, and its `fetch` now describes the v9 API. The Code editor declares ECMAScript, the Web
+globals of the runtime and the Node types of the builtin allowlist, without DOM declarations.
+
+Cloud must implement v9, Artifacts and the shared guest bundle before a package with this revision
+is published, because published clients would send v9.
+
 ## HTTP Request: pending Flow model v11 and Engine v8
 
 The latest published next-tag artifact `@oomol-lab/open-flow@0.1.0-beta.73` has gitHead

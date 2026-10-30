@@ -66,7 +66,13 @@ export interface WorkflowCapability {
   readonly outputs: readonly Port[] | null
 }
 
-export type TaskCapability = ConnectorCapability | WorkflowCapability
+/** Hosts that Code may call through `context.fetch`; requires Flow model 12 and Engine v9. */
+export interface HttpCapability {
+  readonly kind: 'http'
+  readonly hosts: readonly string[]
+}
+
+export type TaskCapability = ConnectorCapability | WorkflowCapability | HttpCapability
 
 export interface ConnectorAccessCapability {
   readonly actionHints?: readonly string[]

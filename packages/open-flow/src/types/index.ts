@@ -22,21 +22,56 @@ export interface ArtifactRef {
   readonly kind: 'artifact'
   readonly id: string
   readonly name: string
-  readonly mediaType: string | undefined
+  readonly mediaType?: string
   readonly size: number
   readonly digest: string
 }
 
 export interface ArtifactPutOptions {
   readonly name: string
-  readonly mediaType?: string | undefined
+  readonly mediaType?: string
 }
 
-export type ArtifactData = Uint8Array | Blob | ReadableStream<Uint8Array>
+/** Strings are stored as UTF-8. */
+export type ArtifactData = string | Uint8Array
 
+/** Artifacts belong to the current Run; an ArtifactRef is JSON and can be passed to downstream nodes. */
 export interface ArtifactCapability {
   put(data: ArtifactData, options: ArtifactPutOptions): Promise<ArtifactRef>
-  open(ref: ArtifactRef): Promise<ReadableStream<Uint8Array>>
+  open(ref: ArtifactRef): Promise<Uint8Array>
+}
+
+export interface TaskFetchInit {
+  /** GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS. */
+  readonly method?: string
+  readonly headers?: Readonly<Record<string, string>> | Iterable<readonly [string, string]>
+  /** At most 1 MiB; strings are sent as UTF-8 text/plain unless a content-type header is supplied. */
+  readonly body?: string | Uint8Array | ArrayBuffer
+  readonly signal?: AbortSignal
+}
+
+export interface TaskFetchHeaders extends Iterable<[string, string]> {
+  get(name: string): string | null
+  has(name: string): boolean
+  entries(): IterableIterator<[string, string]>
+  keys(): IterableIterator<string>
+  values(): IterableIterator<string>
+  forEach(callback: (value: string, name: string) => void): void
+}
+
+/** A read-only subset of the Fetch Response; the body is buffered, at most 1 MiB, and readable once. */
+export interface TaskFetchResponse {
+  readonly status: number
+  readonly statusText: string
+  readonly ok: boolean
+  readonly redirected: false
+  readonly url: string
+  readonly headers: TaskFetchHeaders
+  readonly bodyUsed: boolean
+  bytes(): Promise<Uint8Array>
+  arrayBuffer(): Promise<ArrayBuffer>
+  text(): Promise<string>
+  json(): Promise<unknown>
 }
 
 export interface MediaPreviewPayload {
@@ -73,13 +108,6 @@ export interface CsvPreviewPayload {
 export type PreviewPayload = MediaPreviewPayload | TextPreviewPayload | ImagePreviewPayload | TablePreviewPayload | CsvPreviewPayload
 export type PreviewType = PreviewPayload['type']
 
-export interface TaskLogger {
-  debug(message: string, data?: unknown): void
-  info(message: string, data?: unknown): void
-  warn(message: string, data?: unknown): void
-  error(message: string, data?: unknown): void
-}
-
 export interface TaskContext<
   Actions extends object = Record<string, never>,
   Workflows extends object = { call: (name: never, input?: never) => Promise<never> },
@@ -92,12 +120,13 @@ export interface TaskContext<
   readonly runId: string
   readonly blockId: string
   readonly artifact: ArtifactCapability
-  readonly fetch: typeof fetch
-  readonly logger: TaskLogger
   /** Reads the selected direct predecessors, sorted by node ID; empty for a graph root. */
   getPrevious(): Promise<readonly PreviousNode[]>
-  preview(payload: PreviewPayload, id?: string): Promise<void>
-  reportProgress(progress: number): Promise<void>
+  /**
+   * Calls an HTTP(S) URL whose host the node declares in its `http` Capability. Redirects are returned, not followed,
+   * and no platform credentials are added. Network failures reject with a TypeError.
+   */
+  fetch(input: string | URL, init?: TaskFetchInit): Promise<TaskFetchResponse>
 }
 
 export type TaskResult<Outputs extends object> = keyof Outputs extends never ? Outputs | void : Outputs

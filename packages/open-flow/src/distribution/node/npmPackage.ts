@@ -158,6 +158,10 @@ function createManifest(version: string): object {
         types: './dist/common/runtime-contract.d.ts',
         import: './dist/common/runtime-contract.js',
       },
+      './runtime-nodejs-compat': {
+        types: './dist/common/runtime-nodejs-compat.d.ts',
+        import: './dist/common/runtime-nodejs-compat.js',
+      },
       './scheduler': {
         types: './dist/common/scheduler.d.ts',
         import: './dist/common/scheduler.js',

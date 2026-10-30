@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { remapInputMappings, renamedPort } from '../../flow/common/portChanges.ts'
 import { httpHeaderNameIssue } from './headers.ts'
 
+export { httpHostAllowed, isHttpHost, maxHttpHosts } from './hosts.ts'
+
 const parameterSchema = z.strictObject({ mode: z.enum(['fields', 'object']).default('fields'), names: z.array(z.string()).default([]) })
 export const httpRequestConfigSchema = z.strictObject({
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']).default('GET'),

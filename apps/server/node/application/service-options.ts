@@ -11,6 +11,7 @@ export interface ServerRuntime {
   readonly maxPendingRuns?: number
   readonly runEventRetentionMs?: number
   readonly runTimeoutMs?: number
+  readonly taskCpuMs?: number
 }
 
 export interface ServerCapabilities {
@@ -54,6 +55,7 @@ export function validateRuntime(runtime: ServerRuntime): void {
   validatePositiveInteger(runtime.maxPendingRuns, 'Maximum pending Runs must be a positive safe integer.')
   validatePositiveInteger(runtime.maxConcurrentRuns, 'Maximum concurrent Runs must be a positive safe integer.')
   validatePositiveInteger(runtime.runTimeoutMs, 'Run timeout must be a positive safe integer number of milliseconds.')
+  validatePositiveInteger(runtime.taskCpuMs, 'Task CPU limit must be a positive safe integer number of milliseconds.')
 }
 
 export function validateCapabilities(capabilities: ServerCapabilities): void {

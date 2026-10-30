@@ -7,25 +7,31 @@ export interface EngineContract {
   readonly webhookResponses?: boolean
   readonly workflowTools?: boolean
   readonly httpRequests?: boolean
+  /** Code may call `context.fetch` for hosts declared by its `http` Capability. */
+  readonly codeFetch?: boolean
 }
 
-export const currentEngineContract = 'open-flow-engine/v8'
+/** v9 is a single contract: the Node compatibility builtins, `context.fetch`, and no `context.egress`. */
+export const currentEngineContract = 'open-flow-engine/v9'
+/** The published v8 Node compatibility contract, retained for existing Publications and Runs. */
 export const nodejsEngineContract = 'open-flow-engine/v8/nodejs-compat-v1'
 
-const currentContract: EngineContract = {
+const platformSource = (contract: string) => `export const engineContract = ${JSON.stringify(contract)}
+export function identity(value) { return value }
+`
+
+const v8Contract: EngineContract = {
   workflowTools: true,
   httpRequests: true,
   waitAutoContinue: true,
   webhookResponses: true,
   platformExports: new Set(['engineContract', 'identity']),
   platformModule: 'open-flow:platform',
-  platformSource: `export const engineContract = ${JSON.stringify(currentEngineContract)}
-export function identity(value) { return value }
-`,
+  platformSource: platformSource('open-flow-engine/v8'),
 }
 
 const nodejsContract: EngineContract = {
-  ...currentContract,
+  ...v8Contract,
   builtinModules: new Set(
     [
       'assert',
@@ -54,31 +60,30 @@ const nodejsContract: EngineContract = {
       'zlib',
     ].flatMap((name) => [name, `node:${name}`]),
   ),
-  platformSource: `export const engineContract = ${JSON.stringify(nodejsEngineContract)}
-export function identity(value) { return value }
-`,
+  platformSource: platformSource(nodejsEngineContract),
 }
+
+const currentContract: EngineContract = { ...nodejsContract, codeFetch: true, platformSource: platformSource(currentEngineContract) }
 
 export function findEngineContract(contract: string): EngineContract | undefined {
   if (contract == currentEngineContract) return currentContract
+  if (contract == 'open-flow-engine/v8') return v8Contract
   if (contract == nodejsEngineContract) return nodejsContract
   if (contract == 'open-flow-engine/v7' || contract == 'open-flow-engine/v7/nodejs-compat-v1')
     return {
-      ...(contract.endsWith('/nodejs-compat-v1') ? nodejsContract : currentContract),
+      ...(contract.endsWith('/nodejs-compat-v1') ? nodejsContract : v8Contract),
       workflowTools: false,
       httpRequests: false,
-      platformSource: `export const engineContract = ${JSON.stringify(contract)}\nexport function identity(value) { return value }\n`,
+      platformSource: platformSource(contract),
     }
   if (contract == 'open-flow-engine/v6' || contract == 'open-flow-engine/v6/nodejs-compat-v1')
     return {
-      ...(contract == 'open-flow-engine/v6' ? currentContract : nodejsContract),
+      ...(contract == 'open-flow-engine/v6' ? v8Contract : nodejsContract),
       workflowTools: false,
       httpRequests: false,
       waitAutoContinue: false,
       webhookResponses: false,
-      platformSource: `export const engineContract = ${JSON.stringify(contract)}
-export function identity(value) { return value }
-`,
+      platformSource: platformSource(contract),
     }
   return undefined
 }

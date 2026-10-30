@@ -3,7 +3,7 @@ import type { RuntimeHarness, RuntimeProgram } from '@oomol-lab/open-flow/runtim
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { prepareFlow } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
+import { nodejsRuntimeConformanceCases, runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { afterAll, describe, expect, it } from 'vitest'
 import { IsolatedVmError, isolatedVmEngineDigest, isolatedVmLimits, IsolatedVmHost } from '../node/runtime/isolated-vm.ts'
@@ -212,29 +212,44 @@ describe('isolated-vm runtime conformance', () => {
     await expect(invoke('export default (_, context) => typeof context.connector')).resolves.toBe('undefined')
   })
 
-  for (const conformance of runtimeConformanceCases) {
+  for (const conformance of [...runtimeConformanceCases, ...nodejsRuntimeConformanceCases]) {
     it(conformance.name, async () => await conformance.verify(harness))
   }
 
-  it('does not expose Node or network globals to the user realm', async () => {
+  it.each([
+    ['open-flow-engine/v8', false],
+    [currentEngineContract, true],
+  ])('does not expose host or network globals to the user realm under %s', async (engineContract, nodejs) => {
     await expect(
-      invoke(`export default () => ({
+      host.invoke({
+        capability: async () => ({ body: null, status: 200 }),
+        input: null,
+        invocationId: 'realm-globals',
+        program: {
+          ...program(`export default (_, context) => ({
         AbortController: typeof AbortController,
         AbortSignal: typeof AbortSignal,
         Buffer: typeof Buffer,
+        env: typeof process == 'object' ? Object.keys(process.env) : [],
         fetch: typeof fetch,
         process: typeof process,
         require: typeof require,
         WebSocket: typeof WebSocket,
+        egress: typeof context.egress,
       })`),
+          engineContract,
+        },
+      }),
     ).resolves.toEqual({
       AbortController: 'function',
       AbortSignal: 'function',
-      Buffer: 'undefined',
+      Buffer: nodejs ? 'function' : 'undefined',
+      env: [],
       fetch: 'undefined',
-      process: 'undefined',
+      process: nodejs ? 'object' : 'undefined',
       require: 'undefined',
       WebSocket: 'undefined',
+      egress: nodejs ? 'undefined' : 'function',
     })
   })
 
@@ -336,6 +351,38 @@ describe('isolated-vm runtime conformance', () => {
     await expect(invoke('export default () => "still-alive"')).resolves.toBe('still-alive')
   })
 
+  it.each([
+    ['timer', 'for (let index = 0; index < 3; index++) { await new Promise((resolve) => setTimeout(resolve, 1)); burn(80) }'],
+    ['Capability', 'await context.actions.example.echo({}); burn(300)'],
+  ])('accumulates CPU time after %s callbacks', async (_entry, body) => {
+    await expect(
+      host.invoke(
+        {
+          capabilities: [{ kind: 'connector', action: 'example.echo', connections: [] }],
+          capability: async () => ({ body: 'ok', status: 200 }),
+          input: null,
+          invocationId: 'accumulated-cpu',
+          program: program(`const burn = (ms) => { const end = Date.now() + ms; while (Date.now() < end) {} }
+export default async (_, context) => { ${body}; return 'unbounded' }`),
+        },
+        { ...isolatedVmLimits, cpuMs: 200 },
+      ),
+    ).rejects.toMatchObject({ code: 'limit-exceeded', message: 'Runtime invocation exceeded its CPU limit.' })
+  })
+
+  it('cancels a busy asynchronous Task without blocking other invocations', async () => {
+    const busy = invoke('export default async () => { await new Promise((resolve) => setTimeout(resolve, 1)); while (true) {} }', {
+      ...isolatedVmLimits,
+      wallMs: 200,
+    })
+    const sibling = invoke('export default async () => { await new Promise((resolve) => setTimeout(resolve, 400)); return "sibling" }')
+    await expect(busy).rejects.toMatchObject({ code: 'limit-exceeded' })
+    await expect(sibling).resolves.toBe('sibling')
+    const started = performance.now()
+    await expect(invoke('export default () => "next"')).resolves.toBe('next')
+    expect(performance.now() - started).toBeLessThan(1_000)
+  })
+
   it('rejects oversized results without returning partial data', async () => {
     await expect(invoke('export default () => "x".repeat(2048)', { ...isolatedVmLimits, maxResultBytes: 256 })).rejects.toMatchObject({
       code: 'limit-exceeded',
@@ -382,8 +429,8 @@ describe('isolated-vm runtime conformance', () => {
           input: null,
           invocationId: 'capability-count-limit',
           program: program(`export default async (_input, capability) => {
-  await capability.artifact.put({ call: 1 })
-  return await capability.artifact.put({ call: 2 })
+  await capability.actions.call('example.echo', { call: 1 })
+  return await capability.actions.call('example.echo', { call: 2 })
 }`),
         },
         { ...isolatedVmLimits, maxCapabilityCalls: 1 },
@@ -397,7 +444,7 @@ describe('isolated-vm runtime conformance', () => {
           capability: async () => ({ body: 'x'.repeat(256), status: 200 }),
           input: null,
           invocationId: 'capability-response-limit',
-          program: program('export default async (_input, capability) => capability.artifact.put({})'),
+          program: program('export default async (_input, capability) => capability.actions.call("example.echo", {})'),
         },
         { ...isolatedVmLimits, maxCapabilityResponseBytes: 64 },
       ),
@@ -460,7 +507,7 @@ describe('isolated-vm runtime conformance', () => {
       program: program(
         `export default async (input, capability) => {
   globalThis.count = (globalThis.count ?? 0) + 1
-  return { count: globalThis.count, response: await capability.artifact.put(input) }
+  return { count: globalThis.count, response: await capability.actions.call('example.echo', input) }
 }`,
       ),
     })
@@ -471,14 +518,14 @@ describe('isolated-vm runtime conformance', () => {
       program: program(
         `export default async (input, capability) => {
   globalThis.count = (globalThis.count ?? 0) + 1
-  return { count: globalThis.count, response: await capability.artifact.put(input) }
+  return { count: globalThis.count, response: await capability.actions.call('example.echo', input) }
 }`,
       ),
     })
 
     await expect(Promise.all([first, second])).resolves.toEqual([
-      { count: 1, response: { body: { value: 'first' }, status: 200 } },
-      { count: 1, response: { body: { value: 'second' }, status: 200 } },
+      { count: 1, response: { action: 'example.echo', input: { value: 'first' } } },
+      { count: 1, response: { action: 'example.echo', input: { value: 'second' } } },
     ])
   })
 
@@ -495,20 +542,20 @@ describe('isolated-vm runtime conformance', () => {
       },
       input: null,
       invocationId: 'concurrent-canceled',
-      program: program(`export default async (_input, capability) => capability.artifact.put({ wait: true })`),
+      program: program(`export default async (_input, capability) => capability.actions.call('example.echo', { wait: true })`),
       signal: cancellation.signal,
     })
     const completed = host.invoke({
       capability: async () => ({ body: 'completed', status: 200 }),
       input: null,
       invocationId: 'concurrent-completed',
-      program: program(`export default async (_input, capability) => capability.artifact.put({ wait: false })`),
+      program: program(`export default async (_input, capability) => capability.actions.call('example.echo', { wait: false })`),
     })
 
     await started
     cancellation.abort(new Error('Cancel only the first invocation.'))
     await expect(canceled).rejects.toThrow('Cancel only the first invocation.')
-    await expect(completed).resolves.toEqual({ body: 'completed', status: 200 })
+    await expect(completed).resolves.toBe('completed')
   })
 
   it('rejects pending work when closed', async () => {
@@ -524,7 +571,7 @@ describe('isolated-vm runtime conformance', () => {
       },
       input: null,
       invocationId: 'closed-pending',
-      program: program('export default async (_input, capability) => capability.artifact.put({})'),
+      program: program('export default async (_input, capability) => capability.actions.call("example.echo", {})'),
     })
     await started
     const rejected = expect(pending).rejects.toMatchObject({ code: 'canceled' })
@@ -554,7 +601,7 @@ describe('isolated-vm runtime conformance', () => {
       },
       input: null,
       invocationId: 'executor-loss',
-      program: program('export default async (_input, capability) => capability.artifact.put({})'),
+      program: program('export default async (_input, capability) => capability.actions.call("example.echo", {})'),
     })
     await started
     const crashed = expect(pending).rejects.toMatchObject({ code: 'executor-crashed' })
@@ -737,6 +784,26 @@ it.each(['managed', 'code'] as const)('retries %s Tasks through the real Executo
   expect(events.filter((event) => event == 'node.started')).toHaveLength(1)
   expect(events.filter((event) => event == 'node.failed')).toHaveLength(0)
   expect(events.filter((event) => event == 'node.log')).toHaveLength(1)
+})
+
+it('bounds Flow Code Tasks by node and Run deadlines rather than the standalone wall-clock limit', async () => {
+  const prepared = await retryFixture('code', 'export default async () => { await new Promise((resolve) => setTimeout(resolve, 150)); return { value: 1 } }')
+  const result = await Effect.runPromise(
+    host.run(
+      prepared,
+      {
+        flowId: 'wall',
+        runId: 'wall',
+        trigger: { nodeId: 'start', outputs: {} },
+        emit: () => {},
+        capability: async () => ({ body: null, status: 200 }),
+        invokeTask: async () => ({}),
+        projectFailure: (error) => ({ code: 'node.failed', message: String(error) }),
+      },
+      { ...isolatedVmLimits, wallMs: 50 },
+    ),
+  )
+  expect(result).toMatchObject({ kind: 'node-results', nodes: [{ nodeId: 'task', outputs: { value: 1 } }] })
 })
 
 it.each([

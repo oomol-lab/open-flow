@@ -315,6 +315,10 @@
     "task": {
       "sharedPermissions": "使用 Flow 共用權限群組",
       "sharedPermissionsHint": "直接使用 Flow 共用權限群組已授權的所有 Actions，無需逐一新增。",
+      "httpHosts": "HTTP 主機",
+      "httpHostsHint": "Code 可透過 context.fetch 存取的主機，每行一個。*.example.com 符合其子網域。",
+      "httpHostsInvalid": "「{{host}}」不是有效的主機，請填寫 api.example.com 這類主機名稱。",
+      "httpHostsLimit": "最多宣告 {{count}} 個主機。",
       "addAction": "新增 Action",
       "removeAction": "移除 Action",
       "actionAccount": "帳號",

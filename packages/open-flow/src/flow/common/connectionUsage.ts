@@ -93,7 +93,7 @@ export function clearNodeConnections(graph: FlowDocument['graph'], connectionId?
           return [id, node]
         }
         const capabilities = node.task.capabilities?.map((capability) => {
-          if (capability.kind == 'workflow') return capability
+          if (capability.kind == 'workflow' || capability.kind == 'http') return capability
           if (!('mode' in capability)) {
             if ('action' in capability) {
               const { connectionId: selected, ...rest } = capability
