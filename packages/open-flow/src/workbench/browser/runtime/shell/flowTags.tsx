@@ -16,6 +16,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/bro
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
+import { cn } from '../../../../ui/browser/utils.ts'
 import { followWorkbenchLink } from '../navigationLink.ts'
 import { useFlowQuery } from './flowQuery.ts'
 
@@ -205,8 +206,15 @@ export function TagPicker({
                       <Combobox.Item
                         key={option.kind == 'tag' ? option.tagId : option.kind}
                         value={option}
-                        className={`flex w-full items-center gap-2 px-2 text-left hover:bg-accent data-highlighted:bg-accent ${selectionMenuItemClass}`}
+                        className={`flex w-full cursor-pointer items-center gap-2 px-2 text-left select-none hover:bg-accent data-highlighted:bg-accent ${selectionMenuItemClass}`}
                       >
+                        <i
+                          aria-hidden="true"
+                          className={cn(
+                            'size-3.5 shrink-0 text-muted-foreground',
+                            option.kind == 'tag' ? 'i-lucide-light:tag' : option.kind == 'untagged' ? 'i-lucide-light:tag-x' : 'i-lucide-light:plus',
+                          )}
+                        />
                         <span className="min-w-0 flex-1 break-words">{option.name}</span>
                         {filter && option.kind == 'tag' && (
                           <span className="text-muted-foreground">{state.tags.find((tag) => tag.tagId == option.tagId)?.referenceCount}</span>
@@ -224,7 +232,7 @@ export function TagPicker({
               <Button
                 type="button"
                 variant="ghost"
-                className="w-full justify-start"
+                className="w-full cursor-pointer justify-start"
                 disabled={pending}
                 onClick={() => {
                   setOpen(false)
