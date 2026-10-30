@@ -39,7 +39,12 @@ afterEach(async () => {
 
 async function browser(overrides: Partial<ComponentProps<typeof FlowBrowser>> = {}) {
   const i18n = createI18n('en')
-  const store = new WorkbenchStore(new WorkbenchClient(vi.fn()), { getItem: () => null, setItem() {} }, undefined, i18n)
+  const store = new WorkbenchStore(
+    new WorkbenchClient(async (path) => Response.json(String(path).startsWith('/v1/tags') ? { tags: [], version: 1 } : { flows: [], total: 0, version: 1 })),
+    { getItem: () => null, setItem() {} },
+    undefined,
+    i18n,
+  )
   cleanup.push(() => {
     store.dispose()
     i18n.dispose()
@@ -115,7 +120,7 @@ it('opens confirmation once, preserves its snapshot, and retries the same submis
   }
   expect(onImportFlow).toHaveBeenCalledTimes(2)
   expect(onImportFlow.mock.calls[0]).toEqual(onImportFlow.mock.calls[1])
-  expect(onImportFlow).toHaveBeenCalledWith(file, 'Example', expect.any(String))
+  expect(onImportFlow).toHaveBeenCalledWith(file, 'Example', expect.any(String), [])
 })
 
 it('rejects unavailable states before parsing and makes retained handles inert after unmount', async () => {

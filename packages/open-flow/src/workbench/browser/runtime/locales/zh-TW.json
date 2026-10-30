@@ -1720,5 +1720,39 @@
     "responseOutputs": "回應輸出",
     "authenticationType": "驗證方式",
     "responseSettings": "回應設定"
+  },
+  "tags": {
+    "count": "共 {{count}} 個",
+    "title": "標籤",
+    "search": "搜尋標籤",
+    "matchAny": "符合任一所選標籤",
+    "loading": "正在載入標籤…",
+    "noMatches": "沒有符合的標籤",
+    "createNamed": "建立「{{name}}」",
+    "manage": "管理標籤",
+    "remove": "移除 {{name}}",
+    "expand": "展開其餘 {{count}} 個標籤",
+    "filterBy": "依 {{name}} 篩選",
+    "create": "新增標籤",
+    "invalid": "請輸入有效的標籤名稱（最多 80 個字元）。",
+    "usage": "使用數量",
+    "references": "使用「{{name}}」的工作流程",
+    "unused": "沒有工作流程使用此標籤。",
+    "deleteTitle": "刪除「{{name}}」？",
+    "deleteDescription": "將從 {{count}} 個工作流程移除此標籤，工作流程會保留。",
+    "clear": "清除篩選",
+    "notFound": "此標籤已無法使用。",
+    "conflict": "已有同名標籤。",
+    "untagged": "未標記",
+    "add": "新增標籤",
+    "filter": "依標籤篩選"
+  },
+  "flowSettings": {
+    "title": "工作流程設定",
+    "name": "標題",
+    "discardTitle": "放棄變更？",
+    "discardDescription": "工作流程設定的變更尚未儲存。",
+    "continueEditing": "繼續編輯",
+    "discardChanges": "放棄變更"
   }
 }

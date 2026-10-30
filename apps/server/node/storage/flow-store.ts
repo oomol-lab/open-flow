@@ -1,14 +1,17 @@
-import type { Presentation } from '@oomol-lab/open-flow/control-api'
+import type { FlowQuery, FlowUpdate, Presentation } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
 import type { FlowResourceReferenceStore } from './flow-resource-reference-store.ts'
 import type { RevisionStore } from './revision-store.ts'
+import type { TagStore } from './tag-store.ts'
 
+import { normalizeFlowQuery } from '@oomol-lab/open-flow/control-api'
 import { revisionResourceReferences } from './flow-resources.ts'
 import { requireErrorSources } from './trigger-store.ts'
 
 export interface StoredFlow {
+  readonly tagIds: string
   readonly liveEnabled: number | null
   readonly liveHasStart: number | null
   readonly publicationId: string | null
@@ -61,7 +64,8 @@ export function presentationView(stored: StoredPresentation): Presentation {
   return { revision: stored.revision, updatedAt: new Date(stored.updatedAt).toISOString(), value: stored.value, version: 1 }
 }
 
-const flowColumns = `(SELECT json_extract(publications.interface_json, '$.inputs') IS NOT NULL FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS liveHasStart,
+const flowColumns = `(SELECT json_group_array(tag_id) FROM (SELECT tag_id FROM flow_tags WHERE flow_id = flows.flow_id ORDER BY tag_id)) AS tagIds,
+                     (SELECT json_extract(publications.interface_json, '$.inputs') IS NOT NULL FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS liveHasStart,
                      (SELECT enabled FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS liveEnabled,
                      (SELECT publication_id FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS publicationId,
                      (SELECT publications.revision_id FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS publishedRevisionId,
@@ -81,12 +85,21 @@ const flowTables = 'flows LEFT JOIN flow_provider_access AS access ON access.flo
  * Draft head, and Presentation, and it does not belong to a Project.
  */
 export class FlowStore {
+  readonly #tags: TagStore
   readonly #references: FlowResourceReferenceStore
   readonly #database: DatabaseSync
   readonly #revisions: RevisionStore
   readonly #transaction: <Value>(operation: () => Value) => Value
 
-  constructor(database: DatabaseSync, transaction: <Value>(operation: () => Value) => Value, revisions: RevisionStore, references: FlowResourceReferenceStore) {
+  constructor(
+    database: DatabaseSync,
+    transaction: <Value>(operation: () => Value) => Value,
+    revisions: RevisionStore,
+    references: FlowResourceReferenceStore,
+    tags: TagStore,
+  ) {
+    this.#tags = tags
+    database.function('open_flow_lower', { deterministic: true }, (value) => String(value).toLowerCase())
     this.#references = references
     this.#database = database
     this.#revisions = revisions
@@ -108,6 +121,7 @@ export class FlowStore {
 
   createFlow(input: {
     readonly actorId: string
+    readonly tagIds?: readonly string[]
     readonly connectorTeamId?: string
     readonly content: string
     readonly createdAt: number
@@ -155,6 +169,7 @@ export class FlowStore {
         .run(input.flowId, JSON.stringify(input.presentation ?? {}), input.createdAt)
       this.#references.replaceResources(input.actorId, input.flowId, 'draft', resources)
       this.#database.prepare('INSERT INTO flow_connector_teams (flow_id, team_id) VALUES (?, ?)').run(input.flowId, input.connectorTeamId ?? null)
+      this.#tags.replace(input.actorId, input.flowId, input.tagIds ?? [])
       return { created: true, flow: this.get(input.flowId)! }
     })
   }
@@ -168,33 +183,60 @@ export class FlowStore {
     after?: { readonly createdAt: number; readonly flowId: string },
     includeTotal = false,
     ownerId?: string,
+    query: FlowQuery = {},
   ): { readonly flows: readonly StoredFlow[]; readonly total?: number } {
+    const filter = normalizeFlowQuery(query)
     const conditions: string[] = []
     const values: (string | number)[] = []
     if (ownerId != null) {
-      conditions.push('owner_id = ?')
+      conditions.push('flows.owner_id = ?')
       values.push(ownerId)
     }
+    if (filter.query) {
+      conditions.push('instr(open_flow_lower(flows.name), ?) > 0')
+      values.push(filter.query)
+    }
+    const membership: string[] = []
+    if (filter.tagIds.length) {
+      membership.push(`EXISTS (SELECT 1 FROM flow_tags ft WHERE ft.flow_id = flows.flow_id AND ft.tag_id IN (${filter.tagIds.map(() => '?').join(',')}))`)
+      values.push(...filter.tagIds)
+    }
+    if (filter.untagged) membership.push('NOT EXISTS (SELECT 1 FROM flow_tags ft WHERE ft.flow_id = flows.flow_id)')
+    if (membership.length) conditions.push(`(${membership.join(' OR ')})`)
+    const total = includeTotal
+      ? (
+          this.#database.prepare(`SELECT COUNT(*) AS total FROM flows ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}`).get(...values) as {
+            total: number
+          }
+        ).total
+      : undefined
     if (after != null) {
-      conditions.push('(created_at > ? OR (created_at = ? AND flows.flow_id > ?))')
+      conditions.push('(flows.created_at > ? OR (flows.created_at = ? AND flows.flow_id > ?))')
       values.push(after.createdAt, after.createdAt, after.flowId)
     }
     const where = conditions.length == 0 ? '' : `WHERE ${conditions.join(' AND ')}`
     const flows = this.#database
-      .prepare(`SELECT ${flowColumns} FROM ${flowTables} ${where} ORDER BY created_at, flows.flow_id LIMIT ?`)
+      .prepare(`SELECT ${flowColumns} FROM ${flowTables} ${where} ORDER BY flows.created_at, flows.flow_id LIMIT ?`)
       .all(...values, limit) as unknown as StoredFlow[]
-    if (!includeTotal) return { flows }
-    const total = (
-      ownerId == null
-        ? this.#database.prepare('SELECT COUNT(*) AS total FROM flows').get()
-        : this.#database.prepare('SELECT COUNT(*) AS total FROM flows WHERE owner_id = ?').get(ownerId)
-    ) as { readonly total: number }
-    return { flows, total: total.total }
+    return { flows, ...(total == null ? {} : { total }) }
+  }
+
+  updateMetadata(flowId: string, changes: FlowUpdate, updatedAt: number): StoredFlow | undefined {
+    return this.#transaction(() => {
+      const current = this.get(flowId)
+      if (current == null || current.status != 'active') return
+      const ids = changes.tagIds == null ? undefined : [...new Set(changes.tagIds)].toSorted()
+      if (ids != null) this.#tags.replace(current.ownerId, flowId, ids)
+      const name = changes.name ?? current.name
+      if (name != current.name || (ids != null && current.tagIds != JSON.stringify(ids))) {
+        this.#database.prepare('UPDATE flows SET name = ?, updated_at = ? WHERE flow_id = ?').run(name, updatedAt, flowId)
+      }
+      return this.get(flowId)
+    })
   }
 
   rename(flowId: string, name: string, updatedAt: number): StoredFlow | undefined {
-    this.#database.prepare("UPDATE flows SET name = ?, updated_at = ? WHERE flow_id = ? AND status = 'active'").run(name, updatedAt, flowId)
-    return this.get(flowId)
+    return this.updateMetadata(flowId, { name }, updatedAt)
   }
 
   setEnabled(flowId: string, publicationId: string, enabled: boolean): StoredFlow | undefined {
@@ -220,6 +262,7 @@ export class FlowStore {
         .prepare("UPDATE flows SET status = 'retiring', updated_at = ?, deletion_requested_at = ? WHERE flow_id = ?")
         .run(updatedAt, updatedAt, flowId)
       this.#references.delete(flowId)
+      this.#database.prepare('DELETE FROM flow_tags WHERE flow_id = ?').run(flowId)
       this.#retire(flowId, updatedAt)
       return this.get(flowId)
     })
@@ -285,6 +328,7 @@ export class FlowStore {
       this.#database.prepare('DELETE FROM poll_bindings WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM integration_bindings WHERE flow_id = ?').run(flowId)
       this.#references.delete(flowId)
+      this.#database.prepare('DELETE FROM flow_tags WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM flow_live WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM publications WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM flow_presentations WHERE flow_id = ?').run(flowId)

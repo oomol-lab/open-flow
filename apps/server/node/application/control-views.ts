@@ -37,6 +37,7 @@ export function flow(stored: StoredFlow): Flow {
             revisionId: stored.publishedRevisionId,
           },
         }),
+    tagIds: JSON.parse(stored.tagIds),
     createdAt: timestamp(stored.createdAt),
     ...(stored.connectorTeamId == null ? {} : { connectorTeamId: stored.connectorTeamId }),
     draftRevisionId: stored.draftRevisionId,

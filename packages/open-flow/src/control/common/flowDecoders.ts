@@ -60,6 +60,7 @@ export function flow(value: unknown): Flow {
             revisionId: string(target.revisionId),
           },
         }),
+    tagIds: source.tagIds === undefined ? [] : strings(source.tagIds),
     createdAt: string(source.createdAt),
     ...(source.connectorTeamId == null ? {} : { connectorTeamId: string(source.connectorTeamId) }),
     draftRevisionId: string(source.draftRevisionId),

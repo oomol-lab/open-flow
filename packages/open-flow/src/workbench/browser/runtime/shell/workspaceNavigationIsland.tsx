@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import type { WorkspaceStatus } from '../stores/workspaceModel.ts'
 
 import { useState } from 'react'
@@ -11,11 +11,13 @@ import { followWorkbenchLink } from '../navigationLink.ts'
 
 export function WorkspaceNavigationIsland({
   flowName,
+  settings,
   flowsHref,
   ghost = false,
   onOpenFlows,
   saveStatus,
 }: {
+  readonly settings?: ReactNode
   readonly flowName: string
   readonly flowsHref: string
   readonly ghost?: boolean
@@ -64,6 +66,7 @@ export function WorkspaceNavigationIsland({
               <span aria-label={draftStatusLabel} className="workspace-draft-indicator" data-save-status={draftStatus} role="status" tabIndex={0} />
             </CanvasTooltip>
           )}
+          {settings}
         </TooltipProvider>
       </div>
     </nav>

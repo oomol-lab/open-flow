@@ -10,6 +10,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { ReactFlow } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
 import { downloadFlowSvg, flowToSvg } from '../../src/canvas/browser/graph/FlowCanvas/exportSvg.ts'
@@ -18,6 +19,7 @@ import { CanvasViewControls, CanvasTopLeftControls } from '../../src/canvas/brow
 import { CornerControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CornerControls.tsx'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
+import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { deriveAddNodeOptions } from '../../src/workbench/browser/runtime/editor/addNodeOptions.ts'
 import { CanvasNodePicker } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
@@ -25,8 +27,10 @@ import { WorkbenchInspectorToggle } from '../../src/workbench/browser/runtime/ed
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
+import { FlowSettingsButton } from '../../src/workbench/browser/runtime/shell/flowSettings.tsx'
 import { WorkspaceNavigationIsland } from '../../src/workbench/browser/runtime/shell/workspaceNavigationIsland.tsx'
 import { WorkspacePublishIsland } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
+import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import googleSheetsIcon from './fixtures/google-sheets.ico'
 import { remoteGithubArtwork, sampleSprite } from './fixtures/providerSprite.ts'
@@ -497,7 +501,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'workspace-navigation-island',
     title: 'Workspace navigation island',
     description:
-      'Compare the canvas island with the ghost style used while loading or recovering a workflow. Cycle names and the draft status dot beside the title. Open the publish confirmation to inspect its content insets and separation between copy and actions in both themes. Cycle History and switch languages to inspect single-line published, empty, and loading menu labels. Open the menu with the MiniMap expanded to inspect overlapping controls. Cancel or dismiss confirmation without publishing; confirm to log one publication.publish event.',
+      'The settings button opens the production Flow settings panel. Change the title and tags, and check that the heading updates while draft status stays unchanged. Manage labels from its picker and inspect usage links. Creating or renaming a label keeps both dialogs open and retains unsaved title edits. Compare the canvas island with the ghost style used while loading or recovering a workflow. Cycle names and the draft status dot beside the title. Open the publish confirmation to inspect its content insets and separation between copy and actions in both themes. Cycle History and switch languages to inspect single-line published, empty, and loading menu labels. Open the menu with the MiniMap expanded to inspect overlapping controls. Cancel or dismiss confirmation without publishing; confirm to log one publication.publish event.',
     standalone: true,
     render: (log, dark, language) => <NavigationIslandStory dark={dark} language={language} log={log} />,
   },
@@ -672,6 +676,69 @@ function SvgExportStory({ dark, language }: { readonly dark: boolean; readonly l
 
 function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
+  const [tagStore, setTagStore] = useState<WorkbenchStore>()
+  const tagFlows = useVal(tagStore?.workspace.$.flows)
+  useEffect(() => {
+    let flow = {
+      flowId: 'navigation-sample',
+      name: 'nn',
+      version: 1 as const,
+      status: 'active' as const,
+      tagIds: ['production', 'ai'],
+      createdAt: '2026-10-30T00:00:00.000Z',
+      updatedAt: '2026-10-30T00:00:00.000Z',
+      draftRevisionId: 'draft',
+      resourceReferences: { draft: null, sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] } },
+    }
+    let tags = [
+      { tagId: 'production', name: 'Production', version: 1 },
+      { tagId: 'ai', name: 'AI', version: 1 },
+    ]
+    const client = new WorkbenchClient(async (path, init) => {
+      const url = String(path).split('?')[0]
+      if (url == '/v1/tags' && init?.method == 'POST') {
+        const { name } = JSON.parse(String(init.body)) as { name: string }
+        const tag = { tagId: `tag-${tags.length}`, name, version: 1 }
+        tags = [...tags, tag]
+        return Response.json(tag)
+      }
+      if (url?.startsWith('/v1/tags/') && init?.method != null) {
+        const tagId = url.split('/')[3]!
+        if (init.method == 'DELETE') {
+          tags = tags.filter((tag) => tag.tagId != tagId)
+          flow = { ...flow, tagIds: flow.tagIds.filter((id) => id != tagId) }
+          return Response.json({ version: 1 })
+        }
+        const { name } = JSON.parse(String(init.body)) as { name: string }
+        tags = tags.map((tag) => (tag.tagId == tagId ? Object.assign({}, tag, { name }) : tag))
+        return Response.json(tags.find((tag) => tag.tagId == tagId))
+      }
+      if (url == '/v1/tags')
+        return Response.json({ tags: tags.map((tag) => Object.assign({}, tag, { referenceCount: flow.tagIds.includes(tag.tagId) ? 1 : 0 })), version: 1 })
+      if (url == `/v1/flows/${flow.flowId}` && init?.method == 'PATCH') {
+        const changes = JSON.parse(String(init.body)) as { name?: string; tagIds?: string[] }
+        flow = { ...flow, ...(changes.name == null ? {} : { name: changes.name }), ...(changes.tagIds == null ? {} : { tagIds: changes.tagIds }) }
+        log('flow.settings', changes)
+        return Response.json(flow)
+      }
+      if (url == `/v1/flows/${flow.flowId}/tags`) {
+        const { tagIds } = JSON.parse(String(init?.body)) as { tagIds: string[] }
+        flow = { ...flow, tagIds }
+        log('flow.tags', tagIds)
+        return Response.json(flow)
+      }
+      if (url == '/v1/flows') {
+        const selected = new URL(String(path), 'https://lab.local').searchParams.get('tagIds')?.split(',') ?? []
+        const matches = selected.length == 0 || selected.some((id) => flow.tagIds.includes(id))
+        return Response.json({ flows: matches ? [{ ...flow, referenceCount: 0 }] : [], total: matches ? 1 : 0, version: 1 })
+      }
+      return Response.json({ message: 'Unsupported story action' }, { status: 400 })
+    })
+    const store = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, i18n)
+    setTagStore(store)
+    void store.workspace.reloadFlows()
+    return () => store.dispose()
+  }, [i18n, log])
   const [shortName, setShortName] = useState(true)
   const [hasPublications, setHasPublications] = useState<boolean | undefined>(true)
   const [publishState, setPublishState] = useState<PublishState>('ready')
@@ -688,7 +755,14 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
   const nextSaveStatus = saveStatuses[(saveStatuses.indexOf(saveStatus) + 1) % saveStatuses.length]!
   useStoryActions([
     { label: ghost ? 'Show canvas island' : 'Show loading and recovery ghost style', onClick: () => setGhost((current) => !current) },
-    { label: shortName ? 'Show long name' : 'Show short name', onClick: () => setShortName((current) => !current) },
+    {
+      label: shortName ? 'Show long name' : 'Show short name',
+      onClick: () => {
+        const short = !shortName
+        setShortName(short)
+        void tagStore?.updateFlowSettings('navigation-sample', { name: short ? 'nn' : 'Quarterly customer onboarding and account follow-up workflow' })
+      },
+    },
     { label: `Show ${nextSaveStatus} draft save state`, onClick: () => setSaveStatus(nextSaveStatus) },
     {
       label: `History: ${hasPublications == null ? 'loading' : hasPublications ? 'published' : 'unpublished'}`,
@@ -700,7 +774,13 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
     <WorkspaceNavigationIsland
       ghost={ghost}
       saveStatus={ghost ? undefined : saveStatus}
-      flowName={shortName ? 'nn' : 'Quarterly customer onboarding and account follow-up workflow'}
+      settings={
+        tagStore != null &&
+        tagFlows?.[0] != null && (
+          <FlowSettingsButton store={tagStore} flow={tagFlows[0]} hrefForFlow={() => '#workflows'} onSelectFlow={(flow) => log('flow.open', flow.flowId)} />
+        )
+      }
+      flowName={tagFlows?.[0]?.name ?? 'nn'}
       flowsHref="#workflows"
       onOpenFlows={() => log('flows.open')}
     />

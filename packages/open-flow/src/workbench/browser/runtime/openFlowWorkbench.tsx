@@ -180,8 +180,8 @@ function Workbench({
           hrefForFlow={(flow, view = 'design') => hrefFor({ flowId: flow.flowId, view })}
           initializing={initializing}
           language={language}
-          onCreateFlow={(name) => navigation.createFlow(name, createFlow)}
-          onImportFlow={(file, name, key) => navigation.importFlow(file, name, key, importFlow)}
+          onCreateFlow={(name, tagIds) => navigation.createFlow(name, createFlow, tagIds)}
+          onImportFlow={(file, name, key, tagIds) => navigation.importFlow(file, name, key, importFlow, tagIds)}
           onLanguageChange={onLanguageChange}
           onSelectFlow={(flow, view) => void navigation.selectFlow(flow, view)}
           store={store}
@@ -230,8 +230,10 @@ export {
 export interface OpenFlowWorkbenchProps {
   /** Embedded catalogs fill a host-owned page without adding width limits or page padding. */
   readonly catalogWidth?: 'default' | 'full' | 'embedded' | undefined
-  readonly importFlow?: ((file: WorkflowFile, name: string, idempotencyKey: string) => Promise<string>) | undefined
-  readonly createFlow?: ((name: string) => Promise<string>) | undefined
+  readonly importFlow?:
+    | ((file: WorkflowFile, name: string, idempotencyKey: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>)
+    | undefined
+  readonly createFlow?: ((name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>) | undefined
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?:
     | {

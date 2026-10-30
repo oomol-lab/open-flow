@@ -1,5 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
+import type { FlowQuery, FlowUpdate } from '../../../../control/common/api.ts'
 import type { RevisionContent } from '../../../../flow/common/change.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
 import type { WorkbenchClient, Flow } from '../api.ts'
@@ -7,6 +8,7 @@ import type { SetNotice } from './workbenchNotice.ts'
 
 import * as Effect from 'effect/Effect'
 import { derive, val } from 'value-enhancer'
+import { normalizeFlowQuery } from '../../../../control/common/api.ts'
 import { flowResourceReferences } from '../../../../flow/common/semantics.ts'
 import { Latest } from './latest.ts'
 import { errorNotice } from './workbenchNotice.ts'
@@ -57,6 +59,9 @@ export class FlowCatalog {
   readonly #lifetime = new AbortController()
   readonly #pending = new Set<string>()
   #disposed = false
+  #query: Required<FlowQuery> = normalizeFlowQuery()
+  #request?: AbortController
+  #stopWatch?: () => void
   public readonly $: FlowCatalog$
 
   public constructor(client: WorkbenchClient, setNotice: SetNotice, i18n: I18n) {
@@ -80,7 +85,10 @@ export class FlowCatalog {
   }
 
   public dispose(): void {
+    if (this.#disposed) return
     this.#disposed = true
+    this.#request?.abort()
+    this.#stopWatch?.()
     this.#lifetime.abort()
     this.#session.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
@@ -91,7 +99,27 @@ export class FlowCatalog {
     return this.#state.value.flows.find((flow) => flow.flowId == flowId)
   }
 
+  public watch(): void {
+    if (this.#stopWatch != null) return
+    const subscription = this.#client.watchFlowCatalog(() => void this.reload())
+    this.#stopWatch = subscription.stop
+    void subscription.ready.then(() => {
+      if (!this.#disposed) void this.reload()
+    })
+  }
+
+  public async setQuery(query: FlowQuery): Promise<void> {
+    const next = normalizeFlowQuery(query)
+    if (JSON.stringify(next) == JSON.stringify(this.#query) && (this.loaded || this.#request != null)) return
+    this.#query = next
+    this.#state.set({ ...initialState })
+    await this.reload()
+  }
+
   public async reload(): Promise<void> {
+    if (this.#disposed) return
+    this.#request?.abort()
+    const controller = (this.#request = new AbortController())
     const current = this.#session.begin()
     const loaded = this.#state.value.loaded
     if (loaded) {
@@ -104,12 +132,10 @@ export class FlowCatalog {
         loadMoreFailed: false,
         refreshing: false,
         nextCursor: undefined,
-        flows: [],
-        total: undefined,
       })
     }
     try {
-      const page = await this.#client.listFlows({ includeTotal: true, limit: pageLimit })
+      const page = await this.#client.listFlows({ ...this.#query, includeTotal: true, limit: pageLimit, signal: controller.signal })
       if (!current()) return
       this.#set({
         loaded: true,
@@ -132,7 +158,7 @@ export class FlowCatalog {
     const current = this.#session.capture()
     this.#set({ loadingMore: true, loadMoreFailed: false })
     try {
-      const page = await this.#client.listFlows({ cursor: nextCursor, limit: pageLimit })
+      const page = await this.#client.listFlows({ ...this.#query, cursor: nextCursor, limit: pageLimit, signal: this.#request?.signal })
       if (!current()) return
       const flows = new Map(this.#state.value.flows.map((flow) => [flow.flowId, flow]))
       for (const flow of page.flows) flows.set(flow.flowId, flow)
@@ -195,18 +221,31 @@ export class FlowCatalog {
     }
   }
 
-  public create(name: string, create?: (name: string) => Promise<string>): Promise<Flow | undefined> {
-    return this.#create(async () => (create == null ? this.#client.createFlow(name) : this.#client.getFlow(await create(name))))
+  public create(
+    name: string,
+    create?: (name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    tagIds?: readonly string[],
+  ): Promise<Flow | undefined> {
+    return this.#create(async () =>
+      create == null
+        ? tagIds == null
+          ? this.#client.createFlow(name)
+          : this.#client.createFlow(name, undefined, undefined, tagIds)
+        : this.#client.getFlow(await (tagIds == null ? create(name) : create(name, { tagIds }))),
+    )
   }
 
   public import(
     file: WorkflowFile,
     name: string,
     key: string,
-    importer?: (file: WorkflowFile, name: string, key: string) => Promise<string>,
+    importer?: (file: WorkflowFile, name: string, key: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    tagIds?: readonly string[],
   ): Promise<Flow | undefined> {
     return this.#create(async () =>
-      importer == null ? this.#client.importFlow(file, { name, idempotencyKey: key }) : this.#client.getFlow(await importer(file, name, key)),
+      importer == null
+        ? this.#client.importFlow(file, { name, idempotencyKey: key, ...(tagIds == null ? {} : { tagIds }) })
+        : this.#client.getFlow(await (tagIds == null ? importer(file, name, key) : importer(file, name, key, { tagIds }))),
     )
   }
 
@@ -229,6 +268,18 @@ export class FlowCatalog {
       if (this.#disposed) return false
       this.#remove(flowId)
       this.#setNotice({ kind: 'success', message: this.#i18n.t('notice.flowDeleteAccepted', { name: flow.name }) })
+      return true
+    } catch (error) {
+      if (!this.#disposed) this.#setNotice(errorNotice(error, this.#i18n.t))
+      return false
+    }
+  }
+
+  public async updateSettings(flowId: string, changes: FlowUpdate): Promise<boolean> {
+    try {
+      const changed = await this.#client.updateFlow(flowId, changes)
+      if (this.#disposed) return false
+      this.include(changed)
       return true
     } catch (error) {
       if (!this.#disposed) this.#setNotice(errorNotice(error, this.#i18n.t))

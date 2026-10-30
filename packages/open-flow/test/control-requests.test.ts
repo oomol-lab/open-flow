@@ -33,6 +33,9 @@ const samples = {
   importFlow: { file: {}, version: 1 },
   createFlow: { name: 'Flow', version: 1 },
   renameFlow: { name: 'Flow', version: 1 },
+  updateFlow: { name: 'Flow', tagIds: [], version: 1 },
+  saveTag: { name: 'Tag', version: 1 },
+  setFlowTags: { tagIds: ['tag'], version: 1 },
   changeDraft: {
     expectedRevisionId: 'r1',
     operations: [{ kind: 'graph.node.create', nodeId: 'start', node: { inputDefs: [], kind: 'start', name: 'Start' } }],

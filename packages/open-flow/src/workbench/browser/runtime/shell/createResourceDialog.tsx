@@ -1,4 +1,4 @@
-import type { FormEvent, ReactElement } from 'react'
+import type { FormEvent, ReactElement, ReactNode } from 'react'
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -13,6 +13,7 @@ import { WorkbenchSelect } from './workbenchSelect.tsx'
 
 export default function CreateResourceDialog({
   disabled,
+  tagField,
   field,
   id,
   issue,
@@ -26,6 +27,7 @@ export default function CreateResourceDialog({
   sourceUrl,
   title,
 }: {
+  readonly tagField?: ((container: HTMLElement | null) => ReactNode) | undefined
   readonly disabled?: boolean | undefined
   readonly field?:
     | {
@@ -67,6 +69,7 @@ export default function CreateResourceDialog({
   const t = useTranslate()
   const input = useRef<HTMLInputElement>(null)
   const portal = useRef<HTMLDivElement>(null)
+  const [root, setRoot] = useState<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const showIssue = name.length > 0 && issue != null
   const message = showIssue ? t(`resource.nameIssue.${issue}`, { max: resourceNameMaxLength }) : t('resource.nameHint', { max: resourceNameMaxLength })
@@ -92,7 +95,7 @@ export default function CreateResourceDialog({
         }}
         open={open}
       >
-        <DialogContent container={portal.current} initialFocus={() => input.current} showCloseButton={false}>
+        <DialogContent ref={setRoot} container={portal.current} initialFocus={() => input.current} showCloseButton={false}>
           <form className="flex flex-col gap-4" onSubmit={onSubmit}>
             <DialogHeader>
               <div className="flex items-center justify-between">
@@ -129,6 +132,7 @@ export default function CreateResourceDialog({
                 />
                 {showIssue ? <FieldError id={messageId}>{message}</FieldError> : <FieldDescription id={messageId}>{message}</FieldDescription>}
               </Field>
+              {tagField?.(root)}
               {field != null && (
                 <Field>
                   <FieldLabel htmlFor={field.state == 'ready' ? fieldId : undefined}>{field.label}</FieldLabel>
@@ -139,7 +143,7 @@ export default function CreateResourceDialog({
                       id={fieldId}
                       onValueChange={field.onValueChange}
                       options={field.options}
-                      portalRoot={portal.current}
+                      portalRoot={root}
                       value={field.value}
                     />
                   ) : (

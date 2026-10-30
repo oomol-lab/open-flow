@@ -7,6 +7,7 @@ afterEach(() => {
 })
 
 const flow = {
+  tagIds: [],
   createdAt: '2026-08-14T00:00:00.000Z',
   draftRevisionId: 'revision-1',
   resourceReferences: {
@@ -859,4 +860,34 @@ it('preserves optional Wait timing and resolution audit metadata while accepting
   expect(decodeRunEvent(resolved)).toEqual(resolved)
   expect(decodeRunEvent({ ...resolved, payload: { ...resolved.payload, source: 'automatic' } }).payload).toMatchObject({ source: 'automatic' })
   expect(() => decodeRunEvent({ ...resolved, payload: { ...resolved.payload, source: 'unknown' } })).toThrow()
+})
+
+describe('Flow tags', () => {
+  it('reads older Flow responses as having no tags and rejects malformed memberships', async () => {
+    const { tagIds: _tagIds, ...legacy } = flow
+    expect((await new ControlClient(async () => Response.json(legacy)).getFlow(flow.flowId)).tagIds).toEqual([])
+    for (const tagIds of [null, 'tag', [1]])
+      await expect(new ControlClient(async () => Response.json({ ...legacy, tagIds })).getFlow(flow.flowId)).rejects.toMatchObject({ code: 'response.invalid' })
+  })
+
+  it('validates tag directory counts and forwards creation and assignment memberships', async () => {
+    const request = vi.fn(async (_path: string, _init?: RequestInit) => Response.json({ ...flow, tagIds: ['tag'] }))
+    const client = new ControlClient(request)
+    await client.createFlow('Tagged', 'key', 'team', ['tag'])
+    expect(JSON.parse(String(request.mock.calls.at(-1)?.[1]?.body))).toEqual({ name: 'Tagged', teamId: 'team', tagIds: ['tag'], version: 1 })
+    await client.setFlowTags(flow.flowId, ['tag'])
+    expect(request).toHaveBeenLastCalledWith(
+      '/v1/flows/flow%2F1/tags',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify({ tagIds: ['tag'], version: 1 }) }),
+    )
+    await client.updateFlow(flow.flowId, { name: 'Settings', tagIds: ['tag'] })
+    expect(request).toHaveBeenLastCalledWith(
+      '/v1/flows/flow%2F1',
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ name: 'Settings', tagIds: ['tag'], version: 1 }) }),
+    )
+    for (const referenceCount of [-1, '1', 1.5]) {
+      const directory = new ControlClient(async () => Response.json({ tags: [{ tagId: 'tag', name: 'Tag', referenceCount, version: 1 }], version: 1 }))
+      await expect(directory.listTags()).rejects.toMatchObject({ code: 'response.invalid' })
+    }
+  })
 })

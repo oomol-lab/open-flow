@@ -49,6 +49,7 @@ import { runEnvironment } from './run-environment.ts'
 import { RunExecutor } from './run.ts'
 import { validateCapabilities, validateRuntime } from './service-options.ts'
 import { Supervisor } from './supervisor.ts'
+import { TagControl } from './tag-control.ts'
 import { VariableControl } from './variable-control.ts'
 import { WaitActions } from './wait-actions.ts'
 import { waitForWebhookRun } from './webhook-response.ts'
@@ -300,6 +301,7 @@ export class ServerService {
       drafts,
       publications,
       flows: new FlowControl(access, flowChanged, drafts, store, resolveConnectorTeam, this.#clock, flowCatalogChanged, triggersChanged, publications),
+      tags: new TagControl(store, flowCatalogChanged),
       variables: new VariableControl(store),
       runs: new RunControl(
         store,

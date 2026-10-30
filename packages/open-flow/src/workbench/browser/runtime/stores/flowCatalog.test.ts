@@ -257,8 +257,37 @@ it('applies list metadata to detail-only entries when their page is loaded witho
     expect(catalog.$.flows.value[1]).not.toHaveProperty('referenceCount')
     await catalog.loadMore()
     expect(catalog.$.flows.value).toEqual([{ ...flow, referenceCount: 0 }, listed])
-    expect(list).toHaveBeenLastCalledWith({ cursor: 'next', limit: 50 })
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'next', limit: 50 }))
   } finally {
     catalog.dispose()
+  }
+})
+
+it('keeps filtered query pages separate and discards late pages after query changes', async () => {
+  const client = new WorkbenchClient(vi.fn())
+  const first = Promise.withResolvers<Awaited<ReturnType<typeof client.listFlows>>>()
+  const second = Promise.withResolvers<Awaited<ReturnType<typeof client.listFlows>>>()
+  const list = vi.spyOn(client, 'listFlows').mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+  const filtered = new FlowCatalog(client, vi.fn(), createI18n())
+  const workspace = new FlowCatalog(client, vi.fn(), createI18n())
+  workspace.include(flow)
+  try {
+    const initial = filtered.setQuery({ query: 'old', tagIds: ['tag'] })
+    const changed = filtered.setQuery({ query: ' New ', untagged: true })
+    expect(list.mock.calls[0]?.[0]?.signal?.aborted).toBe(true)
+    second.resolve({ version: 1, flows: [{ ...flow, name: 'New', referenceCount: 0 }], total: 1, nextCursor: 'new-page' })
+    await changed
+    first.resolve({ version: 1, flows: [{ ...flow, name: 'Old', referenceCount: 0 }], total: 99, nextCursor: 'old-page' })
+    await initial
+    expect(filtered.$.flows.value.map((item) => item.name)).toEqual(['New'])
+    expect(filtered.$.total.value).toBe(1)
+    expect(filtered.$.nextCursor.value).toBe('new-page')
+    expect(workspace.flow(flow.flowId)).toEqual(flow)
+    list.mockResolvedValueOnce({ version: 1, flows: [], total: 1 })
+    await filtered.loadMore()
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ query: 'new', untagged: true, tagIds: [], cursor: 'new-page' }))
+  } finally {
+    filtered.dispose()
+    workspace.dispose()
   }
 })

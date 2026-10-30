@@ -12,6 +12,7 @@ import { ResultStore } from './result-store.ts'
 import { RevisionStore } from './revision-store.ts'
 import { RunStore } from './run-store.ts'
 import { RunViewStore } from './run-view-store.ts'
+import { TagStore } from './tag-store.ts'
 import { TriggerStore } from './trigger-store.ts'
 import { UserStore } from './user-store.ts'
 import { VariableStore } from './variable-store.ts'
@@ -41,6 +42,7 @@ export class Store {
   readonly runViews: RunViewStore
   readonly triggers: TriggerStore
   readonly users: UserStore
+  readonly tags: TagStore
   readonly variables: VariableStore
 
   constructor(
@@ -55,6 +57,7 @@ export class Store {
 
     this.users = new UserStore(connection)
     this.eventSources = new EventSourceStore(connection, transaction, clock)
+    this.tags = new TagStore(connection, transaction)
     this.variables = new VariableStore(connection, transaction, clock)
     this.connectorTeams = new ConnectorTeamStore(connection)
     this.revisions = new RevisionStore(connection)
@@ -64,7 +67,7 @@ export class Store {
     // stores that report occurrences into them.
     this.integrations = new IntegrationStore(connection, this.eventSources, transaction, (input) => this.runs.acceptTriggerOccurrence(input))
     this.polls = new PollStore(connection, transaction, (input) => this.runs.acceptTriggerOccurrence(input))
-    this.flows = new FlowStore(connection, transaction, this.revisions, this.resourceReferences)
+    this.flows = new FlowStore(connection, transaction, this.revisions, this.resourceReferences, this.tags)
     this.publications = new PublicationStore(
       connection,
       clock,

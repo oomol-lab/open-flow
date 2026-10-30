@@ -7,7 +7,7 @@ import type { FlowCatalogItem } from '../stores/flowCatalog.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import type { WorkspaceBusy } from '../stores/workspaceModel.ts'
 
-import { forwardRef, lazy, Suspense, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
+import { forwardRef, lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { val } from 'value-enhancer'
@@ -29,7 +29,10 @@ import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
 import { FlowDeletionDialog } from './flowDeletionDialog.tsx'
+import { useFlowQuery } from './flowQuery.ts'
 import { FlowReferencesButton } from './flowReferences.tsx'
+import { FlowSettingsDialog } from './flowSettings.tsx'
+import { FlowTagChips, TagPicker } from './flowTags.tsx'
 import { IdTooltip } from './idTooltip.tsx'
 import { WorkflowExportMenuItem } from './workflowExportMenuItem.tsx'
 
@@ -44,6 +47,9 @@ interface LanguageSelectProps {
 }
 
 interface FlowItemProps {
+  readonly settingsFinalFocus: () => HTMLElement | null
+  readonly onChanged: () => void
+  readonly onTagFilter: (tagId: string) => void
   readonly busy: WorkspaceBusy | undefined
   readonly flow: FlowCatalogItem
   readonly href: string
@@ -68,14 +74,14 @@ function formatUpdatedAt(updatedAt: string, locale: string): string {
   })
 }
 
-function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store }: FlowItemProps): ReactElement {
+function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store, onTagFilter, onChanged, settingsFinalFocus }: FlowItemProps): ReactElement {
   const [root, setRoot] = useState<HTMLDivElement | null>(null)
   const renameAnchor = useRef<HTMLSpanElement>(null)
   const actionsButton = useRef<HTMLButtonElement>(null)
   const nameInput = useRef<HTMLInputElement>(null)
   const locale = useLang()
   const t = useTranslate()
-  const [mode, setMode] = useState<'delete' | 'idle' | 'rename'>('idle')
+  const [mode, setMode] = useState<'delete' | 'idle' | 'rename' | 'settings'>('idle')
   const [name, setName] = useState(flow.name)
   const [pending, setPending] = useState<'publish' | 'enabled' | undefined>()
   const changed = flow.live != null && flow.live.revisionId != flow.draftRevisionId
@@ -94,6 +100,7 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store }: FlowItemPr
     try {
       if (action == 'publish') await store.workspace.publishFlow(flow)
       else await store.workspace.setFlowEnabled(flow, action)
+      onChanged()
     } finally {
       setPending(undefined)
     }
@@ -103,11 +110,17 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store }: FlowItemPr
   async function rename(event: FormEvent): Promise<void> {
     event.preventDefault()
     const nextName = name.trim()
-    if (resourceNameIssue(nextName) == null && (await store.workspace.renameFlow(flow.flowId, nextName))) setMode('idle')
+    if (resourceNameIssue(nextName) == null && (await store.workspace.renameFlow(flow.flowId, nextName))) {
+      setMode('idle')
+      onChanged()
+    }
   }
 
   async function remove(): Promise<void> {
-    if (await store.workspace.deleteFlow(flow.flowId)) setMode('idle')
+    if (await store.workspace.deleteFlow(flow.flowId)) {
+      setMode('idle')
+      onChanged()
+    }
   }
 
   return (
@@ -201,6 +214,7 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store }: FlowItemPr
                 </Popover>
               )}
             </span>
+            <FlowTagChips container={root} ids={flow.tagIds ?? []} store={store} onFilter={onTagFilter} />
           </span>
         </span>
         <span className="resource-flow-id-cell">
@@ -263,6 +277,10 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store }: FlowItemPr
               <i aria-hidden="true" className="i-lucide-light:text-cursor-input size-4 shrink-0" />
               {t('common.rename')}
             </DropdownMenuItem>
+            <DropdownMenuItem disabled={flow.status != 'active' || busy != null} onClick={() => setMode('settings')}>
+              <i aria-hidden="true" className="i-lucide-light:settings size-4 shrink-0" />
+              {t('flowSettings.title')}
+            </DropdownMenuItem>
             <DropdownMenuItem
               disabled={flow.status != 'active' || busy != null || pending != null || (flow.live != null && !changed)}
               onClick={() => void update('publish')}
@@ -294,6 +312,18 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store }: FlowItemPr
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {mode == 'settings' && (
+        <FlowSettingsDialog
+          store={store}
+          flow={flow}
+          container={root}
+          hrefForFlow={hrefForFlow}
+          onSelectFlow={onSelect}
+          onSaved={onChanged}
+          finalFocus={() => actionsButton.current ?? settingsFinalFocus()}
+          onClose={() => setMode('idle')}
+        />
+      )}
       {mode == 'delete' && (
         <FlowDeletionDialog
           flow={flow}
@@ -341,8 +371,8 @@ interface FlowBrowserProps extends LanguageSelectProps {
   readonly createFlowField?: ComponentProps<typeof CreateResourceDialog>['field']
   readonly hrefForFlow: (flow: Pick<Flow, 'flowId'>, view?: WorkbenchView) => string
   readonly initializing?: boolean
-  readonly onImportFlow?: (file: WorkflowFile, name: string, key: string) => Promise<boolean>
-  readonly onCreateFlow: (name: string) => Promise<boolean>
+  readonly onImportFlow?: (file: WorkflowFile, name: string, key: string, tagIds?: readonly string[]) => Promise<boolean>
+  readonly onCreateFlow: (name: string, tagIds?: readonly string[]) => Promise<boolean>
   readonly onSelectFlow: (flow: Pick<Flow, 'flowId'>, view?: WorkbenchView) => void
   readonly store: WorkbenchStore
 }
@@ -364,23 +394,32 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
 ): ReactElement {
   const t = useTranslate()
   const busy = useVal(store.workspace.$.busy)
-  const loadFailed = useVal(store.workspace.$.flowLoadFailed)
-  const loadMoreFailed = useVal(store.workspace.$.flowLoadMoreFailed)
-  const flowLoading = useVal(store.workspace.$.flowLoading)
+  const [filter, setFilter] = useState('')
+  const [tagIds, setTagIds] = useState<readonly string[]>([])
+  const [untagged, setUntagged] = useState(false)
+  const result = useFlowQuery(store, { query: filter, tagIds, untagged })
+  const { catalog, flows, total, failed: loadFailed, loadMoreFailed, loading: flowLoading, loadingMore, nextCursor, refreshing } = result
   const loading = initializing || flowLoading
-  const loadingMore = useVal(store.workspace.$.flowLoadingMore)
-  const nextCursor = useVal(store.workspace.$.flowNextCursor)
-  const refreshing = useVal(store.workspace.$.flowRefreshing)
-  const flows = useVal(store.workspace.$.flows)
-  const total = useVal(store.workspace.$.flowTotal)
+  const tagState = useVal(store.tags.state)
+  const [root, setRoot] = useState<HTMLElement | null>(null)
+  const tagsContext = { store, container: root, hrefForFlow, onSelectFlow }
+  const hasFilters = filter.trim().length > 0 || tagIds.length > 0 || untagged
+  function clearFilters(): void {
+    setFilter('')
+    setTagIds([])
+    setUntagged(false)
+  }
+  useEffect(() => {
+    store.tags.start()
+  }, [store])
   // The command and React read the same state, including calls before React rerenders.
   const [creation$] = useState(() => val<FlowCreation | undefined>(undefined))
   const creation = useVal(creation$)
   const fileInput = useRef<HTMLInputElement>(null)
-  const [filter, setFilter] = useState('')
+  const searchInput = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
-  const normalized = filter.trim().toLocaleLowerCase()
-  const visible = flows.filter((flow) => flow.name.toLocaleLowerCase().includes(normalized))
+  const [creationTags, setCreationTags] = useState<readonly string[]>([])
+  const [creatingTag, setCreatingTag] = useState(false)
 
   const command = useRef<OpenFlowWorkbenchHandle['openImport']>()
   useImperativeHandle(ref, () => ({ openImport: (input) => command.current?.(input) ?? 'unavailable' }), [])
@@ -400,6 +439,8 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
       store.workspace.notify({ kind: 'error', message: t('resource.importInvalid') })
       return 'invalid-file'
     }
+    setCreationTags([])
+    setCreatingTag(false)
     setName(file.name ?? (input.fileName == null ? importedWorkflowName(language) : workflowNameFromFile(input.fileName)))
     creation$.set({ kind: 'import', file, key: randomId(), ...(input.sourceUrl == null ? {} : { sourceUrl: input.sourceUrl }) })
     return 'opened'
@@ -408,6 +449,8 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
   function openCreate(): void {
     if (creation$.value != null) return
     setName('')
+    setCreationTags([])
+    setCreatingTag(false)
     creation$.set({ kind: 'create' })
   }
 
@@ -415,15 +458,16 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
     event.preventDefault()
     const request = creation$.value
     const nextName = name.trim()
-    if (request == null || resourceNameIssue(nextName) != null) return
-    const success = request.kind == 'create' ? await onCreateFlow(nextName) : await onImportFlow?.(request.file, nextName, request.key)
+    if (request == null || creatingTag || resourceNameIssue(nextName) != null) return
+    const success =
+      request.kind == 'create' ? await onCreateFlow(nextName, creationTags) : await onImportFlow?.(request.file, nextName, request.key, creationTags)
     if (!success || command.current == null || creation$.value !== request) return
     creation$.set(undefined)
     setName('')
   }
 
   return (
-    <main className="resource-browser" data-tooltip-portal>
+    <main className="resource-browser" data-tooltip-portal ref={setRoot}>
       <div
         className={cn('resource-page', {
           'resource-page-full': catalogWidth == null || catalogWidth == 'full',
@@ -435,7 +479,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
           <div className="resource-list-title">
             <div className="resource-list-heading">
               <h2 id="flow-list-title">{t('resource.flows')}</h2>
-              {!loading && <span>{t('resource.flowCount', { count: total ?? flows.length })}</span>}
+              {!loading && total != null && <span>{t('resource.flowCount', { count: total })}</span>}
             </div>
             <div className="resource-list-actions">
               <InputGroup className="w-full sm:w-56">
@@ -443,6 +487,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
                   <Icon name="search" size={17} />
                 </InputGroupAddon>
                 <InputGroupInput
+                  ref={searchInput}
                   autoComplete="off"
                   aria-label={t('resource.searchByName')}
                   name="flow-search"
@@ -451,6 +496,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
                   value={filter}
                 />
               </InputGroup>
+              <TagPicker {...tagsContext} value={tagIds} onChange={setTagIds} untagged={untagged} onUntaggedChange={setUntagged} />
               {onImportFlow != null && (
                 <>
                   <Input
@@ -483,6 +529,36 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
               </Button>
             </div>
           </div>
+          {(tagIds.length > 0 || untagged) && (
+            <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+              <i aria-hidden="true" className="i-lucide-light:funnel size-4 shrink-0 text-muted-foreground" />
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {tagState.tags
+                  .filter((tag) => tagIds.includes(tag.tagId))
+                  .map((tag) => (
+                    <Button
+                      key={tag.tagId}
+                      variant="secondary"
+                      size="sm"
+                      aria-label={t('tags.remove', { name: tag.name })}
+                      onClick={() => setTagIds(tagIds.filter((id) => id != tag.tagId))}
+                    >
+                      {tag.name}
+                      <i aria-hidden="true" className="i-lucide-light:x size-3" />
+                    </Button>
+                  ))}
+                {untagged && (
+                  <Button variant="secondary" size="sm" onClick={() => setUntagged(false)}>
+                    {t('tags.untagged')}
+                    <i aria-hidden="true" className="i-lucide-light:x size-3" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  {t('tags.clear')}
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="resource-table-scroll">
             <div className="resource-table">
               <div aria-hidden="true" className="resource-list-columns-shell">
@@ -508,21 +584,28 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
                       <EmptyDescription>{t('resource.flowsLoadFailedDescription')}</EmptyDescription>
                     </EmptyHeader>
                     <EmptyContent>
-                      <Button onClick={() => void store.retryFlows()} variant="outline">
+                      <Button onClick={() => void catalog?.reload()} variant="outline">
                         {t('empty.retry')}
                       </Button>
                     </EmptyContent>
                   </Empty>
-                ) : visible.length == 0 ? (
+                ) : flows.length == 0 ? (
                   <Empty className="min-h-64">
                     <EmptyHeader>
                       <EmptyMedia variant="icon">
                         <Icon name="flow" size={20} />
                       </EmptyMedia>
-                      <EmptyTitle>{t(normalized.length == 0 ? 'resource.noFlows' : 'resource.noMatchingFlows')}</EmptyTitle>
-                      <EmptyDescription>{t(normalized.length == 0 ? 'resource.noFlowsDescription' : 'resource.noMatchingDescription')}</EmptyDescription>
+                      <EmptyTitle>{t(!hasFilters ? 'resource.noFlows' : 'resource.noMatchingFlows')}</EmptyTitle>
+                      <EmptyDescription>{t(!hasFilters ? 'resource.noFlowsDescription' : 'resource.noMatchingDescription')}</EmptyDescription>
                     </EmptyHeader>
-                    {normalized.length == 0 && (
+                    {hasFilters && (
+                      <EmptyContent>
+                        <Button variant="outline" onClick={clearFilters}>
+                          {t('tags.clear')}
+                        </Button>
+                      </EmptyContent>
+                    )}
+                    {!hasFilters && (
                       <EmptyContent>
                         <Button onClick={openCreate} variant="outline">
                           <Icon data-icon="inline-start" name="plus" />
@@ -532,9 +615,12 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
                     )}
                   </Empty>
                 ) : (
-                  visible.map((flow) => (
+                  flows.map((flow) => (
                     <FlowItem
                       busy={busy}
+                      settingsFinalFocus={() => searchInput.current}
+                      onChanged={() => void catalog?.reload()}
+                      onTagFilter={(id) => setTagIds((current) => (current.includes(id) ? current : [...current, id]))}
                       flow={flow}
                       href={hrefForFlow(flow)}
                       hrefForFlow={hrefForFlow}
@@ -549,7 +635,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
           </div>
           {nextCursor != null && (
             <div className="resource-list-footer">
-              <Button disabled={loadingMore || refreshing} onClick={() => void store.workspace.loadMoreFlows()} variant="outline">
+              <Button disabled={loadingMore || refreshing} onClick={() => void catalog?.loadMore()} variant="outline">
                 {t(loadingMore ? 'resource.loadingMore' : loadMoreFailed ? 'resource.retryLoadMore' : 'resource.loadMore')}
               </Button>
             </div>
@@ -558,7 +644,20 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
         {creation != null && (
           <Suspense fallback={null}>
             <CreateResourceDialog
-              disabled={createFlowDisabled}
+              disabled={createFlowDisabled || creatingTag}
+              tagField={(container) => (
+                <Field>
+                  <FieldLabel>{t('tags.title')}</FieldLabel>
+                  <TagPicker
+                    {...tagsContext}
+                    onPendingChange={setCreatingTag}
+                    dialogContainer={root}
+                    container={container}
+                    value={creationTags}
+                    onChange={setCreationTags}
+                  />
+                </Field>
+              )}
               field={createFlowField}
               id="flow-name"
               issue={resourceNameIssue(name)}

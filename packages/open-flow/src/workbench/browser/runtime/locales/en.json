@@ -1720,5 +1720,39 @@
     "responseOutputs": "Response outputs",
     "authenticationType": "Type",
     "responseSettings": "Response settings"
+  },
+  "tags": {
+    "count": "{{count}} total",
+    "title": "Tags",
+    "search": "Search tags",
+    "matchAny": "Match any selected tag",
+    "loading": "Loading tags…",
+    "noMatches": "No matching tags",
+    "createNamed": "Create “{{name}}”",
+    "manage": "Manage tags",
+    "remove": "Remove {{name}}",
+    "expand": "Show {{count}} more tags",
+    "filterBy": "Filter by {{name}}",
+    "create": "New tag",
+    "invalid": "Enter a valid tag name (up to 80 characters).",
+    "usage": "Usage",
+    "references": "Flows tagged “{{name}}”",
+    "unused": "No flows use this tag.",
+    "deleteTitle": "Delete “{{name}}”?",
+    "deleteDescription": "Remove this tag from {{count}} flows. The flows will be kept.",
+    "clear": "Clear filters",
+    "notFound": "This tag is no longer available.",
+    "conflict": "A tag with this name already exists.",
+    "untagged": "Untagged",
+    "add": "Add tags",
+    "filter": "Filter by tags"
+  },
+  "flowSettings": {
+    "title": "Flow settings",
+    "name": "Title",
+    "discardTitle": "Discard changes?",
+    "discardDescription": "Your Flow settings have not been saved.",
+    "continueEditing": "Continue editing",
+    "discardChanges": "Discard changes"
   }
 }

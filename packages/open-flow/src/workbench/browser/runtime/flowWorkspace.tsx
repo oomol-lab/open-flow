@@ -33,6 +33,7 @@ import { readRunDrawerOpen, writeRunDrawerOpen } from './runs/runDrawerPreferenc
 import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunStatusIslandContainer } from './runs/runStatusIsland.tsx'
 import { RunsView } from './runs/runsView.tsx'
+import { FlowSettingsButton } from './shell/flowSettings.tsx'
 import { WorkspaceDiagnosticsIsland } from './shell/workspaceDiagnosticsIsland.tsx'
 import { WorkspaceNavigationIsland } from './shell/workspaceNavigationIsland.tsx'
 import { WorkspacePublishIsland } from './shell/workspacePublishIsland.tsx'
@@ -771,6 +772,17 @@ export default function FlowWorkspace({
     <WorkspaceNavigationIsland
       ghost={view == 'design' && !canvasReady}
       saveStatus={view == 'design' && canvasReady ? saveStatus : undefined}
+      settings={
+        flow != null && (
+          <FlowSettingsButton
+            key={flow.flowId}
+            flow={flow}
+            store={store}
+            hrefForFlow={(target) => hrefFor({ flowId: target.flowId, view: 'design' })}
+            onSelectFlow={(target) => void navigation.selectFlow(target)}
+          />
+        )
+      }
       flowName={flow?.name ?? flow?.flowId ?? ''}
       flowsHref={hrefFor({ view: 'design' })}
       onOpenFlows={() => void navigation.openFlows()}

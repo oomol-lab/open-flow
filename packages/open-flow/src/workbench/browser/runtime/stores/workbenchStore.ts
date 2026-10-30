@@ -2,6 +2,7 @@ import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { FlowSvgOptions } from '../../../../canvas/browser/graph/FlowCanvas/exportSvg.ts'
 import type { InteractiveMode } from '../../../../canvas/browser/stores/canvas/canvas.store.ts'
+import type { FlowUpdate } from '../../../../control/common/api.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
 import type { ConnectorConnection, WorkbenchClient, Draft, Flow, FlowCheck, Run, RunEvent } from '../api.ts'
 import type { Point } from '../canvasPresentation.ts'
@@ -33,9 +34,11 @@ import { readCanvasInteractiveMode, writeCanvasInteractiveMode } from './canvasI
 import { CatalogStores } from './catalogStores.ts'
 import { ConnectorAccessStore } from './connectorAccessStore.ts'
 import { ConnectorStore } from './connectorStore.ts'
+import { FlowCatalog } from './flowCatalog.ts'
 import { Latest } from './latest.ts'
 import { combineSources } from './optionSource.ts'
 import { resourceData } from './resource.ts'
+import { TagCatalog } from './tagCatalog.ts'
 import { TriggerStore } from './triggerStore.ts'
 import { errorNotice } from './workbenchNotice.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
@@ -90,6 +93,24 @@ const blockedExternalPages: Pick<WorkbenchHost, 'openExternalPage'> = {
 }
 
 export class WorkbenchStore {
+  public readonly tags: TagCatalog
+
+  public createFlowCatalog(): FlowCatalog {
+    return new FlowCatalog(
+      this.#client,
+      (notice) => {
+        if (!this.#disposed) this.#notice.set(notice)
+      },
+      this.#i18n,
+    )
+  }
+
+  public async updateFlowSettings(flowId: string, changes: FlowUpdate): Promise<boolean> {
+    const updated = await this.workspace.updateFlowSettings(flowId, changes)
+    if (updated) await this.tags.reload()
+    return updated
+  }
+
   readonly results: Pick<WorkbenchClient, 'listRunResults' | 'readRunResult' | 'downloadRunResult'>
   readonly #client: WorkbenchClient
   readonly #externalRuns = new Latest()
@@ -143,6 +164,7 @@ export class WorkbenchStore {
     const setNotice = (notice: Notice): void => {
       if (!this.#disposed) this.#notice.set(notice)
     }
+    this.tags = new TagCatalog(client, setNotice, i18n, () => this.workspace.reloadFlows())
     this.connectorAccess = new ConnectorAccessStore(client, setNotice, i18n, (flowId) => this.workspace.catalogs.refreshFlow(flowId))
     this.runs = new RunStore(client, setNotice, i18n)
     this.workspace = new WorkspaceStore(
@@ -281,6 +303,7 @@ export class WorkbenchStore {
   }
 
   public dispose(): void {
+    this.tags.dispose()
     this.#disposed = true
     this.#stopAccessReaction()
     this.interactiveMode$.dispose()
@@ -389,13 +412,18 @@ export class WorkbenchStore {
     file: WorkflowFile,
     name: string,
     key: string,
-    importer?: (file: WorkflowFile, name: string, key: string) => Promise<string>,
+    importer?: (file: WorkflowFile, name: string, key: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    tagIds?: readonly string[],
   ): Promise<boolean> {
-    return await this.#openNewFlow(await this.workspace.importFlow(file, name, key, importer), 'notice.flowImported')
+    return await this.#openNewFlow(await this.workspace.importFlow(file, name, key, importer, tagIds), 'notice.flowImported')
   }
 
-  public async createFlow(name: string, create?: (name: string) => Promise<string>): Promise<boolean> {
-    return await this.#openNewFlow(await this.workspace.createFlow(name, create))
+  public async createFlow(
+    name: string,
+    create?: (name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    tagIds?: readonly string[],
+  ): Promise<boolean> {
+    return await this.#openNewFlow(await this.workspace.createFlow(name, create, tagIds))
   }
 
   async #openNewFlow(created: Flow | undefined, notice?: 'notice.flowImported'): Promise<boolean> {

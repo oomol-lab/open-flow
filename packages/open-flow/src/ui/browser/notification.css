@@ -6,15 +6,16 @@
 }
 
 @supports (position-anchor: --open-flow-canvas) {
-  [data-sonner-toaster].open-flow-notifications[data-sonner-theme][data-x-position='center'] {
-    /* Follow the available canvas; pages without one retain viewport centering. */
+  :root:not(:has([data-slot='dialog-content'])) [data-sonner-toaster].open-flow-notifications[data-sonner-theme][data-x-position='center'] {
+    /* Follow the canvas outside modals; modal feedback shares their viewport center. */
     position-anchor: --open-flow-canvas;
     left: anchor(center, 50%);
     max-width: calc(anchor-size(width, 100%) - 24px);
     transform: translateX(-50%);
   }
 
-  [data-sonner-toaster].open-flow-notifications[data-sonner-theme][data-x-position='center'][data-y-position='top'] {
+  :root:not(:has([data-slot='dialog-content']))
+    [data-sonner-toaster].open-flow-notifications[data-sonner-theme][data-x-position='center'][data-y-position='top'] {
     top: calc(anchor(top, calc(var(--offset-top) - 16px)) + 16px);
   }
 }

@@ -33,6 +33,9 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
   const referenceFailureRef = useRef(referenceFailure)
   referenceFailureRef.current = referenceFailure
   const [teamState, setTeamState] = useState<'ready' | 'loading' | 'disabled'>('ready')
+  const [tagFailure, setTagFailure] = useState<'none' | 'read' | 'save'>('none')
+  const tagFailureRef = useRef(tagFailure)
+  tagFailureRef.current = tagFailure
   const [failImport, setFailImport] = useState(false)
   const [single, setSingle] = useState(false)
   const [embedded, setEmbedded] = useState(false)
@@ -41,6 +44,15 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
   const [connected, setConnected] = useState(false)
   const [session, setSession] = useState<{ connect: () => void; i18n: ReturnType<typeof createI18n>; store: WorkbenchStore }>()
   useStoryActions([
+    {
+      label: 'Fail next tag read',
+      onClick: () => {
+        tagFailureRef.current = 'read'
+        setTagFailure('read')
+        void session?.store.tags.reload()
+      },
+    },
+    { label: 'Fail next tag save', onClick: () => setTagFailure('save') },
     { label: referenceFailure == 'initial' ? 'Initial failure armed' : 'Fail initial reference request', onClick: () => setReferenceFailure('initial') },
     { label: referenceFailure == 'next' ? 'Next-page failure armed' : 'Fail next reference page', onClick: () => setReferenceFailure('next') },
     {
@@ -77,44 +89,95 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
     setConnected(false)
     const connection = Promise.withResolvers<void>()
     const i18n = createI18n(language)
-    const flows: Flow[] = (single ? ['xxx'] : ['Published flow', 'Unpublished changes with a long flow name', 'Disabled flow', 'Draft flow']).map(
-      (name, index) => {
-        const flow: Flow = {
-          flowId: single ? 'flow_7a7ca0123456789abcdef67e0dd' : `flow-list-sample-${index}`,
-          name,
-          createdAt: '2026-09-24T09:00:00.000Z',
-          updatedAt: '2026-09-24T09:00:00.000Z',
-          draftRevisionId: 'draft',
-          resourceReferences: {
-            draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
-            sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
-          },
-          status: 'active',
-          version: 1,
-        }
-        return index == 3
-          ? flow
-          : Object.assign(flow, {
-              live: { hasStart: true, enabled: index != 2, publicationId: `publication-${index}`, revisionId: index == 1 ? 'previous' : 'draft' },
-            })
-      },
-    )
+    const flows: Flow[] = (
+      single ? ['xxx'] : ['Published flow', 'Unpublished changes with a long flow name', 'Disabled flow', 'Draft flow', 'Untagged flow']
+    ).map((name, index) => {
+      const flow: Flow = {
+        flowId: single ? 'flow_7a7ca0123456789abcdef67e0dd' : `flow-list-sample-${index}`,
+        name,
+        tagIds: index == 0 ? ['production', 'sales'] : index == 1 ? ['ai', 'operations', 'notifications', 'knowledge', 'sales'] : index < 4 ? ['ai'] : [],
+        createdAt: '2026-09-24T09:00:00.000Z',
+        updatedAt: '2026-09-24T09:00:00.000Z',
+        draftRevisionId: 'draft',
+        resourceReferences: {
+          draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+          sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+        },
+        status: 'active',
+        version: 1,
+      }
+      return index >= 3
+        ? flow
+        : Object.assign(flow, {
+            live: { hasStart: true, enabled: index != 2, publicationId: `publication-${index}`, revisionId: index == 1 ? 'previous' : 'draft' },
+          })
+    })
     const referencedFlowId = flows[0]?.flowId
+    let tags = [
+      'Production',
+      'Sales operations with a long tag name',
+      'AI integrations with a long tag name',
+      'Operations',
+      'Notifications',
+      'Knowledge base with a long tag name',
+    ].map((name, index) => ({
+      tagId: ['production', 'sales', 'ai', 'operations', 'notifications', 'knowledge'][index]!,
+      name,
+      version: 1,
+    }))
     let reads = 0
     const client = new WorkbenchClient(
       async (path, init) => {
         const url = String(path).split('?')[0]!
-        const index = flows.findIndex((flow) => url == `/v1/flows/${flow.flowId}` || url == `/v1/flows/${flow.flowId}/enabled`)
+        const mutation = init?.method != null && init.method != 'GET'
+        if (
+          (url == '/v1/tags' && tagFailureRef.current == 'read') ||
+          (mutation && (url.startsWith('/v1/tags') || url.endsWith('/tags')) && tagFailureRef.current == 'save')
+        ) {
+          tagFailureRef.current = 'none'
+          setTagFailure('none')
+          return Response.json({ message: 'Tag request failed' }, { status: 500 })
+        }
+        if (url == '/v1/tags' && !mutation)
+          return Response.json({
+            tags: tags.map((tag) => ({ ...tag, referenceCount: flows.filter((flow) => flow.tagIds?.includes(tag.tagId)).length })),
+            version: 1,
+          })
+        if (url.startsWith('/v1/tags') && mutation) {
+          const id = url.split('/')[3]
+          const previous = tags.find((tag) => tag.tagId == id)
+          if (init?.method == 'DELETE') {
+            tags = tags.filter((tag) => tag.tagId != id)
+            for (let position = 0; position < flows.length; position++)
+              flows[position] = { ...flows[position]!, tagIds: flows[position]!.tagIds?.filter((tagId) => tagId != id) ?? [] }
+            return Response.json({ version: 1 })
+          }
+          const { name } = JSON.parse(String(init?.body)) as { name: string }
+          if (tags.some((tag) => tag.name.toLowerCase() == name.trim().toLowerCase() && tag.tagId != id))
+            return Response.json({ error: { code: 'tag.conflict', message: 'A tag with this name already exists.' } }, { status: 409 })
+          const tag = { tagId: id ?? `tag-${tags.length}`, name: name.trim(), version: 1 }
+          tags = previous == null ? [...tags, tag] : tags.map((item) => (item.tagId == id ? tag : item))
+          return Response.json(tag)
+        }
+        const index = flows.findIndex(
+          (flow) => url == `/v1/flows/${flow.flowId}` || url == `/v1/flows/${flow.flowId}/enabled` || url == `/v1/flows/${flow.flowId}/tags`,
+        )
         const flow = flows[index]
+        if (flow != null && init?.method == 'PUT' && url.endsWith('/tags')) {
+          const { tagIds } = JSON.parse(String(init.body)) as { tagIds: string[] }
+          flows[index] = { ...flow, tagIds }
+          log('flow.tags', tagIds)
+          return Response.json(flows[index])
+        }
         if (flow != null && init?.method == 'DELETE') {
           flows.splice(index, 1)
           log('flow.delete', flow.flowId)
           return Response.json({ ...flow, status: 'retiring' }, { status: 202 })
         }
         if (flow != null && init?.method == 'PATCH') {
-          const { name } = JSON.parse(String(init.body)) as { name: string }
-          flows[index] = { ...flow, name }
-          log('flow.rename', name)
+          const { name, tagIds } = JSON.parse(String(init.body)) as { name?: string; tagIds?: string[] }
+          flows[index] = { ...flow, ...(name == null ? {} : { name }), ...(tagIds == null ? {} : { tagIds }) }
+          log('flow.settings', { name, tagIds })
           return Response.json(flows[index])
         }
         if (flow?.live != null && init?.method == 'PUT' && url.endsWith('/enabled')) {
@@ -157,13 +220,26 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
                 : [],
           })
         if (String(path).split('?')[0] == '/v1/flows') {
-          const catalog = reads++ == 0 ? flows : flows.map((item, position) => (position == 3 ? Object.assign({}, item, { name: 'Updated draft flow' }) : item))
+          const catalog =
+            reads++ == 0
+              ? flows
+              : flows.map((item, position) => (position == 3 && item.name == 'Draft flow' ? Object.assign({}, item, { name: 'Updated draft flow' }) : item))
+          const parameters = new URL(String(path), 'https://lab.local').searchParams
+          const query = parameters.get('query') ?? ''
+          const ids = parameters.get('tagIds')?.split(',') ?? []
+          const untagged = parameters.get('untagged') == 'true'
+          const matches = catalog.filter(
+            (item) =>
+              item.name.toLowerCase().includes(query) &&
+              ((ids.length == 0 && !untagged) || item.tagIds?.some((tagId) => ids.includes(tagId)) || (untagged && (item.tagIds?.length ?? 0) == 0)),
+          )
           return Response.json({
             version: 1,
-            flows: empty ? [] : catalog.map((item) => ({ ...item, referenceCount: item.flowId == referencedFlowId ? 53 : 0 })),
-            total: empty ? 0 : catalog.length,
+            flows: empty ? [] : matches.map((item) => ({ ...item, referenceCount: item.flowId == referencedFlowId ? 53 : 0 })),
+            total: empty ? 0 : matches.length,
           })
         }
+        if (flow != null && !mutation) return Response.json(flow)
         return Response.json({ message: 'Unsupported story action' }, { status: 400 })
       },
       undefined,
@@ -214,9 +290,12 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
           language={language}
           store={session.store}
           hrefForFlow={(flow, view = 'design') => `#${flow.flowId}/${view}`}
-          onCreateFlow={async () => false}
-          onImportFlow={async (file, name, key) => {
-            log('flow.import', { file, name, key })
+          onCreateFlow={async (name, tagIds) => {
+            log('flow.create', { name, tagIds })
+            return true
+          }}
+          onImportFlow={async (file, name, key, tagIds) => {
+            log('flow.import', { file, name, key, tagIds })
             if (failImport) session.store.workspace.notify({ kind: 'error', message: session.i18n.t('notice.requestFailed') })
             return !failImport
           }}
@@ -232,7 +311,7 @@ export const flowBrowserStory: FrontendStory = {
   id: 'flow-browser',
   title: 'Flow list',
   description:
-    'Open the reference count to compare draft, published, disabled and long-name references, and load the second page. Fail initial reference request and Fail next reference page each fail once, allowing retry without losing loaded rows. Reference links log their target flow and view. Delete the first row to inspect compact impact summaries; expand each summary for calling workflows or error listeners. The other rows have no references. Reference lookup failures block deletion until retry succeeds. Deleting removes only the sample workflow. Show single workflow reproduces a short name and a full-length ID in an embedded list. Compare column spacing at wide and compact widths; search and dialog inputs keep the same text size at both widths. Hover or focus a flow name to see its full text. Hover, focus, or click a Flow ID to inspect its full value and copy action; Escape closes the tooltip. Embedded layout leaves page width and spacing to the host. Show empty list to inspect the empty state. New Flow and Import workflow include a team field for checking modal controls. Import external file and Import invalid file exercise the production ref entry. The source link sits beneath the dialog title and uses the muted theme color. Fail import submission keeps the dialog open for retry; submitted keys are logged. Team cycles ready, loading and disabled submission states. Import accepts .openflow.json files and logs the submitted content; malformed files show a notification without moving the table. Row menus export a deterministic sample file that can be imported again. The list loads before notifications connect. Connect notifications to refresh the Draft row without clearing the list. Show startup to inspect the skeleton. Use the row menu to rename a flow, start/stop its publication, or open publication and run history (logged with the target flow and view). Check that renaming stays centered on the flow name with compact controls; invalid names show feedback below the controls, and Enter, Escape, and Cancel retain their usual behavior. Search for Published flow to verify the menu extends beyond a single-row table. The name column receives more flexible space; the action column fits its reference count and menu. Compare publication and runtime columns with equal flexible space at each width. At compact widths, flow names and status columns stay aligned across rows. Switch language and theme to inspect labels and menus.',
+    'Tags appear below names on one line. Long labels truncate and the overflow count stays on that line; its menu exposes the remaining tags without changing row height. Click a tag or use the tag filter to combine labels, untagged flows and name search. Selected conditions sit below a divider with a leading filter icon; check their wrapping and clear/remove actions at compact widths. Open Flow settings from a row menu to edit the title and tags together. Unsaved title or tag changes require confirmation when cancelling, closing, pressing Escape, clicking the backdrop or following a tag usage link. Continue editing retains both fields; discard closes without saving. Restoring the original values allows closing immediately. The list uses an icon to open tag filters. Settings, create and import forms place an Add tags chip beside selected tags. Search stays inside the shared panel; verify keyboard search, multiple selections, creating a tag, management and focus restoration. Manage tags uses the Flow list toolbar and table, with a count, search, New tag button and row action menus. The close button shares the header controls’ center line; at narrow widths, search and New tag move below the title and close button. Check name truncation, reference links, anchored create/rename forms that keep the table stationary, and focus after saving or cancelling deletion. Duplicate tag names use input-attached danger feedback. Fail next tag read and Fail next tag save each fail once to exercise retry. Check centered usage counts across used and unused tags. Open the AI tag usage to compare draft, changed, disabled and long-name flows: the workflow icon and name sit on the left with compact publication/runtime chips on the right, following Variables reference rows. Workflow names stay on one line with ellipses and full-text tooltips. Panel titles may wrap across lines. Status chips wrap at narrow widths, and drafts show only one state. Flow reference counts also load a second page. Fail initial reference request and Fail next reference page each fail once, allowing retry without losing loaded rows. Reference links log their target flow and view. Delete the first row to inspect compact impact summaries; expand each summary for calling workflows or error listeners. The other rows have no references. Reference lookup failures block deletion until retry succeeds. Deleting removes only the sample workflow. Show single workflow reproduces a short name and a full-length ID in an embedded list. Compare column spacing at wide and compact widths; search and dialog inputs keep the same text size at both widths. Hover or focus a flow name to see its full text. Hover, focus, or click a Flow ID to inspect its full value and copy action; Escape closes the tooltip. Embedded layout leaves page width and spacing to the host. Show empty list to inspect the empty state. New Flow and Import workflow include a team field for checking modal controls. Import external file and Import invalid file exercise the production ref entry. The source link sits beneath the dialog title and uses the muted theme color. Fail import submission keeps the dialog open for retry; submitted keys are logged. Team cycles ready, loading and disabled submission states. Import accepts .openflow.json files and logs the submitted content; malformed files show a notification without moving the table. Row menus export a deterministic sample file that can be imported again. The list loads before notifications connect. Connect notifications to refresh the Draft row without clearing the list. Show startup to inspect the skeleton. Use the row menu to rename a flow, start/stop its publication, or open publication and run history (logged with the target flow and view). With a name filter active, rename a matching flow so it no longer matches: it leaves the list immediately. Starting/stopping also refreshes the filtered row without connecting notifications. Check that renaming stays centered on the flow name with compact controls; invalid names show feedback below the controls, and Enter, Escape, and Cancel retain their usual behavior. Search for Published flow to verify the menu extends beyond a single-row table. The name column receives more flexible space; the action column fits its reference count and menu. Compare publication and runtime columns with equal flexible space at each width. At compact widths, flow names and status columns stay aligned across rows. Switch language and theme to inspect labels and menus.',
   standalone: true,
   render: (log, dark, language) => <FlowBrowserStory dark={dark} language={language} log={log} />,
 }

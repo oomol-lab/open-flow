@@ -71,6 +71,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['control/common/providerAccess', 'common/providerAccess'],
   ['control/common/requests', 'common/control-requests'],
   ['control/common/results', 'common/run-results'],
+  ['control/common/tags', 'common/tags'],
   ['control/common/triggerCatalog', 'common/trigger-catalog'],
   ['decision/common/decision', 'common/decision'],
   ['event-source/common/definition', 'common/event-source-definition'],

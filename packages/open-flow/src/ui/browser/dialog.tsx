@@ -34,22 +34,19 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
   )
 }
 
-function DialogContent({
-  children,
-  className,
-  closeLabel = 'Close',
-  container,
-  showCloseButton = true,
-  ...props
-}: DialogPrimitive.Popup.Props & {
-  readonly closeLabel?: React.ReactNode
-  readonly container?: HTMLElement | null
-  readonly showCloseButton?: boolean
-}) {
+const DialogContent = React.forwardRef<
+  HTMLDivElement,
+  DialogPrimitive.Popup.Props & {
+    readonly closeLabel?: React.ReactNode
+    readonly container?: HTMLElement | null
+    readonly showCloseButton?: boolean
+  }
+>(function DialogContent({ children, className, closeLabel = 'Close', container, showCloseButton = true, ...props }, ref) {
   return (
     <DialogPortal container={container}>
       <DialogOverlay />
       <DialogPrimitive.Popup
+        ref={ref}
         data-slot="dialog-content"
         className={cn(
           'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] grid-cols-[minmax(0,1fr)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg bg-popover [--ui-control-background:var(--ui-popover)] p-4 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none sm:max-w-sm transition-opacity duration-150 ease-out data-starting-style:opacity-0 data-ending-style:opacity-0 motion-reduce:transition-none',
@@ -72,7 +69,7 @@ function DialogContent({
       </DialogPrimitive.Popup>
     </DialogPortal>
   )
-}
+})
 
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return <div data-slot="dialog-header" className={cn('flex flex-col gap-2', className)} {...props} />

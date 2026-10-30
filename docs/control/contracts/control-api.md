@@ -84,6 +84,45 @@ allowed. Clients should refresh this query when opening reference or deletion UI
 
 ## 3. Flow, Revision, and Presentation
 
+### Tags and catalog filters
+
+Tags belong to the authenticated account, independently of Connector Teams. A tag is
+`{tagId, name, version: 1}`. Names are trimmed, follow the resource-name contract (at most
+80 characters, no control characters), and are unique within an account after Unicode
+lowercasing. Renaming keeps its ID. `tag.invalid`, `tag.conflict`, and `tag.not-found` return
+400, 409, and 404 respectively; another account's tags are not found.
+
+- `GET /v1/tags` returns `{tags, version: 1}`. Each item adds `referenceCount`, counting distinct
+  active Flows. The directory is complete and ordered by normalized name and tag ID.
+- `POST /v1/tags` and `PATCH /v1/tags/:tagId` accept `{name, version: 1}` and return the tag
+  (201 for creation, 200 for rename).
+- `DELETE /v1/tags/:tagId` removes the tag and its memberships and returns `{version: 1}`.
+  Referencing Flows are retained. Flow retirement also clears its memberships.
+- `PUT /v1/flows/:flowId/tags` accepts `{tagIds, version: 1}`, atomically replaces the set, and
+  returns the Flow. IDs must all belong to the Flow owner; duplicates are deduplicated.
+  Retiring Flows reject changes with `flow.busy`.
+- `PATCH /v1/flows/:flowId` accepts `{name?, tagIds?, version: 1}` with at least one field.
+  It updates the title and replaces tag membership in one transaction and returns the Flow.
+  Omitted fields retain their current values. An invalid title or tag leaves both unchanged.
+
+Flow responses include `tagIds` in ID order. Older responses without this optional field decode
+as an empty set. Creation and import accept optional `tagIds`; membership is committed with the
+Flow. The sorted unique set participates in creation idempotency. Replay returns the current Flow
+without restoring original tags or requiring those original tags to still exist. Workflow files do
+not contain tags, and tag updates do not change Draft, Presentation, or publication identity.
+
+`GET /v1/flows` additionally accepts `query` (trimmed, case-insensitive literal name substring),
+`tagIds` (comma-separated IDs), and `untagged` (boolean). Name search intersects with the union of
+selected tags and untagged Flows. Empty conditions impose no restriction. Filtering precedes
+pagination and `total` counts all matches. Cursors bind the normalized conditions: reusing a cursor
+with a different filter returns `page.invalid-cursor`. Existing unfiltered cursors remain valid for
+unfiltered requests. A tag's reverse lookup uses this same endpoint with its single `tagId`;
+there is no Draft/Live distinction for tag membership.
+
+The SDK exposes tag directory/mutation methods, `updateFlow`, `setFlowTags`, optional creation/import tag IDs,
+and these filters on `listFlows`. Workbench host creation and import callbacks receive the optional
+tag selection as their last options argument and must forward it in the creation request.
+
 ### Shareable workflow files
 
 `GET /v1/flows/:flowId/export` returns the current persisted Draft as a UTF-8 JSON file
@@ -143,6 +182,7 @@ Flow is a top-level resource:
 
 ```ts
 interface Flow {
+  tagIds?: readonly string[]
   live?: { enabled: boolean; publicationId: string; revisionId: string }
   createdAt: string
   draftRevisionId: string
@@ -998,52 +1038,57 @@ Workbench dispatches commands in receipt order only to the current ready canvas,
 
 ## 8. Routes
 
-| Method    | Path                                                         | Success status | Description                                                    |
-| --------- | ------------------------------------------------------------ | -------------: | -------------------------------------------------------------- |
-| `GET`     | `/v1/flows`                                                  |            200 | `cursor`, `limit`, `includeTotal`                              |
-| `POST`    | `/v1/flows`                                                  |        201/200 | `{ name, teamId?, version: 1 }`                                |
-| `GET`     | `/v1/flows/:flowId`                                          |            200 | Flow and Draft head                                            |
-| `PATCH`   | `/v1/flows/:flowId`                                          |            200 | `{ name, version: 1 }`                                         |
-| `DELETE`  | `/v1/flows/:flowId`                                          |            202 | Enter `retiring`                                               |
-| `GET`     | `/v1/flows/:flowId/editor`                                   |            200 | Combined Flow, Draft, Live, and Presentation read              |
-| `GET`     | `/v1/flows/:flowId/draft`                                    |            200 | Current Draft snapshot                                         |
-| `GET`     | `/v1/flows/:flowId/draft/sync`                               |            200 | Current complete snapshot                                      |
-| `POST`    | `/v1/flows/:flowId/draft/changes`                            |            200 | `Idempotency-Key` and change batch                             |
-| `POST`    | `/v1/flows/:flowId/draft/upgrade`                            |            200 | Deterministic lossless Draft model upgrade                     |
-| `POST`    | `/v1/flows/:flowId/draft/repair`                             |            200 | Tolerant repair creating a new Draft Revision                  |
-| `GET`     | `/v1/flows/:flowId/revisions/:revisionId`                    |            200 | immutable Revision                                             |
-| `POST`    | `/v1/flows/:flowId/canvas`                                   |            200 | Broadcast a transient canvas command                           |
-| `GET/PUT` | `/v1/flows/:flowId/presentation`                             |            200 | Presentation CAS                                               |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/check`              |            200 | Pinned Revision validation                                     |
-| `GET`     | `/v1/flows/:flowId/live`                                     |            200 | Live projection                                                |
-| `GET`     | `/v1/flows/:flowId/publications/:publicationId/presentation` |            200 | Immutable presentation snapshot, or null                       |
-| `GET`     | `/v1/flows/:flowId/publications`                             |            200 | Publication page                                               |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/publications`       |            202 | Publish operation                                              |
-| `GET`     | `/v1/flows/:flowId/publish-operations/:operationId`          |            200 | Publish operation                                              |
-| `POST`    | `/v1/flows/:flowId/publications/:publicationId/rollback`     |        201/200 | Rollback                                                       |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/runs`               |        202/200 | Draft Run                                                      |
-| `POST`    | `/v1/runs`                                                   |        202/200 | Live Run                                                       |
-| `GET`     | `/v1/flows/:flowId/runs`                                     |            200 | Run page filters                                               |
-| `GET`     | `/v1/runs/:runId`                                            |            200 | Run detail                                                     |
-| `GET`     | `/v1/runs/:runId/events`                                     |            200 | `after`, `limit`                                               |
-| `GET`     | `/v1/runs/:runId/result`                                     |            200 | terminal result                                                |
-| `POST`    | `/v1/runs/:runId/cancel`                                     |            200 | `{ version: 1 }`                                               |
-| `POST`    | `/v1/runs/:runId/waits/:waitId/resolve`                      |            200 | `{ action, version: 1 }`                                       |
-| `GET`     | `/v1/trigger-keys`                                           |            200 | Trigger summaries                                              |
-| `GET`     | `/v1/trigger-keys/catalog`                                   |       200, 304 | definitions, display, locale                                   |
-| `GET`     | `/v1/trigger-keys/:key`                                      |            200 | definition detail                                              |
-| `GET`     | `/v1/flows/:flowId/triggers`                                 |            200 | Trigger bindings                                               |
-| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId`                  |            200 | binding detail                                                 |
-| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/activities`       |            200 | Activity page                                                  |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/test`             |            200 | Poll test                                                      |
-| `GET`     | `/v1/connector/teams`                                        |            200 | Available Team catalog: enabled, teams, version                |
-| `GET`     | `/v1/connector/providers`                                    |            200 | Provider catalog; optional `flowId`                            |
-| `GET`     | `/v1/connector/actions`                                      |            200 | `service` or `q`; optional `flowId`                            |
-| `GET`     | `/v1/connector/actions/:actionId`                            |            200 | Action detail; optional `flowId`                               |
-| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/options/:field`   |            200 | Dynamic Draft Trigger options scoped by its saved Connection   |
-| `GET`     | `/v1/connector/connections`                                  |            200 | All Connections in the current scope; optional `flowId`        |
-| `GET`     | `/v1/connector/connections/:serviceId`                       |            200 | Connections; optional `flowId`                                 |
-| `POST`    | `/v1/connector/connections/:serviceId/page`                  |            200 | External authorization page URL; optional `flowId` or `teamId` |
+| Method    | Path                                                         | Success status | Description                                                      |
+| --------- | ------------------------------------------------------------ | -------------: | ---------------------------------------------------------------- |
+| `GET`     | `/v1/tags`                                                   |            200 | Account tag directory with usage counts                          |
+| `POST`    | `/v1/tags`                                                   |            201 | `{ name, version: 1 }`                                           |
+| `PATCH`   | `/v1/tags/:tagId`                                            |            200 | `{ name, version: 1 }`                                           |
+| `DELETE`  | `/v1/tags/:tagId`                                            |            200 | Delete tag and memberships; retain Flows                         |
+| `PUT`     | `/v1/flows/:flowId/tags`                                     |            200 | `{ tagIds, version: 1 }`                                         |
+| `GET`     | `/v1/flows`                                                  |            200 | `cursor`, `limit`, `includeTotal`, `query`, `tagIds`, `untagged` |
+| `POST`    | `/v1/flows`                                                  |        201/200 | `{ name, teamId?, tagIds?, version: 1 }`                         |
+| `GET`     | `/v1/flows/:flowId`                                          |            200 | Flow and Draft head                                              |
+| `PATCH`   | `/v1/flows/:flowId`                                          |            200 | `{ name?, tagIds?, version: 1 }`; at least one field             |
+| `DELETE`  | `/v1/flows/:flowId`                                          |            202 | Enter `retiring`                                                 |
+| `GET`     | `/v1/flows/:flowId/editor`                                   |            200 | Combined Flow, Draft, Live, and Presentation read                |
+| `GET`     | `/v1/flows/:flowId/draft`                                    |            200 | Current Draft snapshot                                           |
+| `GET`     | `/v1/flows/:flowId/draft/sync`                               |            200 | Current complete snapshot                                        |
+| `POST`    | `/v1/flows/:flowId/draft/changes`                            |            200 | `Idempotency-Key` and change batch                               |
+| `POST`    | `/v1/flows/:flowId/draft/upgrade`                            |            200 | Deterministic lossless Draft model upgrade                       |
+| `POST`    | `/v1/flows/:flowId/draft/repair`                             |            200 | Tolerant repair creating a new Draft Revision                    |
+| `GET`     | `/v1/flows/:flowId/revisions/:revisionId`                    |            200 | immutable Revision                                               |
+| `POST`    | `/v1/flows/:flowId/canvas`                                   |            200 | Broadcast a transient canvas command                             |
+| `GET/PUT` | `/v1/flows/:flowId/presentation`                             |            200 | Presentation CAS                                                 |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/check`              |            200 | Pinned Revision validation                                       |
+| `GET`     | `/v1/flows/:flowId/live`                                     |            200 | Live projection                                                  |
+| `GET`     | `/v1/flows/:flowId/publications/:publicationId/presentation` |            200 | Immutable presentation snapshot, or null                         |
+| `GET`     | `/v1/flows/:flowId/publications`                             |            200 | Publication page                                                 |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/publications`       |            202 | Publish operation                                                |
+| `GET`     | `/v1/flows/:flowId/publish-operations/:operationId`          |            200 | Publish operation                                                |
+| `POST`    | `/v1/flows/:flowId/publications/:publicationId/rollback`     |        201/200 | Rollback                                                         |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/runs`               |        202/200 | Draft Run                                                        |
+| `POST`    | `/v1/runs`                                                   |        202/200 | Live Run                                                         |
+| `GET`     | `/v1/flows/:flowId/runs`                                     |            200 | Run page filters                                                 |
+| `GET`     | `/v1/runs/:runId`                                            |            200 | Run detail                                                       |
+| `GET`     | `/v1/runs/:runId/events`                                     |            200 | `after`, `limit`                                                 |
+| `GET`     | `/v1/runs/:runId/result`                                     |            200 | terminal result                                                  |
+| `POST`    | `/v1/runs/:runId/cancel`                                     |            200 | `{ version: 1 }`                                                 |
+| `POST`    | `/v1/runs/:runId/waits/:waitId/resolve`                      |            200 | `{ action, version: 1 }`                                         |
+| `GET`     | `/v1/trigger-keys`                                           |            200 | Trigger summaries                                                |
+| `GET`     | `/v1/trigger-keys/catalog`                                   |       200, 304 | definitions, display, locale                                     |
+| `GET`     | `/v1/trigger-keys/:key`                                      |            200 | definition detail                                                |
+| `GET`     | `/v1/flows/:flowId/triggers`                                 |            200 | Trigger bindings                                                 |
+| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId`                  |            200 | binding detail                                                   |
+| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/activities`       |            200 | Activity page                                                    |
+| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/test`             |            200 | Poll test                                                        |
+| `GET`     | `/v1/connector/teams`                                        |            200 | Available Team catalog: enabled, teams, version                  |
+| `GET`     | `/v1/connector/providers`                                    |            200 | Provider catalog; optional `flowId`                              |
+| `GET`     | `/v1/connector/actions`                                      |            200 | `service` or `q`; optional `flowId`                              |
+| `GET`     | `/v1/connector/actions/:actionId`                            |            200 | Action detail; optional `flowId`                                 |
+| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/options/:field`   |            200 | Dynamic Draft Trigger options scoped by its saved Connection     |
+| `GET`     | `/v1/connector/connections`                                  |            200 | All Connections in the current scope; optional `flowId`          |
+| `GET`     | `/v1/connector/connections/:serviceId`                       |            200 | Connections; optional `flowId`                                   |
+| `POST`    | `/v1/connector/connections/:serviceId/page`                  |            200 | External authorization page URL; optional `flowId` or `teamId`   |
 
 Connector route `flowId` is an opaque Flow identity. When supplied, deployments must verify the Flow and resolve Providers, Actions, and Connections within its Connector scope. Clients cannot substitute Team IDs, Connection owners, or other external identities. Omission uses the deployment’s unscoped Connector catalog.
 
