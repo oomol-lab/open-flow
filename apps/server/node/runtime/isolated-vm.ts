@@ -28,7 +28,8 @@ export interface IsolatedVmLimits {
 export const isolatedVmLimits: IsolatedVmLimits = {
   cpuMs: 10_000,
   maxCapabilityCalls: 100,
-  maxCapabilityResponseBytes: 1024 * 1024,
+  // Fetch bodies and Artifact chunks of up to 1 MiB arrive base64-encoded inside their JSON envelope.
+  maxCapabilityResponseBytes: 2 * 1024 * 1024,
   maxInputBytes: 1024 * 1024,
   maxProgramBytes: 4 * 1024 * 1024,
   maxResultBytes: 1024 * 1024,

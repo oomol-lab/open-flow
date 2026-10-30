@@ -20,12 +20,13 @@ const maximumBytes = 4 * 1024 * 1024
 /** Reads a complete response body, failing with `limit-exceeded` once it exceeds `limit` bytes. */
 export async function readHttpBytes(response: Response, failure: FailureFactory, limit = maximumBytes): Promise<Uint8Array> {
   const message = `Response exceeds ${limit / 1024 / 1024} MiB.`
+  // HEAD and 304 responses declare the resource length without carrying a body.
+  if (response.body == null) return new Uint8Array()
   if (Number(response.headers.get('content-length')) > limit) {
-    await response.body?.cancel()
+    await response.body.cancel()
     throw failure('limit-exceeded', message)
   }
-  const reader = response.body?.getReader()
-  if (reader == null) return new Uint8Array()
+  const reader = response.body.getReader()
   const parts: Uint8Array[] = []
   let size = 0
   try {

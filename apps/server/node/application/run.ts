@@ -20,7 +20,7 @@ import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
-import { executeCodeFetch } from '../deployment/code-fetch.ts'
+import { CodeFetchDeniedError, executeCodeFetch } from '../deployment/code-fetch.ts'
 import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { executeHttpRequest } from '../deployment/http-request.ts'
 import { HttpTaskError } from '../deployment/http-transport.ts'
@@ -348,7 +348,8 @@ export class RunExecutor {
               error instanceof TaskHostError ||
               error instanceof HttpTaskError ||
               error instanceof WorkflowToolError ||
-              error instanceof ArtifactHostError
+              error instanceof ArtifactHostError ||
+              error instanceof CodeFetchDeniedError
             )
               return { code: error.code, message: error.message, retryable: error.retryable, catchable: error.catchable }
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }

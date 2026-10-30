@@ -37,12 +37,36 @@ export function binary(value) {
   return { buffer, offset: 0, length: view.byteLength }
 }
 
+// Primitive calls carry at most 1 MiB, and JSON escaping can grow text sixfold, so text and bytes cross in 128 Ki pieces.
+const transferUnits = 131072
+
+function concatenate(parts) {
+  if (parts.length === 1) return parts[0]
+  const bytes = new Uint8Array(parts.reduce((size, part) => size + part.length, 0))
+  let offset = 0
+  for (const part of parts) {
+    bytes.set(part, offset)
+    offset += part.length
+  }
+  return bytes
+}
+
 class TextEncoder {
   get encoding() {
     return 'utf-8'
   }
   encode(value = '') {
-    return new Uint8Array(primitive('encode', { text: String(value) }))
+    const text = String(value)
+    const parts = []
+    let start = 0
+    do {
+      let end = Math.min(start + transferUnits, text.length)
+      // Keep surrogate pairs in one piece.
+      if (end < text.length && (text.charCodeAt(end - 1) & 0xfc00) === 0xd800) end--
+      parts.push(new Uint8Array(primitive('encode', { text: text.slice(start, end) })))
+      start = end
+    } while (start < text.length)
+    return concatenate(parts)
   }
   encodeInto(value, destination) {
     if (!(destination instanceof Uint8Array)) throw new TypeError('Expected a Uint8Array.')
@@ -70,9 +94,7 @@ class TextDecoder {
   constructor(label = 'utf-8', options = {}) {
     this.#fatal = Boolean(options.fatal)
     this.#ignoreBOM = Boolean(options.ignoreBOM)
-    const result = primitive('decoder', { label: String(label), fatal: this.#fatal, ignoreBOM: this.#ignoreBOM })
-    this.#id = result.id
-    this.#encoding = result.encoding
+    this.#encoding = primitive('decoder', { label: String(label), fatal: this.#fatal, ignoreBOM: this.#ignoreBOM }).encoding
   }
   get encoding() {
     return this.#encoding
@@ -86,7 +108,33 @@ class TextDecoder {
   decode(value = new Uint8Array(), options = {}) {
     const view = value instanceof ArrayBuffer ? new Uint8Array(value) : value
     if (!ArrayBuffer.isView(view)) throw new TypeError('Expected an ArrayBuffer or ArrayBufferView.')
-    return primitive('decode', { id: this.#id, offset: view.byteOffset, length: view.byteLength, stream: Boolean(options.stream) }, view.buffer)
+    const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+    const stream = Boolean(options.stream)
+    let text = ''
+    let offset = 0
+    do {
+      const length = Math.min(transferUnits, bytes.length - offset)
+      // Earlier pieces stream through one host decoder; the host releases it once a call does not stream.
+      const request = {
+        label: this.#encoding,
+        fatal: this.#fatal,
+        ignoreBOM: this.#ignoreBOM,
+        offset: 0,
+        length,
+        stream: stream || offset + length < bytes.length,
+      }
+      let result
+      try {
+        result = primitive('decode', this.#id === undefined ? request : { ...request, id: this.#id }, bytes.slice(offset, offset + length).buffer)
+      } catch (error) {
+        this.#id = undefined
+        throw error
+      }
+      this.#id = result.id
+      text += result.text
+      offset += length
+    } while (offset < bytes.length)
+    return text
   }
 }
 

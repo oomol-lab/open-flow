@@ -176,6 +176,18 @@ export default async () => {
 export default async () => { const timeout = AbortSignal.timeout(1); await delay(10); return { timeout: timeout.reason.name, aborted: AbortSignal.abort().aborted } }`,
     { timeout: 'TimeoutError', aborted: true },
   ),
+  nodejsCase(
+    'encodes and decodes text larger than one builtin transfer and creates many decoders',
+    `export default () => {
+  const text = '你😀a'.repeat(400000); const bytes = new TextEncoder().encode(text);
+  const decoder = new TextDecoder(); let streamed = '';
+  for (let offset = 0; offset < bytes.length; offset += 1000003) streamed += decoder.decode(bytes.subarray(offset, offset + 1000003), { stream: true });
+  streamed += decoder.decode();
+  let decoded = 0; for (let index = 0; index < 300; index++) decoded += new TextDecoder().decode(new Uint8Array([0x61])).length;
+  return { bytes: bytes.length, whole: new TextDecoder().decode(bytes) === text, streamed: streamed === text, decoded };
+}`,
+    { bytes: 3_200_000, whole: true, streamed: true, decoded: 300 },
+  ),
   {
     name: 'isolates files, globals and builtin module state between Task invocations',
     async verify(harness) {

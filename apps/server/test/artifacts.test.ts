@@ -1,12 +1,14 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, expect, it } from 'vitest'
+import { RunArtifacts } from '../node/application/run-artifacts.ts'
 import { acceptRun } from './runFixture.ts'
 import { closeOpenServices, closeService, openService, startService } from './serviceFixture.ts'
 
@@ -153,4 +155,26 @@ it('denies an Artifact reference that does not belong to the Run', async () => {
   const produced = service.events(accepted.runId).find((event) => event.kind == 'node.completed' && event.payload.nodeId == 'produce')
   expect(produced?.value).toEqual({ text: 'capability.denied', binary: null })
   await closeService(service)
+})
+
+it('counts unfinished uploads toward the Run Artifact limit', async () => {
+  const runs = { artifactBytes: () => 0 } as unknown as ConstructorParameters<typeof RunArtifacts>[0]
+  const artifacts = new RunArtifacts(runs, { maxArtifactBytes: 1024 * 1024, maxRunBytes: 1024 * 1024 })
+  const write = () =>
+    artifacts.invoke(
+      'run',
+      {
+        callId: 'call',
+        invocationId: 'invocation',
+        jobId: 'job',
+        kind: 'artifact.write',
+        nodeId: 'produce',
+        payload: { data: Buffer.alloc(512 * 1024).toString('base64') },
+        signal: new AbortController().signal,
+      },
+      async () => {},
+    )
+  write()
+  write()
+  expect(write).toThrow(expect.objectContaining({ code: 'runtime.limit-exceeded' }))
 })

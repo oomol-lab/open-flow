@@ -75,7 +75,15 @@ const operation = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('params.stringify'), entries: z.array(z.tuple([z.string(), z.string()])) }),
   z.object({ operation: z.literal('encode'), text: z.string() }),
   z.object({ operation: z.literal('decoder'), label: z.string(), fatal: z.boolean(), ignoreBOM: z.boolean() }),
-  z.object({ operation: z.literal('decode'), id: z.number().int().nonnegative(), ...range, stream: z.boolean() }),
+  z.object({
+    operation: z.literal('decode'),
+    id: z.number().int().positive().optional(),
+    label: z.string(),
+    fatal: z.boolean(),
+    ignoreBOM: z.boolean(),
+    ...range,
+    stream: z.boolean(),
+  }),
   z.object({ operation: z.enum(['atob', 'btoa']), text: z.string() }),
   z.object({ operation: z.literal('random'), length: z.number().int().min(0).max(65536) }),
   z.object({ operation: z.literal('uuid') }),
@@ -104,7 +112,9 @@ const operation = z.discriminatedUnion('operation', [
 
 /** Creates the per-Task primitive state behind the guest bridge, bounded by call count, bytes, and live instances. */
 export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): NodejsPrimitives {
-  const decoders: TextDecoder[] = []
+  // Only streaming decodes keep a host decoder, so Tasks may create any number of guest TextDecoders.
+  const decoders = new Map<number, TextDecoder>()
+  let nextDecoder = 0
   const hashes = new Map<number, PlatformHash>()
   let nextHash = 0
   let remainingBytes = 64 * binaryLimit
@@ -203,18 +213,29 @@ export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): Nodej
         if (encoded.byteLength > binaryLimit) throw new Error('Builtin result too large.')
         return encoded.buffer
       }
-      case 'decoder': {
-        if (decoders.length >= 256) throw new Error('TextDecoder limit exceeded.')
-        const decoder = new TextDecoder(request.label, { fatal: request.fatal, ignoreBOM: request.ignoreBOM })
-        decoders.push(decoder)
-        return { value: { id: decoders.length - 1, encoding: decoder.encoding } }
-      }
+      case 'decoder':
+        return { value: { encoding: new TextDecoder(request.label, { fatal: request.fatal, ignoreBOM: request.ignoreBOM }).encoding } }
       case 'decode': {
-        const decoder = decoders[request.id]
-        if (decoder == null) throw new TypeError('Unknown TextDecoder.')
         const byteLength = buffer?.byteLength ?? 0
         if (request.offset + request.length > byteLength) throw new RangeError('Invalid buffer range.')
-        return { value: decoder.decode(new Uint8Array(buffer ?? new ArrayBuffer(0), request.offset, request.length), { stream: request.stream }) }
+        const stored = request.id == null ? undefined : decoders.get(request.id)
+        if (request.id != null && stored == null) throw new TypeError('Unknown TextDecoder.')
+        const decoder = stored ?? new TextDecoder(request.label, { fatal: request.fatal, ignoreBOM: request.ignoreBOM })
+        let text: string
+        try {
+          text = decoder.decode(new Uint8Array(buffer ?? new ArrayBuffer(0), request.offset, request.length), { stream: request.stream })
+        } catch (error) {
+          if (request.id != null) decoders.delete(request.id)
+          throw error
+        }
+        if (!request.stream) {
+          if (request.id != null) decoders.delete(request.id)
+          return { value: { text } }
+        }
+        if (stored != null) return { value: { id: request.id, text } }
+        if (decoders.size >= 256) throw new Error('TextDecoder limit exceeded.')
+        decoders.set(++nextDecoder, decoder)
+        return { value: { id: nextDecoder, text } }
       }
       case 'atob':
         return { value: atob(request.text) }
@@ -246,7 +267,7 @@ export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): Nodej
     },
     close() {
       closed = true
-      decoders.length = 0
+      decoders.clear()
       for (const hash of hashes.values()) hash.destroy()
       hashes.clear()
     },

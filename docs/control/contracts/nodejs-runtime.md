@@ -46,6 +46,8 @@ limits stay with the deployment.
 - `events`, `string_decoder`, POSIX `path`, `querystring`, `url` and `util.promisify` follow Node.
   `URL` follows the WHATWG standard, including `URL.canParse`. Windows paths are not covered.
 - `buffer` supports UTF-8, base64, hex, ASCII, Latin-1 and UTF-16LE encodings.
+- `TextEncoder` and `TextDecoder` handle text of any size within the memory limit, including
+  streaming decodes, and a Task may create any number of decoders.
 - `crypto` provides incremental `createHash` and `createHmac` for the SHA family and MD5,
   `randomBytes`, `randomUUID` and `getRandomValues`. Web Crypto `subtle` is not part of the contract.
 - `zlib` provides one-shot gzip, gunzip, deflate, inflate, deflateRaw, inflateRaw and unzip. Brotli
@@ -81,7 +83,8 @@ add no platform credentials, return redirects instead of following them, drop `s
 bound each request in time. The result is a read-only subset of the Fetch `Response`: `status`,
 `statusText`, `ok`, `url`, `redirected: false`, `headers` (`get`, `has` and iteration), and a
 buffered body read once through `text()`, `json()`, `bytes()` or `arrayBuffer()`. Network failures
-and oversized bodies reject the call. The guest sends one `http.fetch` Capability call per request;
+and oversized bodies reject the call. A request that fails without a complete response is
+retryable only for GET, HEAD and OPTIONS, because the target may already have acted on other methods. The guest sends one `http.fetch` Capability call per request;
 `createFetch` owns that protocol, and runtime conformance covers it.
 
 Engine v9 removes the always-denied `context.egress` placeholder.

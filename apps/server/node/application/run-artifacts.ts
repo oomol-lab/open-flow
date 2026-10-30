@@ -104,6 +104,11 @@ export class RunArtifacts {
     if (part.length > chunkBytes) throw new ArtifactHostError('capability.invalid', 'Artifact chunks must not exceed 512 KiB.')
     upload.bytes += part.length
     if (upload.bytes > this.#limits.maxArtifactBytes) throw new ArtifactHostError('runtime.limit-exceeded', 'Artifact exceeds the configured size limit.')
+    // Unfinished uploads are retained in memory, so they count toward the Run limit before they are stored.
+    let pending = 0
+    for (const other of this.#uploads.values()) if (other.runId == upload.runId && other !== upload) pending += other.bytes
+    if (this.#runs.artifactBytes(upload.runId) + pending + upload.bytes > this.#limits.maxRunBytes)
+      throw new ArtifactHostError('runtime.limit-exceeded', 'Run Artifacts exceed the configured size limit.')
     upload.parts.push(part)
   }
 
@@ -125,8 +130,6 @@ export class RunArtifacts {
     this.#uploads.delete(upload.id)
     this.#append(upload, payload.data)
     const content = Buffer.concat(upload.parts)
-    if (this.#runs.artifactBytes(runId) + content.length > this.#limits.maxRunBytes)
-      throw new ArtifactHostError('runtime.limit-exceeded', 'Run Artifacts exceed the configured size limit.')
     const artifact: StoredArtifact = {
       digest: `sha256:${createHash('sha256').update(content).digest('hex')}`,
       id: randomUUID(),

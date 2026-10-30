@@ -30,6 +30,9 @@ const server = createServer(async (request, response) => {
 let origin: string
 const directories: string[] = []
 const signal = () => AbortSignal.timeout(5000)
+const reset = async () => {
+  throw new TypeError('connection reset')
+}
 const payload = (route: string, extra: Record<string, unknown> = {}) => ({ url: `${origin}${route}`, method: 'GET', headers: [], ...extra })
 
 beforeAll(async () => {
@@ -52,6 +55,22 @@ describe('Code fetch transport', () => {
     expect(result).toMatchObject({ status: 200, url: `${origin}/echo` })
     expect(Buffer.from(result.body as string, 'base64')).toEqual(Buffer.concat([Buffer.from('POST 7 '), Buffer.from([0, 255, 1])]))
     expect((result.headers as [string, string][]).map(([name]) => name)).not.toContain('set-cookie')
+  })
+
+  it('accepts HEAD responses that declare a length above the body limit', async () => {
+    const response = new Response(null, { headers: { 'content-length': String(4 * 1024 * 1024) } })
+    await expect(executeCodeFetch(['127.0.0.1'], payload('/echo', { method: 'HEAD' }), signal(), async () => response)).resolves.toMatchObject({
+      status: 200,
+      body: '',
+    })
+  })
+
+  it('retries failed requests only for idempotent methods', async () => {
+    await expect(executeCodeFetch(['127.0.0.1'], payload('/echo'), signal(), reset)).rejects.toMatchObject({ code: 'http.http-failed', retryable: true })
+    await expect(executeCodeFetch(['127.0.0.1'], payload('/echo', { method: 'POST' }), signal(), reset)).rejects.toMatchObject({
+      code: 'http.http-failed',
+      retryable: false,
+    })
   })
 
   it('returns redirects instead of following them', async () => {
@@ -114,7 +133,7 @@ describe('Code fetch in a Run', () => {
     const service = await openService(path.join(directory, 'open-flow.sqlite'))
     await startService(service)
     const runs = []
-    for (const [index, hosts] of [['127.0.0.1'], undefined].entries()) {
+    for (const [index, hosts] of [['127.0.0.1'], undefined, ['example.com']].entries()) {
       const accepted = await acceptRun(service, {
         flowId: 'main',
         idempotencyKey: `fetch-${index}`,
@@ -132,6 +151,10 @@ describe('Code fetch in a Run', () => {
     expect(service.control.runs.getRunResult('test', runs[1]!)).toMatchObject({
       status: 'failed',
       error: { code: 'capability.denied', message: 'HTTP access is not declared for this Code node.' },
+    })
+    expect(service.control.runs.getRunResult('test', runs[2]!)).toMatchObject({
+      status: 'failed',
+      error: { code: 'capability.denied', message: 'The host "127.0.0.1" is not declared for this Code node.' },
     })
     await closeService(service)
   })

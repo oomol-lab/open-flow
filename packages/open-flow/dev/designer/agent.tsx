@@ -6,6 +6,7 @@ import type { ConnectorActionView } from '../../src/workbench/browser/runtime/co
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
@@ -224,7 +225,7 @@ function createSession(language: UiLanguage, log: LogAction) {
       return Response.json({
         closureDigest: 'lab',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v6',
+        engineContract: currentEngineContract,
         flowId: flow.flowId,
         modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,

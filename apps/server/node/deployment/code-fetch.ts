@@ -7,6 +7,7 @@ import { HttpTaskError, readHttpBytes } from './http-transport.ts'
 
 const maximumBytes = 1024 * 1024
 const methods: ReadonlySet<string> = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
+const idempotentMethods: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS'])
 const reservedHeaders: ReadonlySet<string> = new Set(['connection', 'content-length', 'host', 'keep-alive', 'te', 'trailer', 'transfer-encoding', 'upgrade'])
 const base64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
@@ -58,7 +59,12 @@ export async function executeCodeFetch(
     response = await request(url, { method: call.method, headers, body, redirect: 'manual', signal: requestSignal })
   } catch {
     if (signal.aborted) throw signal.reason
-    throw failure('http-failed', requestSignal.aborted ? 'The HTTP request timed out.' : 'The HTTP request failed before a response was received.', true)
+    // The target may have acted before a timeout or reset, so only idempotent methods are safe to retry.
+    throw failure(
+      'http-failed',
+      requestSignal.aborted ? 'The HTTP request timed out.' : 'The HTTP request failed before a response was received.',
+      idempotentMethods.has(call.method),
+    )
   }
   let content: Uint8Array
   try {
@@ -66,7 +72,7 @@ export async function executeCodeFetch(
   } catch (error) {
     if (signal.aborted) throw signal.reason
     if (error instanceof HttpTaskError) throw error
-    throw failure('http-failed', 'The HTTP response body could not be read.', true)
+    throw failure('http-failed', 'The HTTP response body could not be read.', idempotentMethods.has(call.method))
   }
   return {
     status: response.status,
