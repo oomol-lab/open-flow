@@ -3,9 +3,9 @@ import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { expect, it } from 'vitest'
 import { authoringExample, authoringExamples } from '../src/control/common/authoringExamples.ts'
 import { decodeDraftOperations, draftOperationsSchema, resolveDraftOperations } from '../src/control/common/draftOperations.ts'
-import { currentEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
 import { applyFlowChanges, decodeChangeOperations } from '../src/flow/common/change.ts'
 import { validateFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract, findEngineContract } from '../src/runtime/common/runtime.ts'
 import { triggerDefinitions } from '../src/trigger/providers/definitions.ts'
 
 const definitions = (key: string) => triggerDefinitions.find((definition) => definition.snapshot.key == key)!.snapshot

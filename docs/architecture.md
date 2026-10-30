@@ -47,6 +47,9 @@ Node authoring separates business configuration, input sources, and internal def
 The public package assembles fixed ports, capability-derived definitions, and internal identities.
 Read, edit, schema, search, and diagnostics use the same public view. Input sources follow each node's execution capabilities.
 CLI, MCP, and deployments must not compensate for missing node conversions.
+Inside the public package, node families depend only on the shared Flow model; the Flow graph aggregates them, and
+features that read whole Flows, execution, and control sit above it. [Node authoring](authoring/node-authoring.md#module-placement)
+defines the layers, and the package checks enforce them.
 
 Workbench owns Flow editing and its product UI. The deployment host owns login, account roles, deployment settings, and browser analytics.
 Hosts integrate through public props, shared UI, and product theme contracts. They must not override internal product selectors or copy Workbench implementations.

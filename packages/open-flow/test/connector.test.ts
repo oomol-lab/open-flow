@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { connectorActionIcon, connectorActionNode, connectorActionTitle, connectorNodeId } from '../src/connector/common/actionNode.ts'
 import { connectorActionPorts } from '../src/connector/common/actionSchema.ts'
 import { defaultConnection } from '../src/connector/common/model.ts'
 
@@ -51,31 +50,6 @@ test('maps Connector action schemas into Designer ports', () => {
     { handle: 'note', value: null },
   ])
   assert.deepEqual(ports.outputs, [{ description: undefined, handle: 'results', json_schema: { items: { type: 'string' }, type: 'array' }, nullable: false }])
-})
-
-test('creates a Connector Designer node with stable title and icon behavior', () => {
-  const action = {
-    actionId: 'gmail.send_email',
-    homepageUrl: 'https://mail.google.com/',
-    inputSchema: { type: 'object' },
-    name: 'send_email',
-    outputSchema: { type: 'object' },
-    service: 'gmail',
-  }
-
-  assert.equal(connectorActionTitle(action.name), 'Send Email')
-  assert.match(connectorActionIcon(action) ?? '', /domain=mail.google.com/)
-  assert.deepEqual(connectorActionNode(action, 'connection-1', connectorNodeId('gmail_send_email')).task, {
-    executor: { name: 'connector', options: { action: 'gmail.send_email', connection: 'connection-1' } },
-    inputs_def: [],
-    outputs_def: [{ description: undefined, handle: 'output', json_schema: { type: 'object' }, nullable: false }],
-  })
-  const unconnected = connectorActionNode(action, undefined, connectorNodeId('gmail_send_email')).task
-  if (typeof unconnected == 'string') throw new Error('Expected an inline Connector Task.')
-  assert.deepEqual(unconnected.executor, {
-    name: 'connector',
-    options: { action: 'gmail.send_email' },
-  })
 })
 
 test('exposes complete dynamic responses without confusing a declared output field', () => {

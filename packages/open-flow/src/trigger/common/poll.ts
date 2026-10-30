@@ -1,7 +1,8 @@
 export { resolveTriggerConfig, triggerConfigValues } from './config.ts'
 import type { ConnectorProxy } from '../../connector/common/proxy.ts'
-import type { JsonValue, TriggerKeySnapshot, TriggerSchedule } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../flow/common/model.ts'
 import type { TriggerConfigOption, TriggerConfigOptionsContext } from './configOptions.ts'
+import type { TriggerKeySnapshot, TriggerSchedule } from './model.ts'
 
 const encoder = new TextEncoder()
 

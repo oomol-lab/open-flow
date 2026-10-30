@@ -1,4 +1,5 @@
-import type { JsonValue, Port, PortDefinition, TriggerNode } from '../../flow/common/change.ts'
+import type { JsonValue, Port, PortDefinition } from '../../flow/common/model.ts'
+import type { TriggerNode } from './model.ts'
 
 import { isJsonObject } from '../../base/common/json.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'

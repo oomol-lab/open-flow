@@ -1,18 +1,11 @@
 import type { TriggerKeySnapshot } from '../../flow/common/change.ts'
 import type { UiLanguage } from '../../localization/common/languages.ts'
+import type { TriggerDisplay } from '../../trigger/providers/localization.ts'
 import type { TriggerKeySummary } from './api.ts'
 
 import { isUiLanguage } from '../../localization/common/languages.ts'
 import { exact, requiredFields, invalidResponse, record, string } from './decoding.ts'
 import { triggerKey } from './triggerDecoders.ts'
-
-export interface TriggerDisplay {
-  readonly configInputs: Readonly<Record<string, string>>
-  readonly configInputLabels: Readonly<Record<string, string>>
-  readonly displayName: string
-  readonly description: string
-  readonly outputs: Readonly<Record<string, string>>
-}
 
 export interface TriggerCatalog {
   readonly version: 3

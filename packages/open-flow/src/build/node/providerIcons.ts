@@ -1,7 +1,7 @@
 import type { Plugin } from 'vite'
-import type { ProviderIconSprite, ProviderIconSpriteCatalog } from '../../control/common/providerIconSprite.ts'
+import type { ProviderIconSprite, ProviderIconSpriteCatalog } from '../../connector/common/providerIconSprite.ts'
 
-import { providerIconAppearance } from '../../control/common/providerIconSprite.ts'
+import { providerIconAppearance } from '../../connector/common/providerIconSprite.ts'
 
 const catalogUrl = 'https://connector.oomol.com/public/v1/apps'
 const catalogTimeoutMs = 5_000

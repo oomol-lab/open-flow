@@ -1,4 +1,4 @@
-import type { CodeModule, ConnectorCapability, TaskCapability, JsonValue } from '../../flow/common/change.ts'
+import type { CodeModule, ConnectorCapability, TaskCapability, JsonValue } from '../../flow/common/model.ts'
 
 import { dequal } from 'dequal/lite'
 import { currentEngineContract, nodejsEngineContract } from './engineContract.ts'

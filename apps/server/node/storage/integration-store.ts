@@ -13,7 +13,7 @@ import type {
 
 import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
-import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
+import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
 
 export interface IntegrationPublication {
   readonly eventSource?: boolean

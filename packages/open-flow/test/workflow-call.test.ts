@@ -6,10 +6,10 @@ import type { WorkflowContract } from '../src/workflow/common/workflow.ts'
 import * as Effect from 'effect/Effect'
 import { expect, it, vi } from 'vitest'
 import { compileAuthoring, authoringNode } from '../src/control/common/authoring.ts'
-import { currentEngineContract } from '../src/execution/common/engineContract.ts'
 import { decodeFlowRunCheckpoint, runFlow } from '../src/execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../src/flow/common/change.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/engineContract.ts'
 import {
   sameWorkflowInterface,
   publishedWorkflowInterface,

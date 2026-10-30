@@ -2,7 +2,6 @@ import type { RevisionContent, TriggerNode, Port } from '../src/flow/common/chan
 
 import * as Effect from 'effect/Effect'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { applyFlowChanges, currentFlowModelVersion } from '../src/flow/common/change.ts'
 import { decodeRevisionContent } from '../src/flow/common/changeSchema.ts'
@@ -10,6 +9,7 @@ import { decodeRevision, digestBytes, encodeRevision, upgradeRevisionContent } f
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
 import { updateStartInputDefs } from '../src/flow/common/nodeChanges.ts'
 import { normalizeRunTrigger, prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 import { matchesTriggerOutputs, normalizeTriggerOutputs } from '../src/trigger/common/contract.ts'
 
 const inputDefs: readonly Port[] = [

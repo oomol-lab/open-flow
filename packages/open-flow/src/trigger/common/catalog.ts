@@ -1,4 +1,5 @@
-import type { JsonObject, TriggerDefinition, TriggerDescriptor, TriggerPollTime } from '../../schema/index.ts'
+import type { JsonObject } from '../../base/common/json.ts'
+import type { TriggerDefinition, TriggerDescriptor, TriggerPollTime } from '../../schema/index.ts'
 
 import { z } from 'zod'
 import { isJsonObject } from '../../base/common/json.ts'

@@ -1,4 +1,4 @@
-export type JsonValue = null | boolean | number | string | readonly JsonValue[] | JsonObject
+import type { JsonValue } from '../../types/index.ts'
 
 export type JsonObject = { readonly [key: string]: JsonValue }
 

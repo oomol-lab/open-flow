@@ -2,10 +2,10 @@ import type { TaskCapability, Graph, JsonValue, WaitAction, WaitAutoContinue } f
 import type { NodeErrorData } from '../../flow/common/errorHandling.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 import type { WebhookResponseSnapshot } from '../../flow/common/webhookResponse.ts'
+import type { AgentCheckpoint } from '../../runtime/common/runtime.ts'
 import type { PreviousNode } from '../../types/index.ts'
 import type { FlowRunCheckpoint } from './checkpoint.ts'
 import type { ExecutableNode, NodeResult } from './node-execution.ts'
-import type { AgentCheckpoint } from './runtime.ts'
 
 import * as Cause from 'effect/Cause'
 import * as Clock from 'effect/Clock'

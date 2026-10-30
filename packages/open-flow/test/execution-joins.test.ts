@@ -3,10 +3,10 @@ import type { Graph, GraphNode, InputMapping } from '../src/flow/common/change.t
 
 import * as Effect from 'effect/Effect'
 import { expect, it } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/engineContract.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../src/flow/common/change.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/engineContract.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const port = { nullable: true, jsonSchema: {} }

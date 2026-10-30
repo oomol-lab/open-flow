@@ -1,9 +1,16 @@
-import type { TriggerDisplay } from '../../control/common/triggerCatalog.ts'
-import type { TriggerKeySnapshot } from '../../flow/common/change.ts'
 import type { UiLanguage } from '../../localization/common/languages.ts'
+import type { TriggerKeySnapshot } from '../common/model.ts'
 
 import { englishTriggerFieldDescriptions } from './fieldDescriptions.ts'
 import { triggerConfigFieldLabels } from './fieldLabels.ts'
+
+export interface TriggerDisplay {
+  readonly configInputs: Readonly<Record<string, string>>
+  readonly configInputLabels: Readonly<Record<string, string>>
+  readonly displayName: string
+  readonly description: string
+  readonly outputs: Readonly<Record<string, string>>
+}
 
 type Translations = Readonly<Record<string, Partial<TriggerDisplay>>>
 

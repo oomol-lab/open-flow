@@ -3,11 +3,11 @@ import type { AuthoringHost, AuthoringRequest } from './authoring.ts'
 
 import * as Effect from 'effect/Effect'
 import { expect, it } from 'vitest'
-import { currentEngineContract } from '../../execution/common/runtime.ts'
 import { runFlow } from '../../execution/common/scheduler.ts'
 import { applyFlowChanges, currentFlowModelVersion } from '../../flow/common/change.ts'
 import { inverseFlowChanges } from '../../flow/common/inverseChanges.ts'
 import { prepareFlow } from '../../flow/common/semantics.ts'
+import { currentEngineContract } from '../../runtime/common/runtime.ts'
 import { authoringDiagnostics, authoringNode, authoringSchema, compileAuthoring, searchAuthoring } from './authoring.ts'
 
 const empty: RevisionContent = {

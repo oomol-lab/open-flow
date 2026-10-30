@@ -96,6 +96,24 @@ Schemas are configuration objects too. An empty object does not clear existing c
 
 The compiler processes batches and new-node aliases in order. If application fails, no part of the batch is persisted.
 
+### Module placement
+
+Node code follows the layers that `scripts/check-module-layers.ts` enforces; a module imports only its own layer or lower ones,
+including type-only imports.
+
+| Layer         | Location                                                                             | Owns                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Flow model    | `flow/common/model.ts` and its leaf helpers                                          | Ports, groups, input mappings, sources, capabilities, Task definition bases, and code modules |
+| Node families | `decision/`, `http/`, `openapi/`, `trigger/`, and the runtime contract in `runtime/` | Executor or node shapes, factories, validation, and execution helpers for one family          |
+| Flow          | other `flow/common/` files                                                           | The node and executor unions, change operations, decoding, graph rules, and semantics         |
+| Above flow    | `workflow/`, `execution/`, `control/`, and the browser modules                       | Features that read whole Flows, scheduling, the Control API and authoring, and UI             |
+
+A node family gets its own module when it has a public package entry. Otherwise its node-specific code stays in
+`flow/common/`. Family modules type their Tasks with `ManagedTaskDefinitionOf<Executor>` instead of the
+`ManagedTaskDefinition` union, and checks that need the whole document run in the flow layer, one node at a time.
+New published declarations need a source-to-output entry in `src/distribution/node/browserPackage.ts`; the build
+fails when a declaration imports an unlisted source.
+
 The interface returns save state and semantic validation separately. Drafts with diagnostics can be saved.
 Commits reuse whole-graph version checks and idempotency records. If a response is lost, an identical request checks the idempotent result first.
 A new request based on an old version must not merge automatically.

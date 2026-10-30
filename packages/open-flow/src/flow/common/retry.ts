@@ -1,11 +1,9 @@
 import type { GraphNode } from './change.ts'
+import type { RetryConfiguration } from './model.ts'
 
 import { z } from 'zod'
 
-export interface RetryConfiguration {
-  readonly maxRetries: number
-  readonly intervalMs: number
-}
+export type { RetryConfiguration } from './model.ts'
 
 export const retryNodeTypes = ['code', 'connector', 'openapi', 'http-request', 'llm', 'decision'] as const
 export const nodeRetryLimits = { maxRetries: 5, minIntervalMs: 1000, maxIntervalMs: 60000, intervalStepMs: 1000 } as const

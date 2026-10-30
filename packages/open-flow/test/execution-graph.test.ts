@@ -3,11 +3,11 @@ import type { Graph, RevisionContent } from '../src/flow/common/change.ts'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { applyFlowChanges } from '../src/flow/common/change.ts'
 import { availableOutputs, inputSourceCandidates } from '../src/flow/common/graph.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const port = { jsonSchema: {}, nullable: true }

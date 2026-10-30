@@ -5,7 +5,7 @@ import type { DatabaseSync } from 'node:sqlite'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { ControlError } from '../error.ts'
-import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
+import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
 
 export type TriggerActivityKind =
   | 'delivery.failed'

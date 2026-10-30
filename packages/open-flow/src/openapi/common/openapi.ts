@@ -1,4 +1,4 @@
-import type { InputPort, JsonValue, ManagedTaskDefinition, Port } from '../../flow/common/change.ts'
+import type { InputPort, JsonValue, ManagedTaskDefinitionOf, Port, TaskExecutor } from '../../flow/common/model.ts'
 
 import { dequal } from 'dequal/lite'
 import { matchesSchema } from '../../flow/common/schema.ts'
@@ -224,6 +224,10 @@ function schema(doc: ObjectValue, schemaValue: JsonValue): JsonValue {
   if (typeof converted == 'boolean') return converted
   return { $schema: 'https://json-schema.org/draft/2020-12/schema', ...object(converted), ...(Object.keys(defs).length ? { $defs: defs } : {}) }
 }
+function isOpenApiExecutor(executor: TaskExecutor): executor is OpenApiExecutor {
+  return executor.kind == 'openapi'
+}
+
 function parameters(config: OpenApiExecutor): ObjectValue[] {
   const doc = parseOpenApi(config.document)
   const { item, op } = operation(doc, config.path, config.method)
@@ -250,7 +254,7 @@ function jsonContent(doc: ObjectValue, value: JsonValue): { schema: JsonValue; r
 export function authHandles(auth: readonly OpenApiAuth[]): string[] {
   return auth.flatMap((scheme) => (scheme.type == 'basic' ? [`auth.${scheme.id}.username`, `auth.${scheme.id}.password`] : [`auth.${scheme.id}.token`]))
 }
-export function openApiTask(config: OpenApiExecutor, name = 'OpenAPI'): ManagedTaskDefinition {
+export function openApiTask(config: OpenApiExecutor, name = 'OpenAPI'): ManagedTaskDefinitionOf<OpenApiExecutor> {
   if (!config.path) return { name, executor: config, inputs: [], outputs: [] }
   const doc = parseOpenApi(config.document)
   const { op } = operation(doc, config.path, config.method)
@@ -318,8 +322,8 @@ export interface OpenApiFieldIssue {
 }
 
 /** The canvas validator and property panel share the same configuration contract. */
-export function openApiFieldIssues(task: ManagedTaskDefinition): OpenApiFieldIssue[] {
-  if (task.executor.kind != 'openapi') return []
+export function openApiFieldIssues<Executor extends TaskExecutor>(task: ManagedTaskDefinitionOf<Executor>): OpenApiFieldIssue[] {
+  if (!isOpenApiExecutor(task.executor)) return []
   const config = task.executor
   let field: OpenApiFieldIssue['field'] = 'sourceUrl'
   try {
@@ -342,7 +346,7 @@ export function openApiFieldIssues(task: ManagedTaskDefinition): OpenApiFieldIss
   }
 }
 
-export function openApiIssues(task: ManagedTaskDefinition): string[] {
+export function openApiIssues(task: ManagedTaskDefinitionOf<TaskExecutor>): string[] {
   return openApiFieldIssues(task).map((issue) => issue.message)
 }
 export function selectOperation(value: JsonValue, sourceUrl: string, path: string, method: string): OpenApiExecutor {

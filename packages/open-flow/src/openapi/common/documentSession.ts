@@ -1,4 +1,4 @@
-import type { JsonValue } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../flow/common/model.ts'
 
 import { listOperations } from './openapi.ts'
 

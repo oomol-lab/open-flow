@@ -1,4 +1,4 @@
-import type { Group, InputPort, InputValues, JsonValue } from '../../flow/common/change.ts'
+import type { Group, InputPort, InputValues, JsonValue } from '../../flow/common/model.ts'
 
 import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'

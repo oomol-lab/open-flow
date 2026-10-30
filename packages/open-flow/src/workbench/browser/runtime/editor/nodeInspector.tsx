@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
 import type { GraphNode } from '../../../../flow/common/change.ts'
+import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
 import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'

@@ -1,5 +1,4 @@
 import { expect, it } from 'vitest'
-import { connectorProvider } from './connectorDecoders.ts'
 import { providerIconAppearance } from './providerIconSprite.ts'
 const iconSprite = {
   version: 'v1',
@@ -21,10 +20,4 @@ it.each([null, {}, { ...iconSprite, iconSize: 0 }, { ...iconSprite, lightUrl: ''
 it('ignores missing and out-of-bounds positions', () => {
   expect(providerIconAppearance(iconSprite, null)).toEqual({})
   expect(providerIconAppearance(iconSprite, { x: 90, y: 2 })).toEqual({})
-})
-it('decodes new and legacy Provider representations', () => {
-  const provider = { serviceId: 'mail', serviceName: 'Mail', icon: 'https://example.com/icon.svg' }
-  expect(connectorProvider(provider)).toEqual(provider)
-  expect(connectorProvider({ ...provider, iconSprite, iconSpritePosition })).toEqual({ ...provider, iconSprite, iconSpritePosition })
-  expect(connectorProvider({ ...provider, iconSprite: {}, iconSpritePosition })).toEqual(provider)
 })

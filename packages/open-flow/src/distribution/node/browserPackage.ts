@@ -33,7 +33,7 @@ const flowEncodingEntryPath = 'src/flow/common/encoding.ts'
 const flowSemanticsEntryPath = 'src/flow/common/semantics.ts'
 const runLifecycleEntryPath = 'src/execution/common/runLifecycle.ts'
 const runEventsEntryPath = 'src/execution/common/events.ts'
-const runtimeContractEntryPath = 'src/execution/common/runtime.ts'
+const runtimeContractEntryPath = 'src/runtime/common/runtime.ts'
 const schedulerEntryPath = 'src/execution/common/scheduler.ts'
 const webhookTriggerEntryPath = 'src/trigger/common/webhook.ts'
 const localizationEntryPath = 'src/localization/common/languages.ts'
@@ -44,6 +44,95 @@ const previewEntryPath = 'src/distribution/browser/preview.ts'
 const previewDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowPreview.tsx'
 const workbenchEntryPath = 'src/distribution/browser/workbench.ts'
 const workbenchDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowWorkbench.tsx'
+
+/** Published declaration paths under `dist/`, keyed by source path under `src/`. A source may publish into several directories. */
+const declarationOutputs: readonly (readonly [source: string, output: string])[] = [
+  ['canvas/common/commands', 'common/canvas-commands'],
+  ['connector/common/actionSchema', 'common/connector-action'],
+  ['connector/common/providerIconSprite', 'common/providerIconSprite'],
+  ['connector/common/proxy', 'common/connector-proxy'],
+  ['control/common/api', 'common/control-api'],
+  ['control/common/authoring', 'common/authoring'],
+  ['control/common/authoringExamples', 'common/authoringExamples'],
+  ['control/common/authoringFields', 'common/authoringFields'],
+  ['control/common/authoringSchema', 'common/authoringSchema'],
+  ['control/common/conformance', 'common/control-api-conformance'],
+  ['control/common/connectorDecoders', 'common/connectorDecoders'],
+  ['control/common/draftOperations', 'common/draftOperations'],
+  ['control/common/errors', 'common/control-api-errors'],
+  ['control/common/eventSources', 'common/event-sources'],
+  ['control/common/flowInspection', 'common/flowInspection'],
+  ['control/common/flowNotifications', 'common/flow-notifications'],
+  ['control/common/flowNotifications', 'browser/flow-notifications'],
+  ['control/common/liveDetails', 'common/liveDetails'],
+  ['control/common/mcp', 'common/mcp'],
+  ['control/common/mcpConformance', 'common/mcp-conformance'],
+  ['control/common/providerAccess', 'common/providerAccess'],
+  ['control/common/requests', 'common/control-requests'],
+  ['control/common/results', 'common/run-results'],
+  ['control/common/triggerCatalog', 'common/trigger-catalog'],
+  ['decision/common/decision', 'common/decision'],
+  ['event-source/common/definition', 'common/event-source-definition'],
+  ['event-source/common/index', 'common/event-source'],
+  ['event-source/common/view', 'common/event-source-view'],
+  ['execution/common/checkpoint', 'common/scheduler-checkpoint'],
+  ['execution/common/dependencies', 'common/scheduler-dependencies'],
+  ['runtime/common/engineContract', 'common/engine-contract'],
+  ['execution/common/events', 'common/run-events'],
+  ['execution/common/node-execution', 'common/scheduler-node-execution'],
+  ['execution/common/runLifecycle', 'common/run-lifecycle'],
+  ['runtime/common/runtime', 'common/runtime-contract'],
+  ['execution/common/scheduler', 'common/scheduler'],
+  ['flow/common/agent', 'common/flow-agent'],
+  ['flow/common/authoring', 'common/flow-authoring'],
+  ['flow/common/change', 'common/flow-change'],
+  ['flow/common/changeSchema', 'common/flow-change-schema'],
+  ['flow/common/connectionUsage', 'common/flow-connectionUsage'],
+  ['flow/common/edgeChanges', 'common/flow-authoring-edge'],
+  ['flow/common/encoding', 'common/flow-encoding'],
+  ['flow/common/errorHandling', 'common/flow-errorHandling'],
+  ['flow/common/graph', 'common/flow-graph'],
+  ['flow/common/inputValue', 'common/flow-input-value'],
+  ['flow/common/json', 'common/flow-json'],
+  ['flow/common/moduleChanges', 'common/flow-authoring-module'],
+  ['flow/common/model', 'common/flow-model'],
+  ['flow/common/modules', 'common/flow-modules'],
+  ['flow/common/nodeChanges', 'common/flow-authoring-node'],
+  ['flow/common/promptTemplate', 'common/flow-promptTemplate'],
+  ['flow/common/retry', 'common/flow-retry'],
+  ['flow/common/schema', 'common/flow-schema'],
+  ['flow/common/schemaKeywords', 'common/flow-schemaKeywords'],
+  ['flow/common/semantics', 'common/flow-semantics'],
+  ['flow/common/webhookMethod', 'common/webhook-method'],
+  ['flow/common/webhookResponse', 'common/webhook-response'],
+  ['flow/common/workflowFile', 'common/flow-workflowFile'],
+  ['flow/common/workflowReferences', 'common/flow-workflowReferences'],
+  ['http/common/httpRequest', 'common/http-request'],
+  ['localization/common/languages', 'common/localization'],
+  ['openapi/common/openapi', 'common/openapi'],
+  ['trigger/common/config', 'common/trigger-config'],
+  ['trigger/common/configOptions', 'common/trigger-config-options'],
+  ['trigger/common/contract', 'common/trigger-contract'],
+  ['trigger/common/cron', 'common/cron-trigger'],
+  ['trigger/common/integration', 'common/integration-trigger'],
+  ['trigger/common/model', 'common/trigger-model'],
+  ['trigger/common/poll', 'common/poll-trigger'],
+  ['trigger/common/webhook', 'common/webhook-trigger'],
+  ['trigger/providers/definitions', 'common/provider-triggers'],
+  ['trigger/providers/localization', 'common/trigger-localization'],
+  ['ui/browser/public', 'browser/ui'],
+  ...['input', 'label', 'logo', 'textarea', 'hostTooltip', 'hostNavigationActions', 'idTooltip'].map(
+    (name) => [`ui/browser/${name}`, `browser/ui-${name}`] as const,
+  ),
+  ['workbench/browser/runtime/contract', 'browser/workbench-contract'],
+  ['workbench/browser/runtime/eventSources', 'browser/event-sources'],
+  ['workbench/browser/runtime/hostConformance', 'browser/host-conformance'],
+  ['workbench/browser/runtime/openFlowPreview', 'browser/preview'],
+  ['workbench/browser/runtime/openFlowWorkbench', 'browser/workbench'],
+  ['workflow/common/workflow', 'common/workflow'],
+]
+/** Declarations published by the npm package stage rather than this build. */
+const externalDeclarations: readonly (readonly [source: string, output: string])[] = [['types/index', 'index']]
 
 interface BuildBrowserPackageOptions {
   readonly packageRoot: string
@@ -84,7 +173,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, browserOutputPath, previewEntryPath, 'preview', false)
   await buildRuntime(options, browserOutputPath, workbenchEntryPath, 'workbench', false)
   await copyFile(path.join(options.sourceRoot, 'src/ui/browser/theme.css'), path.join(browserOutputPath, 'theme.css'))
-  await writeDeclarations(options, browserOutputPath, commonOutputPath)
+  await writeDeclarations(options)
 }
 
 async function buildRuntime(
@@ -154,7 +243,7 @@ async function extractFonts(cssPath: string, outputPath: string): Promise<void> 
   await writeFile(cssPath, css)
 }
 
-async function writeDeclarations(options: BuildBrowserPackageOptions, browserOutputPath: string, commonOutputPath: string): Promise<void> {
+async function writeDeclarations(options: BuildBrowserPackageOptions): Promise<void> {
   const declarationRoot = path.join(options.packageRoot, '.browser-declarations')
   const compiler = path.join(path.dirname(packageRequire.resolve('typescript/package.json')), 'bin/tsc')
   try {
@@ -218,347 +307,36 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       ],
       { cwd: options.sourceRoot },
     )
-    for (const name of ['index', 'definition']) {
-      const declaration = (await readFile(path.join(declarationRoot, `event-source/common/${name}.d.ts`), 'utf8'))
-        .replaceAll("'./definition.ts'", "'./event-source-definition.js'")
-        .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
-        .replaceAll("'../../control/common/eventSources.ts'", "'./event-sources.js'")
-        .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-      await writeFile(path.join(commonOutputPath, name == 'index' ? 'event-source.d.ts' : `event-source-${name}.d.ts`), declaration)
-    }
-    await writeFile(path.join(commonOutputPath, 'event-sources.d.ts'), await readFile(path.join(declarationRoot, 'control/common/eventSources.d.ts'), 'utf8'))
-    await writeFile(
-      path.join(browserOutputPath, 'event-sources.d.ts'),
-      (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/eventSources.d.ts'), 'utf8'))
-        .replaceAll("'./contract.ts'", "'./workbench-contract.js'")
-        .replaceAll("'../../../control/common/api.ts'", "'../common/control-api.js'")
-        .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),
-    )
-    let uiDeclaration = await readFile(path.join(declarationRoot, 'ui/browser/public.d.ts'), 'utf8')
-    for (const name of ['input', 'label', 'logo', 'textarea', 'hostTooltip', 'hostNavigationActions', 'idTooltip']) {
-      const declaration = (await readFile(path.join(declarationRoot, `ui/browser/${name}.d.ts`), 'utf8')).replaceAll(
-        "'../../localization/common/languages.ts'",
-        "'../common/localization.js'",
-      )
-      await writeFile(path.join(browserOutputPath, `ui-${name}.d.ts`), declaration)
-      uiDeclaration = uiDeclaration.replaceAll(`'./${name}.tsx'`, `'./ui-${name}.js'`)
-    }
-    await writeFile(path.join(browserOutputPath, 'ui.d.ts'), uiDeclaration)
-    await writeFile(path.join(browserOutputPath, 'ui.css.d.ts'), 'export {}\n')
-    const previewDeclaration = (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowPreview.d.ts'), 'utf8'))
-      .replaceAll("'../../../control/common/api.ts'", "'../common/control-api.js'")
-      .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'")
-    await writeFile(path.join(browserOutputPath, 'preview.d.ts'), previewDeclaration)
-    await writeFile(path.join(browserOutputPath, 'preview.css.d.ts'), 'export {}\n')
-    const workbenchDeclaration = await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowWorkbench.d.ts'), 'utf8')
-    const workbenchContract = (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/contract.d.ts'), 'utf8'))
-      .replaceAll("'../../../control/common/flowNotifications.ts'", "'./flow-notifications.js'")
-      .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'")
-    const localizationDeclaration = await readFile(path.join(declarationRoot, 'localization/common/languages.d.ts'), 'utf8')
-    const flowNotificationsDeclaration = (await readFile(path.join(declarationRoot, 'control/common/flowNotifications.d.ts'), 'utf8')).replaceAll(
-      "'../../canvas/common/commands.ts'",
-      "'../common/canvas-commands.js'",
-    )
-    const canvasCommandsDeclaration = await readFile(path.join(declarationRoot, 'canvas/common/commands.d.ts'), 'utf8')
-    const flowAuthoringDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/authoring.d.ts'), 'utf8'))
-      .replaceAll("'./edgeChanges.ts'", "'./flow-authoring-edge.js'")
-      .replaceAll("'./moduleChanges.ts'", "'./flow-authoring-module.js'")
-      .replaceAll("'./nodeChanges.ts'", "'./flow-authoring-node.js'")
-    const flowAuthoringEdgeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/edgeChanges.d.ts'), 'utf8')).replaceAll(
-      "'./change.ts'",
-      "'./flow-change.js'",
-    )
-    const flowAuthoringModuleDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/moduleChanges.d.ts'), 'utf8')).replaceAll(
-      "'./change.ts'",
-      "'./flow-change.js'",
-    )
-    const flowAuthoringNodeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/nodeChanges.d.ts'), 'utf8'))
-      .replaceAll("'../../decision/common/decision.ts'", "'./decision.js'")
-      .replaceAll("'./change.ts'", "'./flow-change.js'")
-    const flowChangeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/change.d.ts'), 'utf8'))
-      .replaceAll("'../../decision/common/decision.ts'", "'./decision.js'")
-      .replaceAll("'../../http/common/httpRequest.ts'", "'./http-request.js'")
-      .replaceAll("'../../openapi/common/openapi.ts'", "'./openapi.js'")
-      .replaceAll("'../../workflow/common/workflow.ts'", "'./workflow.js'")
-      .replaceAll("'../../types/index.ts'", "'../index.js'")
-      .replaceAll("'./schemaKeywords.ts'", "'./flow-schemaKeywords.js'")
-      .replaceAll("'./changeSchema.ts'", "'./flow-change-schema.js'")
-      .replaceAll("'./inputValue.ts'", "'./flow-input-value.js'")
-      .replaceAll("'./webhookMethod.ts'", "'./webhook-method.js'")
-      .replaceAll("'./retry.ts'", "'./flow-retry.js'")
-      .replaceAll("'./errorHandling.ts'", "'./flow-errorHandling.js'")
-    const flowInputValueDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/inputValue.d.ts'), 'utf8')).replaceAll(
-      "'./change.ts'",
-      "'./flow-change.js'",
-    )
-    const flowChangeSchemaDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/changeSchema.d.ts'), 'utf8')).replaceAll(
-      "'./change.ts'",
-      "'./flow-change.js'",
-    )
-    const connectorActionDeclaration = await readFile(path.join(declarationRoot, 'connector/common/actionSchema.d.ts'), 'utf8')
-    const connectorProxyDeclaration = (await readFile(path.join(declarationRoot, 'connector/common/proxy.d.ts'), 'utf8'))
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-      .replaceAll("'../../event-source/common/definition.ts'", "'./event-source-definition.js'")
-    await Promise.all(
-      [
-        'authoring',
-        'authoringSchema',
-        'authoringFields',
-        'draftOperations',
-        'flowInspection',
-        'liveDetails',
-        'authoringExamples',
-        'providerAccess',
-        'connectorDecoders',
-        'providerIconSprite',
-      ].map(async (name) => {
-        const declaration = (await readFile(path.join(declarationRoot, `control/common/${name}.d.ts`), 'utf8'))
-          .replaceAll(/(['"])\.\/api\.ts\1/g, "'./control-api.js'")
-          .replaceAll(/(['"])\.\.\/\.\.\/types\/index\.ts\1/g, "'../index.js'")
-          .replaceAll('./eventSources.ts', './event-sources.js')
-          .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
-          .replaceAll("'./authoring.ts'", "'./authoring.js'")
-          .replaceAll("'../../workflow/common/workflow.ts'", "'./workflow.js'")
-          .replaceAll("'./authoringSchema.ts'", "'./authoringSchema.js'")
-          .replaceAll("'../../flow/common/changeSchema.ts'", "'./flow-change-schema.js'")
-          .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
-          .replaceAll("'./connectorDecoders.ts'", "'./connectorDecoders.js'")
-          .replaceAll(/(['"])\.\.\/\.\.\/flow\/common\/change\.ts\1/g, "'./flow-change.js'")
-          .replaceAll(/(['"])\.\.\/\.\.\/flow\/common\/retry\.ts\1/g, "'./flow-retry.js'")
-        await writeFile(path.join(commonOutputPath, `${name}.d.ts`), declaration)
-      }),
-    )
-    const controlApiDeclaration = (await readFile(path.join(declarationRoot, 'control/common/api.d.ts'), 'utf8'))
-      .replaceAll("'../../workflow/common/workflow.ts'", "'./workflow.js'")
-      .replaceAll("'../../canvas/common/commands.ts'", "'./canvas-commands.js'")
-      .replaceAll("'../../flow/common/workflowFile.ts'", "'./flow-workflowFile.js'")
-      .replaceAll("'../../flow/common/semantics.ts'", "'./flow-semantics.js'")
-      .replaceAll("'./providerIconSprite.ts'", "'./providerIconSprite.js'")
-      .replaceAll('./eventSources.ts', './event-sources.js')
-      .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
-      .replaceAll("'./authoring.ts'", "'./authoring.js'")
-      .replaceAll("'./authoringSchema.ts'", "'./authoringSchema.js'")
-      .replaceAll("'../../flow/common/changeSchema.ts'", "'./flow-change-schema.js'")
-      .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
-      .replaceAll("'./connectorDecoders.ts'", "'./connectorDecoders.js'")
-      .replaceAll("'./flowInspection.ts'", "'./flowInspection.js'")
-      .replaceAll("'./liveDetails.ts'", "'./liveDetails.js'")
-      .replaceAll("'./authoringFields.ts'", "'./authoringFields.js'")
-      .replaceAll('./eventSources.ts', './event-sources.js')
-      .replaceAll("'../../execution/common/runLifecycle.ts'", "'./run-lifecycle.js'")
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-      .replaceAll("'./errors.ts'", "'./control-api-errors.js'")
-      .replaceAll("'./results.ts'", "'./run-results.js'")
-      .replaceAll("'./flowNotifications.ts'", "'./flow-notifications.js'")
-      .replaceAll("'./triggerCatalog.ts'", "'./trigger-catalog.js'")
-      .replaceAll("'../../trigger/common/configOptions.ts'", "'./trigger-config-options.js'")
-    const triggerConfigOptionsDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/configOptions.d.ts'), 'utf8'))
-      .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-    const triggerCatalogDeclaration = (await readFile(path.join(declarationRoot, 'control/common/triggerCatalog.d.ts'), 'utf8'))
-      .replaceAll("'./api.ts'", "'./control-api.js'")
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-      .replaceAll("'../../localization/common/languages.ts'", "'./localization.js'")
-    const triggerLocalizationDeclaration = (await readFile(path.join(declarationRoot, 'trigger/providers/localization.d.ts'), 'utf8'))
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-      .replaceAll("'../../localization/common/languages.ts'", "'./localization.js'")
-      .replaceAll("'../../control/common/triggerCatalog.ts'", "'./trigger-catalog.js'")
-    const controlApiConformanceDeclaration = (await readFile(path.join(declarationRoot, 'control/common/conformance.d.ts'), 'utf8'))
-      .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
-      .replaceAll("'./api.ts'", "'./control-api.js'")
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-      .replaceAll("'../../trigger/common/configOptions.ts'", "'./trigger-config-options.js'")
-    const controlApiErrorsDeclaration = await readFile(path.join(declarationRoot, 'control/common/errors.d.ts'), 'utf8')
-    const flowEncodingDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/encoding.d.ts'), 'utf8'))
-      .replaceAll("'./workflowFile.ts'", "'./flow-workflowFile.js'")
-      .replaceAll("'./changeSchema.ts'", "'./flow-change-schema.js'")
-      .replaceAll("'./json.ts'", "'./flow-json.js'")
-    await Promise.all(
-      ['agent', 'semantics', 'graph', 'schema', 'schemaKeywords', 'modules', 'connectionUsage', 'promptTemplate', 'workflowFile', 'retry', 'errorHandling'].map(
-        async (name) => {
-          const declaration = (await readFile(path.join(declarationRoot, `flow/common/${name}.d.ts`), 'utf8'))
-            .replaceAll("'../../execution/common/engineContract.ts'", "'./engine-contract.js'")
-            .replaceAll("'../../execution/common/runtime.ts'", "'./runtime-contract.js'")
-            .replaceAll("'../../trigger/common/contract.ts'", "'./trigger-contract.js'")
-            .replaceAll("'./change.ts'", "'./flow-change.js'")
-            .replaceAll("'./semantics.ts'", "'./flow-semantics.js'")
-            .replaceAll("'./errorHandling.ts'", "'./flow-errorHandling.js'")
-            .replaceAll("'./graph.ts'", "'./flow-graph.js'")
-            .replaceAll("'./schema.ts'", "'./flow-schema.js'")
-            .replaceAll("'./schemaKeywords.ts'", "'./flow-schemaKeywords.js'")
-            .replaceAll("'../../types/index.ts'", "'../index.js'")
-            .replaceAll("'./modules.ts'", "'./flow-modules.js'")
-            .replaceAll("'./agent.ts'", "'./flow-agent.js'")
-            .replaceAll("'./connectionUsage.ts'", "'./flow-connectionUsage.js'")
-            .replaceAll("'./promptTemplate.ts'", "'./flow-promptTemplate.js'")
-          await writeFile(path.join(commonOutputPath, `flow-${name}.d.ts`), declaration)
-        },
-      ),
-    )
-    const runLifecycleDeclaration = await readFile(path.join(declarationRoot, 'execution/common/runLifecycle.d.ts'), 'utf8')
-    const runEventsDeclaration = (await readFile(path.join(declarationRoot, 'execution/common/events.d.ts'), 'utf8')).replaceAll(
-      "'../../flow/common/webhookResponse.ts'",
-      "'./webhook-response.js'",
-    )
-    const engineContractDeclaration = await readFile(path.join(declarationRoot, 'execution/common/engineContract.d.ts'), 'utf8')
-    const runtimeContractDeclaration = (await readFile(path.join(declarationRoot, 'execution/common/runtime.d.ts'), 'utf8'))
-      .replaceAll("'../../decision/common/decision.ts'", "'./decision.js'")
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-      .replaceAll("'./engineContract.ts'", "'./engine-contract.js'")
-    await Promise.all(
-      ['scheduler', 'checkpoint', 'dependencies', 'node-execution'].map(async (name) => {
-        const declaration = (await readFile(path.join(declarationRoot, `execution/common/${name}.d.ts`), 'utf8'))
-          .replaceAll("'../../flow/common/webhookResponse.ts'", "'./webhook-response.js'")
-          .replaceAll("'../../types/index.ts'", "'../index.js'")
-          .replaceAll("'./runtime.ts'", "'./runtime-contract.js'")
-          .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-          .replaceAll("'../../flow/common/semantics.ts'", "'./flow-semantics.js'")
-          .replaceAll("'../../flow/common/agent.ts'", "'./flow-agent.js'")
-          .replaceAll("'./scheduler.ts'", "'./scheduler.js'")
-          .replaceAll("'./checkpoint.ts'", "'./scheduler-checkpoint.js'")
-          .replaceAll("'./dependencies.ts'", "'./scheduler-dependencies.js'")
-          .replaceAll("'./node-execution.ts'", "'./scheduler-node-execution.js'")
-        await writeFile(path.join(commonOutputPath, `${name == 'scheduler' ? name : `scheduler-${name}`}.d.ts`), declaration)
-      }),
-    )
-    const cronTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/cron.d.ts'), 'utf8')).replaceAll(
-      "'../../flow/common/change.ts'",
-      "'./flow-change.js'",
-    )
-    const integrationTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/integration.d.ts'), 'utf8'))
-      .replaceAll("'./config.ts'", "'./trigger-config.js'")
-      .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
-      .replaceAll("'./configOptions.ts'", "'./trigger-config-options.js'")
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-    const pollTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/poll.d.ts'), 'utf8'))
-      .replaceAll("'./config.ts'", "'./trigger-config.js'")
-      .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
-      .replaceAll("'./configOptions.ts'", "'./trigger-config-options.js'")
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-    const triggerConfigDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/config.d.ts'), 'utf8')).replaceAll(
-      "'../../flow/common/change.ts'",
-      "'./flow-change.js'",
-    )
-    const providerTriggersDeclaration = (await readFile(path.join(declarationRoot, 'trigger/providers/definitions.d.ts'), 'utf8'))
-      .replaceAll("'../common/integration.ts'", "'./integration-trigger.js'")
-      .replaceAll("'../common/poll.ts'", "'./poll-trigger.js'")
-      .replaceAll("'../common/configOptions.ts'", "'./trigger-config-options.js'")
-      .replaceAll("'./localization.ts'", "'./trigger-localization.js'")
-    const webhookTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/webhook.d.ts'), 'utf8'))
-      .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-      .replaceAll("'../../flow/common/webhookResponse.ts'", "'./webhook-response.js'")
-      .replaceAll("'./contract.ts'", "'./trigger-contract.js'")
+    const outputsBySource = new Map<string, string[]>()
+    for (const [source, output] of [...declarationOutputs, ...externalDeclarations])
+      outputsBySource.set(source, [...(outputsBySource.get(source) ?? []), output])
+    const distPath = path.join(options.packageRoot, 'dist')
     await Promise.all([
-      writeFile(path.join(commonOutputPath, 'flow-authoring.d.ts'), flowAuthoringDeclaration),
-      writeFile(path.join(commonOutputPath, 'flow-authoring-edge.d.ts'), flowAuthoringEdgeDeclaration),
-      writeFile(path.join(commonOutputPath, 'flow-authoring-module.d.ts'), flowAuthoringModuleDeclaration),
-      writeFile(path.join(commonOutputPath, 'flow-authoring-node.d.ts'), flowAuthoringNodeDeclaration),
-      writeFile(path.join(commonOutputPath, 'flow-change.d.ts'), flowChangeDeclaration),
-      writeFile(path.join(commonOutputPath, 'webhook-method.d.ts'), await readFile(path.join(declarationRoot, 'flow/common/webhookMethod.d.ts'), 'utf8')),
-      writeFile(path.join(commonOutputPath, 'flow-input-value.d.ts'), flowInputValueDeclaration),
-      writeFile(path.join(commonOutputPath, 'flow-change-schema.d.ts'), flowChangeSchemaDeclaration),
-      writeFile(path.join(commonOutputPath, 'flow-json.d.ts'), await readFile(path.join(declarationRoot, 'flow/common/json.d.ts'), 'utf8')),
-      writeFile(path.join(commonOutputPath, 'flow-encoding.d.ts'), flowEncodingDeclaration),
-      writeFile(
-        path.join(browserOutputPath, 'workbench.d.ts'),
-        workbenchDeclaration
-          .replaceAll("'../../../flow/common/workflowFile.ts'", "'../common/flow-workflowFile.js'")
-          .replaceAll("'./contract.ts'", "'./workbench-contract.js'")
-          .replaceAll("'./eventSources.tsx'", "'./event-sources.js'")
-          .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),
+      ...declarationOutputs.map(async ([source, output]) => {
+        const declaration = await readFile(path.join(declarationRoot, `${source}.d.ts`), 'utf8')
+        await writeFile(path.join(distPath, `${output}.d.ts`), rewriteDeclarationImports(declaration, source, output, outputsBySource))
+      }),
+      ...['browser/ui.css', 'browser/preview.css', 'browser/workbench.css', 'browser/theme.css'].map((output) =>
+        writeFile(path.join(distPath, `${output}.d.ts`), 'export {}\n'),
       ),
-      writeFile(
-        path.join(browserOutputPath, 'host-conformance.d.ts'),
-        (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/hostConformance.d.ts'), 'utf8')).replaceAll(
-          "'./contract.ts'",
-          "'./workbench-contract.js'",
-        ),
-      ),
-      writeFile(path.join(browserOutputPath, 'workbench-contract.d.ts'), workbenchContract),
-      writeFile(path.join(browserOutputPath, 'flow-notifications.d.ts'), flowNotificationsDeclaration),
-      writeFile(path.join(browserOutputPath, 'workbench.css.d.ts'), 'export {}\n'),
-      writeFile(path.join(browserOutputPath, 'theme.css.d.ts'), 'export {}\n'),
-      writeFile(path.join(commonOutputPath, 'run-lifecycle.d.ts'), runLifecycleDeclaration),
-      writeFile(path.join(commonOutputPath, 'run-events.d.ts'), runEventsDeclaration),
-      writeFile(path.join(commonOutputPath, 'engine-contract.d.ts'), engineContractDeclaration),
-      writeFile(path.join(commonOutputPath, 'runtime-contract.d.ts'), runtimeContractDeclaration),
-      writeFile(
-        path.join(commonOutputPath, 'decision.d.ts'),
-        (await readFile(path.join(declarationRoot, 'decision/common/decision.d.ts'), 'utf8')).replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
-      ),
-      writeFile(
-        path.join(commonOutputPath, 'http-request.d.ts'),
-        (await readFile(path.join(declarationRoot, 'http/common/httpRequest.d.ts'), 'utf8')).replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
-      ),
-      writeFile(
-        path.join(commonOutputPath, 'openapi.d.ts'),
-        (await readFile(path.join(declarationRoot, 'openapi/common/openapi.d.ts'), 'utf8')).replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
-      ),
-      writeFile(
-        path.join(commonOutputPath, 'workflow.d.ts'),
-        (await readFile(path.join(declarationRoot, 'workflow/common/workflow.d.ts'), 'utf8')).replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
-      ),
-      writeFile(path.join(commonOutputPath, 'connector-action.d.ts'), connectorActionDeclaration),
-      writeFile(path.join(commonOutputPath, 'connector-proxy.d.ts'), connectorProxyDeclaration),
-      writeFile(
-        path.join(commonOutputPath, 'control-requests.d.ts'),
-        (await readFile(path.join(declarationRoot, 'control/common/requests.d.ts'), 'utf8'))
-          .replaceAll("'../../canvas/common/commands.ts'", "'./canvas-commands.js'")
-          .replaceAll('./eventSources.ts', './event-sources.js')
-          .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
-          .replaceAll("'./authoring.ts'", "'./authoring.js'")
-          .replaceAll("'../../workflow/common/workflow.ts'", "'./workflow.js'")
-          .replaceAll("'./authoringSchema.ts'", "'./authoringSchema.js'")
-          .replaceAll("'../../flow/common/changeSchema.ts'", "'./flow-change-schema.js'")
-          .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
-          .replaceAll("'./connectorDecoders.ts'", "'./connectorDecoders.js'")
-          .replaceAll("'./authoringExamples.ts'", "'./authoringExamples.js'")
-          .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
-      ),
-      writeFile(
-        path.join(commonOutputPath, 'mcp.d.ts'),
-        (await readFile(path.join(declarationRoot, 'control/common/mcp.d.ts'), 'utf8'))
-          .replaceAll("'./mcpConformance.ts'", "'./mcp-conformance.js'")
-          .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
-      ),
-      writeFile(
-        path.join(commonOutputPath, 'mcp-conformance.d.ts'),
-        (await readFile(path.join(declarationRoot, 'control/common/mcpConformance.d.ts'), 'utf8')).replaceAll(
-          "'./conformance.ts'",
-          "'./control-api-conformance.js'",
-        ),
-      ),
-      writeFile(path.join(commonOutputPath, 'control-api.d.ts'), controlApiDeclaration),
-      writeFile(path.join(commonOutputPath, 'trigger-catalog.d.ts'), triggerCatalogDeclaration),
-      writeFile(path.join(commonOutputPath, 'trigger-config-options.d.ts'), triggerConfigOptionsDeclaration),
-      writeFile(path.join(commonOutputPath, 'trigger-config.d.ts'), triggerConfigDeclaration),
-      writeFile(path.join(commonOutputPath, 'trigger-localization.d.ts'), triggerLocalizationDeclaration),
-      writeFile(
-        path.join(commonOutputPath, 'run-results.d.ts'),
-        (await readFile(path.join(declarationRoot, 'control/common/results.d.ts'), 'utf8')).replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'"),
-      ),
-      writeFile(path.join(commonOutputPath, 'control-api-errors.d.ts'), controlApiErrorsDeclaration),
-      writeFile(path.join(commonOutputPath, 'flow-notifications.d.ts'), flowNotificationsDeclaration),
-      writeFile(path.join(commonOutputPath, 'canvas-commands.d.ts'), canvasCommandsDeclaration),
-      writeFile(path.join(commonOutputPath, 'control-api-conformance.d.ts'), controlApiConformanceDeclaration),
-      writeFile(path.join(commonOutputPath, 'cron-trigger.d.ts'), cronTriggerDeclaration),
-      writeFile(
-        path.join(commonOutputPath, 'trigger-contract.d.ts'),
-        (await readFile(path.join(declarationRoot, 'trigger/common/contract.d.ts'), 'utf8'))
-          .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
-          .replaceAll("'../../flow/common/webhookMethod.ts'", "'./webhook-method.js'"),
-      ),
-      writeFile(path.join(commonOutputPath, 'integration-trigger.d.ts'), integrationTriggerDeclaration),
-      writeFile(path.join(commonOutputPath, 'poll-trigger.d.ts'), pollTriggerDeclaration),
-      writeFile(path.join(commonOutputPath, 'provider-triggers.d.ts'), providerTriggersDeclaration),
-      writeFile(path.join(commonOutputPath, 'webhook-trigger.d.ts'), webhookTriggerDeclaration),
-      writeFile(
-        path.join(commonOutputPath, 'webhook-response.d.ts'),
-        (await readFile(path.join(declarationRoot, 'flow/common/webhookResponse.d.ts'), 'utf8')).replaceAll("'./change.ts'", "'./flow-change.js'"),
-      ),
-      writeFile(path.join(commonOutputPath, 'localization.d.ts'), localizationDeclaration),
     ])
   } finally {
     await rm(declarationRoot, { force: true, recursive: true })
   }
+}
+
+/** Rewrites each relative source import to the published declaration of the same source. */
+function rewriteDeclarationImports(declaration: string, source: string, output: string, outputsBySource: ReadonlyMap<string, readonly string[]>): string {
+  const outputDirectory = path.posix.dirname(output)
+  return declaration.replaceAll(
+    /(\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)(["'])(\.\.?\/[^"']+)\2/g,
+    (_match: string, prefix: string, quote: string, specifier: string) => {
+      const target = path.posix.join(path.posix.dirname(source), specifier).replace(/\.(?:tsx?|js)$/, '')
+      const outputs = outputsBySource.get(target)
+      if (outputs == null) throw new Error(`Declaration ${source} imports ${target}, which has no published declaration.`)
+      const published = outputs.find((candidate) => path.posix.dirname(candidate) == outputDirectory) ?? outputs[0]!
+      const relative = path.posix.relative(outputDirectory, published)
+      return `${prefix}${quote}${relative.startsWith('.') ? relative : `./${relative}`}.js${quote}`
+    },
+  )
 }

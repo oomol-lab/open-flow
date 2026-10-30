@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { eventSourceViewSchema } from '../../event-source/common/view.ts'
 
 const id = z.string().min(1).max(256)
 const eventType = z.string().regex(/^[a-z][a-z0-9_.:]{0,127}$/)
@@ -10,43 +11,15 @@ const eventSourceSchema = z.object({
   revision: z.int().positive(),
   name,
   provider: z.enum(['feishu', 'feishu_app_bot', 'slackbot', 'intercom', 'sentry', 'zoom', 'fireflies', 'jira']),
-  appId: id.nullable(),
-  workspaceId: id.optional(),
-  installationId: id.optional(),
-  organizationId: id.optional(),
-  projectId: id.optional(),
-  projectKey: id.optional(),
-  subscriptionStatus: z.enum(['idle', 'pending', 'ready', 'error']).optional(),
-  lastError: z.string().optional(),
-  signingSecretConfigured: z.boolean().optional(),
+  ...eventSourceViewSchema.shape,
   connectionId: id,
   teamId: id.nullable(),
   enabled: z.boolean(),
   eventTypes: z.array(eventType),
-  manageSubscriptions: z.boolean().nullable(),
-  verificationTokenConfigured: z.boolean().nullable(),
-  encryptKeyConfigured: z.boolean().nullable(),
   endpointUrl: z.string().nullable(),
-  verifiedAt: z.string().nullable(),
   lastReceivedAt: z.string().nullable(),
   updatedAt: z.string(),
   consumers: z.array(z.object({ flowId: id, flowName: z.string(), triggerNodeId: id })),
-})
-
-export const eventSourceViewSchema = eventSourceSchema.pick({
-  appId: true,
-  workspaceId: true,
-  installationId: true,
-  organizationId: true,
-  projectId: true,
-  projectKey: true,
-  subscriptionStatus: true,
-  lastError: true,
-  signingSecretConfigured: true,
-  manageSubscriptions: true,
-  verificationTokenConfigured: true,
-  encryptKeyConfigured: true,
-  verifiedAt: true,
 })
 
 export interface CreateFeishuEventSource {

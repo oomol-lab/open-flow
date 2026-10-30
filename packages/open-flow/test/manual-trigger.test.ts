@@ -3,11 +3,11 @@ import type { RevisionContent } from '../src/flow/common/change.ts'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { expect, it } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { applyFlowChanges } from '../src/flow/common/change.ts'
 import { encodeRevision } from '../src/flow/common/encoding.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 
 it('requires an entry and skips unrelated roots and other trigger branches', async () => {
   const content: RevisionContent = {

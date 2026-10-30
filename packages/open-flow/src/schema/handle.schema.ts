@@ -3,53 +3,6 @@ import { HandleSchemaOverridesItemSchema } from './schema-overrides.schema.ts'
 
 export const HandleNameSchema = /* @__PURE__ */ z.string().describe('Handle name')
 
-export const ConditionExpressionSchema = /* @__PURE__ */ z
-  .strictObject({
-    input_handle: HandleNameSchema.describe('Input handle name to evaluate the expression'),
-    operator: z
-      .enum([
-        '==',
-        '!=',
-        '<',
-        '<=',
-        '>',
-        '>=',
-        'is null',
-        'is not null',
-        'is true',
-        'is false',
-        'contains',
-        'not contains',
-        'is empty',
-        'is not empty',
-        'has key',
-        'not has key',
-        'has value',
-        'not has value',
-        'starts with',
-        'ends with',
-      ])
-      .describe('Operator to compare the handle value'),
-    value: z.any().optional().describe('Value to compare the handle value'),
-  })
-  .describe('A single expression to evaluate a condition')
-
-export const ConditionHandleDefSchema = /* @__PURE__ */ z
-  .strictObject({
-    handle: HandleNameSchema,
-    description: /* @__PURE__ */ z.string().optional().describe('Describe the Condition'),
-    logical: z.enum(['AND', 'OR']).optional().describe('Logical operator to combine multiple expressions, default is OR.').default('OR'),
-    expressions: z.array(ConditionExpressionSchema).optional().describe('Expressions to evaluate the condition'),
-  })
-  .describe('Condition definition to control the flow')
-
-export const DefaultConditionHandleDefSchema = /* @__PURE__ */ z
-  .strictObject({
-    handle: HandleNameSchema,
-    description: /* @__PURE__ */ z.string().optional().describe('Describe the Default Condition'),
-  })
-  .describe('Default Condition definition to control the flow')
-
 const BaseHandleDef = {
   handle: HandleNameSchema,
   description: /* @__PURE__ */ z.string().optional().describe('Describe the Handle'),
@@ -78,10 +31,3 @@ export const GroupDividerDefSchema = /* @__PURE__ */ z.strictObject({
   group: z.string().describe('Title of the group divider'),
   collapsed: z.boolean().optional().describe('If the group is collapsed, default is false.'),
 })
-
-export const ValueHandleDefSchema = /* @__PURE__ */ z
-  .strictObject(BaseHandleDef)
-  .extend({
-    value: z.any().optional().describe('Provide static value for block, default is null.'),
-  })
-  .describe('Value Handles on Block.')

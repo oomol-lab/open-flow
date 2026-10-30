@@ -2,11 +2,11 @@ import type { JsonValue, RevisionContent as RevisionFixture } from '../src/flow/
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
-import { currentEngineContract, nodejsEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
 import { inputValues } from '../src/flow/common/inputValue.ts'
 import { validateModules } from '../src/flow/common/modules.ts'
 import { matchesSchema } from '../src/flow/common/schema.ts'
 import { createRuntimeProgram, flowDependencies, prepareFlow, validateFlow, validateFlowInputs } from '../src/flow/common/semantics.ts'
+import { currentEngineContract, nodejsEngineContract, findEngineContract } from '../src/runtime/common/runtime.ts'
 import { sourceEvents } from '../src/trigger/providers/source-events.ts'
 
 const engine = findEngineContract(currentEngineContract)!

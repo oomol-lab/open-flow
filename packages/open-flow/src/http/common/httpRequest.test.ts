@@ -4,11 +4,11 @@ import type { RevisionContent } from '../../flow/common/change.ts'
 import * as Effect from 'effect/Effect'
 import { expect, it } from 'vitest'
 import { compileAuthoring, authoringNode } from '../../control/common/authoring.ts'
-import { currentEngineContract } from '../../execution/common/engineContract.ts'
 import { runFlow } from '../../execution/common/scheduler.ts'
 import { currentFlowModelVersion, applyFlowChanges } from '../../flow/common/change.ts'
 import { decodeRevisionContent } from '../../flow/common/changeSchema.ts'
 import { prepareFlow } from '../../flow/common/semantics.ts'
+import { currentEngineContract } from '../../runtime/common/engineContract.ts'
 import { buildHttpRequest, httpRequestConfigSchema, httpRequestTask, httpRequestInputs, parseHttpResponse } from './httpRequest.ts'
 
 const config = (value: unknown = {}) => httpRequestConfigSchema.parse(value)

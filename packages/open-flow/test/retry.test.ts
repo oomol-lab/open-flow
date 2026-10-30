@@ -6,10 +6,10 @@ import * as Exit from 'effect/Exit'
 import * as Fiber from 'effect/Fiber'
 import { TestClock } from 'effect/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/engineContract.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../src/flow/common/change.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/engineContract.ts'
 
 const retry = { maxRetries: 2, intervalMs: 1000 }
 async function fixture(policy?: RetryConfiguration, timeoutMs?: number) {

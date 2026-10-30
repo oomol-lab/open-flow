@@ -48,7 +48,7 @@ for (const expected of [
   'src/control/common/api.ts',
   'src/flow/common/change.ts',
   'src/flow/common/authoring.ts',
-  'src/execution/common/runtime.ts',
+  'src/runtime/common/runtime.ts',
   'src/trigger/providers/definitions.ts',
   'src/event-source/common/catalog.generated.json',
 ]) {

@@ -1,8 +1,8 @@
 import type { ConnectorActionMetadata, ConnectorProvider } from '../api.ts'
 
 import { connectorActionPorts } from '../../../../connector/common/actionSchema.ts'
+import { providerIconAppearance } from '../../../../connector/common/providerIconSprite.ts'
 import { invalidResponse, jsonValue, record, string } from '../../../../control/common/decoding.ts'
-import { providerIconAppearance } from '../../../../control/common/providerIconSprite.ts'
 import { ApiError } from '../api.ts'
 
 export interface ProxyResponse {

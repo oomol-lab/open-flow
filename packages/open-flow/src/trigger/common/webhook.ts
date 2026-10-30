@@ -1,4 +1,6 @@
-import type { JsonValue, WebhookBodyField, WebhookMethod, WebhookOptions } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../flow/common/model.ts'
+import type { WebhookMethod } from '../../flow/common/webhookMethod.ts'
+import type { WebhookBodyField, WebhookOptions } from './model.ts'
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../base/common/json.ts'

@@ -5,7 +5,6 @@ import type { AgentTool, JsonValue, ManagedTaskDefinition, RevisionContent } fro
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
-import { currentEngineContract, findEngineContract } from '../src/execution/common/engineContract.ts'
 import { runFlow, decodeFlowRunCheckpoint } from '../src/execution/common/scheduler.ts'
 import { agentConfigIssues, agentToolInput, agentToolSchema } from '../src/flow/common/agent.ts'
 import { applyFlowChanges, decodeChangeOperations } from '../src/flow/common/change.ts'
@@ -13,6 +12,7 @@ import { decodeRevision, digestBytes, encodeRevision } from '../src/flow/common/
 import { matchesSchema } from '../src/flow/common/schema.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 import { flowDependencies, validateFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract, findEngineContract } from '../src/runtime/common/engineContract.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const tool: AgentTool = {

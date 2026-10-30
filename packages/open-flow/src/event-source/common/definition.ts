@@ -1,4 +1,4 @@
-import type { JsonValue } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../types/index.ts'
 
 export interface SourceConfiguration {
   readonly identity: string

@@ -1,4 +1,4 @@
-import type { EngineContract } from '../../execution/common/engineContract.ts'
+import type { EngineContract } from '../../runtime/common/engineContract.ts'
 import type { RevisionContent } from './change.ts'
 import type { Diagnostic } from './semantics.ts'
 

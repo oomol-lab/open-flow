@@ -1,4 +1,4 @@
-import type { FixedInputValue, InputValues, InputMapping, JsonValue } from './change.ts'
+import type { FixedInputValue, InputValues, InputMapping, JsonValue } from './model.ts'
 
 /** An explicit clear suppresses the default; absent mappings still inherit it. */
 export function inputValue(mapping: InputMapping | undefined, fallback: JsonValue | undefined): JsonValue | undefined {

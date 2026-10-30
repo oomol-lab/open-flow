@@ -4,9 +4,9 @@ import type { WaitAction, RevisionContent, InputPort } from '../src/flow/common/
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { afterEach, expect, it, vi } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { decodeFlowRunCheckpoint, runFlow } from '../src/execution/common/scheduler.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 
 function deferred<T>() {
   let resolve!: (value: T) => void

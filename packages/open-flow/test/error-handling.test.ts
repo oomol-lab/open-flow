@@ -3,11 +3,11 @@ import type { RevisionContent } from '../src/flow/common/change.ts'
 
 import * as Effect from 'effect/Effect'
 import { expect, it, vi } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/engineContract.ts'
 import { decodeFlowRunCheckpoint, runFlow } from '../src/execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../src/flow/common/change.ts'
 import { decodeRevisionContent, decodeRevision, encodeRevision } from '../src/flow/common/encoding.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/engineContract.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 function content(onError?: 'error', inputInvalid = false): RevisionContent {
