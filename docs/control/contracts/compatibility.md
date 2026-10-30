@@ -15,6 +15,11 @@ Flow. The guest implementation of the builtin modules is part of the public pack
 check, run and publish with `nodejs-compat-v1`. Server accepts both v8 contracts; older Servers
 reject the compatibility contract, so upgrade Server before its clients.
 
+The public `TaskContext` type drops `fetch`, `logger`, `preview` and `reportProgress`; no runtime
+provided them, so only type-checked callers that referenced them need changes. The Code editor
+declares ECMAScript, the Web globals of the runtime and the Node types of the builtin allowlist,
+without DOM declarations. Imports outside the allowlist have no types, matching their rejection.
+
 ## HTTP Request: pending Flow model v11 and Engine v8
 
 The latest published next-tag artifact `@oomol-lab/open-flow@0.1.0-beta.73` has gitHead

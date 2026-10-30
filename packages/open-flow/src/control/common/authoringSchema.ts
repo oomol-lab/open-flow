@@ -10,6 +10,7 @@ import {
 } from '../../flow/common/changeSchema.ts'
 import { retryConfigurationSchema, retryNodeTypes } from '../../flow/common/retry.ts'
 import { httpRequestConfigSchema } from '../../http/common/httpRequest.ts'
+import { findEngineContract, nodejsEngineContract } from '../../runtime/common/engineContract.ts'
 import { authoringLlmConfiguration } from './authoringLlm.ts'
 import { authoringOpenApiSchema } from './authoringOpenApi.ts'
 
@@ -259,6 +260,9 @@ const requestContracts = {
   },
 }
 
+const codeBuiltins = [...findEngineContract(nodejsEngineContract)!.builtinModules!].filter((name) => !name.startsWith('node:'))
+const codeGuidance = `Code is an ES module whose default export receives (inputs, context) and returns the business outputs. It may import the Node builtins ${codeBuiltins.join(', ')}, with or without the node: prefix; fs is a fresh in-memory filesystem containing /tmp per execution. Networking (fetch, http), require, dynamic import and packages are unavailable; use HTTP Request or Connector nodes for external calls. context provides inputs, signal, getPrevious(), actions, workflows, artifact, flowId, runId and blockId. Select workflows through config.capabilities: [{kind: "workflow", flowId, name}]. Call context.workflows.call(name, input) and await its business output. The platform derives input/output types. Refresh a selected workflow tool with node.refresh and tool: its name. Calls obey node and Run time limits.`
+
 /** Transport-independent discovery of the same requests the service validates. */
 export function authoringRequestContract(name: string) {
   if (!Object.hasOwn(requestContracts, name)) return undefined
@@ -308,7 +312,7 @@ export function authoringSchema(kind?: AuthoringType) {
                               : kind == 'agent'
                                 ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
                                 : kind == 'code'
-                                  ? 'Select workflows through config.capabilities: [{kind: "workflow", flowId, name}]. Call context.workflows.call(name, input) and await its business output. The platform derives input/output types. Refresh a selected workflow tool with node.refresh and tool: its name. Calls obey node and Run time limits.'
+                                  ? codeGuidance
                                   : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
         example: {
           op: 'node.add',

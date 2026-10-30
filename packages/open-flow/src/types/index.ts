@@ -75,13 +75,6 @@ export interface CsvPreviewPayload {
 export type PreviewPayload = MediaPreviewPayload | TextPreviewPayload | ImagePreviewPayload | TablePreviewPayload | CsvPreviewPayload
 export type PreviewType = PreviewPayload['type']
 
-export interface TaskLogger {
-  debug(message: string, data?: unknown): void
-  info(message: string, data?: unknown): void
-  warn(message: string, data?: unknown): void
-  error(message: string, data?: unknown): void
-}
-
 export interface TaskContext<
   Actions extends object = Record<string, never>,
   Workflows extends object = { call: (name: never, input?: never) => Promise<never> },
@@ -94,12 +87,8 @@ export interface TaskContext<
   readonly runId: string
   readonly blockId: string
   readonly artifact: ArtifactCapability
-  readonly fetch: typeof fetch
-  readonly logger: TaskLogger
   /** Reads the selected direct predecessors, sorted by node ID; empty for a graph root. */
   getPrevious(): Promise<readonly PreviousNode[]>
-  preview(payload: PreviewPayload, id?: string): Promise<void>
-  reportProgress(progress: number): Promise<void>
 }
 
 export type TaskResult<Outputs extends object> = keyof Outputs extends never ? Outputs | void : Outputs

@@ -1,45 +1,16 @@
 import { createSystem, createVirtualTypeScriptEnvironment } from '@typescript/vfs'
 import ts, { displayPartsToString } from 'typescript-lsp'
+import { codeCompilerOptions, codeTypeRoots, codeTypeFiles } from './codeTypes.ts'
 import { syntaxDiagnostics } from './typeScriptDiagnostics.ts'
 import { ShadowDocument } from './typeScriptShadow.ts'
 
-const compilerOptions: import('typescript-lsp').CompilerOptions = {
-  allowJs: true,
-  checkJs: true,
-  lib: ['lib.es2024.d.ts', 'lib.dom.d.ts'],
-  module: ts.ModuleKind.ESNext,
-  moduleResolution: ts.ModuleResolutionKind.Bundler,
-  noEmit: true,
-  strict: true,
-  target: ts.ScriptTarget.ES2024,
-}
-
-const libraries = import.meta.glob<string>(
-  [
-    '../../../node_modules/typescript-lsp/lib/lib.*.d.ts',
-    '!../../../node_modules/typescript-lsp/lib/lib.webworker*.d.ts',
-    '!../../../node_modules/typescript-lsp/lib/lib.scripthost*.d.ts',
-  ],
-  { eager: true, query: '?raw', import: 'default' },
-)
-const platformSources = import.meta.glob<string>('../../types/index.ts', { eager: true, query: '?raw', import: 'default' })
-const platformTypes = platformSources['../../types/index.ts']!
-
-const files = new Map<string, string>()
-const libraryFiles: string[] = []
-for (const path in libraries) {
-  const file = `/${path.split('/').at(-1)}`
-  files.set(file, libraries[path]!)
-  libraryFiles.push(file)
-}
-files.set('file:///node_modules/@oomol-lab/open-flow/package.json', JSON.stringify({ name: '@oomol-lab/open-flow', types: 'index.d.ts' }))
-files.set('file:///node_modules/@oomol-lab/open-flow/index.d.ts', platformTypes)
+const files = new Map(codeTypeFiles)
 
 const system = createSystem(files)
 const openDocuments = new Map<string, ShadowDocument>()
 const typings = new Map<string, string>()
 const compiler = ts as unknown as Parameters<typeof createVirtualTypeScriptEnvironment>[2]
-let environment = createVirtualTypeScriptEnvironment(system, libraryFiles, compiler, compilerOptions)
+let environment = createVirtualTypeScriptEnvironment(system, [...codeTypeRoots], compiler, codeCompilerOptions)
 
 const completionKinds: Readonly<Record<string, number>> = {
   'alias': 18,

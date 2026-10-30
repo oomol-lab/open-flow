@@ -69,13 +69,15 @@ const codeEditorTyping = `/**
  */
 `
 
-const codeEditorSource = `export default async function (inputs, context) {
-  await context.reportProgress(20)
-  const response = await context.fetch("https://example.com")
-  const text = await response.text()
-  return { result: inputs.value + text }
+const codeEditorSource = `import { createHash } from "node:crypto"
+
+export default async function (inputs, context) {
+  const previous = await context.getPrevious()
+  const digest = createHash("sha256").update(inputs.value).digest("hex")
+  return { result: \`\${digest} after \${previous.length} nodes\` }
 }
 `
+const codeEditorServerSource = codeEditorSource.replace('"node:crypto"\n', '"node:crypto"\nimport { request } from "node:http"\n')
 
 const codeEditorStory: FrontendStory = {
   group: 'Node Task',
@@ -166,16 +168,20 @@ function CodeEditorStory({ dark, log }: { readonly dark: boolean; readonly log: 
   useStoryActions([
     {
       label: serverSource == null ? 'Show server issue' : 'Clear server issue',
-      onClick: () => setServerSource((current) => (current == null ? value : undefined)),
+      onClick: () => {
+        if (serverSource != null) return setServerSource(undefined)
+        setValue(codeEditorServerSource)
+        setServerSource(codeEditorServerSource)
+      },
     },
-    { label: 'Insert syntax error', onClick: () => setValue(codeEditorSource.replace('const text =', 'const text = ; //')) },
+    { label: 'Insert syntax error', onClick: () => setValue(codeEditorSource.replace('const digest =', 'const digest = ; //')) },
     { label: 'Reset source', onClick: () => setValue(codeEditorSource) },
   ])
-  const serverMessage = 'This module cannot use context.fetch in the current engine.'
+  const serverMessage = 'CodeModule "main" cannot import "node:http".'
   const diagnostics = useMemo(
     () => ({
       source: serverSource ?? '',
-      items: serverSource != null ? [{ line: 3, column: 25, message: serverMessage }] : [],
+      items: serverSource != null ? [{ line: 2, column: 1, message: serverMessage }] : [],
     }),
     [serverSource],
   )
