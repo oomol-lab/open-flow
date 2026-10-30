@@ -8,6 +8,7 @@ import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connec
 import type { LlmHost } from '../deployment/llm.ts'
 import type { StoredRun } from '../storage/run-store.ts'
 import type { Store } from '../storage/store.ts'
+import type { ArtifactEvent } from './run-artifacts.ts'
 import type { RunControl } from './run-control.ts'
 
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
@@ -27,6 +28,7 @@ import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { errorKind } from '../logger.ts'
 import { supportsIsolatedVmEngine, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
+import { ArtifactHostError, RunArtifacts } from './run-artifacts.ts'
 import { workflowRunOutcome } from './workflow.ts'
 
 const encoder = new TextEncoder()
@@ -98,6 +100,7 @@ export class RunExecutor {
   readonly workflowResumptions = new Map<string, () => void>()
   readonly #workflowResumeWaiters = new Map<string, Set<() => void>>()
   readonly #toolCalls = new Map<string, { runId: string; jobId: string; abort: AbortController }>()
+  readonly #artifacts: RunArtifacts
 
   constructor(
     store: Store,
@@ -117,6 +120,7 @@ export class RunExecutor {
     this.#subscribeRun = subscribeRun
     this.#invokeWorkflow = invokeWorkflow
     this.#store = store
+    this.#artifacts = new RunArtifacts(store.runs)
     this.#isolatedVm = isolatedVm
     this.#resolveConnector = resolveConnector
     this.#resolveLlm = resolveLlm
@@ -278,15 +282,19 @@ export class RunExecutor {
         }
         launch = { bindingValues, inputs: run.inputs, trigger: run.trigger }
       }
+      const emit = async (event: Parameters<NonNullable<Parameters<IsolatedVmHost['run']>[1]['emit']>>[0] | ArtifactEvent): Promise<void> => {
+        if (event.type == 'run.started' && event.runId == run.runId) return
+        if ((event.type == 'node.completed' || event.type == 'node.failed') && 'jobId' in event) {
+          this.#cancelNodeTools(run.runId, event.jobId)
+          this.#artifacts.discard(run.runId, event.jobId)
+        }
+        const projected = await projectEvent(event)
+        if (projected != null && this.#store.runs.append(run.runId, projected)) this.#runChanged(run.flowId, run.runId)
+      }
       yield* this.#isolatedVm
         .run(flow, {
-          capability: (capabilities, call) => this.#invokeCapability(capabilities, call, this.#connectorContext(run, 'execute'), run, flow),
-          emit: async (event) => {
-            if (event.type == 'run.started' && event.runId == run.runId) return
-            if ((event.type == 'node.completed' || event.type == 'node.failed') && 'jobId' in event) this.#cancelNodeTools(run.runId, event.jobId)
-            const projected = await projectEvent(event)
-            if (projected != null && this.#store.runs.append(run.runId, projected)) this.#runChanged(run.flowId, run.runId)
-          },
+          capability: (capabilities, call) => this.#invokeCapability(capabilities, call, this.#connectorContext(run, 'execute'), run, flow, emit),
+          emit,
           flowId: run.flowId,
           ...launch,
           remainingMs: budgetMs,
@@ -331,7 +339,13 @@ export class RunExecutor {
           projectFailure: (error) => {
             if (error instanceof ConnectorTaskError || error instanceof HttpTaskError || error instanceof WorkflowToolError)
               indeterminate ||= error.indeterminate
-            if (error instanceof ConnectorTaskError || error instanceof TaskHostError || error instanceof HttpTaskError || error instanceof WorkflowToolError)
+            if (
+              error instanceof ConnectorTaskError ||
+              error instanceof TaskHostError ||
+              error instanceof HttpTaskError ||
+              error instanceof WorkflowToolError ||
+              error instanceof ArtifactHostError
+            )
               return { code: error.code, message: error.message, retryable: error.retryable, catchable: error.catchable }
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
           },
@@ -345,6 +359,7 @@ export class RunExecutor {
                 Effect.catch((error) => Effect.sync(() => this.#failRun(run, startedAt, false, error))),
               ),
           }),
+          Effect.ensuring(Effect.sync(() => this.#artifacts.discard(run.runId))),
         )
     })
   }
@@ -510,7 +525,13 @@ export class RunExecutor {
     access: Exclude<ConnectorAccessContext, { readonly scope: 'catalog' }>,
     run: StoredRun,
     flow: PreparedFlow,
+    emit: (event: ArtifactEvent) => Promise<void>,
   ): Promise<RuntimeCapabilityResponse> {
+    if (call.kind.startsWith('artifact.')) {
+      const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
+      if (node?.kind != 'task' || !('moduleId' in node.task)) throw new TaskHostError('capability.denied', 'Artifacts require a Code node invocation.')
+      return await this.#artifacts.invoke(run.runId, call, emit)
+    }
     if (call.kind == 'workflow') {
       const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
       if (node?.kind != 'task' || !('moduleId' in node.task) || call.jobId == null)

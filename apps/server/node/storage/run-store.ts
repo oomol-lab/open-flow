@@ -58,6 +58,14 @@ export interface StoredRun {
   readonly trigger?: TriggerSeed
 }
 
+export interface StoredArtifact {
+  readonly digest: string
+  readonly id: string
+  readonly mediaType?: string
+  readonly name: string
+  readonly size: number
+}
+
 export interface RunStoreOptions {
   readonly maxPendingRuns: number
   readonly runEventRetentionMs: number
@@ -498,6 +506,24 @@ export class RunStore {
     return this.#transaction(() => this.#finishRun(runId, 'indeterminate', result, "status = 'starting'", this.#clock()))
   }
 
+  putArtifact(runId: string, artifact: StoredArtifact, content: Uint8Array): void {
+    this.#database
+      .prepare('INSERT INTO run_artifacts (artifact_id, run_id, name, media_type, size, digest, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(artifact.id, runId, artifact.name, artifact.mediaType ?? null, artifact.size, artifact.digest, content, new Date(this.#clock()).toISOString())
+  }
+
+  artifactBytes(runId: string): number {
+    return (this.#database.prepare('SELECT COALESCE(SUM(size), 0) AS bytes FROM run_artifacts WHERE run_id = ?').get(runId) as { readonly bytes: number }).bytes
+  }
+
+  /** Reads `length` bytes from `offset`; undefined when the Artifact does not belong to the Run. */
+  readArtifact(runId: string, artifactId: string, offset: number, length: number): { readonly content: Uint8Array; readonly size: number } | undefined {
+    const row = this.#database
+      .prepare('SELECT size, substr(content, ?, ?) AS content FROM run_artifacts WHERE run_id = ? AND artifact_id = ?')
+      .get(offset + 1, length, runId, artifactId) as { readonly content: Uint8Array | null; readonly size: number } | undefined
+    return row == null ? undefined : { content: row.content ?? new Uint8Array(0), size: row.size }
+  }
+
   append(runId: string, event: ProjectedRunEvent): boolean {
     return this.#transaction(() => {
       const run = this.#database.prepare('SELECT status, event_count AS eventCount, event_bytes AS eventBytes FROM runs WHERE run_id = ?').get(runId) as {
@@ -889,6 +915,7 @@ export class RunStore {
         this.#database.prepare('DELETE FROM wait_receipts WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM work WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM run_results WHERE run_id = ?').run(runId)
+        this.#database.prepare('DELETE FROM run_artifacts WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM error_dispatches WHERE source_run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM runs WHERE run_id = ?').run(runId)
       }
@@ -1049,6 +1076,15 @@ export class RunStore {
   }
 
   #pruneExpiredEvents(now: number, limit: number): number {
+    // Artifacts are only reachable through their Run events, so they share the event retention.
+    this.#database
+      .prepare(
+        `DELETE FROM run_artifacts WHERE artifact_id IN (
+           SELECT artifact_id FROM run_artifacts JOIN runs USING (run_id)
+           WHERE runs.events_expires_at IS NOT NULL AND runs.events_expires_at <= ? LIMIT ?
+         )`,
+      )
+      .run(now, limit)
     return Number(
       this.#database
         .prepare(

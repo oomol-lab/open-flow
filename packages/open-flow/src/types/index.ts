@@ -22,21 +22,23 @@ export interface ArtifactRef {
   readonly kind: 'artifact'
   readonly id: string
   readonly name: string
-  readonly mediaType: string | undefined
+  readonly mediaType?: string
   readonly size: number
   readonly digest: string
 }
 
 export interface ArtifactPutOptions {
   readonly name: string
-  readonly mediaType?: string | undefined
+  readonly mediaType?: string
 }
 
-export type ArtifactData = Uint8Array | Blob | ReadableStream<Uint8Array>
+/** Strings are stored as UTF-8. */
+export type ArtifactData = string | Uint8Array
 
+/** Artifacts belong to the current Run; an ArtifactRef is JSON and can be passed to downstream nodes. */
 export interface ArtifactCapability {
   put(data: ArtifactData, options: ArtifactPutOptions): Promise<ArtifactRef>
-  open(ref: ArtifactRef): Promise<ReadableStream<Uint8Array>>
+  open(ref: ArtifactRef): Promise<Uint8Array>
 }
 
 export interface MediaPreviewPayload {

@@ -38,15 +38,21 @@ export const isolatedVmLimits: IsolatedVmLimits = {
 
 const v7EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1').digest('hex')}`
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1').digest('hex')}`
+const v8EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1').digest('hex')}`
+
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1').digest('hex')}`
 
 const v6EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1').digest('hex')}`
 
-/** v8 adds workflow tools and HTTP Request; published v7 and v6 retain their execution contracts and digests. */
+/**
+ * v8 adds workflow tools and HTTP Request, and later working Artifacts. Artifact calls under the earlier v8 digest were always
+ * denied, so its Runs execute with the current implementation. Published v7 and v6 retain their execution contracts and digests.
+ */
 export function supportsIsolatedVmEngine(engineContract: string, engineDigest: string): boolean {
   return (
     findEngineContract(engineContract) != null &&
     (engineDigest === isolatedVmEngineDigest ||
+      ((engineContract === 'open-flow-engine/v8' || engineContract === 'open-flow-engine/v8/nodejs-compat-v1') && engineDigest === v8EngineDigest) ||
       ((engineContract === 'open-flow-engine/v7' || engineContract === 'open-flow-engine/v7/nodejs-compat-v1') && engineDigest === v7EngineDigest) ||
       ((engineContract === 'open-flow-engine/v6' || engineContract === 'open-flow-engine/v6/nodejs-compat-v1') && engineDigest === v6EngineDigest))
   )

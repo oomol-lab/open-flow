@@ -6,7 +6,7 @@ import type IsolatedVM from 'isolated-vm'
 import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, IsolatedVmLimits, ParentMessage } from './isolated-vm.ts'
 
 import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
-import { createActions, createWorkflows, findEngineContract, snapshotRuntimeResult } from '@oomol-lab/open-flow/runtime-contract'
+import { createActions, createArtifacts, createWorkflows, findEngineContract, snapshotRuntimeResult } from '@oomol-lab/open-flow/runtime-contract'
 import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
@@ -214,14 +214,12 @@ async function invoke(kind, payload) {
 const snapshotRuntimeResult = ${snapshotRuntimeResult.toString()}
 const createWorkflows = ${createWorkflows.toString()}
 const createActions = ${createActions.toString()}
+const createArtifacts = ${createArtifacts.toString()}
 export const capability = Object.freeze({
   getPrevious: () => invoke('previous', null),
   actions: createActions((payload) => invoke('connector', payload)),
   workflows: createWorkflows((payload) => invoke('workflow', payload)),
-  artifact: Object.freeze({
-    open: (reference) => invoke('artifact.open', reference),
-    put: (input) => invoke('artifact.put', input),
-  }),
+  artifact: createArtifacts(invoke),
   egress: (url) => invoke('egress', { url }),
 })`
 

@@ -207,6 +207,61 @@ export default () => ({ file: fs.existsSync('/tmp/marker'), url: 'taskMarker' in
   },
 ]
 
+/** Reference Artifact Host for the guest chunk protocol; deployments own storage, identity and limits. */
+function artifactHost() {
+  const chunkBytes = 512 * 1024
+  const uploads = new Map<string, Uint8Array[]>()
+  const artifacts = new Map<string, Uint8Array>()
+  const kinds: string[] = []
+  let nextUpload = 0
+  const capability = async (call: RuntimeCapabilityCall): Promise<RuntimeCapabilityResponse> => {
+    kinds.push(call.kind)
+    const payload = call.payload as Readonly<Record<string, JsonValue>>
+    if (call.kind == 'artifact.write') {
+      const upload = typeof payload.upload == 'string' ? payload.upload : `u${++nextUpload}`
+      uploads.set(upload, [...(uploads.get(upload) ?? []), decodeBase64(payload.data!)])
+      return { body: { upload }, status: 200 }
+    }
+    if (call.kind == 'artifact.put') {
+      const parts = [...(typeof payload.upload == 'string' ? (uploads.get(payload.upload) ?? []) : []), decodeBase64(payload.data!)]
+      const bytes = new Uint8Array(parts.reduce((size, part) => size + part.length, 0))
+      parts.reduce((offset, part) => (bytes.set(part, offset), offset + part.length), 0)
+      const id = `a${artifacts.size + 1}`
+      artifacts.set(id, bytes)
+      return {
+        body: {
+          kind: 'artifact',
+          id,
+          name: payload.name!,
+          size: bytes.length,
+          digest: artifactDigest(id),
+          ...(payload.mediaType == null ? {} : { mediaType: payload.mediaType }),
+        },
+        status: 200,
+      }
+    }
+    if (call.kind == 'artifact.read') {
+      const bytes = artifacts.get(String(payload.id))!
+      const offset = Number(payload.offset)
+      return { body: { data: encodeBase64(bytes.subarray(offset, offset + chunkBytes)), size: bytes.length }, status: 200 }
+    }
+    throw new Error(`Unexpected Capability ${call.kind}.`)
+  }
+  return { capability, digest: artifactDigest, kinds: () => kinds }
+}
+
+function decodeBase64(text: JsonValue): Uint8Array {
+  return Uint8Array.from(atob(String(text)), (character) => character.charCodeAt(0))
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''))
+}
+
+function artifactDigest(id: string): string {
+  return `sha256:${id.slice(1).padStart(64, '0')}`
+}
+
 function nodejsCase(name: string, source: string, expected: JsonValue): RuntimeConformanceCase {
   return {
     name,
@@ -488,20 +543,107 @@ export default () => fs.readFileSync('/etc/passwd', 'utf8')`,
     async verify(harness) {
       const calls: RuntimeCapabilityCall[] = []
       const value = await harness.invoke({
+        capabilities: [{ kind: 'connector', action: 'example.read', connections: [] }],
         capability: async (call) => {
           calls.push(call)
           return { body: { accepted: true, echoed: call.payload }, status: 200 }
         },
         input: { issue: 42 },
         invocationId: 'async-capability',
-        program: program(harness, `export default async (input, capability) => capability.artifact.put({ action: 'read', input })`),
+        program: program(harness, `export default async (input, context) => context.actions.example.read(input)`),
       })
-      equal(value, { body: { accepted: true, echoed: { action: 'read', input: { issue: 42 } } }, status: 200 }, 'Capability result')
+      equal(value, { accepted: true, echoed: { action: 'example.read', input: { issue: 42 } } }, 'Capability result')
       equal(
         calls.map(({ invocationId, kind, payload }) => ({ invocationId, kind, payload })),
-        [{ invocationId: 'async-capability', kind: 'artifact.put', payload: { action: 'read', input: { issue: 42 } } }],
+        [{ invocationId: 'async-capability', kind: 'connector', payload: { action: 'example.read', input: { issue: 42 } } }],
         'Capability request',
       )
+    },
+  },
+  {
+    name: 'stores and reads Artifacts through bounded chunks',
+    async verify(harness) {
+      const host = artifactHost()
+      const value = await harness.invoke({
+        capability: host.capability,
+        input: null,
+        invocationId: 'artifact-roundtrip',
+        program: program(
+          harness,
+          `export default async (_input, context) => {
+  const large = new Uint8Array(1200 * 1024).map((_, index) => index % 251)
+  const text = await context.artifact.put('你好', { name: 'greeting.txt', mediaType: 'text/plain' })
+  const binary = await context.artifact.put(large, { name: 'data.bin' })
+  const empty = await context.artifact.put(new Uint8Array(0), { name: 'empty' })
+  const read = await context.artifact.open(binary)
+  return { text, binary, empty, greeting: new TextDecoder().decode(await context.artifact.open(text)),
+    same: read.length == large.length && read.every((byte, index) => byte == large[index]), emptyLength: (await context.artifact.open(empty)).length }
+}`,
+        ),
+      })
+      const ref = (id: string, name: string, size: number, mediaType?: string) => ({
+        kind: 'artifact',
+        id,
+        name,
+        size,
+        digest: host.digest(id),
+        ...(mediaType == null ? {} : { mediaType }),
+      })
+      equal(
+        value,
+        {
+          text: ref('a1', 'greeting.txt', 6, 'text/plain'),
+          binary: ref('a2', 'data.bin', 1200 * 1024),
+          empty: ref('a3', 'empty', 0),
+          greeting: '你好',
+          same: true,
+          emptyLength: 0,
+        },
+        'Artifact roundtrip',
+      )
+      equal(
+        host.kinds(),
+        [
+          'artifact.put',
+          'artifact.write',
+          'artifact.write',
+          'artifact.put',
+          'artifact.put',
+          'artifact.read',
+          'artifact.read',
+          'artifact.read',
+          'artifact.read',
+          'artifact.read',
+        ],
+        'Artifact chunks',
+      )
+    },
+  },
+  {
+    name: 'rejects invalid Artifact arguments before Host dispatch',
+    async verify(harness) {
+      const host = artifactHost()
+      const value = await harness.invoke({
+        capability: host.capability,
+        input: null,
+        invocationId: 'artifact-invalid',
+        program: program(
+          harness,
+          `export default async (_input, context) => {
+  const codes = []
+  for (const call of [() => context.artifact.put({}, { name: 'x' }), () => context.artifact.put('x', {}), () => context.artifact.put('x', { name: 'x', mediaType: 1 }), () => context.artifact.open({ id: 'a1' })]) {
+    try { await call() } catch (error) { codes.push(error.code) }
+  }
+  return codes
+}`,
+        ),
+      })
+      equal(
+        value,
+        Array.from({ length: 4 }, () => 'capability.invalid'),
+        'Artifact validation',
+      )
+      equal(host.kinds(), [], 'Artifact dispatch')
     },
   },
   {
@@ -677,6 +819,81 @@ export interface DecisionTaskInvocation {
   readonly version: 1
 }
 export type InvokeDecisionTask = (invocation: DecisionTaskInvocation) => Promise<LlmTaskResult>
+
+/**
+ * Serialized into the sandbox; keep it self-contained. Transfers bytes as base64 chunks through
+ * `artifact.write`, `artifact.put` and `artifact.read` so each Capability message stays bounded.
+ */
+export function createArtifacts(invoke: (kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>) {
+  const chunkBytes = 512 * 1024
+  // Keep helpers inside the function serialized into the isolated runtime.
+  // eslint-disable-next-line unicorn/consistent-function-scoping
+  const invalid = (message: string): Error => Object.assign(new TypeError(message), { code: 'capability.invalid' })
+  // eslint-disable-next-line unicorn/consistent-function-scoping
+  const encode = (bytes: Uint8Array): string => {
+    let text = ''
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) text += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+    return btoa(text)
+  }
+  // eslint-disable-next-line unicorn/consistent-function-scoping
+  const decode = (text: unknown): Uint8Array => {
+    if (typeof text != 'string') throw new TypeError('Artifact content is invalid.')
+    const binary = atob(text)
+    const bytes = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+    return bytes
+  }
+  return Object.freeze({
+    async put(data: unknown, options: unknown): Promise<JsonValue> {
+      const settings = options as { readonly name?: unknown; readonly mediaType?: unknown } | null
+      if (settings == null || typeof settings != 'object' || typeof settings.name != 'string' || settings.name.length == 0)
+        throw invalid('Artifact name is required.')
+      if (settings.mediaType !== undefined && typeof settings.mediaType != 'string') throw invalid('Artifact mediaType must be a string.')
+      const bytes = typeof data == 'string' ? new TextEncoder().encode(data) : data instanceof Uint8Array ? data : undefined
+      if (bytes == null) throw invalid('Artifact data must be a string or Uint8Array.')
+      const tail = bytes.length == 0 ? 0 : Math.floor((bytes.length - 1) / chunkBytes) * chunkBytes
+      let upload: JsonValue | undefined
+      for (let offset = 0; offset < tail; offset += chunkBytes) {
+        const response = await invoke('artifact.write', {
+          ...(upload === undefined ? {} : { upload }),
+          data: encode(bytes.subarray(offset, offset + chunkBytes)),
+        })
+        upload = (response.body as { readonly upload?: JsonValue } | null)?.upload
+      }
+      const response = await invoke('artifact.put', {
+        ...(upload === undefined ? {} : { upload }),
+        name: settings.name,
+        ...(settings.mediaType === undefined ? {} : { mediaType: settings.mediaType }),
+        data: encode(bytes.subarray(tail)),
+      })
+      return response.body
+    },
+    async open(ref: unknown): Promise<Uint8Array> {
+      const artifact = ref as { readonly kind?: unknown; readonly id?: unknown } | null
+      if (artifact == null || typeof artifact != 'object' || artifact.kind != 'artifact' || typeof artifact.id != 'string')
+        throw invalid('An ArtifactRef is required.')
+      const parts: Uint8Array[] = []
+      let offset = 0
+      let size = 0
+      do {
+        const body = (await invoke('artifact.read', { id: artifact.id, offset })).body as { readonly data?: unknown; readonly size?: unknown } | null
+        const part = decode(body?.data)
+        if (typeof body?.size != 'number' || !Number.isSafeInteger(body.size) || (part.length == 0 && offset < body.size))
+          throw new TypeError('Artifact content is invalid.')
+        size = body.size
+        parts.push(part)
+        offset += part.length
+      } while (offset < size)
+      const bytes = new Uint8Array(offset)
+      let position = 0
+      for (const part of parts) {
+        bytes.set(part, position)
+        position += part.length
+      }
+      return bytes
+    },
+  })
+}
 
 /** Serialized into the sandbox alongside the strict JSON snapshot helper. */
 export function createWorkflows(invoke: (payload: JsonValue) => Promise<RuntimeCapabilityResponse>) {

@@ -414,8 +414,8 @@ export default async (_, context) => { ${body}; return 'unbounded' }`),
           input: null,
           invocationId: 'capability-count-limit',
           program: program(`export default async (_input, capability) => {
-  await capability.artifact.put({ call: 1 })
-  return await capability.artifact.put({ call: 2 })
+  await capability.actions.call('example.echo', { call: 1 })
+  return await capability.actions.call('example.echo', { call: 2 })
 }`),
         },
         { ...isolatedVmLimits, maxCapabilityCalls: 1 },
@@ -429,7 +429,7 @@ export default async (_, context) => { ${body}; return 'unbounded' }`),
           capability: async () => ({ body: 'x'.repeat(256), status: 200 }),
           input: null,
           invocationId: 'capability-response-limit',
-          program: program('export default async (_input, capability) => capability.artifact.put({})'),
+          program: program('export default async (_input, capability) => capability.actions.call("example.echo", {})'),
         },
         { ...isolatedVmLimits, maxCapabilityResponseBytes: 64 },
       ),
@@ -492,7 +492,7 @@ export default async (_, context) => { ${body}; return 'unbounded' }`),
       program: program(
         `export default async (input, capability) => {
   globalThis.count = (globalThis.count ?? 0) + 1
-  return { count: globalThis.count, response: await capability.artifact.put(input) }
+  return { count: globalThis.count, response: await capability.actions.call('example.echo', input) }
 }`,
       ),
     })
@@ -503,14 +503,14 @@ export default async (_, context) => { ${body}; return 'unbounded' }`),
       program: program(
         `export default async (input, capability) => {
   globalThis.count = (globalThis.count ?? 0) + 1
-  return { count: globalThis.count, response: await capability.artifact.put(input) }
+  return { count: globalThis.count, response: await capability.actions.call('example.echo', input) }
 }`,
       ),
     })
 
     await expect(Promise.all([first, second])).resolves.toEqual([
-      { count: 1, response: { body: { value: 'first' }, status: 200 } },
-      { count: 1, response: { body: { value: 'second' }, status: 200 } },
+      { count: 1, response: { action: 'example.echo', input: { value: 'first' } } },
+      { count: 1, response: { action: 'example.echo', input: { value: 'second' } } },
     ])
   })
 
@@ -527,20 +527,20 @@ export default async (_, context) => { ${body}; return 'unbounded' }`),
       },
       input: null,
       invocationId: 'concurrent-canceled',
-      program: program(`export default async (_input, capability) => capability.artifact.put({ wait: true })`),
+      program: program(`export default async (_input, capability) => capability.actions.call('example.echo', { wait: true })`),
       signal: cancellation.signal,
     })
     const completed = host.invoke({
       capability: async () => ({ body: 'completed', status: 200 }),
       input: null,
       invocationId: 'concurrent-completed',
-      program: program(`export default async (_input, capability) => capability.artifact.put({ wait: false })`),
+      program: program(`export default async (_input, capability) => capability.actions.call('example.echo', { wait: false })`),
     })
 
     await started
     cancellation.abort(new Error('Cancel only the first invocation.'))
     await expect(canceled).rejects.toThrow('Cancel only the first invocation.')
-    await expect(completed).resolves.toEqual({ body: 'completed', status: 200 })
+    await expect(completed).resolves.toBe('completed')
   })
 
   it('rejects pending work when closed', async () => {
@@ -556,7 +556,7 @@ export default async (_, context) => { ${body}; return 'unbounded' }`),
       },
       input: null,
       invocationId: 'closed-pending',
-      program: program('export default async (_input, capability) => capability.artifact.put({})'),
+      program: program('export default async (_input, capability) => capability.actions.call("example.echo", {})'),
     })
     await started
     const rejected = expect(pending).rejects.toMatchObject({ code: 'canceled' })
@@ -586,7 +586,7 @@ export default async (_, context) => { ${body}; return 'unbounded' }`),
       },
       input: null,
       invocationId: 'executor-loss',
-      program: program('export default async (_input, capability) => capability.artifact.put({})'),
+      program: program('export default async (_input, capability) => capability.actions.call("example.echo", {})'),
     })
     await started
     const crashed = expect(pending).rejects.toMatchObject({ code: 'executor-crashed' })

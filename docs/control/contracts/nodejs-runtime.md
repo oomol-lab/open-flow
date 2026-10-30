@@ -77,3 +77,27 @@ a workflow without Outputs returns `{}`. Concurrent calls, including `Promise.al
 The calling node remains active and its deadline continues during child Wait or approval. These
 in-memory calls are not restartable JavaScript checkpoints. Ending the node or parent cancels
 unfinished calls; unconfirmed execution remains indeterminate after restart.
+
+## Artifacts
+
+Engine v8 `context.artifact` stores bytes that belong to the current Run, available under both the
+base and the Node compatibility contract. `put(data, { name, mediaType? })` accepts a string (stored
+as UTF-8) or `Uint8Array` and returns `ArtifactRef { kind: 'artifact', id, name, mediaType?, size,
+digest }`, where `digest` is `sha256:` followed by 64 lowercase hexadecimal characters. The reference
+is a JSON value; ports declare it with `contentMediaType: 'oomol/artifact'` and downstream Tasks in the
+same Run read it with `open(ref)`, which resolves to a `Uint8Array`. Blobs and streams are not
+accepted. Each `put` produces a `node.artifact` event.
+
+The public `createArtifacts` guest helper transfers base64 chunks of at most 512 KiB through three
+Capability kinds:
+
+| Kind             | Payload                                               | Response body                     |
+| ---------------- | ----------------------------------------------------- | --------------------------------- |
+| `artifact.write` | `{ upload?, data }`                                   | `{ upload }`                      |
+| `artifact.put`   | `{ upload?, name, mediaType?, data }`, the last chunk | `ArtifactRef`                     |
+| `artifact.read`  | `{ id, offset }`                                      | `{ data, size }`, at most 512 KiB |
+
+Uploads belong to one Task invocation and are discarded when it ends. A reference from another Run is
+denied. Deployments own storage, retention and the per-Artifact and per-Run size limits; exceeding
+them is a non-catchable `limit-exceeded` failure. Invalid arguments fail with `capability.invalid`
+before Host dispatch.
