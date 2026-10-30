@@ -63,6 +63,7 @@
     "./skills/open-flow/references/flow-authoring.md": "./skills/open-flow/references/flow-authoring.md",
     "./skills/open-flow/references/flow-n8n-conversion.md": "./skills/open-flow/references/flow-n8n-conversion.md",
     "./package.json": "./package.json",
+    "./flow-state": "./src/state/common/state.ts",
     "./http-request": "./src/http/common/httpRequest.ts"
   },
   "scripts": {

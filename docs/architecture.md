@@ -166,6 +166,15 @@ Retries must not duplicate accepted execution. If side-effect outcomes cannot be
 Cancellation and completion races must produce one authoritative terminal state.
 The deployment limits concurrency and execution budgets and owns queuing and recovery. Clients must not take ownership of scheduling facts.
 
+### Flow State
+
+State Store owns explicitly written cross-Run business values and deduplication identities.
+Records belong to a Flow and its Run source (`draft` or `live`), independently of Revisions,
+Publications, Run storage and Trigger progress. Deployments own persistence, quotas and lifecycle
+cleanup. Publishing, rollback and editing do not mutate State. State exposes no arbitrary node
+results. Writes persist immediately as ordinary side effects, survive Task failure or cancellation,
+and follow the existing no-replay rule when their outcome is unknown. State is not a secret store.
+
 ### Workflow calls
 
 A Call Workflow Task stores a target Flow ID and a local input/output contract snapshot. Editing does not resolve the target; selection, explicit refresh and deployment checks do. The deployment admits each call against the target's current enabled Live, under the same owner, and fixes that child Run's Revision and authorization normally. Each Publication fixes an interface snapshot with independently nullable inputs and outputs: null means the corresponding Start or Outputs node is absent. Interface reads use this snapshot without loading a Revision. When the saved Revision differs from current Live, compare their published interfaces by named schemas and nullability; unchanged interfaces remain callable, while changes require explicit refresh. Descriptions and port ordering do not affect interface equality. Snapshot provenance is not a historical execution selector. Recursive call chains are rejected.

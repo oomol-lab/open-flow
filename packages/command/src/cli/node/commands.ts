@@ -6,6 +6,9 @@ import { z } from 'zod'
 const edit = ['expected-revision', 'idempotency-key']
 const page = ['cursor', 'limit']
 const commands = [
+  ['state show', '<flow> --scope <draft|live> [--full]', ['scope', 'full']],
+  ['state clear', '<flow> --scope <draft|live> [--key <key>] --yes', ['scope', 'key', 'yes']],
+  ['dedupe clear', '<flow> --scope <draft|live> --space <space> --yes', ['scope', 'space', 'yes']],
   ['canvas', '<flow> (--input JSON|@file|- | --file path|-)', ['input', 'file']],
   ['read', '<flow> [--input JSON|@file|- | --file path|-]', ['input', 'file']],
   ['search', '<flow> (--input JSON|@file|- | --file path|-)', ['input', 'file']],
@@ -60,6 +63,9 @@ const optionDetails: Record<
   string,
   { description: string; type?: string; enum?: readonly string[]; default?: string | number; minimum?: number; maximum?: number }
 > = {
+  'scope': { description: 'Required State scope; never defaults to live.', type: 'string', enum: ['draft', 'live'] },
+  'key': { description: 'Business state key; omit to clear all business values.', type: 'string' },
+  'space': { description: 'Deduplication space: flow or node:<nodeId>.', type: 'string' },
   'revision': { description: 'Exact Revision to read or check; defaults to the current Draft.', type: 'string' },
   'publication': { description: 'Exact Publication ID whose fixed Code connections are read; defaults to the Draft.', type: 'string' },
   'pointer': { description: 'JSON Pointer within the stored result; defaults to the root.', type: 'string' },

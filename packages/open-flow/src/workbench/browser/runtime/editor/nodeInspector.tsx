@@ -37,9 +37,11 @@ import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { ConnectorAccount, TriggerConnection, SavedConnectionReference } from './connectionSettings.tsx'
 import { presentConnectorInputs } from './connectorInputPresentation.ts'
 import { DecisionSection } from './decisionSection.tsx'
+import { DedupeSection } from './dedupeSection.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { EventSourceTriggerConfig } from './eventSourceTriggerConfig.tsx'
+import { FlowStateButton } from './flowStatePanel.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
 import { HttpParameterEditor } from './httpParameterEditor.tsx'
 import { HttpRequestSection } from './httpRequestSection.tsx'
@@ -73,7 +75,8 @@ export function inspectorIcon(node: ResolvedSelection | undefined): IconName {
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
     if (node.definition.executor.kind == 'decision') return 'decision'
     if (node.definition.executor.kind == 'workflow') return 'flow'
-    if (node.definition.executor.kind == 'openapi' || node.definition.executor.kind == 'http-request') return 'task'
+    if (node.definition.executor.kind == 'openapi' || node.definition.executor.kind == 'http-request' || node.definition.executor.kind == 'dedupe')
+      return 'task'
     return node.definition.executor.kind == 'connector' ? 'connection' : 'llm'
   }
   return 'task'
@@ -127,6 +130,8 @@ function nodePurposePlaceholder(
           return t('decision.description')
         case 'workflow':
           return t('workflow.description')
+        case 'dedupe':
+          return undefined
         case 'http-request':
           return t('httpRequest.description')
         case 'openapi':
@@ -642,6 +647,27 @@ export function NodeInspector({
           />
         )}
 
+        {task != null && 'executor' in task && task.executor.kind === 'dedupe' && (
+          <DedupeSection
+            key={`${revision.revision.flowId}:${selection!.id}`}
+            task={task}
+            disabled={disabled}
+            history={
+              store != null && store.$.flowId.value != null ? (
+                <FlowStateButton
+                  key={selection!.id}
+                  client={store.state}
+                  flowId={store.$.flowId.value}
+                  nodeIds={Object.keys(revision.graph()?.nodes ?? {})}
+                  space={task.executor.space === 'flow' ? 'flow' : `node:${selection!.id}`}
+                />
+              ) : undefined
+            }
+            onSave={(before, value) =>
+              store?.nodes.saveTaskSettings(selection!.id, { kind: 'dedupe', name: task.name, before, task: value }) ?? Promise.resolve(false)
+            }
+          />
+        )}
         {isHttpRequest && task != null && 'executor' in task && (
           <HttpRequestSection
             key={`http:${selection?.id}`}

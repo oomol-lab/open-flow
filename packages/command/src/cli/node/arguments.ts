@@ -5,6 +5,9 @@ import { randomUUID } from 'node:crypto'
 import { CliError } from './support.ts'
 
 export interface ParsedArguments {
+  readonly scope?: string
+  readonly key?: string
+  readonly space?: string
   readonly idempotencyKey: string
   readonly expectedPublication?: string
   readonly trigger?: string
@@ -48,6 +51,9 @@ export interface ParsedArguments {
 const runStatuses: ReadonlySet<RunStatus> = new Set(runStatusValues)
 
 export function parseArguments(args: readonly string[]): ParsedArguments {
+  let scope: string | undefined
+  let key: string | undefined
+  let space: string | undefined
   let idempotencyKey = randomUUID() as string
   let expectedPublication: string | undefined
   const positionals: string[] = []
@@ -100,7 +106,13 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       if (options.includes(flag) && flag != 'set' && flag != 'unset') throw new CliError('cli.invalid-arguments', `Duplicate option --${flag}.`)
       options.push(flag)
     }
-    if (argument == '--json') {
+    if (['--scope', '--key', '--space'].includes(argument)) {
+      const value = inlineValue ?? args[++index]
+      if (value == null || value.startsWith('--')) throw new CliError('cli.invalid-arguments', `${argument} requires a value.`)
+      if (argument === '--scope') scope = value
+      else if (argument === '--key') key = value
+      else space = value
+    } else if (argument == '--json') {
       json = true
     } else if (argument == '--follow') {
       follow = true
@@ -207,6 +219,9 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     }
   }
   return {
+    scope,
+    key,
+    space,
     idempotencyKey,
     ...(resultAfter == null ? {} : { resultAfter }),
     ...(maxBytes == null ? {} : { maxBytes }),

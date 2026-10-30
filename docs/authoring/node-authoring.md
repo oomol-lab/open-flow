@@ -270,3 +270,14 @@ Outputs are always `body`, `statusCode`, and `headers`. JSON arrays remain a sin
 The node supports ordinary `retry` and `onError`; it has no separate error execution edge.
 Use `statusPolicy: "all"` to inspect non-2xx responses with a Condition node. Network and parsing
 failures still fail. See the Control API HTTP Request contract for wire formats and limits.
+
+## Remove Duplicates
+
+Public type `dedupe` uses config `{ field, mode, space }`. Field is a dot-separated identity path;
+an empty path uses the scalar item itself. Mode defaults to `new`, with `increasing` available for
+monotonic numbers or RFC 3339 timestamps. Space defaults to `node`; `flow` shares Code dedupe
+history. Bind the fixed `items` array input. Outputs `items` and `duplicates` retain input order.
+History records immediately: downstream failure does not roll it back, so later Runs skip those
+items. New node IDs start independent histories; renaming preserves history. Deleted node spaces
+remain until explicitly cleared. Limits belong to the deployment, not node configuration.
+The node supports `onError: "stop" | "error"` but does not support retries.

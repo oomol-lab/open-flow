@@ -6,9 +6,11 @@ import type { EventSourceControl } from './event-source-control.ts'
 import type { FlowControl } from './flow-control.ts'
 import type { PublicationControl } from './publication-control.ts'
 import type { RunControl } from './run-control.ts'
+import type { StateControl } from './state-control.ts'
 import type { VariableControl } from './variable-control.ts'
 
 export interface ControlService {
+  readonly state: StateControl
   readonly access: ControlAccess
   readonly eventSources: EventSourceControl
   readonly variables: VariableControl

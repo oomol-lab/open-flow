@@ -1,5 +1,20 @@
 # Public contracts and version evolution
 
+## Flow State: pending Model v13 and Engine v10
+
+The implementation baseline checked on 2026-10-30 is published beta.76, gitHead
+`fd93811d8fdccc98be4511a43106bbc0fb7a6572`. Its tarball establishes Model v12 / Engine v9.
+Model v13 adds the dedupe executor; older model envelopes reject it. Engine v10 adds Code
+`context.state` and `context.dedupe`; earlier engines reject dedupe nodes and expose neither API.
+Existing v9 Publications and Runs retain their contract and isolation digest. The new runtime
+digest appends `state/1`. Revisions and checkpoints are not rewritten. Migration 57 creates
+Flow State tables and a durable Run write counter. Flow deletion removes all State records.
+
+Upgrade Server and clients together. Cloud must implement tenant D1 persistence and quotas,
+execution-protocol forwarding, Code capabilities, dedupe execution and lifecycle cleanup before
+releasing clients which require v10. Cloud integration is a separate repository task; this
+implementation does not establish Cloud conformance.
+
 ## Code runtime alignment: pending Flow model v12 and Engine v9
 
 The latest published next-tag artifact `@oomol-lab/open-flow@0.1.0-beta.75` (gitHead

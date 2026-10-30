@@ -8,6 +8,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'flow-state',
+    entry: { kind: 'cron' },
+    name: 'Fetch only new HTTP items',
+    version: 1,
+    task: 'Create an hourly Cron trigger, an HTTP Request that fetches a JSON list using an unbound url input, and a Remove Duplicates node using the id field in its node space. Return items and duplicates through Outputs. Rename the dedupe node to New items in a later edit without changing its mode, space or bindings. Check the workflow. Verification supplies the HTTP URL and simulates two Cron Runs against the same list; the second Run must return no new items.',
+  },
+  {
     id: 'http-request',
     entry: { kind: 'start' },
     name: 'Call an HTTP endpoint',
@@ -208,6 +215,7 @@ function source(nodeId: string, handle: string, from: string, output: string): C
 }
 export function initialOperations(id: string): ChangeOperation[] {
   if (
+    id == 'flow-state' ||
     id == 'http-request' ||
     id == 'poll-batch' ||
     id == 'wait-auto-continue' ||
@@ -405,6 +413,8 @@ export function samples(id: string, stage = 0): Sample[] {
         })),
       },
     }))
+  if (id == 'flow-state')
+    return ['first', 'second'].map((name) => ({ name, orders: [], order, outputs: { scheduledAt: '2026-10-30T00:00:00Z' }, parameters: { url: '' } }))
   if (id == 'http-request')
     return [null, { message: 'Hello', count: 0 }].map((payload) => ({
       name: payload == null ? 'null-body' : 'json-body',
@@ -512,6 +522,17 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
       manual.autoContinue == null
       ? []
       : ['Preserve the relative timer and input, configure the date timer, and clear the manual timer.']
+  }
+  if (id === 'flow-state') {
+    const filtered = Object.values(current.document.graph.nodes).find((candidate) => candidate.name === 'New items')
+    return filtered?.kind === 'task' &&
+      'executor' in filtered.task &&
+      filtered.task.executor.kind === 'dedupe' &&
+      filtered.task.executor.field === 'id' &&
+      filtered.task.executor.mode === 'new' &&
+      filtered.task.executor.space === 'node'
+      ? []
+      : ['Preserve the dedupe configuration while renaming.']
   }
   if (id == 'http-request') {
     const requestNode = Object.values(current.document.graph.nodes).find((candidate) => candidate.name == 'Send request updated')

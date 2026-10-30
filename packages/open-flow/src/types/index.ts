@@ -119,6 +119,17 @@ export interface TaskContext<
   readonly inputs: Readonly<Record<string, unknown>>
   readonly runId: string
   readonly blockId: string
+  readonly state: {
+    get(key: string): Promise<JsonValue | null>
+    set(key: string, value: JsonValue): Promise<void>
+    insert(key: string, value: Exclude<JsonValue, null>): Promise<boolean>
+    delete(key: string): Promise<void>
+    list(): Promise<string[]>
+  }
+  readonly dedupe: {
+    insert(ids: readonly (string | number)[]): Promise<boolean[]>
+    has(ids: readonly (string | number)[]): Promise<boolean[]>
+  }
   readonly artifact: ArtifactCapability
   /** Reads the selected direct predecessors, sorted by node ID; empty for a graph root. */
   getPrevious(): Promise<readonly PreviousNode[]>

@@ -51,6 +51,7 @@ import { remapInputMappings, renamedPort, renameOutputMapping } from '../../../.
 import { renamePromptInput } from '../../../../flow/common/promptTemplate.ts'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { httpRequestTask, httpRequestInputs, withHttpParameterFields, withHttpParameterSource } from '../../../../http/common/httpRequest.ts'
+import { dedupeTask } from '../../../../state/common/state.ts'
 import { withWorkflowTask } from '../../../../workflow/common/workflow.ts'
 import { feishuResourceKind, supportsFeishuChatFilter } from './feishuEventConfig.ts'
 
@@ -133,6 +134,7 @@ interface TaskSettingsBase {
 export type TaskSettings =
   | (TaskSettingsBase & { readonly kind: 'workflow'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'decision'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
+  | (TaskSettingsBase & { readonly kind: 'dedupe'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'http-request'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'openapi'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'agent'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
@@ -147,6 +149,7 @@ export type AddNodeIntent =
   | { readonly kind: 'outputs'; readonly name: string }
   | { readonly kind: 'decision'; readonly name: string }
   | { readonly kind: 'http-request'; readonly name: string }
+  | { readonly kind: 'dedupe'; readonly name: string }
   | { readonly kind: 'openapi'; readonly name: string }
   | { readonly kind: 'workflow'; readonly name: string }
   | { readonly kind: 'agent'; readonly name: string; readonly prompt?: string; readonly outputDescription?: string }
@@ -213,6 +216,9 @@ export function addNode(revision: RevisionView, nodeId: string, intent: AddNodeI
       break
     case 'decision':
       changes = createDecisionTask({ nodeId }, intent.name)
+      break
+    case 'dedupe':
+      changes = createManagedTask({ nodeId }, dedupeTask(undefined, intent.name))
       break
     case 'http-request':
       changes = createManagedTask({ nodeId }, httpRequestTask(undefined, intent.name))
@@ -423,6 +429,7 @@ export function updateTask(revision: RevisionView, nodeId: string, settings: Tas
       return [{ kind: 'graph.node.replace', nodeId, before: node, node: next }]
     }
     case 'decision':
+    case 'dedupe':
     case 'http-request':
     case 'openapi':
     case 'agent': {

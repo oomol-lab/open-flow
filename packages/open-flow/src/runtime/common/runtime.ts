@@ -5,6 +5,58 @@ import { currentEngineContract } from './engineContract.ts'
 
 export { currentEngineContract, nodejsEngineContract, findEngineContract, type EngineContract } from './engineContract.ts'
 
+/** Serialized into the guest; keep validation and helpers self-contained. */
+export function createState(invoke: (kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>) {
+  // Serialized into the guest together with this factory.
+  // oxlint-disable-next-line unicorn/consistent-function-scoping
+  const invalid = (message: string) => Object.assign(new TypeError(message), { code: 'capability.invalid' })
+  const keyOf = (key: unknown) => {
+    if (typeof key !== 'string' || key.length === 0 || new TextEncoder().encode(key).length > 256) throw invalid('State keys require 1 to 256 UTF-8 bytes.')
+    return key
+  }
+  const valueOf = (value: unknown): JsonValue => {
+    if (value === undefined) throw invalid('State values must be JSON.')
+    try {
+      return (snapshotRuntimeResult({ value }) as { value: JsonValue }).value
+    } catch {
+      throw invalid('State values must be JSON.')
+    }
+  }
+  const idsOf = (ids: unknown): (string | number)[] => {
+    if (!Array.isArray(ids) || !Array.from(ids).every((id) => typeof id === 'string' || (typeof id === 'number' && Number.isFinite(id))))
+      throw invalid('Identities must be strings or finite numbers.')
+    return ids
+  }
+  return {
+    state: Object.freeze({
+      async get(key: unknown) {
+        return ((await invoke('state.get', { key: keyOf(key) })).body as { value: JsonValue }).value
+      },
+      async set(key: unknown, value: unknown) {
+        await invoke('state.set', { key: keyOf(key), value: valueOf(value) })
+      },
+      async insert(key: unknown, value: unknown) {
+        if (value === null) throw invalid('State insert does not accept null.')
+        return ((await invoke('state.insert', { key: keyOf(key), value: valueOf(value) })).body as { inserted: boolean }).inserted
+      },
+      async delete(key: unknown) {
+        await invoke('state.delete', { key: keyOf(key) })
+      },
+      async list() {
+        return ((await invoke('state.list', {})).body as { keys: string[] }).keys
+      },
+    }),
+    dedupe: Object.freeze({
+      async insert(ids: unknown) {
+        return ((await invoke('dedupe.insert', { ids: idsOf(ids) })).body as { inserted: boolean[] }).inserted
+      },
+      async has(ids: unknown) {
+        return ((await invoke('dedupe.has', { ids: idsOf(ids) })).body as { present: boolean[] }).present
+      },
+    }),
+  }
+}
+
 export type RuntimeModule = Pick<CodeModule, 'imports' | 'source'>
 
 /** Snapshot a Task result before JSON transport can discard or coerce invalid values. */
@@ -391,6 +443,70 @@ async function rejects(operation: Promise<unknown>, pattern: RegExp, message: st
 }
 
 export const runtimeConformanceCases: readonly RuntimeConformanceCase[] = [
+  {
+    name: 'cancels detached State work when its Task finishes',
+    async verify(harness) {
+      let aborted = false
+      const result = await harness.invoke({
+        input: null,
+        invocationId: 'state-detached',
+        capability: async ({ signal }) =>
+          await new Promise((resolve) => {
+            signal.addEventListener(
+              'abort',
+              () => {
+                aborted = true
+                resolve({ status: 200, body: null })
+              },
+              { once: true },
+            )
+          }),
+        program: program(
+          harness,
+          `export default async (_, context) => {
+          void context.state.set('detached', 1);
+          await new Promise(resolve => setTimeout(resolve, 20));
+          return null;
+        }`,
+        ),
+      })
+      equal(result, null, 'Detached State Task result')
+      equal(aborted, true, 'Detached State cancellation')
+    },
+  },
+  {
+    name: 'rejects non-JSON State values and invalid identities before Host dispatch',
+    async verify(harness) {
+      let calls = 0
+      const result = await harness.invoke({
+        input: null,
+        invocationId: 'state-invalid',
+        capability: async () => {
+          calls += 1
+          return { status: 200, body: null }
+        },
+        program: program(
+          harness,
+          `export default async (_, context) => {
+          const cyclic = {}; cyclic.self = cyclic;
+          const invalid = [undefined, NaN, Infinity, new Date(), { x: undefined }, cyclic, [undefined], { x: () => 1 }];
+          const errors = [];
+          for (const value of invalid) { try { await context.state.set('key', value); errors.push('accepted'); } catch (e) { errors.push(e.code); } }
+          for (const call of [() => context.state.get(''), () => context.state.get('x'.repeat(257)), () => context.state.insert('x', null), () => context.dedupe.insert([NaN]), () => context.dedupe.has([null]), () => context.dedupe.insert(new Array(1))]) {
+            try { await call(); errors.push('accepted'); } catch (e) { errors.push(e.code); }
+          }
+          return errors;
+        }`,
+        ),
+      })
+      equal(
+        result,
+        Array.from({ length: 14 }, () => 'capability.invalid'),
+        'State boundary validation',
+      )
+      equal(calls, 0, 'State invalid dispatch')
+    },
+  },
   {
     name: 'rejects Task results that JSON transport would discard or coerce',
     async verify(harness) {

@@ -130,3 +130,40 @@ Uploads belong to one Task invocation and are discarded when it ends. A referenc
 denied. Deployments own storage, retention and the per-Artifact and per-Run size limits; exceeding
 them is a non-catchable `limit-exceeded` failure. Invalid arguments fail with `capability.invalid`
 before Host dispatch.
+
+## Flow State (Engine v10)
+
+Code receives `context.state.get(key)`, `set(key, value)`, `insert(key, value)`, `delete(key)` and
+`list()`. Keys contain 1 to 256 UTF-8 bytes. Values are strictly JSON, checked before serialization.
+Get returns an independent value or null; list returns sorted keys. Set with null deletes. Insert
+rejects null and returns false without replacing an existing key. Writes persist immediately,
+even if the Task subsequently fails or the Run is canceled. State is not a credential store.
+
+`context.dedupe.insert(ids)` returns aligned booleans indicating newly recorded identities;
+`has(ids)` only checks membership. Identities are strings or finite numbers. Public common code
+hashes UTF-8 `${typeof id}:${String(id)}` with SHA-256 and retains its first 16 bytes; -0 equals 0.
+No original identities are stored. Code uses only the shared `flow` space; node spaces are private.
+Run source fixes isolated Draft or Live scope. Calls after Task or Run termination are denied.
+Agent code tools do not receive State. State calls emit no events and do not log values.
+
+Increasing mode compares finite numbers numerically or RFC 3339 timestamps by epoch milliseconds.
+Timestamps require seconds, an explicit Z or numeric timezone and at most three fractional digits.
+Invalid dates or mixed types (including the saved watermark) fail the whole batch. Items compare
+to the initial watermark, equal values count once, and the maximum is committed after the batch.
+Input order is retained. Empty batches preserve the watermark in the same mode; switching modes resets the space even with an empty batch. Code insert resets increasing spaces
+to set mode atomically; Code has rejects increasing spaces without changing them.
+
+Capability kinds and payloads: `state.get`/`state.delete` use `{ key }`, `state.set`/`state.insert`
+use `{ key, value }`, `state.list` uses `{}`, and `dedupe.insert`/`dedupe.has` use `{ ids }`.
+Responses respectively contain `{ value }`, null, null, `{ inserted }`, `{ keys }`,
+`{ inserted }` and `{ present }`. Invalid parameters fail with `capability.invalid`.
+Exhausted identity or space slots fail with catchable `dedupe.full`; exhausted saved-key slots, oversized values or the write budget fail with
+non-catchable `limit-exceeded`. Capacity failure writes nothing, while all-duplicate batches still
+succeed at capacity. Mode switches and record counts commit in the same transaction.
+
+Default limits per Flow/source are 1,000 saved keys, 64 KiB per JSON value, 10,000 identities shared across all spaces, 100 spaces, and
+1,000 attempted writes per Run. Each set/insert/delete or dedupe batch consumes one durable write
+allowance, including failed writes. Reads consume no
+write allowance. Publishing, rollback and node editing do not clear history.
+
+State count limits allow updates and deletion at capacity. Keys and dedupe space names are limited to 256 UTF-8 bytes. Watermark spaces consume one space slot but no identity slots. Switching mode releases the previous identities atomically; rejected batches preserve the previous state. There is no separate total byte quota.

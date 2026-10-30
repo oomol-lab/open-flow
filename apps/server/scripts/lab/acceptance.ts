@@ -25,6 +25,18 @@ export function runtimeAssertions(
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id === 'flow-state') {
+    const result = events.find((event) => event.kind === 'run.completed')?.payload.result
+    const items = [
+      { id: 1, title: 'One' },
+      { id: 2, title: 'Two' },
+    ]
+    const duplicate = { id: 1, title: 'Duplicate' }
+    const expected = sample.name === 'first' ? { items, duplicates: [duplicate] } : { items: [], duplicates: [...items, duplicate] }
+    if (result == null || typeof result !== 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, expected))
+      errors.push('Persist history between Cron Runs and return only new HTTP items, preserving order.')
+    return errors
+  }
   if (id == 'http-request') {
     const result = events.find((event) => event.kind == 'run.completed')?.payload.result
     const expected = { body: { body: sample.outputs?.payload, tags: ['a b', 'c'], header: 'lab', authenticated: true }, statusCode: 201 }

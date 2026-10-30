@@ -1673,3 +1673,51 @@ Agent workflow responses use the existing saved-result and `read_result` paging 
 result source `{ kind: "workflow", flowId }`. Tool approval and model parameter schemas use the
 same machinery as connector tools. Parent and child event logs remain separate. Tool waits retain
 memory and consume the parent's deadlines; they do not add durable JavaScript checkpoints.
+
+## Flow State
+
+Model v13 / Engine v10 adds explicit persistent Flow State. State belongs to a Flow and the
+Run source (`draft` or `live`); neither publication nor rollback copies or resets it. These
+management operations require the same Flow access as editing. They do not change a Revision.
+
+| Method | Path                       | Query                                                                       | Success                             |
+| ------ | -------------------------- | --------------------------------------------------------------------------- | ----------------------------------- |
+| GET    | `/v1/flows/:flowId/state`  | Required `scope=draft\|live`; optional `values=true\|false` (default false) | `200 FlowStateView`                 |
+| DELETE | `/v1/flows/:flowId/state`  | Required `scope`; optional `key`                                            | `200 { version: 1, cleared: true }` |
+| DELETE | `/v1/flows/:flowId/dedupe` | Required `scope` and `space=flow\|node:<nodeId>`                            | `200 { version: 1, cleared: true }` |
+
+Unknown query fields, omitted/invalid scope, invalid boolean values, empty/oversized keys and
+invalid space names are rejected with `400 flow.invalid`. DELETE is idempotent; an absent key
+or space is already clear. Clearing business values does not clear dedupe history, and clearing
+a dedupe space does not touch business values or other spaces.
+
+`FlowStateView` and its schema are exported from `@oomol-lab/open-flow/flow-state`. Its root has
+`version: 1`, `scope`, deployment `limits`, `values`, and `spaces`. Value entries
+contain `key`, JSON UTF-8 byte `size`, and epoch-millisecond `updatedAt`; `value` is included only when
+requested. Space entries contain `space`, `mode`, `count`, `watermark`, and epoch-millisecond
+`updatedAt`. Hashes and original identity lists are never returned. Deleted-node spaces remain
+visible until explicitly cleared. Limits are `maxValueBytes` (65,536), `maxValues` (1,000), `maxIdentities` (10,000),
+`maxSpaces` (100), and `maxRunWrites` (1,000). Each Flow/source has independent limits.
+Identity counts are shared across all spaces; watermark spaces consume only a space slot.
+There is no total byte quota. Updates to existing keys and duplicate-only batches remain allowed at capacity.
+
+The public client exposes `getFlowState(flowId, scope, values?)`,
+`clearFlowState(flowId, scope, key?)`, and `clearFlowDedupe(flowId, scope, space)`. CLI and MCP
+use this same deployment service:
+
+```bash
+oo flow state show FLOW --scope draft
+oo flow state show FLOW --scope live --full
+oo flow state clear FLOW --scope draft --key cursor --yes
+oo flow dedupe clear FLOW --scope live --space node:filter --yes
+```
+
+CLI clearing requires `--yes`. MCP tools are `flow_state`, `flow_state_clear`, and
+`flow_dedupe_clear`; each requires an explicit `scope`. Workbench defaults to Draft and asks
+for separate confirmation before clearing Live. Live clearing immediately affects future
+membership checks and may cause items to be processed again.
+
+The `dedupe` authoring node owns its `items` array input and `items` / `duplicates` array outputs.
+Callers supply `config: { field, mode, space }` and input mappings; they do not construct executor
+ports. See [Node authoring](../../authoring/node-authoring.md) and the
+[State runtime contract](nodejs-runtime.md) for record timing, watermark comparison and quotas.

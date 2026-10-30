@@ -6,7 +6,7 @@ import { NodeToolbar, useStore, useViewport } from '@xyflow/react'
 import { memo, useContext } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
-import { NodeActions } from '../../../../../canvas/browser/nodeActions.tsx'
+import { NodeActions, NodeHistoryContext } from '../../../../../canvas/browser/nodeActions.tsx'
 import { Button } from '../../../../../ui/browser/button.tsx'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '../../../../../ui/browser/context-menu.tsx'
 import { coalesce, toTrue } from '../../../base/trivial.ts'
@@ -40,8 +40,10 @@ function InFlowCanvas({ canvasStore }: SharedProps) {
   const editable = useVal(canvasStore.$.editable)
   const semantic = NodeStore.to(nodeStore)
   const ignored = useVal(semantic?.ignore)
+  const history = useContext(NodeHistoryContext)?.(nodeStore.nodeId)
   return (
     <NodeActions
+      history={history}
       className={styles.action}
       contentClassName={styles.menu}
       container={container()}
@@ -116,8 +118,10 @@ type ContextMenuItem = ContextMenuActionItem | false | undefined
 function useNodeMenuItems({ t, nodeStore, onDelete, editable }: Params): ContextMenuItem[] {
   const skip = useVal(NodeStore.to(nodeStore)?.ignore)
   const { duplicateNode } = nodeStore
+  const history = useContext(NodeHistoryContext)?.(nodeStore.nodeId)
 
   return coalesce<ContextMenuItem>([
+    history && { ...history, key: '$history', icon: <i aria-hidden="true" className="i-lucide-light:database" /> },
     editable &&
       duplicateNode && {
         label: t('nodeActions.duplicate'),

@@ -7,6 +7,7 @@ import type { LlmHost } from '../deployment/llm.ts'
 import type { IntegrationOptions } from '../runtime/integration-runtime.ts'
 
 export interface ServerRuntime {
+  readonly stateLimits?: Partial<typeof import('../storage/state-store.ts').stateLimits>
   readonly maxConcurrentRuns?: number
   readonly maxPendingRuns?: number
   readonly runEventRetentionMs?: number
@@ -51,6 +52,7 @@ function parseOrigin(value: string, label: string): URL {
 }
 
 export function validateRuntime(runtime: ServerRuntime): void {
+  for (const [name, value] of Object.entries(runtime.stateLimits ?? {})) validatePositiveInteger(value, `State limit ${name} must be a positive safe integer.`)
   validatePositiveInteger(runtime.runEventRetentionMs, 'Run event retention must be a positive safe integer number of milliseconds.')
   validatePositiveInteger(runtime.maxPendingRuns, 'Maximum pending Runs must be a positive safe integer.')
   validatePositiveInteger(runtime.maxConcurrentRuns, 'Maximum concurrent Runs must be a positive safe integer.')
