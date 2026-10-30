@@ -157,12 +157,13 @@ Capability kinds and payloads: `state.get`/`state.delete` use `{ key }`, `state.
 use `{ key, value }`, `state.list` uses `{}`, and `dedupe.insert`/`dedupe.has` use `{ ids }`.
 Responses respectively contain `{ value }`, null, null, `{ inserted }`, `{ keys }`,
 `{ inserted }` and `{ present }`. Invalid parameters fail with `capability.invalid`.
-A full space fails with catchable `dedupe.full`; a full Flow or exhausted write budget fails with
+Exhausted identity or space slots fail with catchable `dedupe.full`; exhausted saved-key slots, oversized values or the write budget fail with
 non-catchable `limit-exceeded`. Capacity failure writes nothing, while all-duplicate batches still
-succeed at capacity. Mode switches and accounting commit in the same transaction.
+succeed at capacity. Mode switches and record counts commit in the same transaction.
 
-Default limits are 64 KiB per JSON value, 2 MiB per Flow/source, 10,000 identities per space and
+Default limits per Flow/source are 1,000 saved keys, 64 KiB per JSON value, 10,000 identities shared across all spaces, 100 spaces, and
 1,000 attempted writes per Run. Each set/insert/delete or dedupe batch consumes one durable write
-allowance, including failed writes. Values cost UTF-8 key bytes plus serialized JSON bytes plus
-64 bytes; identities cost 96 bytes and a nonempty watermark costs 96 bytes. Reads consume no
+allowance, including failed writes. Reads consume no
 write allowance. Publishing, rollback and node editing do not clear history.
+
+State count limits allow updates and deletion at capacity. Keys and dedupe space names are limited to 256 UTF-8 bytes. Watermark spaces consume one space slot but no identity slots. Switching mode releases the previous identities atomically; rejected batches preserve the previous state. There is no separate total byte quota.

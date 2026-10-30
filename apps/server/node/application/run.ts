@@ -444,10 +444,15 @@ export class RunExecutor {
         const space = executor.space === 'flow' ? 'flow' : `node:${invocation.nodeId}`
         const inserted = this.#store.state.insert(run.flowId, run.source, space, executor.mode, ids, hashes)
         if (executor.mode === 'new') {
-          const count = this.#store.state.dedupeCount(run.flowId, run.source, space)
+          const count = this.#store.state.dedupeCount(run.flowId, run.source)
           const limit = this.#store.state.limits.maxIdentities
           if (count >= limit * 0.8)
-            await report({ code: 'dedupe.near-limit', count, limit, message: 'History is at least 80% full. Clear it or use increasing mode.' })
+            await report({
+              code: 'dedupe.near-limit',
+              count,
+              limit,
+              message: 'Flow deduplication history is at least 80% full. Clear history or use increasing mode.',
+            })
         }
         const values = items as JsonValue[]
         return { items: values.filter((_, index) => inserted[index]), duplicates: values.filter((_, index) => !inserted[index]) }

@@ -4,9 +4,8 @@ import type { DatabaseSync } from 'node:sqlite'
 
 import { increasingIdentities, StateError } from '@oomol-lab/open-flow/flow-state'
 
-export const stateLimits = { maxValueBytes: 64 * 1024, maxBytes: 2 * 1024 * 1024, maxIdentities: 10_000, maxRunWrites: 1_000 }
+export const stateLimits = { maxValueBytes: 64 * 1024, maxValues: 1_000, maxSpaces: 100, maxIdentities: 10_000, maxRunWrites: 1_000 }
 type SpaceRow = { mode: 'new' | 'increasing'; count: number; watermark_json: string | null; updated_at: number }
-const identityBytes = 96
 
 export class StateStore {
   readonly database: DatabaseSync
@@ -55,15 +54,19 @@ export class StateStore {
       const json = JSON.stringify(value)
       const bytes = Buffer.byteLength(json)
       if (value !== null && bytes > this.limits.maxValueBytes) throw new StateError('limit-exceeded', 'State value exceeds its size limit.')
-      const size = value === null ? 0 : Buffer.byteLength(key) + bytes + 64
-      this.#usage(flowId, scope, size - (previous?.size ?? 0))
+      if (value !== null && previous == null) {
+        const { count } = this.database.prepare('SELECT COUNT(*) AS count FROM flow_state_values WHERE flow_id = ? AND scope = ?').get(flowId, scope) as {
+          count: number
+        }
+        if (count >= this.limits.maxValues) throw new StateError('limit-exceeded', 'Flow state entry limit exceeded.')
+      }
       if (value === null) this.database.prepare('DELETE FROM flow_state_values WHERE flow_id = ? AND scope = ? AND key = ?').run(flowId, scope, key)
       else
         this.database
           .prepare(
             'INSERT INTO flow_state_values VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (flow_id, scope, key) DO UPDATE SET value_json = excluded.value_json, size = excluded.size, updated_at = excluded.updated_at, updated_run_id = excluded.updated_run_id',
           )
-          .run(flowId, scope, key, json, size, this.clock(), runId)
+          .run(flowId, scope, key, json, bytes, this.clock(), runId)
       return true
     })
   }
@@ -87,7 +90,13 @@ export class StateStore {
       const old = this.#space(flowId, scope, space)
       if (ids.length === 0 && (old == null || old.mode === mode)) return []
       const previous = old?.mode === mode ? old : undefined
-      const oldBytes = old == null ? 0 : old.mode === 'new' ? old.count * identityBytes : old.watermark_json == null ? 0 : identityBytes
+      if (Buffer.byteLength(space) > 256) throw new StateError('capability.invalid', 'Deduplication space names must not exceed 256 UTF-8 bytes.')
+      if (old == null) {
+        const { count } = this.database.prepare('SELECT COUNT(*) AS count FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ?').get(flowId, scope) as {
+          count: number
+        }
+        if (count >= this.limits.maxSpaces) throw new StateError('dedupe.full', 'Flow deduplication space limit reached. Clear unused history.')
+      }
       const now = this.clock()
       let inserted: boolean[]
       let watermark: DedupeIdentity | null = null
@@ -107,9 +116,9 @@ export class StateStore {
           return fresh
         })
         count = (previous?.count ?? 0) + inserted.filter(Boolean).length
-        if (count > this.limits.maxIdentities) throw new StateError('dedupe.full', 'Deduplication space is full. Clear history or use increasing mode.')
+        if (this.dedupeCount(flowId, scope) - (old?.count ?? 0) + count > this.limits.maxIdentities)
+          throw new StateError('dedupe.full', 'Flow deduplication history is full. Clear history or use increasing mode.')
       }
-      this.#usage(flowId, scope, (mode === 'new' ? count * identityBytes : watermark == null ? 0 : identityBytes) - oldBytes)
       if (old != null && previous == null)
         this.database.prepare('DELETE FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space = ?').run(flowId, scope, space)
       if (mode === 'new') {
@@ -127,25 +136,24 @@ export class StateStore {
     })
   }
 
-  dedupeCount(flowId: string, scope: StateScope, space: string): number {
-    return this.#space(flowId, scope, space)?.count ?? 0
+  dedupeCount(flowId: string, scope: StateScope): number {
+    return (
+      this.database.prepare('SELECT COALESCE(SUM(count), 0) AS count FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ?').get(flowId, scope) as {
+        count: number
+      }
+    ).count
   }
 
   clearValues(flowId: string, scope: StateScope, key?: string): void {
     this.transaction(() => {
       const where = key == null ? 'flow_id = ? AND scope = ?' : 'flow_id = ? AND scope = ? AND key = ?'
       const args = key == null ? [flowId, scope] : [flowId, scope, key]
-      const row = this.database.prepare(`SELECT COALESCE(SUM(size), 0) AS bytes FROM flow_state_values WHERE ${where}`).get(...args) as { bytes: number }
-      this.#usage(flowId, scope, -row.bytes)
       this.database.prepare(`DELETE FROM flow_state_values WHERE ${where}`).run(...args)
     })
   }
 
   clearSpace(flowId: string, scope: StateScope, space: string): void {
     this.transaction(() => {
-      const old = this.#space(flowId, scope, space)
-      if (old == null) return
-      this.#usage(flowId, scope, -(old.mode === 'new' ? old.count * identityBytes : old.watermark_json == null ? 0 : identityBytes))
       this.database.prepare('DELETE FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space = ?').run(flowId, scope, space)
       this.database.prepare('DELETE FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ? AND space = ?').run(flowId, scope, space)
     })
@@ -162,7 +170,6 @@ export class StateStore {
       version: 1,
       scope,
       limits: this.limits,
-      bytes: this.#bytes(flowId, scope),
       values: values.map((row) =>
         Object.assign(
           { key: row.key, size: row.size, updatedAt: row.updated_at },
@@ -183,21 +190,5 @@ export class StateStore {
     return this.database.prepare('SELECT * FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ? AND space = ?').get(flowId, scope, space) as
       | SpaceRow
       | undefined
-  }
-
-  #bytes(flowId: string, scope: StateScope): number {
-    return (
-      (this.database.prepare('SELECT bytes FROM flow_state_usage WHERE flow_id = ? AND scope = ?').get(flowId, scope) as { bytes: number } | undefined)
-        ?.bytes ?? 0
-    )
-  }
-
-  #usage(flowId: string, scope: StateScope, delta: number): void {
-    if (delta === 0) return
-    const bytes = this.#bytes(flowId, scope) + delta
-    if (bytes > this.limits.maxBytes) throw new StateError('limit-exceeded', 'Flow state exceeds its size limit.')
-    this.database
-      .prepare('INSERT INTO flow_state_usage VALUES (?, ?, ?) ON CONFLICT (flow_id, scope) DO UPDATE SET bytes = excluded.bytes')
-      .run(flowId, scope, bytes)
   }
 }

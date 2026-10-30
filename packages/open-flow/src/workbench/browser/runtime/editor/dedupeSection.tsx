@@ -59,9 +59,15 @@ export function DedupeSection({
   }
   if (config.kind !== 'dedupe') return null
   return (
-    <InspectorSection title={t('flowState.nodeTitle')}>
+    <InspectorSection
+      title={
+        <>
+          <span className="min-w-0 flex-1">{t('flowState.nodeTitle')}</span>
+          {history}
+        </>
+      }
+    >
       <div className="node-settings flex flex-col gap-3">
-        <p className="text-muted-foreground text-xs">{t('flowState.warning')}</p>
         <Field>
           <FieldLabel htmlFor={`${id}-field`}>{t('flowState.field')}</FieldLabel>
           <Input
@@ -69,6 +75,7 @@ export function DedupeSection({
             id={`${id}-field`}
             disabled={disabled}
             defaultValue={config.field}
+            placeholder={t('flowState.fieldPlaceholder')}
             onBlur={(event) => {
               if (event.target.value !== config.field) update({ field: event.target.value })
             }}
@@ -106,7 +113,7 @@ export function DedupeSection({
             </Button>
           </div>
         )}
-        {history}
+        <p className="m-0 text-muted-foreground text-xs">{t('flowState.warning')}</p>
       </div>
     </InspectorSection>
   )

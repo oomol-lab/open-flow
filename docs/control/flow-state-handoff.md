@@ -15,7 +15,7 @@ preserving the published v9 runtime and digest. The original baseline below is h
 S1、S2、S3、S5 与架构更新已完成，Cloud S4 未改动。
 
 - 公共层使用 WebCrypto SHA-256 前 16 字节作为带类型标识的哈希；数字与时间水位规则、模式重置与配额错误已写入契约。
-- Server 迁移 57、四张 State 表与 Run 写入计数已接入。支持跨 Task/Run 状态、Draft/Live 隔离、整批原子去重、模式切换与 Flow 生命周期清理。
+- Server 迁移 58、四张 State 表与 Run 写入计数已接入。支持跨 Task/Run 状态、Draft/Live 隔离、整批原子去重、模式切换与 Flow 生命周期清理。
 - REST、CLI、MCP 共用部署服务；scope 必填，默认不返回业务值。Workbench 有 Flow 状态面板与节点历史菜单，Live 清空单独确认，80% 用量在界面和节点运行日志提示。
 - 七种语言文案与 Lab story 已补齐。跨 Run conformance 从公共 `flow-state` 入口导出，参数验证与 Task 结束取消用例在公共 runtime conformance 中。
 - CLI Lab 验收发现原 HTTP/OpenAPI 执行输入过滤会丢弃无绑定的 Run 参数；已在公共执行 owner 修复，并由新 Cron/HTTP 场景覆盖。
@@ -57,7 +57,7 @@ S1、S2、S3、S5 与架构更新已完成，Cloud S4 未改动。
 | ---- | ----------------------------------------------------------------------------- |
 | 文档 | `docs/architecture.md` 第 3 节新增 State Store 边界（计划“架构文档变更”一节） |
 | S1   | 公共包：去重节点、`context.state` / `context.dedupe`、类型、conformance       |
-| S2   | Server：迁移 57、State Store、Capability 宿主、去重节点执行、Flow 删除清理    |
+| S2   | Server：迁移 58、State Store、Capability 宿主、去重节点执行、Flow 删除清理    |
 | S3   | Control API、CLI、MCP 的状态查看与清空                                        |
 | S5   | Workbench 去重节点菜单与 Flow 状态面板、Lab story                             |
 
@@ -118,9 +118,8 @@ engine digest）。
 
 ### 3. S2 Server
 
-- 迁移 57（`apps/server/migrations/0057_*.sql`，并登记到 `storage/migrate.ts`），四张表见计划“存储”一节。
-- State Store 存储模块：带配额的原子写入、整批检查并记录（单个 SQLite 事务）、按 Flow 删除、用量行维护。配额
-  检查读用量行，不使用 `COUNT(*)`。
+- 迁移 58（`apps/server/migrations/0058_*.sql`，并登记到 `storage/migrate.ts`），四张表见计划“存储”一节。
+- State Store 存储模块：带配额的原子写入、整批检查并记录（单个 SQLite 事务）、按 Flow 删除。普通数据与空间条数按 Flow/source 主键前缀统计；标识总数汇总空间计数。
 - Capability 宿主与 `run-artifacts.ts` 并列：scope 取自 Run 来源；`context.dedupe` 只能访问 `flow` 空间；节点空间
   只能由所属去重节点的执行访问。
 - 错误：空间已满为可处理的 `dedupe.full`；业务状态超限与单 Run 写入次数超限为不可处理的 `limit-exceeded`；参数
@@ -137,7 +136,7 @@ engine digest）。
 ### 5. S5 Workbench
 
 - 去重节点菜单：清空历史，编辑器默认只清 `draft`；清空 `live` 需要单独确认；用量达到 80% 时提示。
-- Flow 状态面板：按 scope 展示业务状态、去重空间（含遗留空间）与总用量，支持删除与清空。
+- Flow 状态面板：按 scope 展示业务状态、去重空间（含遗留空间）与条数配额，支持删除与清空。入口位于发布按钮旁的更多操作菜单。
 - 所有新文案进入全部 locale 文件；Lab 增加对应 story，遵循 `AGENTS.md` 的 Lab 规则。
 
 ## 验证
@@ -155,3 +154,7 @@ engine digest）。
 - **版本基线**：beta.76 已发布，已切换到 v13/v10。
 - **Cloud 接入约束**：按本次范围，公共包发布后在 Cloud 仓库实施 S4；Cloud 采用 v10 客户端前先完成宿主与协议升级。
 - **记录时机**：去重节点记录后下游失败会漏处理（计划 D-S2 与“记录时机”）。节点说明与 authoring 指引必须写明。
+
+## 条数配额调整
+
+2026-10-30：用户确认取消总容量配额。每个 Flow/source 最多 1,000 个 key、每值 64 KiB、全空间合计 10,000 个去重标识、100 个空间；key/空间名最多 256 UTF-8 字节。保留每 Run 1,000 次写入保护。迁移 59 移除旧容量记账表，将单值 size 统一为 JSON UTF-8 大小。满额允许更新、删除与重复标识批次，超额新增整批回滚。beta.76 仍是发布基线，继续使用未发布 Model v13 / Engine v10。

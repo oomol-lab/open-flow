@@ -8,13 +8,13 @@ import { dedupeTask } from '../../src/state/common/state.ts'
 import { DedupeSection } from '../../src/workbench/browser/runtime/editor/dedupeSection.tsx'
 import { FlowStateButton, FlowStatePanel } from '../../src/workbench/browser/runtime/editor/flowStatePanel.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { WorkspacePublishIsland } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
 import { useStoryActions } from './storyActions.tsx'
 
 const sample: FlowStateView = {
   version: 1,
   scope: 'draft',
-  bytes: 864176,
-  limits: { maxValueBytes: 65536, maxBytes: 2097152, maxIdentities: 10000, maxRunWrites: 1000 },
+  limits: { maxValueBytes: 65536, maxValues: 1000, maxSpaces: 100, maxIdentities: 10000, maxRunWrites: 1000 },
   values: [{ key: 'cursor', size: 80, updatedAt: 1793322000000, value: { page: 3 } }],
   spaces: [
     { space: 'node:filter', mode: 'new', count: 9000, watermark: null, updatedAt: 1793322000000 },
@@ -26,8 +26,15 @@ function StateStory({ language, dark }: { language: string; dark: boolean }) {
   const [scopes, setScopes] = useState<Record<'draft' | 'live', FlowStateView>>({ draft: sample, live: { ...sample, scope: 'live' } })
   const draftState = scopes.draft
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [stateOpen, setStateOpen] = useState(false)
   const [task, setTask] = useState<import('../../src/flow/common/change.ts').ManagedTaskDefinition>(dedupeTask())
-  useStoryActions([{ label: 'Reset state', onClick: () => setScopes({ draft: sample, live: { ...sample, scope: 'live' } }) }])
+  useStoryActions([
+    { label: 'Reset state', onClick: () => setScopes({ draft: sample, live: { ...sample, scope: 'live' } }) },
+    {
+      label: 'Empty state',
+      onClick: () => setScopes({ draft: { ...sample, values: [], spaces: [] }, live: { ...sample, scope: 'live', values: [], spaces: [] } }),
+    },
+  ])
   const client = useMemo(
     () => ({
       async getFlowState(_flowId: string, scope: 'draft' | 'live', includeValues = false) {
@@ -37,13 +44,11 @@ function StateStory({ language, dark }: { language: string; dark: boolean }) {
       async clearFlowState(_flowId: string, scope: 'draft' | 'live', key?: string) {
         setScopes((current) => {
           const value = current[scope]
-          const removed = value.values.filter((item) => key == null || item.key === key)
           return {
             ...current,
             [scope]: {
               ...value,
-              bytes: value.bytes - removed.reduce((total, item) => total + item.size, 0),
-              values: value.values.filter((item) => !removed.includes(item)),
+              values: key == null ? [] : value.values.filter((item) => item.key !== key),
             },
           }
         })
@@ -51,9 +56,7 @@ function StateStory({ language, dark }: { language: string; dark: boolean }) {
       async clearFlowDedupe(_flowId: string, scope: 'draft' | 'live', space: string) {
         setScopes((current) => {
           const value = current[scope]
-          const removed = value.spaces.find((item) => item.space === space)
-          const bytes = removed == null ? 0 : removed.mode === 'new' ? removed.count * 96 : removed.watermark == null ? 0 : 96
-          return { ...current, [scope]: { ...value, bytes: value.bytes - bytes, spaces: value.spaces.filter((item) => item.space !== space) } }
+          return { ...current, [scope]: { ...value, spaces: value.spaces.filter((item) => item.space !== space) } }
         })
       },
     }),
@@ -81,7 +84,17 @@ function StateStory({ language, dark }: { language: string; dark: boolean }) {
           />
         </div>
         <div className="flex flex-col gap-4 rounded border border-border p-4">
-          <FlowStateButton client={client} flowId="sample" nodeIds={['filter']} />
+          <div className="flex justify-end">
+            <WorkspacePublishIsland
+              hasPublications={false}
+              onOpenPublications={() => {}}
+              onOpenRuns={() => {}}
+              onPublish={() => {}}
+              onOpenState={() => setStateOpen(true)}
+              state="current"
+            />
+          </div>
+          {stateOpen && <FlowStateButton client={client} flowId="sample" nodeIds={['filter']} onClose={() => setStateOpen(false)} />}
           <FlowStatePanel
             value={draftState}
             nodeIds={['filter']}
@@ -101,7 +114,7 @@ export const flowStateStories: FrontendStory[] = [
     title: 'State and history',
     standalone: true,
     description:
-      'Configure identity, mode and space. Inspect business values, near-capacity history and orphaned spaces together. Open State, switch to Live and clear a space to inspect production confirmation. Reset restores the examples.',
+      'Configure identity, mode and space. Inspect saved-entry counts, shared Flow identity counts, watermark slots and orphaned spaces together. Empty state uses short labels without inactive clear controls. Storage rules disclose isolation, retention and size/space limits on demand. Open persistent data from the publish menu, switch to production and clear a space to inspect production confirmation. Reset restores the examples.',
     render: (_log, _dark, language) => <StateStory language={language} dark={_dark} />,
   },
 ]

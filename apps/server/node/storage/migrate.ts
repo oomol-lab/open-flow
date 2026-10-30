@@ -65,6 +65,7 @@ const migrations = [
   '0056_run_artifacts.sql',
   '0057_tags.sql',
   '0058_flow_state.sql',
+  '0059_flow_state_counts.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

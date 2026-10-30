@@ -129,8 +129,13 @@ export function itemIdentities(items: JsonValue, field: string): DedupeIdentity[
 export interface FlowStateView {
   readonly version: 1
   readonly scope: StateScope
-  readonly bytes: number
-  readonly limits: { readonly maxValueBytes: number; readonly maxBytes: number; readonly maxIdentities: number; readonly maxRunWrites: number }
+  readonly limits: {
+    readonly maxValueBytes: number
+    readonly maxValues: number
+    readonly maxSpaces: number
+    readonly maxIdentities: number
+    readonly maxRunWrites: number
+  }
   readonly values: readonly { readonly key: string; readonly size: number; readonly updatedAt: number; readonly value?: JsonValue }[]
   readonly spaces: readonly {
     readonly space: string
@@ -144,10 +149,10 @@ export interface FlowStateView {
 export const flowStateViewSchema = z.object({
   version: z.literal(1),
   scope: z.enum(['draft', 'live']),
-  bytes: z.number().nonnegative(),
   limits: z.object({
     maxValueBytes: z.number().positive(),
-    maxBytes: z.number().positive(),
+    maxValues: z.number().int().positive(),
+    maxSpaces: z.number().int().positive(),
     maxIdentities: z.number().positive(),
     maxRunWrites: z.number().positive(),
   }),
