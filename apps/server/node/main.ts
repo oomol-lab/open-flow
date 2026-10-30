@@ -56,6 +56,10 @@ function main(): Effect.Effect<void> {
       if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0) {
         throw new Error('OPEN_FLOW_RUN_TIMEOUT_MS must be a positive safe integer.')
       }
+      const taskCpuMs = Number(process.env.OPEN_FLOW_TASK_CPU_MS ?? '10000')
+      if (!Number.isSafeInteger(taskCpuMs) || taskCpuMs <= 0) {
+        throw new Error('OPEN_FLOW_TASK_CPU_MS must be a positive safe integer.')
+      }
       const operatorLoginAttemptsPerMinute = Number(process.env.OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE ?? '10')
       if (!Number.isSafeInteger(operatorLoginAttemptsPerMinute) || operatorLoginAttemptsPerMinute <= 0) {
         throw new Error('OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE must be a positive safe integer.')
@@ -126,6 +130,7 @@ function main(): Effect.Effect<void> {
           maxPendingRuns,
           runEventRetentionMs,
           runTimeoutMs,
+          taskCpuMs,
         },
       })
       yield* service.start()

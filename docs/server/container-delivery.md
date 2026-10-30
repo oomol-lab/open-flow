@@ -105,6 +105,7 @@ After a claim, the data volume stores an irreversible Operator token digest and 
 | `OPEN_FLOW_MAX_PENDING_RUNS`                   | Deployment-wide limit on nonterminal Runs. Default: `1000`.                                                                                   |
 | `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | Deployment-wide concurrent execution limit, with at most one per Flow. Default: `4`.                                                          |
 | `OPEN_FLOW_RUN_TIMEOUT_MS`                     | Maximum milliseconds from Run execution start to terminal state. Default: `1800000`.                                                          |
+| `OPEN_FLOW_TASK_CPU_MS`                        | CPU milliseconds one Code Task invocation may use across all of its callbacks. Default: `10000`.                                              |
 | `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`       | Per-minute request limit for each Webhook/Integration endpoint or Wait capability. Default: `120`.                                            |
 | `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` | Deployment-wide Operator login attempts per minute. Default: `10`.                                                                            |
 

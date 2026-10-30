@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
 export interface IsolatedVmLimits {
+  /** CPU time accumulated by one Task invocation across all of its entries into the isolate. */
   readonly cpuMs: number
   readonly maxCapabilityCalls: number
   readonly maxCapabilityResponseBytes: number
@@ -20,11 +21,12 @@ export interface IsolatedVmLimits {
   readonly maxProgramBytes: number
   readonly maxResultBytes: number
   readonly memoryMb: number
+  /** Wall time of a standalone invocation; Flow Tasks use node and Run deadlines instead. */
   readonly wallMs: number
 }
 
 export const isolatedVmLimits: IsolatedVmLimits = {
-  cpuMs: 1_000,
+  cpuMs: 10_000,
   maxCapabilityCalls: 100,
   maxCapabilityResponseBytes: 1024 * 1024,
   maxInputBytes: 1024 * 1024,
@@ -183,8 +185,13 @@ export class IsolatedVmHost {
   #executionId = 0
   readonly #pending = new Map<number, PendingInvocation>()
   #stderr = ''
+  readonly limits: IsolatedVmLimits
 
-  async invoke(invocation: RuntimeInvocation, limits: IsolatedVmLimits = isolatedVmLimits): Promise<JsonValue | undefined> {
+  constructor(limits: IsolatedVmLimits = isolatedVmLimits) {
+    this.limits = limits
+  }
+
+  async invoke(invocation: RuntimeInvocation, limits: IsolatedVmLimits = this.limits): Promise<JsonValue | undefined> {
     return await Effect.runPromise(
       Effect.suspend(() => {
         if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
@@ -259,7 +266,7 @@ export class IsolatedVmHost {
       readonly projectFailure: (error: unknown) => SchedulerFailure
       readonly runId: string
     },
-    limits: IsolatedVmLimits = isolatedVmLimits,
+    limits: IsolatedVmLimits = this.limits,
   ): Effect.Effect<FlowRunOutcome, Error> {
     const { capability, emit, invokeTask, projectFailure, wait, ...flow } = options
     return Effect.suspend(() => {

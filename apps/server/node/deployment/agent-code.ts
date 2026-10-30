@@ -2,7 +2,7 @@ import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { IsolatedVmHost } from '../runtime/isolated-vm.ts'
 
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { IsolatedVmError, isolatedVmEngineDigest, isolatedVmLimits } from '../runtime/isolated-vm.ts'
+import { IsolatedVmError, isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
 
 const wrapper = `import compute from './code.mjs'
 export default async function (inputs) {
@@ -45,7 +45,7 @@ export async function executeCode(host: IsolatedVmHost, code: string, input: Jso
         },
       },
       {
-        ...isolatedVmLimits,
+        ...host.limits,
         maxCapabilityCalls: 0,
         maxInputBytes: 32 * 1024 * 1024,
         maxResultBytes: 32 * 1024 * 1024,

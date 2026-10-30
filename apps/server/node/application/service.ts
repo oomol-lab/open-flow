@@ -31,7 +31,7 @@ import { ConnectorClient } from '../deployment/connector.ts'
 import { ControlError } from '../error.ts'
 import { silentLogger } from '../logger.ts'
 import { IntegrationRuntime } from '../runtime/integration-runtime.ts'
-import { IsolatedVmHost, isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
+import { IsolatedVmHost, isolatedVmEngineDigest, isolatedVmLimits } from '../runtime/isolated-vm.ts'
 import { ListenerRuntime } from '../runtime/listener-runtime.ts'
 import { Store } from '../storage/store.ts'
 import { ConnectorControl } from './connector-control.ts'
@@ -346,7 +346,7 @@ export class ServerService {
           capabilities.connectorAccess ?? new ConfiguredConnectorAccessHost(database, store.connectorTeams, capabilities.connector ?? (() => undefined)),
       }
       const isolatedVm = yield* Effect.acquireRelease(
-        Effect.sync(() => new IsolatedVmHost()),
+        Effect.sync(() => new IsolatedVmHost(runtime.taskCpuMs == null ? isolatedVmLimits : { ...isolatedVmLimits, cpuMs: runtime.taskCpuMs })),
         (opened) => Effect.promise(() => opened.close()),
       )
       const cronLock = yield* Semaphore.make(1)

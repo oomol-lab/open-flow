@@ -168,7 +168,7 @@ responsibility for securing their deployment. At minimum:
   Variables do not provide encryption at rest, per-value ACLs, automatic rotation, or an
   unexportable Secret Manager boundary. A Flow may explicitly return, log, or send a bound value.
 - **Keep resource limits in place.** Tune `OPEN_FLOW_MAX_PENDING_RUNS`,
-  `OPEN_FLOW_MAX_CONCURRENT_RUNS`, `OPEN_FLOW_RUN_TIMEOUT_MS`,
+  `OPEN_FLOW_MAX_CONCURRENT_RUNS`, `OPEN_FLOW_RUN_TIMEOUT_MS`, `OPEN_FLOW_TASK_CPU_MS`,
   `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`, `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE`, and
   `OPEN_FLOW_RUN_EVENT_RETENTION_DAYS` to your deployment rather than removing the limits.
 - **Stay current.** Rebuild the image from the latest release. When running from source, use the

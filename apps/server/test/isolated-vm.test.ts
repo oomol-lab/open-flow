@@ -336,6 +336,38 @@ describe('isolated-vm runtime conformance', () => {
     await expect(invoke('export default () => "still-alive"')).resolves.toBe('still-alive')
   })
 
+  it.each([
+    ['timer', 'for (let index = 0; index < 3; index++) { await new Promise((resolve) => setTimeout(resolve, 1)); burn(80) }'],
+    ['Capability', 'await context.actions.example.echo({}); burn(300)'],
+  ])('accumulates CPU time after %s callbacks', async (_entry, body) => {
+    await expect(
+      host.invoke(
+        {
+          capabilities: [{ kind: 'connector', action: 'example.echo', connections: [] }],
+          capability: async () => ({ body: 'ok', status: 200 }),
+          input: null,
+          invocationId: 'accumulated-cpu',
+          program: program(`const burn = (ms) => { const end = Date.now() + ms; while (Date.now() < end) {} }
+export default async (_, context) => { ${body}; return 'unbounded' }`),
+        },
+        { ...isolatedVmLimits, cpuMs: 200 },
+      ),
+    ).rejects.toMatchObject({ code: 'limit-exceeded', message: 'Runtime invocation exceeded its CPU limit.' })
+  })
+
+  it('cancels a busy asynchronous Task without blocking other invocations', async () => {
+    const busy = invoke('export default async () => { await new Promise((resolve) => setTimeout(resolve, 1)); while (true) {} }', {
+      ...isolatedVmLimits,
+      wallMs: 200,
+    })
+    const sibling = invoke('export default async () => { await new Promise((resolve) => setTimeout(resolve, 400)); return "sibling" }')
+    await expect(busy).rejects.toMatchObject({ code: 'limit-exceeded' })
+    await expect(sibling).resolves.toBe('sibling')
+    const started = performance.now()
+    await expect(invoke('export default () => "next"')).resolves.toBe('next')
+    expect(performance.now() - started).toBeLessThan(1_000)
+  })
+
   it('rejects oversized results without returning partial data', async () => {
     await expect(invoke('export default () => "x".repeat(2048)', { ...isolatedVmLimits, maxResultBytes: 256 })).rejects.toMatchObject({
       code: 'limit-exceeded',
@@ -737,6 +769,26 @@ it.each(['managed', 'code'] as const)('retries %s Tasks through the real Executo
   expect(events.filter((event) => event == 'node.started')).toHaveLength(1)
   expect(events.filter((event) => event == 'node.failed')).toHaveLength(0)
   expect(events.filter((event) => event == 'node.log')).toHaveLength(1)
+})
+
+it('bounds Flow Code Tasks by node and Run deadlines rather than the standalone wall-clock limit', async () => {
+  const prepared = await retryFixture('code', 'export default async () => { await new Promise((resolve) => setTimeout(resolve, 150)); return { value: 1 } }')
+  const result = await Effect.runPromise(
+    host.run(
+      prepared,
+      {
+        flowId: 'wall',
+        runId: 'wall',
+        trigger: { nodeId: 'start', outputs: {} },
+        emit: () => {},
+        capability: async () => ({ body: null, status: 200 }),
+        invokeTask: async () => ({}),
+        projectFailure: (error) => ({ code: 'node.failed', message: String(error) }),
+      },
+      { ...isolatedVmLimits, wallMs: 50 },
+    ),
+  )
+  expect(result).toMatchObject({ kind: 'node-results', nodes: [{ nodeId: 'task', outputs: { value: 1 } }] })
 })
 
 it.each([
