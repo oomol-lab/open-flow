@@ -301,7 +301,11 @@ it('shows only current module diagnostics and exposes recovery after a failed sa
 it.each(['independent', 'shared', 'missing'] as const)('saves selected actions from %s mode and keeps failed saves open for retry', async (mode) => {
   const fixture = codeFixture(mode)
   const { container, i18n } = render(<CodeTaskSection {...fixture.props} prepareAction={async (action) => ({ action, connections: [] })} />)
-  await click(container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!)
+  await click(
+    [...container.querySelectorAll<HTMLButtonElement>('[aria-haspopup="dialog"]')].find((button) =>
+      button.getAttribute('aria-label')?.startsWith(i18n.t('actionPicker.configureActions')),
+    )!,
+  )
   await click([...container.querySelectorAll('button')].find((button) => button.textContent === 'Select read action')!)
   const save = [...container.querySelectorAll('button')].find((button) => button.textContent === i18n.t('common.save'))!
   fixture.store.nodes.setCodeActions.mockResolvedValue(false)
