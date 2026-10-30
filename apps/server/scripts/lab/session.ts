@@ -7,7 +7,7 @@ import { isLabCliOffline } from '@oomol-lab/open-flow-command/lab'
 import { authoringNode } from '@oomol-lab/open-flow/control-requests'
 import { validateFlowInputs } from '@oomol-lab/open-flow/flow-semantics'
 import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
-import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { nodejsEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Scope from 'effect/Scope'
@@ -378,7 +378,7 @@ export class LabSession {
     try {
       const revision = this.current()
       const errors = assertions(this.scenarioId, this.baseline, revision.content)
-      const check = await this.service.control.drafts.checkFlow('operator', this.manifest.flowId, revision.revisionId, currentEngineContract)
+      const check = await this.service.control.drafts.checkFlow('operator', this.manifest.flowId, revision.revisionId, nodejsEngineContract)
       if (!check.valid) errors.push(`Flow check failed: ${JSON.stringify(check)}`)
       const runIds: string[] = []
       if (this.scenarioId == 'concurrent-edit') {
@@ -451,7 +451,7 @@ export class LabSession {
     }
   }
   async runSample(revisionId: string, nodeId: string, outputs: Record<string, JsonValue> = {}, inputs: Record<string, Record<string, JsonValue>> = {}) {
-    const accepted = await this.service.control.runs.createDraftRun('operator', this.manifest.flowId, revisionId, currentEngineContract, inputs, randomUUID(), {
+    const accepted = await this.service.control.runs.createDraftRun('operator', this.manifest.flowId, revisionId, nodejsEngineContract, inputs, randomUUID(), {
       nodeId,
       outputs,
     })

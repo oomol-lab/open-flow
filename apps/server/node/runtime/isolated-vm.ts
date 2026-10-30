@@ -40,13 +40,14 @@ const v7EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated
 
 const v8EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1').digest('hex')}`
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1').digest('hex')}`
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1').digest('hex')}`
 
 const v6EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1').digest('hex')}`
 
 /**
- * v8 adds workflow tools and HTTP Request, and later working Artifacts. Artifact calls under the earlier v8 digest were always
- * denied, so its Runs execute with the current implementation. Published v7 and v6 retain their execution contracts and digests.
+ * v8 adds workflow tools and HTTP Request, and later working Artifacts and Node compatibility builtins. Under the earlier v8
+ * digest, Artifact calls were always denied and builtin imports failed to resolve, so its Runs execute with the current
+ * implementation. Published v7 and v6 retain their execution contracts and digests.
  */
 export function supportsIsolatedVmEngine(engineContract: string, engineDigest: string): boolean {
   return (

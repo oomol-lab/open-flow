@@ -7,7 +7,7 @@ import { controlErrorCode, actionSummary, searchTriggerKeys } from '@oomol-lab/o
 import { authoringSchema } from '@oomol-lab/open-flow/control-requests'
 import { importedWorkflowName, resolveMetadataLanguage } from '@oomol-lab/open-flow/localization'
 import { mcpTools, mcpProtocolVersion, mcpInstructions } from '@oomol-lab/open-flow/mcp'
-import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { nodejsEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import manifest from '../../package.json' with { type: 'json' }
@@ -140,7 +140,7 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
   register('flow_edit', mcpTools.flow_edit, ({ flowId, ...request }) => control.drafts.editAuthoring(actorId, flowId, request))
   register('flow_check', mcpTools.flow_check, ({ flowId, revisionId }) => control.drafts.checkAuthoring(actorId, flowId, revisionId))
   register('flow_publish', mcpTools.flow_publish, ({ flowId, revisionId, expectedLivePublicationId, idempotencyKey }) =>
-    control.publications.publishFlow(actorId, flowId, revisionId, currentEngineContract, expectedLivePublicationId, idempotencyKey),
+    control.publications.publishFlow(actorId, flowId, revisionId, nodejsEngineContract, expectedLivePublicationId, idempotencyKey),
   )
   register('flow_publish_status', mcpTools.flow_publish_status, ({ flowId, operationId }) =>
     control.publications.getPublishOperation(actorId, flowId, operationId),
@@ -151,7 +151,7 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
   register('flow_run', mcpTools.flow_run, async (args) => {
     return (
       args.source == 'draft'
-        ? await control.runs.createDraftRun(actorId, args.flowId, args.revisionId, currentEngineContract, args.inputs, args.idempotencyKey, args.trigger, 'mcp')
+        ? await control.runs.createDraftRun(actorId, args.flowId, args.revisionId, nodejsEngineContract, args.inputs, args.idempotencyKey, args.trigger, 'mcp')
         : await control.runs.createLiveRun(actorId, args.publicationId, args.inputs, args.idempotencyKey, args.trigger, 'mcp')
     ).run
   })

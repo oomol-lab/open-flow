@@ -1,8 +1,14 @@
 # Node compatibility runtime contract
 
 `open-flow-engine/v8/nodejs-compat-v1` extends the v2 execution model with a fixed builtin module
-allowlist. The base `open-flow-engine/v8` contract remains available. Deployments advertise this
-additional contract only when they implement it; Server does not automatically opt into it.
+allowlist. It is the default contract for new checks, Draft Runs and Publications; the base
+`open-flow-engine/v8` contract remains available. Server and Cloud implement both.
+
+The public package owns the guest implementation of the builtin modules as
+`@oomol-lab/open-flow/runtime-nodejs-compat`. A deployment supplies the bridge described there:
+synchronous primitives backed by `createNodejsPrimitives`, timers, and synchronous evaluation of
+lazily loaded builtin groups. The guest bundle is generated with `bun run generate:nodejs-builtins`
+from pinned dependencies; `bun run check` verifies it is current.
 
 The published `open-flow-engine/v6` and `open-flow-engine/v6/nodejs-compat-v1` remain supported for
 existing Publications and Runs, with their original platform identity and builtin allowlist.

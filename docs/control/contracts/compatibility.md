@@ -1,5 +1,20 @@
 # Public contracts and version evolution
 
+## Artifacts and Node compatibility within Engine v8
+
+The latest published next-tag artifact `@oomol-lab/open-flow@0.1.0-beta.75` (gitHead
+`611c3a3d`) establishes Model v11 and Engine v8. Without a new contract revision, Engine v8 gains
+working `context.artifact` and Server support for `open-flow-engine/v8/nodejs-compat-v1`. Under the
+beta.75 isolation digest, Artifact calls were always denied and builtin imports failed to resolve,
+so the change is additive. Server's isolation digest adds `artifact/1 nodejs-compat/1`. It still
+accepts the beta.75 v8 digest and executes those Runs with the current implementation.
+
+SQLite migration 56 adds Run-owned Artifact storage, deleted with Run event retention and with the
+Flow. The guest implementation of the builtin modules is part of the public package
+(`@oomol-lab/open-flow/runtime-nodejs-compat`), shared by Server and Cloud. Public clients now
+check, run and publish with `nodejs-compat-v1`. Server accepts both v8 contracts; older Servers
+reject the compatibility contract, so upgrade Server before its clients.
+
 ## HTTP Request: pending Flow model v11 and Engine v8
 
 The latest published next-tag artifact `@oomol-lab/open-flow@0.1.0-beta.73` has gitHead

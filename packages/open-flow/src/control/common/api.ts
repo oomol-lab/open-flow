@@ -1,6 +1,6 @@
 import type { CanvasCommand } from '../../canvas/common/commands.ts'
 
-import { currentEngineContract } from '../../runtime/common/engineContract.ts'
+import { nodejsEngineContract } from '../../runtime/common/engineContract.ts'
 import { workflowContractSchema, workflowReferencesSchema } from '../../workflow/common/workflow.ts'
 export type { CanvasCommand, CanvasCommandSubscriber } from '../../canvas/common/commands.ts'
 import type { LiveDetails } from './liveDetails.ts'
@@ -1279,7 +1279,7 @@ export class ControlClient {
   async checkFlow(flowId: string, revisionId: string): Promise<FlowCheck> {
     return flowCheck(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/check`, {
-        body: JSON.stringify({ engineContract: currentEngineContract, version: 1 }),
+        body: JSON.stringify({ engineContract: nodejsEngineContract, version: 1 }),
         method: 'POST',
       }),
     )
@@ -1311,7 +1311,7 @@ export class ControlClient {
   async createDraftRun(flowId: string, revisionId: string, options: RunOptions): Promise<DraftRun> {
     const created = runDetails(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/runs`, {
-        body: JSON.stringify({ engineContract: currentEngineContract, inputs: options.inputs ?? {}, trigger: options.trigger, version: 2 }),
+        body: JSON.stringify({ engineContract: nodejsEngineContract, inputs: options.inputs ?? {}, trigger: options.trigger, version: 2 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('run'), 'x-open-flow-client': this.channel },
         method: 'POST',
       }),
@@ -1342,7 +1342,7 @@ export class ControlClient {
   async publishFlow(flowId: string, revisionId: string, expectedLivePublicationId: string | null, options: PublicationOptions = {}): Promise<PublishOperation> {
     return publishOperation(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/publications`, {
-        body: JSON.stringify({ engineContract: currentEngineContract, expectedLivePublicationId, version: 1 }),
+        body: JSON.stringify({ engineContract: nodejsEngineContract, expectedLivePublicationId, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('publication') },
         method: 'POST',
       }),

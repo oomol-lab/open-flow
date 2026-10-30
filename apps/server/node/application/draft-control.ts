@@ -23,7 +23,7 @@ import { removeConnectionUsage, validateFlow } from '@oomol-lab/open-flow/flow-s
 import { triggerConfigValues } from '@oomol-lab/open-flow/integration-trigger'
 import { PermanentPollError, PollConnectionError } from '@oomol-lab/open-flow/poll-trigger'
 import { triggerDefinitions as providerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
-import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { findEngineContract, nodejsEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { createHash, randomUUID } from 'node:crypto'
 import { ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { loadOpenApiDocument } from '../deployment/openapi.ts'
@@ -267,7 +267,7 @@ export class DraftControl {
   }
 
   async checkAuthoring(actorId: string, flowId: string, revisionId: string) {
-    const check = await this.checkFlow(actorId, flowId, revisionId, currentEngineContract)
+    const check = await this.checkFlow(actorId, flowId, revisionId, nodejsEngineContract)
     const revision = this.getRevision(actorId, flowId, revisionId)
     return { flowId, revisionId, valid: check.valid, diagnostics: authoringDiagnostics(revision.content, check.diagnostics), version: 1 as const }
   }

@@ -7,13 +7,23 @@ import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, I
 
 import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
 import { createActions, createArtifacts, createWorkflows, findEngineContract, snapshotRuntimeResult } from '@oomol-lab/open-flow/runtime-contract'
+import {
+  createNodejsPrimitives,
+  nodejsBuiltinGroupModule,
+  nodejsGlobalsModule,
+  nodejsGuestModules,
+  nodejsWebModule,
+  resolveNodejsModule,
+} from '@oomol-lab/open-flow/runtime-nodejs-compat'
 import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import * as FiberSet from 'effect/FiberSet'
-import { randomUUID } from 'node:crypto'
+import { Buffer } from 'node:buffer'
+import { createHash, createHmac, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import * as zlib from 'node:zlib'
 import { IsolatedVmError, isolatedVmEngineDigest, normalizedError, programError, serializedBytes } from './isolated-vm.ts'
 
 type CapabilityOutcome = Omit<CapabilityResult, 'executionId'>
@@ -223,14 +233,30 @@ export const capability = Object.freeze({
   egress: (url) => invoke('egress', { url }),
 })`
 
+// Adapts the Node compatibility guest bridge to the Server bindings; timers reuse the Engine timers installed above.
+const nodejsBridgeSource = `const builtin = globalThis.__openFlowBuiltin
+const primitive = globalThis.__openFlowPrimitive
+delete globalThis.__openFlowBuiltin
+delete globalThis.__openFlowPrimitive
+const setTimer = globalThis.setTimeout
+const setRepeatingTimer = globalThis.setInterval
+const clearTimer = globalThis.clearTimeout
+globalThis.__hostBuiltin = (group) => builtin.applySync(undefined, [String(group)], { arguments: { copy: true } })
+globalThis.__hostPrimitive = (request, buffer, extra) =>
+  primitive.applySync(undefined, [request, buffer, extra], { arguments: { copy: true }, result: { copy: true } })
+globalThis.__hostTimer = (callback, delay, repeat) => (repeat ? setRepeatingTimer : setTimer)(callback, delay)
+globalThis.__hostClearTimer = clearTimer`
+
 function installGlobals(
   ivm: typeof IsolatedVM,
   context: IsolatedVM.Context,
   request: { readonly invocationId: string; readonly limits: IsolatedVmLimits },
   call: (invocationId: string, capabilities: readonly TaskCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
   capabilities: readonly TaskCapability[],
+  nodejs: boolean,
   log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
 ): { readonly close: () => boolean; readonly failure: () => unknown; readonly flush: () => Promise<void> } {
+  const primitives = nodejs ? createNodejsPrimitives({ Buffer, createHash, createHmac, zlib }) : undefined
   const timers = new Map<number, { readonly fire: IsolatedVM.Reference<() => void>; readonly timer: ReturnType<typeof setTimeout> }>()
   const canceledTimers = new Set<number>()
   let active = true
@@ -246,6 +272,7 @@ function installGlobals(
     }
     timers.clear()
     canceledTimers.clear()
+    primitives?.close()
     return wasActive
   }
   const scheduleTimer = new ivm.Reference(
@@ -357,10 +384,16 @@ function installGlobals(
   context.global.setSync('__openFlowNow', now)
   context.global.setSync('__openFlowSetTimeout', scheduleTimer)
   context.global.setSync('__openFlowTimeOrigin', performance.timeOrigin)
+  if (primitives != null)
+    context.global.setSync(
+      '__openFlowPrimitive',
+      new ivm.Reference((source: string, buffer?: ArrayBuffer, extra?: ArrayBuffer) => primitives.call(source, buffer, extra)),
+    )
   return { close, failure: () => capabilityFailure, flush: () => logQueue }
 }
 
 async function compileProgram(
+  ivm: typeof IsolatedVM,
   isolate: IsolatedVM.Isolate,
   context: IsolatedVM.Context,
   program: RuntimeProgram,
@@ -420,6 +453,16 @@ export async function invoke(source) {
   )
   modules.set('engine/main.mjs', mainModule)
   paths.set(mainModule, 'engine/main.mjs')
+  // Node compatibility modules compile on first import, so a Task pays only for the builtins it uses.
+  const engineModule = (modulePath: string): IsolatedVM.Module => {
+    let module = modules.get(modulePath)
+    if (module == null) {
+      module = isolate.compileModuleSync(nodejsGuestModules[modulePath]!, { filename: `open-flow:${modulePath}` })
+      modules.set(modulePath, module)
+      paths.set(module, modulePath)
+    }
+    return module
+  }
 
   const resolve = (specifier: string, referrer: IsolatedVM.Module): IsolatedVM.Module => {
     const referrerPath = paths.get(referrer)
@@ -435,7 +478,30 @@ export async function invoke(source) {
       const target = modules.get(`user/${imported}.mjs`)
       if (target != null) return target
     }
+    const engine = contract.builtinModules == null ? undefined : resolveNodejsModule(contract, specifier, referrerPath)
+    if (engine != null) return engineModule(engine)
     throw new IsolatedVmError('invalid-program', `Module "${specifier}" is not part of the fixed runtime closure.`)
+  }
+  if (contract.builtinModules != null) {
+    context.global.setSync(
+      '__openFlowBuiltin',
+      new ivm.Reference((group: string) => {
+        const module = engineModule(nodejsBuiltinGroupModule(group))
+        module.instantiateSync(context, resolve)
+        module.evaluateSync()
+        return module.namespace.derefInto()
+      }),
+    )
+    const bridgeModule = await isolate.compileModule(nodejsBridgeSource, { filename: 'open-flow:engine/bridge.mjs' })
+    await bridgeModule.instantiate(context, () => {
+      throw new IsolatedVmError('invalid-program', 'Engine bridge module cannot import dependencies.')
+    })
+    await bridgeModule.evaluate()
+    for (const modulePath of [nodejsWebModule, nodejsGlobalsModule]) {
+      const module = engineModule(modulePath)
+      await module.instantiate(context, resolve)
+      await module.evaluate()
+    }
   }
   await mainModule.instantiate(context, resolve)
   await mainModule.evaluate()
@@ -533,10 +599,10 @@ async function execute(
       terminate()
     }, cpuWatchdogIntervalMs)
     const context = await running.createContext()
-    globals = installGlobals(ivm, context, request, call, capabilities, log)
+    globals = installGlobals(ivm, context, request, call, capabilities, contract.builtinModules != null, log)
     canceled.addEventListener('abort', terminate, { once: true })
     if (canceled.aborted) terminate()
-    const mainModule = await compileProgram(running, context, program, contract, request.context)
+    const mainModule = await compileProgram(ivm, running, context, program, contract, request.context)
     const source = await invokeProgram(mainModule, request.input)
     await globals.flush()
     const result = readResult(source, program, request.limits.maxResultBytes, preserveCapabilityFailure, globals.failure())

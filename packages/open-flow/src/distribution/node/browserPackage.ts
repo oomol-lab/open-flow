@@ -34,6 +34,7 @@ const flowSemanticsEntryPath = 'src/flow/common/semantics.ts'
 const runLifecycleEntryPath = 'src/execution/common/runLifecycle.ts'
 const runEventsEntryPath = 'src/execution/common/events.ts'
 const runtimeContractEntryPath = 'src/runtime/common/runtime.ts'
+const runtimeNodejsCompatEntryPath = 'src/runtime/common/nodejsCompat.ts'
 const schedulerEntryPath = 'src/execution/common/scheduler.ts'
 const webhookTriggerEntryPath = 'src/trigger/common/webhook.ts'
 const localizationEntryPath = 'src/localization/common/languages.ts'
@@ -82,6 +83,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['execution/common/node-execution', 'common/scheduler-node-execution'],
   ['execution/common/runLifecycle', 'common/run-lifecycle'],
   ['runtime/common/runtime', 'common/runtime-contract'],
+  ['runtime/common/nodejsCompat', 'common/runtime-nodejs-compat'],
   ['execution/common/scheduler', 'common/scheduler'],
   ['flow/common/agent', 'common/flow-agent'],
   ['flow/common/authoring', 'common/flow-authoring'],
@@ -156,6 +158,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, commonOutputPath, runLifecycleEntryPath, 'run-lifecycle', false)
   await buildRuntime(options, commonOutputPath, runEventsEntryPath, 'run-events', false)
   await buildRuntime(options, commonOutputPath, runtimeContractEntryPath, 'runtime-contract', false)
+  await buildRuntime(options, commonOutputPath, runtimeNodejsCompatEntryPath, 'runtime-nodejs-compat', false)
   await buildRuntime(options, commonOutputPath, flowEncodingEntryPath, 'flow-encoding', false)
   await buildRuntime(options, commonOutputPath, flowSemanticsEntryPath, 'flow-semantics', false)
   await buildRuntime(options, commonOutputPath, schedulerEntryPath, 'scheduler', false)
@@ -290,6 +293,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions): Promise<v
         path.join(options.sourceRoot, runEventsEntryPath),
         path.join(options.sourceRoot, runLifecycleEntryPath),
         path.join(options.sourceRoot, runtimeContractEntryPath),
+        path.join(options.sourceRoot, runtimeNodejsCompatEntryPath),
         path.join(options.sourceRoot, schedulerEntryPath),
         path.join(options.sourceRoot, cronTriggerEntryPath),
         path.join(options.sourceRoot, integrationTriggerEntryPath),

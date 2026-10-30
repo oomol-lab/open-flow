@@ -24,7 +24,7 @@ import { controlErrorCode, decodeRunEvent, readResult } from '@oomol-lab/open-fl
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions, normalizeRunTrigger, prepareFlow, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { projectExecutionId } from '@oomol-lab/open-flow/run-events'
-import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { currentEngineContract, findEngineContract, nodejsEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
@@ -103,7 +103,8 @@ export class RunControl {
     )
     const existing = this.replayRun(idempotencyKey, requestDigest, 'draft')
     if (existing != null) return existing
-    if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
+    if (engineContract != currentEngineContract && engineContract != nodejsEngineContract)
+      throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     const stored = readRevisionOrRepair(() => this.store.flows.revision(flowId, revisionId))
     if (stored == null) notFound()
     const content = revisionContent(stored)

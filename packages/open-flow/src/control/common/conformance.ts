@@ -5,7 +5,7 @@ import type { ProviderAccessIdentity } from './providerAccess.ts'
 
 import { dequal } from 'dequal/lite'
 import { upgradeRevisionContent } from '../../flow/common/change.ts'
-import { currentEngineContract as engineContract } from '../../runtime/common/engineContract.ts'
+import { nodejsEngineContract as engineContract } from '../../runtime/common/engineContract.ts'
 import { ControlClient, decodeRunEvent } from './api.ts'
 import { allConnectorConnectionsQuery } from './connectorQueries.ts'
 

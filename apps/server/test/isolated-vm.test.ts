@@ -3,7 +3,7 @@ import type { RuntimeHarness, RuntimeProgram } from '@oomol-lab/open-flow/runtim
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { prepareFlow } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
+import { nodejsRuntimeConformanceCases, runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { afterAll, describe, expect, it } from 'vitest'
 import { IsolatedVmError, isolatedVmEngineDigest, isolatedVmLimits, IsolatedVmHost } from '../node/runtime/isolated-vm.ts'
@@ -212,7 +212,7 @@ describe('isolated-vm runtime conformance', () => {
     await expect(invoke('export default (_, context) => typeof context.connector')).resolves.toBe('undefined')
   })
 
-  for (const conformance of runtimeConformanceCases) {
+  for (const conformance of [...runtimeConformanceCases, ...nodejsRuntimeConformanceCases]) {
     it(conformance.name, async () => await conformance.verify(harness))
   }
 
