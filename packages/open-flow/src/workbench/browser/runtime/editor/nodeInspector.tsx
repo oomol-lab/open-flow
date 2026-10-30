@@ -649,6 +649,7 @@ export function NodeInspector({
 
         {task != null && 'executor' in task && task.executor.kind === 'dedupe' && (
           <DedupeSection
+            key={`${revision.revision.flowId}:${selection!.id}`}
             task={task}
             disabled={disabled}
             history={

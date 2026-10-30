@@ -318,3 +318,66 @@ it.each(['independent', 'shared', 'missing'] as const)('saves selected actions f
   await click(save)
   expect(container.querySelector('[role="dialog"]')).toBeNull()
 })
+
+it.each([
+  ['node', false],
+  ['node', true],
+  ['flow', false],
+  ['flow', true],
+] as const)('isolates dedupe edits when switching %s with pending=%s', async (switchBy, pending) => {
+  const deferred = Promise.withResolvers<boolean>()
+  const saveTaskSettings = vi
+    .fn()
+    .mockImplementationOnce(() => (pending ? deferred.promise : Promise.resolve(false)))
+    .mockResolvedValue(true)
+  const store = { $: { flowId: val(undefined) }, nodes: { saveTaskSettings } }
+  const section = (flowId: string, nodeId: string) => {
+    const { draft } = publicationFixture(flowId, 'fixed')
+    const node: GraphNode = {
+      kind: 'task',
+      name: 'Dedupe',
+      inputs: {},
+      task: { name: 'Dedupe', inputs: [], outputs: [], executor: { kind: 'dedupe', mode: 'new', field: '', space: 'node' } },
+    }
+    const revision = revisionView({
+      ...draft,
+      content: { ...draft.content, document: { ...draft.content.document, graph: { nodes: { [nodeId]: node }, edges: [] } } },
+    })
+    return (
+      <NodeInspector
+        {...({
+          revision,
+          selection: revision.node(nodeId),
+          store,
+          connectors: {},
+          triggers: {},
+          disabled: false,
+          theme: 'light',
+          variables: { enabled: false, names: [], loaded: true, loading: false },
+        } as unknown as ComponentProps<typeof NodeInspector>)}
+      />
+    )
+  }
+  const view = render(section('first', 'node-a'))
+  const mode = view.container.querySelector<HTMLSelectElement>('select[id$="-mode"]')!
+  await act(async () => {
+    mode.value = 'increasing'
+    mode.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  expect(saveTaskSettings).toHaveBeenCalledTimes(1)
+  const nextId = switchBy === 'node' ? 'node-b' : 'node-a'
+  view.rerender(section(switchBy === 'flow' ? 'second' : 'first', nextId))
+  expect(view.container.querySelector<HTMLSelectElement>('select[id$="-mode"]')?.value).toBe('new')
+  expect(view.container.textContent).not.toContain(view.i18n.t('httpRequest.saveFailed'))
+  const space = view.container.querySelector<HTMLSelectElement>('select[id$="-space"]')!
+  await act(async () => {
+    space.value = 'flow'
+    space.dispatchEvent(new Event('change', { bubbles: true }))
+    deferred.resolve(true)
+  })
+  expect(saveTaskSettings).toHaveBeenCalledTimes(2)
+  expect(saveTaskSettings).toHaveBeenLastCalledWith(
+    nextId,
+    expect.objectContaining({ task: expect.objectContaining({ executor: { kind: 'dedupe', mode: 'new', field: '', space: 'flow' } }) }),
+  )
+})

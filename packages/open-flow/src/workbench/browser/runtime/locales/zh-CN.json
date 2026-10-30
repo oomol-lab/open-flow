@@ -338,7 +338,8 @@
       "source": "源代码",
       "structuredJson": "结构化 JSON",
       "retrySave": "重试保存",
-      "additionalInputs": "附加输入"
+      "additionalInputs": "附加输入",
+      "httpHostsUpdated": "主机配置已在别处更新。已加载最新配置，请检查后再保存。"
     },
     "wait": {
       "approval": "通过或拒绝",

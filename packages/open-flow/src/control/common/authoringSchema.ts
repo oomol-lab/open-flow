@@ -286,7 +286,7 @@ export function authoringSchema(kind?: AuthoringType) {
       }
     : {
         type: kind,
-        onError: retryNodeTypes.some((nodeType) => nodeType == kind) ? { enum: ['stop', 'error'] } : false,
+        onError: kind == 'dedupe' || retryNodeTypes.some((nodeType) => nodeType == kind) ? { enum: ['stop', 'error'] } : false,
         retry: retryNodeTypes.some((nodeType) => nodeType == kind) ? z.toJSONSchema(retryConfigurationSchema) : false,
         inputSources: ['poll', 'integration'].includes(kind)
           ? ['value', 'unset', 'default']

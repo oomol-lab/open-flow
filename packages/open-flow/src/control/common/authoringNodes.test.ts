@@ -394,6 +394,14 @@ describe('business configuration authoring contracts', () => {
     })
   })
 
+  it('advertises dedupe error handling independently from retries', async () => {
+    const contract = authoringSchema('dedupe')
+    expect(contract).toMatchObject({ onError: { enum: ['stop', 'error'] }, retry: false })
+    const created = await edit(empty, [{ op: 'node.add', type: 'dedupe', as: 'step', name: 'Dedupe', onError: 'error' }])
+    expect(authoringNode(created.content, created.nodes.step!).onError).toBe('error')
+    await roundTrip(created.content, created.nodes.step!)
+  })
+
   it.each(authoringTypes)('compiles and round trips the advertised %s creation example', async (type) => {
     const contract = authoringSchema(type)
     if (!('example' in contract)) throw new Error('Missing creation example')

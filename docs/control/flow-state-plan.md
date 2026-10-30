@@ -237,7 +237,7 @@ CREATE TABLE flow_dedupe_spaces (
 | 单 Run 写入操作次数               | 1000   |
 
 单 Run 写入次数沿用 Cloud 大输出“在 D1 原子预留写入次数”的做法，随 Workflow checkpoint 恢复，失败不返还；一次
-`set`、`delete` 或去重批次各计一次。不再设独立总容量配额；key 与空间名最多 256 个 UTF-8 字节，水位模式只占空间名额。
+`set`、`insert`、`delete` 或去重批次各计一次。不再设独立总容量配额；key 与空间名最多 256 个 UTF-8 字节，水位模式只占空间名额。
 
 ## Cloud 成本
 
