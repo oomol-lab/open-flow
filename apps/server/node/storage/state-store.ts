@@ -115,8 +115,9 @@ export class StateStore {
           seen.add(key)
           return fresh
         })
-        count = (previous?.count ?? 0) + inserted.filter(Boolean).length
-        if (this.dedupeCount(flowId, scope) - (old?.count ?? 0) + count > this.limits.maxIdentities)
+        const added = inserted.filter(Boolean).length
+        count = (previous?.count ?? 0) + added
+        if (added > 0 && this.dedupeCount(flowId, scope) - (old?.count ?? 0) + count > this.limits.maxIdentities)
           throw new StateError('dedupe.full', 'Flow deduplication history is full. Clear history or use increasing mode.')
       }
       if (old != null && previous == null)

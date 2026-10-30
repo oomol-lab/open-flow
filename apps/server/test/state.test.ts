@@ -43,6 +43,17 @@ describe('Flow State storage', () => {
     store.clearSpace('f', 'draft', 'flow')
     expect(store.dedupeCount('f', 'draft')).toBe(0)
   })
+  it('accepts duplicate-only batches after lowering the limit but rejects new identities atomically', async () => {
+    const store = setup({ ...stateLimits, maxIdentities: 2 })
+    const ids = ['a', 'b', 'c']
+    const hashes = await hashIdentities(ids)
+    store.insert('f', 'draft', 'flow', 'new', ids.slice(0, 2), hashes.slice(0, 2))
+    const reduced = new StateStore(store.database, store.transaction, store.clock, { ...stateLimits, maxIdentities: 1 })
+    expect(reduced.insert('f', 'draft', 'flow', 'new', ['b', 'b'], [hashes[1]!, hashes[1]!])).toEqual([false, false])
+    expect(() => reduced.insert('f', 'draft', 'flow', 'new', ids, hashes)).toThrow('full')
+    expect(reduced.has('f', 'draft', 'flow', hashes)).toEqual([true, true, false])
+    expect(reduced.dedupeCount('f', 'draft')).toBe(2)
+  })
   it('changes modes atomically and leaves prior history intact after invalid watermarks', async () => {
     const store = setup()
     const ids = ['a']
