@@ -114,9 +114,9 @@ the [property panel entry](property-panel.md) for shared scope.
 - Value error messages appear as attached overlays below the control on hover or focus, with a
   restrained danger background and border. They never reserve document-flow space. Expanded text
   and JSON errors anchor below their editor; collection errors anchor below the main value control.
-  Within a field table, focus takes priority: only the focused editor shows feedback while other
-  rows retain ordinary hover styling without raising their stacking layer. Hover feedback resumes
-  when focus leaves the editors. Pointer focus left on a disclosure or collapsed preview must not
+  Within a field table, a focused editor with an error takes priority: only that editor shows feedback
+  while other rows retain ordinary hover styling without raising their stacking layer. A focused
+  control without an error does not suppress hover feedback on invalid fields. Pointer focus left on a disclosure or collapsed preview must not
   suppress hover feedback; keyboard-focused value controls retain focus priority.
 - Invalid controls share danger borders and tinted surfaces. Actual values, collapsed previews,
   and type names retain their normal text colors; only action prompts such as Set value, Select a

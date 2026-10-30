@@ -1,6 +1,6 @@
 {
   "name": "@oomol-lab/open-flow",
-  "version": "0.1.0-beta.74",
+  "version": "0.1.0-beta.75",
   "description": "Portable contracts and shared browser runtime for Open Flow.",
   "keywords": [
     "ai",
@@ -61,7 +61,8 @@
     "./skills/open-flow/SKILL.md": "./skills/open-flow/SKILL.md",
     "./skills/open-flow/references/flow-authoring.md": "./skills/open-flow/references/flow-authoring.md",
     "./skills/open-flow/references/flow-n8n-conversion.md": "./skills/open-flow/references/flow-n8n-conversion.md",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./http-request": "./src/http/common/httpRequest.ts"
   },
   "scripts": {
     "build": "bun scripts/build.ts",

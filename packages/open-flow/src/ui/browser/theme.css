@@ -3,83 +3,70 @@
   --ui-font-size: 13px;
 }
 
+/* Public --open-flow-* inputs inherit from the host; defaults resolve at each theme root. */
 .open-flow-theme {
-  color-scheme: light;
-  --open-flow-background: #fdfdfd;
-  --open-flow-foreground: #242424;
-  --open-flow-card: #ffffff;
-  --open-flow-node-surface: #f6f6f6;
-  --open-flow-node-content: #ffffff;
-  --open-flow-node-running-beam: oklch(72.3% 0.219 149.579);
-  --open-flow-comment-surface: #f3eddc;
-  --open-flow-comment-content: color-mix(in srgb, var(--open-flow-comment-surface) 55%, var(--open-flow-node-content));
-  --open-flow-comment-border: #e3d8ba;
-  --open-flow-card-foreground: #242424;
-  --open-flow-popover: #ffffff;
-  --open-flow-popover-foreground: #242424;
-  --open-flow-primary: #242424;
-  --open-flow-primary-foreground: #fafafa;
-  --open-flow-secondary: #eeeeee;
-  --open-flow-secondary-foreground: #242424;
-  --open-flow-muted: #f6f6f6;
-  --open-flow-muted-foreground: #6b6b6b;
-  --open-flow-accent: #e7e7e7;
-  --open-flow-accent-foreground: #242424;
-  --open-flow-destructive: #dc2626;
-  --open-flow-border: #dedede;
-  --open-flow-input: #d2d2d2;
-  --open-flow-ring: #777777;
-  --open-flow-radius: 10px;
-  --ui-code-gutter-background: light-dark(#fff, #333338);
-  --ui-code-gutter-border: light-dark(#ddd, #333338);
-  --ui-background: var(--open-flow-background);
-  --ui-foreground: var(--open-flow-foreground);
-  --ui-card: var(--open-flow-card);
-  --ui-card-foreground: var(--open-flow-card-foreground);
-  --ui-popover: var(--open-flow-popover);
-  --ui-popover-foreground: var(--open-flow-popover-foreground);
-  --ui-primary: var(--open-flow-primary);
-  --ui-primary-foreground: var(--open-flow-primary-foreground);
-  --ui-secondary: var(--open-flow-secondary);
-  --ui-secondary-foreground: var(--open-flow-secondary-foreground);
-  --ui-muted: var(--open-flow-muted);
-  --ui-muted-foreground: var(--open-flow-muted-foreground);
-  --ui-accent: var(--open-flow-accent);
-  --ui-accent-foreground: var(--open-flow-accent-foreground);
-  --ui-destructive: var(--open-flow-destructive);
-  --ui-danger-control-background-default: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
-  --ui-danger-control-background-hover: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)));
-  --ui-border: var(--open-flow-border);
-  --ui-input: var(--open-flow-input);
-  --ui-ring: var(--open-flow-ring);
-  --ui-radius: var(--open-flow-radius);
+  --_open-flow-theme: light;
+  color-scheme: var(--_open-flow-theme);
+  --_open-flow-background: var(--open-flow-background, light-dark(#fdfdfd, #1c1c1c));
+  --_open-flow-foreground: var(--open-flow-foreground, light-dark(#242424, #eeeeee));
+  --_open-flow-card: var(--open-flow-card, light-dark(#fefefe, #242424));
+  --_open-flow-node-surface: var(--open-flow-node-surface, light-dark(#f6f6f6, #2b2b2b));
+  --_open-flow-node-content: var(--open-flow-node-content, light-dark(#ffffff, #242424));
+  --_open-flow-node-running-beam: var(--open-flow-node-running-beam, oklch(72.3% 0.219 149.579));
+  --_open-flow-comment-surface: var(--open-flow-comment-surface, light-dark(#f3eddc, #403727));
+  --_open-flow-comment-content: var(
+    --open-flow-comment-content,
+    light-dark(color-mix(in srgb, var(--_open-flow-comment-surface) 55%, var(--_open-flow-node-content)), #2b261d)
+  );
+  --_open-flow-comment-border: var(--open-flow-comment-border, light-dark(#e3d8ba, #5c4e36));
+  --_open-flow-card-foreground: var(--open-flow-card-foreground, light-dark(#242424, #eeeeee));
+  --_open-flow-popover: var(--open-flow-popover, light-dark(#fefefe, #2b2b2b));
+  --_open-flow-popover-foreground: var(--open-flow-popover-foreground, light-dark(#242424, #eeeeee));
+  --_open-flow-primary: var(--open-flow-primary, light-dark(#242424, #eeeeee));
+  --_open-flow-primary-foreground: var(--open-flow-primary-foreground, light-dark(#fafafa, #242424));
+  --_open-flow-secondary: var(--open-flow-secondary, light-dark(#eeeeee, #2b2b2b));
+  --_open-flow-secondary-foreground: var(--open-flow-secondary-foreground, light-dark(#242424, #eeeeee));
+  --_open-flow-muted: var(--open-flow-muted, light-dark(#f6f6f6, #242424));
+  --_open-flow-muted-foreground: var(--open-flow-muted-foreground, light-dark(#6b6b6b, #ababab));
+  --_open-flow-accent: var(--open-flow-accent, light-dark(#e7e7e7, #303030));
+  --_open-flow-accent-foreground: var(--open-flow-accent-foreground, light-dark(#242424, #eeeeee));
+  --_open-flow-destructive: var(--open-flow-destructive, light-dark(#dc2626, #f87171));
+  --_open-flow-border: var(--open-flow-border, light-dark(#dedede, #3c3c3c));
+  --_open-flow-input: var(--open-flow-input, light-dark(#d2d2d2, #484848));
+  --_open-flow-ring: var(--open-flow-ring, light-dark(#777777, #b4b4b4));
+  --_open-flow-radius: var(--open-flow-radius, 10px);
 }
 
 .open-flow-theme[data-theme='dark'] {
-  color-scheme: dark;
-  --open-flow-background: #1c1c1c;
-  --open-flow-foreground: #eeeeee;
-  --open-flow-card: #242424;
-  --open-flow-node-surface: #2b2b2b;
-  --open-flow-node-content: #242424;
-  --open-flow-comment-surface: #403727;
-  --open-flow-comment-content: #2b261d;
-  --open-flow-comment-border: #5c4e36;
-  --open-flow-card-foreground: #eeeeee;
-  --open-flow-popover: #2b2b2b;
-  --open-flow-popover-foreground: #eeeeee;
-  --open-flow-primary: #eeeeee;
-  --open-flow-primary-foreground: #242424;
-  --open-flow-secondary: #2b2b2b;
-  --open-flow-secondary-foreground: #eeeeee;
-  --open-flow-muted: #242424;
-  --open-flow-muted-foreground: #ababab;
-  --open-flow-accent: #303030;
-  --open-flow-accent-foreground: #eeeeee;
-  --open-flow-destructive: #f87171;
-  --open-flow-border: #3c3c3c;
-  --open-flow-input: #484848;
-  --open-flow-ring: #b4b4b4;
+  --_open-flow-theme: dark;
+}
+
+/* Product roles are shared by theme roots and explicit canvas control scopes. */
+.open-flow-theme,
+.open-flow-canvas-root :is(.react-flow__controls, [data-canvas-control-scope]) {
+  --ui-code-gutter-background: light-dark(#fff, #333338);
+  --ui-code-gutter-border: light-dark(#ddd, #333338);
+  --ui-background: var(--_open-flow-background);
+  --ui-foreground: var(--_open-flow-foreground);
+  --ui-card: var(--_open-flow-card);
+  --ui-card-foreground: var(--_open-flow-card-foreground);
+  --ui-popover: var(--_open-flow-popover);
+  --ui-popover-foreground: var(--_open-flow-popover-foreground);
+  --ui-primary: var(--_open-flow-primary);
+  --ui-primary-foreground: var(--_open-flow-primary-foreground);
+  --ui-secondary: var(--_open-flow-secondary);
+  --ui-secondary-foreground: var(--_open-flow-secondary-foreground);
+  --ui-muted: var(--_open-flow-muted);
+  --ui-muted-foreground: var(--_open-flow-muted-foreground);
+  --ui-accent: var(--_open-flow-accent);
+  --ui-accent-foreground: var(--_open-flow-accent-foreground);
+  --ui-destructive: var(--_open-flow-destructive);
+  --ui-danger-control-background-default: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
+  --ui-danger-control-background-hover: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)));
+  --ui-border: var(--_open-flow-border);
+  --ui-input: var(--_open-flow-input);
+  --ui-ring: var(--_open-flow-ring);
+  --ui-radius: var(--_open-flow-radius);
 }
 
 .open-flow-workbench .resource-browser {
@@ -100,11 +87,11 @@
   --ui-disabled-opacity: 1;
   --ui-disabled-cursor: default;
   --ui-disabled-background: var(--ui-control-background);
-  --ui-input: color-mix(in srgb, var(--ui-border) 70%, var(--open-flow-node-content));
-  --ui-card: var(--open-flow-node-surface);
-  --ui-background: var(--open-flow-node-surface);
-  --ui-control-background: var(--open-flow-node-content);
-  --ui-control-hover-background: color-mix(in srgb, var(--open-flow-secondary) 25%, var(--ui-control-background));
+  --ui-input: color-mix(in srgb, var(--ui-border) 70%, var(--_open-flow-node-content));
+  --ui-card: var(--_open-flow-node-surface);
+  --ui-background: var(--_open-flow-node-surface);
+  --ui-control-background: var(--_open-flow-node-content);
+  --ui-control-hover-background: color-mix(in srgb, var(--_open-flow-secondary) 25%, var(--ui-control-background));
   --ui-readonly-focus-outline: 1px solid color-mix(in srgb, var(--ui-ring) 40%, var(--ui-input));
 
   :is(input, textarea):is([readonly], :disabled)::placeholder {
@@ -117,8 +104,8 @@
   }
 }
 
-/* Canvas surfaces preserve the approved node and floating-control palette.
-   Theme values are owned here; components select a surface and data-theme. */
+/* Canvas content keeps its compact geometry and semantic colors. Optional host inputs
+   customize its neutral palette without changing the default canvas appearance. */
 .open-flow-theme[data-surface='canvas'] {
   --nearly-transparent: #00000001;
   --white: #ffffff;
@@ -204,62 +191,58 @@
   --warning: #faad14;
   --error: #ff4d4f;
 
-  color-scheme: light;
+  --fill-1: var(--open-flow-card, light-dark(#ffffff, #242424));
+  --fill-2: var(--open-flow-background, light-dark(#fafafa, #1c1c1c));
+  --fill-3: var(--open-flow-node-surface, light-dark(#f6f6f6, #2b2b2b));
+  --fill-4: var(--open-flow-secondary, light-dark(#eeeeee, #303030));
+  --fill-5: var(--open-flow-accent, light-dark(#e7e7e7, #363636));
+  --fill-6: var(--open-flow-border, light-dark(#e3e3e3, #3c3c3c));
+  --fill-7: var(--open-flow-input, light-dark(#dedede, #484848));
+  --border-1: var(--open-flow-border, light-dark(#dedede, #3c3c3c));
+  --border-2: var(--open-flow-input, light-dark(#d2d2d2, #484848));
+  --text-1: var(--open-flow-muted-foreground, #858585);
+  --text-2: var(--open-flow-muted-foreground, light-dark(#6b6b6b, #ababab));
+  --text-3: var(--open-flow-muted-foreground, light-dark(#6b6b6b, #ababab));
+  --text-4: var(--open-flow-foreground, light-dark(#242424, #eeeeee));
+  --text-5: var(--open-flow-foreground, light-dark(#242424, #eeeeee));
 
-  --fill-1: #ffffff;
-  --fill-2: #fafafa;
-  --fill-3: #f6f6f6;
-  --fill-4: #eeeeee;
-  --fill-5: #e7e7e7;
-  --fill-6: #e3e3e3;
-  --fill-7: #dedede;
-  --border-1: #dedede;
-  --border-2: #d2d2d2;
-  --text-1: #858585;
-  --text-2: #6b6b6b;
-  --text-3: #6b6b6b;
-  --text-4: #242424;
-  --text-5: #242424;
-
-  --accent-soft: #ededed;
-  --accent-soft-hover: #e3e3e3;
-  --accent-foreground: #333333;
+  --accent-soft: var(--open-flow-accent, light-dark(#ededed, #353535));
+  --accent-soft-hover: var(--open-flow-secondary, light-dark(#e3e3e3, #424242));
+  --accent-foreground: var(--open-flow-accent-foreground, light-dark(#333333, #e0e0e0));
   --trigger-icon-color: var(--accent-orange-2);
   --trigger-icon-fill: color-mix(in srgb, var(--trigger-icon-color) 16%, transparent);
-  --canvas-lock-stripe: var(--open-flow-canvas-lock-stripe, rgb(100 100 100 / 5%));
-  --canvas-grid: rgb(100 100 100 / 14%);
+  --canvas-lock-stripe: var(--open-flow-canvas-lock-stripe, light-dark(rgb(100 100 100 / 5%), rgb(180 180 180 / 5%)));
+  --canvas-grid: var(--open-flow-canvas-grid, light-dark(rgb(100 100 100 / 14%), rgb(180 180 180 / 13%)));
   --node-shadow: none;
-  --node-selected-shadow: 0 0 0 2px rgb(70 70 70 / 12%), 0 2px 6px rgb(0 0 0 / 5%);
+  --node-selected-shadow: 0 0 0 2px color-mix(in srgb, var(--open-flow-ring, rgb(70 70 70)) 12%, transparent), 0 2px 6px rgb(0 0 0 / 5%);
   --node-error-selected-shadow: 0 0 0 2px rgb(204 62 68 / 14%), 0 2px 6px rgb(28 32 36 / 5%);
   --floating-control-shadow: 0 1px 3px rgb(28 32 36 / 4%);
 
-  --background: var(--fill-1);
-  --foreground: var(--text-5);
   --ui-background: var(--fill-1);
   --ui-foreground: var(--text-5);
-  --ui-card: var(--widget-popup-background);
-  --ui-card-foreground: var(--widget-font-color);
+  --ui-card: var(--open-flow-card, var(--widget-popup-background));
+  --ui-card-foreground: var(--open-flow-card-foreground, var(--widget-font-color));
   --ui-popover: var(--widget-popup-background);
-  --ui-popover-foreground: var(--widget-font-color);
+  --ui-popover-foreground: var(--open-flow-popover-foreground, var(--widget-font-color));
   --ui-primary: var(--brand-highlight-color);
   --ui-primary-foreground: var(--widget-font-highlight-color);
   --ui-secondary: var(--fill-4);
-  --ui-secondary-foreground: var(--text-4);
-  --ui-muted: var(--fill-4);
+  --ui-secondary-foreground: var(--open-flow-secondary-foreground, var(--text-4));
+  --ui-muted: var(--open-flow-muted, var(--fill-4));
   --ui-muted-foreground: var(--text-2);
   --ui-accent: var(--fill-5);
-  --ui-accent-foreground: var(--text-5);
-  --ui-destructive: var(--accent-red-1);
-  --ui-border: var(--border-2);
+  --ui-accent-foreground: var(--open-flow-accent-foreground, var(--text-5));
+  --ui-destructive: var(--open-flow-destructive, var(--accent-red-1));
+  --ui-border: var(--open-flow-border, var(--border-2));
   --ui-input: var(--border-2);
-  --ui-ring: var(--open-flow-ring);
+  --ui-ring: var(--_open-flow-ring);
   --ui-radius: 6px;
 
-  --brand-color: #3d3d3d;
-  --brand-highlight-color: #505050;
+  --brand-color: var(--open-flow-primary, light-dark(#3d3d3d, #cccccc));
+  --brand-highlight-color: var(--open-flow-primary, light-dark(#505050, #b8b8b8));
   --brand-hover-color: color-mix(in srgb, var(--brand-highlight-color) 20%, transparent);
 
-  --node-background-color: var(--open-flow-node-content);
+  --node-background-color: var(--_open-flow-node-content);
   --node-border-color: var(--border-1);
   --node-selected-border-color: var(--brand-highlight-color);
   --node-head-background-color: var(--fill-3);
@@ -272,7 +255,7 @@
   --widget-font-color: var(--text-4);
   --widget-font-readonly-color: var(--widget-font-color);
   --widget-font-placeholder-color: var(--text-2);
-  --widget-font-highlight-color: var(--white);
+  --widget-font-highlight-color: var(--open-flow-primary-foreground, var(--white));
   --widget-font-disable-color: var(--text-2);
   --widget-font-error-color: var(--widget-font-color);
   --widget-secondary-font-color: var(--text-3);
@@ -284,22 +267,22 @@
   --widget-null-bg-color: #79c0ff33;
 
   --widget-border-color: var(--border-2);
-  --widget-border-highlight-color: #a3a3a3;
+  --widget-border-highlight-color: var(--open-flow-ring, light-dark(#a3a3a3, #747474));
   --widget-background: var(--fill-4);
   --widget-background-highlight-color: var(--fill-5);
   --widget-background-mask-highlight-color: rgba(0, 0, 0, 0.1);
 
   --widget-input-background: var(--fill-3);
-  --widget-input-selection-background-color: #d1d2f3;
+  --widget-input-selection-background-color: var(--open-flow-accent, light-dark(#d1d2f3, #2b4f77));
   --widget-switch-background-color: var(--fill-7);
   --widget-switch-border-color: transparent;
   --widget-label-background: var(--fill-4);
   --widget-active-background: var(--fill-6);
 
-  --widget-selector-selected-focused-bg: var(--brand-1);
-  --widget-selector-selected-bg: var(--brand-2);
+  --widget-selector-selected-focused-bg: var(--open-flow-accent, light-dark(var(--brand-1), var(--brand-9)));
+  --widget-selector-selected-bg: var(--open-flow-secondary, light-dark(var(--brand-2), var(--brand-8)));
 
-  --widget-popup-background: var(--fill-1);
+  --widget-popup-background: var(--open-flow-popover, var(--fill-1));
   --widget-range-background: var(--brand-color);
 
   --widget-segmented-item-selected-bg: var(--fill-2);
@@ -335,7 +318,7 @@
   --edge-selected: var(--text-2);
   --edge-bin: #00d6b9;
   --edge-error: var(--seti-red);
-  --flow-bg: var(--fill-4);
+  --flow-bg: var(--open-flow-canvas-background, light-dark(var(--fill-4), var(--fill-2)));
 
   --xy-controls-button-background-color: var(--ui-background);
   --xy-controls-button-background-color-hover: var(--ui-muted);
@@ -347,7 +330,7 @@
   --xy-minimap-mask-background-color: rgb(0 0 0 / 10%);
   --xy-minimap-node-background-color: var(--widget-background);
 
-  --highlight-indicate-color: var(--brand-7);
+  --highlight-indicate-color: var(--open-flow-primary, light-dark(var(--brand-7), var(--brand-1)));
 
   --block-editor-item-background-color: var(--fill-3);
 
@@ -365,188 +348,57 @@
   --text-weaker: var(--border-2);
   --border-weak: var(--border-1);
 
-  --bubble-bg: var(--brand-1);
-  --bubble-border: var(--brand-4);
+  --bubble-bg: var(--open-flow-accent, light-dark(var(--brand-1), var(--brand-7)));
+  --bubble-border: var(--open-flow-border, light-dark(var(--brand-4), var(--brand-3)));
 
-  --pseudo-outline-color: var(--brand-3);
+  --pseudo-outline-color: var(--open-flow-ring, light-dark(var(--brand-3), var(--brand-7)));
 
-  --comment-bg: var(--open-flow-comment-surface);
-  --comment-preview-bg: var(--open-flow-comment-content);
+  --comment-bg: var(--_open-flow-comment-surface);
+  --comment-preview-bg: var(--_open-flow-comment-content);
   --comment-head-bg: #e8d7b3;
-  --comment-border: var(--open-flow-comment-border);
+  --comment-border: var(--_open-flow-comment-border);
   --comment-selected-border: #a58b50;
   --comment-hover-bg: color-mix(in srgb, var(--comment-head-bg) 70%, #ffffff);
   --comment-active-bg: color-mix(in srgb, var(--comment-head-bg) 93%, #000000);
 }
 
 .open-flow-theme[data-surface='canvas'][data-theme='dark'] {
-  color-scheme: dark;
-
-  --fill-1: #242424;
-  --fill-2: #1c1c1c;
-  --fill-3: #2b2b2b;
-  --fill-4: #303030;
-  --fill-5: #363636;
-  --fill-6: #3c3c3c;
-  --fill-7: #484848;
-  --border-1: #3c3c3c;
-  --border-2: #484848;
-  --text-1: #858585;
-  --text-2: #ababab;
-  --text-3: #ababab;
-  --text-4: #eeeeee;
-  --text-5: #eeeeee;
-
-  --accent-soft: #353535;
-  --accent-soft-hover: #424242;
-  --accent-foreground: #e0e0e0;
   --trigger-icon-color: var(--warning);
   --trigger-icon-fill: color-mix(in srgb, var(--trigger-icon-color) 24%, transparent);
-  --canvas-lock-stripe: var(--open-flow-canvas-lock-stripe, rgb(180 180 180 / 5%));
-  --canvas-grid: rgb(180 180 180 / 13%);
-  --node-shadow: none;
-  --node-selected-shadow: 0 0 0 2px rgb(190 190 190 / 16%), 0 2px 6px rgb(0 0 0 / 20%);
+  --node-selected-shadow: 0 0 0 2px color-mix(in srgb, var(--open-flow-ring, rgb(190 190 190)) 16%, transparent), 0 2px 6px rgb(0 0 0 / 20%);
   --node-error-selected-shadow: 0 0 0 2px rgb(204 62 68 / 24%), 0 2px 6px rgb(0 0 0 / 20%);
   --floating-control-shadow: 0 1px 3px rgb(0 0 0 / 16%);
-
-  --brand-color: #cccccc;
-  --brand-highlight-color: #b8b8b8;
-  --brand-hover-color: color-mix(in srgb, var(--brand-highlight-color) 20%, transparent);
-  --ui-background: var(--fill-1);
-  --ui-foreground: var(--text-5);
-  --ui-card: var(--widget-popup-background);
-  --ui-card-foreground: var(--widget-font-color);
-  --ui-popover: var(--widget-popup-background);
-  --ui-popover-foreground: var(--widget-font-color);
-  --ui-primary: var(--brand-highlight-color);
-  --ui-primary-foreground: var(--widget-font-highlight-color);
-  --ui-secondary: var(--fill-4);
-  --ui-secondary-foreground: var(--text-4);
-  --ui-muted: var(--fill-4);
-  --ui-muted-foreground: var(--text-2);
-  --ui-accent: var(--fill-5);
-  --ui-accent-foreground: var(--text-5);
-  --ui-destructive: var(--accent-red-1);
-  --ui-border: var(--border-2);
-  --ui-input: var(--border-2);
-  --ui-ring: var(--open-flow-ring);
-  --ui-radius: 6px;
-
-  --node-background-color: var(--open-flow-node-content);
-  --node-border-color: var(--border-1);
-  --node-selected-border-color: var(--brand-highlight-color);
-  --node-head-background-color: var(--fill-3);
-  --node-head-background-highlight-color: var(--fill-4);
 
   --widget-error-tag-background: #641e1e;
   --widget-error-tag-border-color: #c60000;
 
-  --widget-shadow: #00000099;
-  --widget-font-color: var(--text-4);
-  --widget-font-readonly-color: var(--widget-font-color);
-  --widget-font-placeholder-color: var(--text-2);
-  --widget-font-highlight-color: var(--white);
-  --widget-font-disable-color: var(--text-2);
-  --widget-font-error-color: var(--widget-font-color);
-  --widget-secondary-font-color: var(--text-3);
-
   --widget-font-danger-color: #ffffffcc;
-  --widget-button-danger-bg: #f851494d;
-  --widget-button-danger-hover-bg: #f8514989;
   --widget-null-color: #79c0ff;
-  --widget-null-bg-color: #79c0ff33;
 
-  --widget-border-color: var(--border-2);
-  --widget-border-highlight-color: #747474;
-  --widget-background: var(--fill-4);
-  --widget-background-highlight-color: var(--fill-5);
   --widget-background-mask-highlight-color: #ffffff1a;
 
-  --widget-input-background: var(--fill-3);
-  --widget-input-selection-background-color: #2b4f77;
-  --widget-switch-background-color: var(--fill-7);
-  --widget-switch-border-color: transparent;
-  --widget-label-background: var(--fill-4);
-  --widget-active-background: var(--fill-6);
-
-  --widget-selector-selected-focused-bg: var(--brand-9);
-  --widget-selector-selected-bg: var(--brand-8);
-
-  --widget-popup-background: var(--fill-1);
   --widget-range-background: var(--brand-highlight-color);
 
   --widget-segmented-item-selected-bg: var(--fill-4);
-  --widget-segmented-item-hover-bg: var(--block-editor-item-background-color);
-  --widget-segmented-track-bg: var(--fill-3);
-  --widget-segmented-font-color: var(--text-strong);
-  --widget-segmented-inactive-color: var(--text-weak);
 
-  --widget-time-picker-active-bg: var(--brand-highlight-color);
-
-  --widget-success-progress-color: var(--accent-green-1);
-  --widget-error-progress-color: var(--accent-red-1);
-
-  --widget-error-color: #ff0000;
   --widget-error-hover-color: #ff2222;
   --widget-error-hover-background-color: #ff000040;
   --widget-error-background: #7b2424;
   --widget-error-background-highlight-color: #853b3c;
   --widget-error-input-border-color: #761414;
   --widget-error-input-background: #351717;
-  --widget-error-tip-border: var(--widget-error-input-border-color);
-  --widget-error-tip-background: var(--widget-error-input-background);
-
-  --widget-warn-color: var(--warning);
 
   --edge-color: #696e77;
-  --edge-linear-gradient-start: var(--edge-color);
-  --edge-linear-gradient-end: var(--edge-color);
 
-  --edge-string: #f9ae58;
-  --edge-json: #9ca0df;
   --edge-primitive: #737373;
-  --edge-selected: var(--text-2);
-  --edge-bin: #00d6b9;
-  --edge-error: var(--seti-red);
-  --flow-bg: var(--fill-2);
-
-  --xy-controls-button-background-color: var(--ui-background);
-  --xy-controls-button-background-color-hover: var(--ui-muted);
-  --xy-controls-button-border-color: var(--ui-border);
-  --xy-controls-button-color: var(--ui-muted-foreground);
-  --xy-controls-button-color-hover: var(--ui-foreground);
-  --xy-controls-box-shadow: var(--floating-control-shadow);
-  --xy-minimap-background-color: var(--node-background-color);
-  --xy-minimap-mask-background-color: rgb(0 0 0 / 10%);
-  --xy-minimap-node-background-color: var(--widget-background);
-
-  --highlight-indicate-color: var(--brand-1);
-
-  --block-editor-item-background-color: var(--fill-3);
-
-  --table-head-color: var(--text-2);
-  --minimap-border-color: var(--border-2);
 
   --contextmenu-shadow: #0000005c;
-  --contextmenu-background: var(--fill-1);
-  --contextmenu-hover: var(--fill-5);
 
-  --text: var(--text-3);
-  --text-strong: var(--text-4);
-  --text-stronger: var(--text-5);
   --text-weak: var(--text-2);
   --text-weaker: var(--text-1);
   --border-weak: var(--border-2);
 
-  --bubble-bg: var(--brand-7);
-  --bubble-border: var(--brand-3);
-
-  --pseudo-outline-color: var(--brand-7);
-
-  --comment-bg: var(--open-flow-comment-surface);
-  --comment-preview-bg: var(--open-flow-comment-content);
   --comment-head-bg: #514532;
-  --comment-border: var(--open-flow-comment-border);
   --comment-selected-border: #bba165;
   --comment-hover-bg: color-mix(in srgb, var(--comment-head-bg) 89%, #ffffff);
   --comment-active-bg: color-mix(in srgb, var(--comment-head-bg) 90%, #000000);

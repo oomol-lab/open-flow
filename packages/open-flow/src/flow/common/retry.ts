@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 export type { RetryConfiguration } from './model.ts'
 
-export const retryNodeTypes = ['code', 'connector', 'openapi', 'llm', 'decision'] as const
+export const retryNodeTypes = ['code', 'connector', 'openapi', 'http-request', 'llm', 'decision'] as const
 export const nodeRetryLimits = { maxRetries: 5, minIntervalMs: 1000, maxIntervalMs: 60000, intervalStepMs: 1000 } as const
 export const defaultNodeRetry: RetryConfiguration = { maxRetries: 2, intervalMs: 2000 }
 export const retryConfigurationSchema = z.strictObject({

@@ -1,4 +1,4 @@
-import type { InputMapping } from './change.ts'
+import type { InputMapping } from './model.ts'
 
 export function renamedPort(
   previous: readonly ({ readonly handle: string } | { readonly group: string })[],

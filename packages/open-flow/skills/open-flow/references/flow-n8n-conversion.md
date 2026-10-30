@@ -13,17 +13,17 @@ publishing and enabling remain separate actions within the user's authorization.
 
 ## Choose a representation
 
-| Source behavior                               | Open Flow building blocks                       | What determines a good fit                                                     |
-| --------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------ |
-| Scheduled, webhook or provider event          | Cron, Webhook, Poll or Integration Trigger      | Schedule/timezone, event payload, delivery and response behavior.              |
-| Provider read or write                        | Connector                                       | Exact operation, input/output shape, account and number of calls.              |
-| Field shaping, filtering, aggregation or join | Code with named input/output fields             | Explicit collection representation, ordering, keys and empty-input behavior.   |
-| IF or Switch                                  | Condition and named execution branches          | Predicate, first/all matches, fallback route and data sent onward.             |
-| Prompt plus model and output parser           | LLM with template, inputs and `resultSchema`    | Supported model, result shape and any parser repair behavior.                  |
-| Agent with tools or memory                    | Agent where its current contract fits           | Tool permissions, state lifetime and how context is supplied.                  |
-| HTTP request                                  | OpenAPI where an actual operation contract fits | Method, parameters, auth, response format and error behavior.                  |
-| Human response or durable pause               | Wait or Approval                                | Who resumes it, payload, timing, notification and external response lifecycle. |
-| Workflow failure handling                     | Error Trigger where its scope fits              | Which failures trigger it and what failure data it receives.                   |
+| Source behavior                               | Open Flow building blocks                               | What determines a good fit                                                     |
+| --------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Scheduled, webhook or provider event          | Cron, Webhook, Poll or Integration Trigger              | Schedule/timezone, event payload, delivery and response behavior.              |
+| Provider read or write                        | Connector                                               | Exact operation, input/output shape, account and number of calls.              |
+| Field shaping, filtering, aggregation or join | Code with named input/output fields                     | Explicit collection representation, ordering, keys and empty-input behavior.   |
+| IF or Switch                                  | Condition and named execution branches                  | Predicate, first/all matches, fallback route and data sent onward.             |
+| Prompt plus model and output parser           | LLM with template, inputs and `resultSchema`            | Supported model, result shape and any parser repair behavior.                  |
+| Agent with tools or memory                    | Agent where its current contract fits                   | Tool permissions, state lifetime and how context is supplied.                  |
+| HTTP request                                  | `http-request`, or `openapi` for a documented operation | Method, parameters, auth, response format and error behavior.                  |
+| Human response or durable pause               | Wait or Approval                                        | Who resumes it, payload, timing, notification and external response lifecycle. |
+| Workflow failure handling                     | Error Trigger where its scope fits                      | Which failures trigger it and what failure data it receives.                   |
 
 Use `schema TYPE` and provider discovery for the actual deployment. A node's
 name alone does not establish equivalence. Provider operations can differ even
@@ -120,10 +120,14 @@ inside URLs, headers, expressions or Code; keep those out of Drafts and reports.
 Use supported credential bindings for the selected operation. A missing account
 can leave a Draft incomplete without implying that the action itself is absent.
 
-For HTTP Request conversion, `schema openapi` describes source URL, operation
-selection and supported authentication. Check the actual operation's response,
-non-success status, redirect, binary and retry requirements against that contract.
-An invented API specification does not establish support for an unknown operation.
+For HTTP Request conversion, `schema http-request` describes a single request's
+method, parameter modes, body, authentication and response handling. Bind `url`,
+request parameters and body through public inputs. Authentication inputs require
+variables or upstream outputs. Query arrays become repeated parameters; response
+arrays remain one value. The first version does not follow redirects or support
+pagination, files, OAuth or direct Agent tools. Check these requirements before
+calling the conversion equivalent. Use `schema openapi` when an actual operation
+contract is available; do not invent an API specification to make a request.
 
 A provider event may expose an ID where the source expected a full record. A
 Connector read can supply the missing data if it preserves the desired behavior.

@@ -39,6 +39,9 @@ The **Theme Preview** group also contains:
 - **Notifications** (`?story=notifications`): production Sonner presentation with success, error, long text and action samples. Add a burst to inspect the stack, or test timed dismissal.
 - **Workbench controls**: shared buttons, inputs, choices, badges and feedback in the product theme.
 - **Theme palette**: Canvas and product color tokens side by side, using the actual CSS variables.
+- **Host theme** (`?story=host-theme`): independent default and host palettes using the public
+  Flow list and public Preview. Compare lists, dialogs, node selection and properties in both modes;
+  the partial override also demonstrates opposite-mode nested defaults.
 
 Switch light/dark mode in the toolbar to review both themes. Story URLs are shareable locally with `?story=node-condition`, `?story=canvas-cards`, `?story=workflow`, `?story=node-states`, `?story=node-controls`, `?story=product-controls` or `?story=palette`. Sample content stays in English; the language picker changes the actual components' translations.
 

@@ -93,7 +93,6 @@
 
 .floatBar {
   --ui-control-radius: 8px;
-  --ui-popover: var(--open-flow-popover, var(--widget-popup-background));
 
   display: flex;
   flex-direction: row;
@@ -103,7 +102,7 @@
   padding: 3px;
   border: 1px solid var(--node-border-color);
   border-radius: calc(var(--ui-control-radius) + 4px);
-  background: var(--ui-popover);
+  background: var(--_open-flow-popover);
   color: var(--ui-muted-foreground);
   box-shadow: var(--floating-control-shadow);
   --icon-font-size: 16px;

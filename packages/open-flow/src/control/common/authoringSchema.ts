@@ -9,6 +9,7 @@ import {
   authoringDefinitionSchemas as definitions,
 } from '../../flow/common/changeSchema.ts'
 import { retryConfigurationSchema, retryNodeTypes } from '../../flow/common/retry.ts'
+import { httpRequestConfigSchema } from '../../http/common/httpRequest.ts'
 import { authoringLlmConfiguration } from './authoringLlm.ts'
 import { authoringOpenApiSchema } from './authoringOpenApi.ts'
 
@@ -31,6 +32,7 @@ export const authoringTypes = [
   'llm',
   'decision',
   'openapi',
+  'http-request',
   'condition',
   'value',
   'wait',
@@ -111,6 +113,7 @@ export const authoringConfigurations = {
   'code': z.strictObject({ inputs: inputFields, outputs: outputFields, capabilities: authoringCapabilities.optional() }),
   'connector': definitions.connector.omit({ outputMode: true }).strict(),
   'openapi': authoringOpenApiSchema,
+  'http-request': httpRequestConfigSchema,
   'agent': definitions.agent
     .omit({ prompt: true, tools: true })
     .extend({
@@ -296,15 +299,17 @@ export function authoringSchema(kind?: AuthoringType) {
                       ? 'Configure static parameters with node.add.inputs or input.set. Definitions come from the selected Trigger key; execution output and variable sources are unavailable.'
                       : kind == 'llm'
                         ? 'Configure model settings, message templates and history as defaults. Input bindings with the same names override these defaults; named business inputs can be bound directly. Template strings interpolate {{name}}.'
-                        : kind == 'openapi'
-                          ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
-                          : kind == 'workflow'
-                            ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
-                            : kind == 'agent'
-                              ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
-                              : kind == 'code'
-                                ? 'Select workflows through config.capabilities: [{kind: "workflow", flowId, name}]. Call context.workflows.call(name, input) and await its business output. The platform derives input/output types. Refresh a selected workflow tool with node.refresh and tool: its name. Calls obey node and Run time limits.'
-                                : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
+                        : kind == 'http-request'
+                          ? 'Configure method, query/headers modes and names, bodyFormat, authentication, responseFormat and statusPolicy. Bind url, query.<name>/header.<name> or whole query/headers objects, body and auth.token (Basic: auth.username/auth.password). Credentials accept variables or upstream outputs only. Outputs: body, statusCode, headers. Authentication is replaced as a complete choice.'
+                          : kind == 'openapi'
+                            ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
+                            : kind == 'workflow'
+                              ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
+                              : kind == 'agent'
+                                ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
+                                : kind == 'code'
+                                  ? 'Select workflows through config.capabilities: [{kind: "workflow", flowId, name}]. Call context.workflows.call(name, input) and await its business output. The platform derives input/output types. Refresh a selected workflow tool with node.refresh and tool: its name. Calls obey node and Run time limits.'
+                                  : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
         example: {
           op: 'node.add',
           as: 'step',
@@ -312,15 +317,16 @@ export function authoringSchema(kind?: AuthoringType) {
           name: 'Step',
           ...((
             {
-              start: { config: { inputDefs: {} } },
-              outputs: { config: { outputDefs: {} } },
-              workflow: { config: { flowId: '<Flow ID>' } },
-              connector: { config: { action: '<Action ID>', connectionId: '<Connection ID>' } },
-              poll: { config: { key: '<Trigger key>', schedule: [{ type: 'every', unit: 'minute', value: 5 }] } },
-              integration: { config: { key: '<Trigger key>' } },
-              openapi: { config: { sourceUrl: 'https://example.com/openapi.json', path: '/items', method: 'get' } },
-              code: { code: 'export default ({value}) => ({result:value})', inputs: { value: { kind: 'value', value: 'Hello' } } },
-              condition: {
+              'start': { config: { inputDefs: {} } },
+              'outputs': { config: { outputDefs: {} } },
+              'workflow': { config: { flowId: '<Flow ID>' } },
+              'connector': { config: { action: '<Action ID>', connectionId: '<Connection ID>' } },
+              'poll': { config: { key: '<Trigger key>', schedule: [{ type: 'every', unit: 'minute', value: 5 }] } },
+              'integration': { config: { key: '<Trigger key>' } },
+              'http-request': { config: {}, inputs: { url: { kind: 'value', value: 'https://example.com' } } },
+              'openapi': { config: { sourceUrl: 'https://example.com/openapi.json', path: '/items', method: 'get' } },
+              'code': { code: 'export default ({value}) => ({result:value})', inputs: { value: { kind: 'value', value: 'Hello' } } },
+              'condition': {
                 config: {
                   match: 'first',
                   branches: [
@@ -335,15 +341,15 @@ export function authoringSchema(kind?: AuthoringType) {
                   ],
                 },
               },
-              value: { config: { values: { threshold: 100, region: 'EU' } } },
-              webhook: { config: { method: 'POST', body: { orderId: { schema: { type: 'string' }, nullable: false } } } },
-              wait: { prompt: 'Continue processing this order?', inputs: { order: { kind: 'value', value: { orderId: 'A-1' } } } },
-              approval: { prompt: 'Approve this order?', inputs: { order: { kind: 'value', value: { orderId: 'A-1' } } } },
-              llm: {
+              'value': { config: { values: { threshold: 100, region: 'EU' } } },
+              'webhook': { config: { method: 'POST', body: { orderId: { schema: { type: 'string' }, nullable: false } } } },
+              'wait': { prompt: 'Continue processing this order?', inputs: { order: { kind: 'value', value: { orderId: 'A-1' } } } },
+              'approval': { prompt: 'Approve this order?', inputs: { order: { kind: 'value', value: { orderId: 'A-1' } } } },
+              'llm': {
                 config: { model: { model: 'deepseek-v4-flash' }, template: [{ role: 'user', content: 'Summarize {{order}}.' }] },
                 inputs: { order: { kind: 'value', value: { orderId: 'A-1', total: 42 } } },
               },
-              agent: {
+              'agent': {
                 config: {
                   model: 'deepseek-v4-flash',
                 },

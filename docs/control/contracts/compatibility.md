@@ -1,5 +1,15 @@
 # Public contracts and version evolution
 
+## HTTP Request: pending Flow model v11 and Engine v8
+
+The latest published next-tag artifact `@oomol-lab/open-flow@0.1.0-beta.73` has gitHead
+`c0675833719334833dbe3dfeeb2ebf9272c607ec` and retains Model v10 / Engine v7. HTTP Request shares
+the pending Model v11 / Engine v8 revision with workflow tools. Model envelopes before v11 reject
+`http-request`; Engines before v8 cannot prepare these nodes. Engine v8's isolation digest includes
+`http-request/1`. Published v6/v7 digests remain supported. Historical Revisions, Publications and
+Runs are not rewritten, and checkpoint structure remains unchanged. Upgrade Server and clients
+together before authoring and publishing HTTP Request nodes.
+
 ## Workflow tools: Flow model v11 and Engine v8
 
 The published `@oomol-lab/open-flow@0.1.0-beta.71` establishes Model v10 and Engine v7 as

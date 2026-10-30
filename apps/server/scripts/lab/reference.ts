@@ -31,6 +31,49 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   }
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
+  if (id == 'http-request') {
+    await call('flow_schema', { type: 'http-request' })
+    const before = await read()
+    const created = await submit(before.revision, [
+      { op: 'node.add', type: 'start', as: 'start', name: 'Start', config: { inputDefs: { url: stringPort, token: stringPort, payload: dataPort } } },
+      {
+        op: 'node.add',
+        type: 'http-request',
+        as: 'http',
+        name: 'Send request',
+        config: {
+          method: 'POST',
+          bodyFormat: 'json',
+          authentication: { type: 'bearer' },
+          query: { mode: 'fields', names: ['tag'] },
+          headers: { mode: 'fields', names: ['X-Test'] },
+        },
+        inputs: {
+          'url': { kind: 'output', node: '$start', port: 'url' },
+          'body': { kind: 'output', node: '$start', port: 'payload' },
+          'auth.token': { kind: 'output', node: '$start', port: 'token' },
+          'query.tag': { kind: 'value', value: ['a b', 'c'] },
+          'header.X-Test': { kind: 'value', value: 'lab' },
+        },
+      },
+      {
+        op: 'node.add',
+        type: 'outputs',
+        as: 'out',
+        name: 'Outputs',
+        config: { outputDefs: { body: dataPort, statusCode: { schema: { type: 'integer' }, nullable: false } } },
+        inputs: { body: { kind: 'output', node: '$http', port: 'body' }, statusCode: { kind: 'output', node: '$http', port: 'statusCode' } },
+      },
+      { op: 'edge.connect', source: '$start', target: '$http' },
+      { op: 'edge.connect', source: '$http', target: '$out' },
+    ])
+    const refs = created.nodes as Record<string, string>
+    await read([refs.http!])
+    await submit(created.revision, [{ op: 'node.update', node: refs.http!, set: { name: 'Send request updated', config: { responseFormat: 'json' } } }])
+    await read([refs.http!])
+    await call('flow_check', { flowId, revisionId: savedRevision })
+    return
+  }
   if (id === 'poll-batch') {
     await call('flow_schema', { type: 'poll' })
     const before = await read()

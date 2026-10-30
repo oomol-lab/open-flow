@@ -21,7 +21,7 @@ export { fixedInputValue, inputValue, inputValues } from './inputValue.ts'
 import type { WebhookMethod } from './webhookMethod.ts'
 
 import { dequal } from 'dequal/lite'
-import { assertDocumentOpenApiAuthBindings, authoringDefinitionSchemas, currentFlowModelVersion, decodeRevisionContent } from './changeSchema.ts'
+import { assertDocumentHttpAuthBindings, authoringDefinitionSchemas, currentFlowModelVersion, decodeRevisionContent } from './changeSchema.ts'
 import { nodeInputMappings, setConditionInput } from './condition.ts'
 import { supportsNodeErrorHandling } from './errorHandling.ts'
 import { supportsNodeRetry } from './retry.ts'
@@ -166,6 +166,7 @@ export interface ConditionNode extends GraphNodeBase {
 }
 
 export type ManagedTaskExecutor =
+  | import('../../http/common/httpRequest.ts').HttpRequestExecutor
   | WorkflowExecutor
   | import('../../decision/common/decision.ts').DecisionExecutor
   | import('../../openapi/common/openapi.ts').OpenApiExecutor
@@ -894,6 +895,6 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       }
     }
   }
-  assertDocumentOpenApiAuthBindings(document)
+  assertDocumentHttpAuthBindings(document)
   return upgradeDecodedRevisionContent({ document, modelVersion: currentFlowModelVersion, modules })
 }

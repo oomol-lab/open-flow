@@ -5,6 +5,7 @@ import type { RevisionView } from '../revisionView.ts'
 import type { AddNodeIntent } from './flowChanges.ts'
 
 import { decisionTask } from '../../../../decision/common/decision.ts'
+import { httpRequestTask } from '../../../../http/common/httpRequest.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { revisionView } from '../revisionView.ts'
 
@@ -56,6 +57,7 @@ export type AddNodeOption = AddNodeOptionBase &
     | { readonly kind: 'decision' }
     | { readonly kind: 'agent' }
     | { readonly kind: 'openapi' }
+    | { readonly kind: 'http-request' }
     | { readonly kind: 'workflow' }
     | { readonly kind: 'llm' }
     | { readonly kind: 'new-task' }
@@ -125,6 +127,16 @@ function builtinOptions(_draft: Draft, t: TFunction): readonly AddNodeOption[] {
       label: t('addNode.decision'),
       inputs: decisionTask().inputs.filter((port) => 'handle' in port),
       outputs: decisionTask().outputs.filter((port) => 'handle' in port),
+    },
+    {
+      description: t('httpRequest.description'),
+      group,
+      icon: ':lucide-light:globe:',
+      id: 'http-request',
+      inputs: httpRequestTask().inputs.filter((port) => 'handle' in port),
+      outputs: httpRequestTask().outputs.filter((port) => 'handle' in port),
+      kind: 'http-request',
+      label: t('httpRequest.title'),
     },
     { description: t('openapi.description'), group, icon: ':logos:openapi-icon:', id: 'openapi', inputs: [], outputs: [], kind: 'openapi', label: 'OpenAPI' },
     {
@@ -287,6 +299,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, t: 
       }
     case 'decision':
       return { kind: 'decision', name: t('addNode.decision') }
+    case 'http-request':
+      return { kind: 'http-request', name: t('httpRequest.title') }
     case 'openapi':
       return { kind: 'openapi', name: 'OpenAPI' }
     case 'llm': {

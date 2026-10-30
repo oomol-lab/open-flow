@@ -282,6 +282,10 @@ export function SourceValueEditor({
     | 'hideChildTypes'
     | 'valueOnly'
     | 'validateObjectFieldName'
+    | 'renderObjectField'
+    | 'depth'
+    | 'objectChild'
+    | 'actions'
   >
   readonly upstream?: NodeInputUpstreamSources
   readonly embedded?: boolean

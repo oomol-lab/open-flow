@@ -6,6 +6,7 @@ export interface EngineContract {
   readonly waitAutoContinue?: boolean
   readonly webhookResponses?: boolean
   readonly workflowTools?: boolean
+  readonly httpRequests?: boolean
 }
 
 export const currentEngineContract = 'open-flow-engine/v8'
@@ -13,6 +14,7 @@ export const nodejsEngineContract = 'open-flow-engine/v8/nodejs-compat-v1'
 
 const currentContract: EngineContract = {
   workflowTools: true,
+  httpRequests: true,
   waitAutoContinue: true,
   webhookResponses: true,
   platformExports: new Set(['engineContract', 'identity']),
@@ -64,12 +66,14 @@ export function findEngineContract(contract: string): EngineContract | undefined
     return {
       ...(contract.endsWith('/nodejs-compat-v1') ? nodejsContract : currentContract),
       workflowTools: false,
+      httpRequests: false,
       platformSource: `export const engineContract = ${JSON.stringify(contract)}\nexport function identity(value) { return value }\n`,
     }
   if (contract == 'open-flow-engine/v6' || contract == 'open-flow-engine/v6/nodejs-compat-v1')
     return {
       ...(contract == 'open-flow-engine/v6' ? currentContract : nodejsContract),
       workflowTools: false,
+      httpRequests: false,
       waitAutoContinue: false,
       webhookResponses: false,
       platformSource: `export const engineContract = ${JSON.stringify(contract)}

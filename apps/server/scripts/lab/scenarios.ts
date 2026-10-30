@@ -8,6 +8,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'http-request',
+    entry: { kind: 'start' },
+    name: 'Call an HTTP endpoint',
+    version: 1,
+    task: 'Create Start with required url and token strings and a nullable JSON payload. Add an HTTP Request named Send request using POST, JSON body, Bearer authentication, named query tag and header X-Test. Bind URL, body and auth token from Start; send tag=["a b","c"] and X-Test=lab. Return body and statusCode through Outputs. In a later edit rename the request to Send request updated and set responseFormat=json, preserving bindings. Read, check and execute with the supplied local HTTP endpoint.',
+  },
+  {
     id: 'poll-batch',
     entry: { kind: 'poll' },
     name: 'Author a batch Poll',
@@ -201,6 +208,7 @@ function source(nodeId: string, handle: string, from: string, output: string): C
 }
 export function initialOperations(id: string): ChangeOperation[] {
   if (
+    id == 'http-request' ||
     id == 'poll-batch' ||
     id == 'wait-auto-continue' ||
     id == 'node-errors' ||
@@ -397,6 +405,13 @@ export function samples(id: string, stage = 0): Sample[] {
         })),
       },
     }))
+  if (id == 'http-request')
+    return [null, { message: 'Hello', count: 0 }].map((payload) => ({
+      name: payload == null ? 'null-body' : 'json-body',
+      orders: [],
+      order,
+      outputs: { url: '', token: 'lab-token', payload },
+    }))
   if (id == 'node-errors') return [{ name: 'handled-and-successful', orders: [], order }]
   if (id == 'node-retries') return [{ name: 'configured-and-cleared', orders: [], order }]
   if (id == 'workflow-call' || id == 'workflow-tools')
@@ -497,6 +512,18 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
       manual.autoContinue == null
       ? []
       : ['Preserve the relative timer and input, configure the date timer, and clear the manual timer.']
+  }
+  if (id == 'http-request') {
+    const requestNode = Object.values(current.document.graph.nodes).find((candidate) => candidate.name == 'Send request updated')
+    return requestNode?.kind == 'task' &&
+      'executor' in requestNode.task &&
+      requestNode.task.executor.kind == 'http-request' &&
+      requestNode.task.executor.method == 'POST' &&
+      requestNode.task.executor.bodyFormat == 'json' &&
+      requestNode.task.executor.responseFormat == 'json' &&
+      requestNode.task.executor.authentication.type == 'bearer'
+      ? []
+      : ['Preserve HTTP configuration when renaming and changing response format.']
   }
   if (id == 'node-errors') {
     const tasks = Object.values(current.document.graph.nodes).filter((candidate) => candidate.kind == 'task')

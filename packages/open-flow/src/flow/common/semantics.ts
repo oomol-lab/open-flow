@@ -1,4 +1,6 @@
+import { dequal } from 'dequal/lite'
 import { decisionTaskIssues } from '../../decision/common/decision.ts'
+import { httpRequestIssues, httpAuthHandles, httpRequestTask, httpRequestUrl } from '../../http/common/httpRequest.ts'
 import { openApiIssues, authHandles } from '../../openapi/common/openapi.ts'
 import { isTriggerNode } from './change.ts'
 import { nodeWorkflowReferences } from './workflowReferences.ts'
@@ -271,13 +273,57 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
       })
     for (const message of openApiIssues(task))
       checked.diagnostics.push({ code: 'openapi.config-invalid', column: 0, line: 1, message, path: `/document/graph/nodes/${nodeId}/task/executor` })
-    if (task.executor.kind == 'openapi') {
-      const handles = authHandles(task.executor.auth)
+    if (task.executor.kind == 'http-request') {
+      for (const issue of httpRequestIssues(task.executor))
+        checked.diagnostics.push({
+          code: 'http-request.config-invalid',
+          column: 0,
+          line: 1,
+          message: issue.message,
+          path: `/document/graph/nodes/${nodeId}/task/executor/${issue.field}`,
+        })
+      if (node.inputs.url?.kind == 'value') {
+        try {
+          httpRequestUrl(node.inputs.url.value)
+        } catch {
+          checked.diagnostics.push({
+            code: 'http-request.url-invalid',
+            column: 0,
+            line: 1,
+            message: 'Enter an HTTP(S) URL without embedded credentials.',
+            path: `/document/graph/nodes/${nodeId}/inputs/url`,
+          })
+        }
+      }
+      if (task.executor.bodyFormat != 'none' && (node.inputs.body == null || node.inputs.body.kind == 'unset'))
+        checked.diagnostics.push({
+          code: 'http-request.body-required',
+          column: 0,
+          line: 1,
+          message: 'Set or bind the request body; JSON null is an explicit value.',
+          path: `/document/graph/nodes/${nodeId}/inputs/body`,
+        })
+      const expected = httpRequestTask(task.executor)
+
+      if (
+        !dequal(httpPortContracts(task.inputs), httpPortContracts(expected.inputs)) ||
+        !dequal(httpPortContracts(task.outputs), httpPortContracts(expected.outputs))
+      )
+        checked.diagnostics.push({
+          code: 'http-request.ports-invalid',
+          column: 0,
+          line: 1,
+          message: 'HTTP Request ports must match its configuration.',
+          path: `/document/graph/nodes/${nodeId}/task`,
+        })
+    }
+    if (task.executor.kind == 'openapi' || task.executor.kind == 'http-request') {
+      const handles = task.executor.kind == 'openapi' ? authHandles(task.executor.auth) : httpAuthHandles(task.executor)
       for (const handle of handles) {
         const mapping = node.inputs[handle]
         if (mapping?.kind != 'sources' || mapping.sources.length == 0)
           checked.diagnostics.push({
-            code: 'openapi.auth-source',
+            code: `${task.executor.kind}.auth-source`,
             column: 0,
             line: 1,
             message: 'Authentication requires a deployment variable or upstream output.',
@@ -385,9 +431,20 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
   }
 }
 
+const httpPortContracts = (ports: import('./change.ts').ManagedTaskDefinition['inputs']) =>
+  ports
+    .filter((port) => 'handle' in port)
+    .map(({ handle, jsonSchema, nullable }) => ({ handle, jsonSchema, nullable }))
+    .toSorted((a, b) => a.handle.localeCompare(b.handle))
+
 export async function prepareFlow(revision: RevisionContent, engineContract: string, triggerId?: string): Promise<PrepareFlowResult> {
   const engine = findEngineContract(engineContract)
   if (engine == null) return { kind: 'engine-unsupported' }
+  if (
+    !engine.httpRequests &&
+    Object.values(revision.document.graph.nodes).some((node) => node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'http-request')
+  )
+    return { kind: 'engine-unsupported' }
   if (!engine.workflowTools && Object.values(revision.document.graph.nodes).some((node) => nodeWorkflowReferences(node).some((ref) => ref.tool != null)))
     return { kind: 'engine-unsupported' }
   if (triggerId != null) {

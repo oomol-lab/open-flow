@@ -11,12 +11,13 @@ const layers: readonly (readonly [name: string, patterns: readonly RegExp[]])[] 
   [
     'flow model',
     [
-      /^flow\/common\/(?:model|inputValue|json|schema|schemaCompare|schemaComparer|schemaKeywords|triggerScheduleSchema|webhookMethod|webhookResponse)\.ts$/,
+      /^flow\/common\/(?:model|inputValue|json|portChanges|schema|schemaCompare|schemaComparer|schemaKeywords|triggerScheduleSchema|webhookMethod|webhookResponse)\.ts$/,
+      /^http\/common\/headers\.ts$/,
       /^connector\/common\//,
       /^event-source\/common\//,
     ],
   ],
-  ['node families', [/^decision\//, /^openapi\//, /^trigger\/(?:common|providers)\//, /^runtime\//]],
+  ['node families', [/^decision\//, /^http\//, /^openapi\//, /^trigger\/(?:common|providers)\//, /^runtime\//]],
   ['flow', [/^flow\//]],
   ['workflow calls', [/^workflow\//]],
   ['execution', [/^execution\//]],

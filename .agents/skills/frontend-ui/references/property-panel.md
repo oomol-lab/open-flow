@@ -35,6 +35,12 @@ the generated, read-only output definitions.
 OpenAPI nodes place OpenAPI configuration and Authentication after Purpose and before Inputs and
 Outputs. The operation determines the generated ports; unconfigured nodes omit the empty port sections.
 
+HTTP Request uses separate Request, Authentication, and Response settings sections before Response
+outputs. URL comes first, followed by Method, Query, Headers, Body format, and request body.
+Authentication keeps its type and credential sources together; Response settings owns response
+format and status policy. Query and Headers use object editors with whole-object and field sources.
+Each input appears once alongside its related settings; the node has no separate Inputs table.
+
 Provider triggers place their Options section immediately before Outputs so provider-specific
 configuration precedes the data it produces.
 

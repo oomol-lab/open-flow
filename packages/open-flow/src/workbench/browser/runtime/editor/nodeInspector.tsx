@@ -18,7 +18,7 @@ import type { WebhookDeploymentProps } from './webhookDeployment.tsx'
 import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { decisionModel } from '../../../../decision/common/decision.ts'
-import { executionReachableNodes, webhookResponseDiagnostics } from '../../../../flow/common/graph.ts'
+import { executionReachableNodes, webhookResponseDiagnostics, inputSourceCandidates } from '../../../../flow/common/graph.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { webhookResponseInputs } from '../../../../flow/common/webhookResponse.ts'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -41,6 +41,8 @@ import { diagnosticMessage } from './diagnostics.ts'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { EventSourceTriggerConfig } from './eventSourceTriggerConfig.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
+import { HttpParameterEditor } from './httpParameterEditor.tsx'
+import { HttpRequestSection } from './httpRequestSection.tsx'
 import { LeinaBotSelect } from './leinaBotSelect.tsx'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { LlmTaskSection } from './llmTaskSection.tsx'
@@ -71,7 +73,7 @@ export function inspectorIcon(node: ResolvedSelection | undefined): IconName {
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
     if (node.definition.executor.kind == 'decision') return 'decision'
     if (node.definition.executor.kind == 'workflow') return 'flow'
-    if (node.definition.executor.kind == 'openapi') return 'task'
+    if (node.definition.executor.kind == 'openapi' || node.definition.executor.kind == 'http-request') return 'task'
     return node.definition.executor.kind == 'connector' ? 'connection' : 'llm'
   }
   return 'task'
@@ -125,6 +127,8 @@ function nodePurposePlaceholder(
           return t('decision.description')
         case 'workflow':
           return t('workflow.description')
+        case 'http-request':
+          return t('httpRequest.description')
         case 'openapi':
           return t('openapi.description')
         case 'connector':
@@ -142,11 +146,13 @@ function inputUpstreamSources({
   selection,
   store,
   handleName,
+  port,
   t,
   triggerDisplays,
 }: Pick<Props, 'revision' | 'sourceNodeIcons' | 'store' | 'triggerDisplays'> & {
   readonly selection: ResolvedNode
   readonly handleName: string
+  readonly port?: InputPort
   readonly t: TFunction
 }): NodeInputUpstreamSources | undefined {
   const graph = revision.graph()!
@@ -176,7 +182,13 @@ function inputUpstreamSources({
         check: undefined,
       }
     }),
-    query: revision.inputSource(selection.id, handleName),
+    query:
+      port == null
+        ? revision.inputSource(selection.id, handleName)
+        : {
+            ...revision.inputSource(selection.id, handleName),
+            candidates: () => inputSourceCandidates(graph, selection.id, handleName, port),
+          },
     groups: [],
     describeGroups: (candidates) =>
       Object.entries(candidates).map(([nodeId, outputs]) => {
@@ -312,6 +324,7 @@ export function NodeInspector({
   const task = selection?.kind == 'task' ? selection.definition : undefined
   const isAgent = task != null && 'executor' in task && task.executor.kind == 'agent'
   const isDecision = task != null && 'executor' in task && task.executor.kind == 'decision'
+  const isHttpRequest = task != null && 'executor' in task && task.executor.kind == 'http-request'
   const isOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi'
   const unconfiguredWorkflow = task != null && 'executor' in task && task.executor.kind == 'workflow' && !task.executor.flowId
   const unconfiguredOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi' && !task.executor.path
@@ -629,6 +642,82 @@ export function NodeInspector({
           />
         )}
 
+        {isHttpRequest && task != null && 'executor' in task && (
+          <HttpRequestSection
+            key={`http:${selection?.id}`}
+            task={task}
+            disabled={disabled}
+            input={(handle, label) => {
+              if (selection?.kind !== 'task') return null
+              const definition = task.inputs.find((port): port is InputPort => 'handle' in port && port.handle === handle)
+              if (definition == null) return null
+              const mapping = revision.inputMappings(selection.node)[handle]
+              const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
+              const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+              return (
+                <Field key={handle}>
+                  <FieldLabel>{label}</FieldLabel>
+                  <NodeInputValue
+                    embedded
+                    definition={definition}
+                    label={label}
+                    presentation={{ compact: true, hideOptions: true }}
+                    sourceOnly={handle.startsWith('auth.')}
+                    readOnly={readOnly}
+                    disabled={disabled}
+                    value={inputValue(mapping, definition.value)}
+                    connected={mapping?.kind === 'sources' && binding?.kind !== 'variable'}
+                    variableName={binding?.kind === 'variable' ? binding.target : undefined}
+                    upstream={inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
+                    variables={variables}
+                    onValue={(value, deletion) => {
+                      void store?.nodes.setInputValue(selection.id, handle, value, deletion)
+                    }}
+                    onVariable={(name) => {
+                      void store?.nodes.setInputVariable(selection.id, handle, name)
+                    }}
+                  />
+                </Field>
+              )
+            }}
+            parameters={
+              selection?.kind === 'task' &&
+              (['query', 'headers'] as const).map((group) => (
+                <HttpParameterEditor
+                  key={group}
+                  group={group}
+                  task={task}
+                  entries={Object.fromEntries(
+                    Object.entries(revision.inputMappings(selection.node)).map(([handle, mapping]) => {
+                      const source = mapping.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
+                      const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+                      return [
+                        handle,
+                        {
+                          value: inputValue(mapping, undefined),
+                          connected: mapping.kind === 'sources' && binding?.kind !== 'variable',
+                          variableName: binding?.kind === 'variable' ? binding.target : undefined,
+                        },
+                      ]
+                    }),
+                  )}
+                  variables={variables}
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  renderSource={(handleName, port) =>
+                    inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName, port, t, triggerDisplays })
+                  }
+                  onEdit={(edit) => {
+                    void store?.nodes.saveHttpParameters(selection.id, group, edit)
+                  }}
+                />
+              ))
+            }
+            onSave={(before, value) =>
+              store?.nodes.saveTaskSettings(selection!.id, { kind: 'http-request', name: task.name, before, task: value }) ?? Promise.resolve(false)
+            }
+          />
+        )}
         {isOpenApi && task != null && 'executor' in task && (
           <OpenApiSection
             key={`openapi:${selection?.id}`}
@@ -693,7 +782,8 @@ export function NodeInspector({
             }
           />
         )}
-        {!unconfiguredOpenApi &&
+        {!isHttpRequest &&
+          !unconfiguredOpenApi &&
           !unconfiguredWorkflow &&
           (selection?.kind === 'outputs' || selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'task') &&
           (() => {
@@ -726,6 +816,7 @@ export function NodeInspector({
                 const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
                 return {
                   definition,
+                  sourceOnly: isHttpRequest && definition.handle.startsWith('auth.'),
                   editor:
                     !readOnly &&
                     connectors != null &&
@@ -891,7 +982,7 @@ export function NodeInspector({
               readOnly={readOnly}
               groups
               layout="ports"
-              title={t('inspector.ports.outputsTitle')}
+              title={t(isHttpRequest ? 'httpRequest.responseOutputs' : 'inspector.ports.outputsTitle')}
               output
               values={presentDecisionOutputs(selection.definition, t)}
               disabled={disabled || !('moduleId' in selection.node.task || isAgent)}

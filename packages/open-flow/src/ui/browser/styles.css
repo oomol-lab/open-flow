@@ -46,7 +46,12 @@
   }
 }
 
-@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+/* The inherited mode stops at a nested theme root; ancestor selectors do not. */
+@custom-variant dark {
+  @container style(--_open-flow-theme: dark) {
+    @slot;
+  }
+}
 
 @theme inline {
   --text-sm: var(--ui-font-size);

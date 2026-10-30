@@ -1,13 +1,13 @@
 @mixin appearance {
   min-width: 176px;
   padding: 6px;
-  border-radius: calc(var(--open-flow-radius) + 2px);
+  border-radius: calc(var(--_open-flow-radius) + 2px);
 
   :global([data-slot$='menu-item']) {
     min-height: 28px;
     gap: 8px;
     padding: 4px 10px;
-    border-radius: var(--open-flow-radius);
+    border-radius: var(--_open-flow-radius);
 
     > i,
     > svg {

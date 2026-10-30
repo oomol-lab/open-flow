@@ -4,7 +4,8 @@ import type { WebhookBodyField, WebhookOptions } from './model.ts'
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../base/common/json.ts'
-import { webhookHeaderNameIssue, validWebhookStatus, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
+import { validWebhookStatus, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
+import { httpHeaderNameIssue } from '../../http/common/headers.ts'
 
 export { webhookSupportsBody } from './contract.ts'
 export { webhookResponseAllowsBody, webhookResponseTimeout } from '../../flow/common/webhookResponse.ts'
@@ -36,7 +37,7 @@ export function webhookResponseHeaders(result: unknown, options: WebhookOptions)
   const values = new Map<string, { name: string; value: unknown }>()
   for (const [name, value] of Object.entries(source)) {
     if (
-      webhookHeaderNameIssue(
+      httpHeaderNameIssue(
         name,
         [...values.values()].map((entry) => entry.name),
       ) != null
@@ -47,7 +48,7 @@ export function webhookResponseHeaders(result: unknown, options: WebhookOptions)
   if (whole == null) {
     const names: string[] = []
     for (const [name, output] of Object.entries(options.responseHeaderOutputs ?? {})) {
-      if (webhookHeaderNameIssue(name, names) != null) return
+      if (httpHeaderNameIssue(name, names) != null) return
       names.push(name)
       values.set(name.toLowerCase(), { name, value: workflowOutputValue(result, output) })
     }

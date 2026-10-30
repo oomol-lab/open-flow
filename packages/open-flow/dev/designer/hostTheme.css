@@ -1,0 +1,75 @@
+.host-theme-gallery {
+  display: grid;
+  gap: 20px;
+  padding: 16px;
+}
+
+.host-theme-sample > h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.host-theme-runtime[data-view='canvas'] {
+  height: 440px;
+}
+
+/* A host-owned palette fixture. Only public inputs cross into production UI. */
+.host-theme-brand {
+  --open-flow-background: #fffdfc;
+  --open-flow-foreground: #343036;
+  --open-flow-card: #fffefd;
+  --open-flow-card-foreground: #343036;
+  --open-flow-popover: #fffefd;
+  --open-flow-popover-foreground: #343036;
+  --open-flow-primary: #453459;
+  --open-flow-primary-foreground: #fffdfc;
+  --open-flow-secondary: #faf7f8;
+  --open-flow-secondary-foreground: #343036;
+  --open-flow-muted: #f5f1f4;
+  --open-flow-muted-foreground: #6d666f;
+  --open-flow-accent: color-mix(in oklab, #453459 8%, #fffdfc);
+  --open-flow-accent-foreground: #343036;
+  --open-flow-destructive: #d73220;
+  --open-flow-border: #ece6ea;
+  --open-flow-input: #ece6ea;
+  --open-flow-ring: #453459;
+  --open-flow-radius: 8px;
+  --open-flow-node-surface: #f5f1f4;
+  --open-flow-node-content: #fffefd;
+  --open-flow-canvas-background: #fffdfc;
+  --open-flow-canvas-grid: rgb(52 48 54 / 10%);
+}
+
+.host-theme-brand[data-theme='dark'] {
+  --open-flow-background: #151217;
+  --open-flow-foreground: #eee9ed;
+  --open-flow-card: #1f1b22;
+  --open-flow-card-foreground: #eee9ed;
+  --open-flow-popover: #28232c;
+  --open-flow-popover-foreground: #eee9ed;
+  --open-flow-primary: #e9e1f2;
+  --open-flow-primary-foreground: #151217;
+  --open-flow-secondary: #28232c;
+  --open-flow-secondary-foreground: #eee9ed;
+  --open-flow-muted: #28232c;
+  --open-flow-muted-foreground: #aea4b3;
+  --open-flow-accent: color-mix(in oklab, #e9e1f2 10%, #1f1b22);
+  --open-flow-accent-foreground: #eee9ed;
+  --open-flow-destructive: #df3422;
+  --open-flow-border: #3e3741;
+  --open-flow-input: #3e3741;
+  --open-flow-ring: #e9e1f2;
+  --open-flow-node-surface: #28232c;
+  --open-flow-node-content: #1f1b22;
+  --open-flow-canvas-background: #151217;
+  --open-flow-canvas-grid: rgb(238 233 237 / 14%);
+}
+
+.host-theme-partial {
+  /* Unrelated host values must not influence production control states. */
+  --secondary: #ff00ff;
+  --foreground: #00ff00;
+  --open-flow-primary: #453459;
+  --open-flow-primary-foreground: #fffdfc;
+  --open-flow-ring: #806598;
+}
