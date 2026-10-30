@@ -12,6 +12,7 @@ import {
 import { retryConfigurationSchema, retryNodeTypes } from '../../flow/common/retry.ts'
 import { httpRequestConfigSchema } from '../../http/common/httpRequest.ts'
 import { currentEngineContract, findEngineContract } from '../../runtime/common/engineContract.ts'
+import { dedupeConfigSchema } from '../../state/common/state.ts'
 import { authoringLlmConfiguration } from './authoringLlm.ts'
 import { authoringOpenApiSchema } from './authoringOpenApi.ts'
 
@@ -35,6 +36,7 @@ export const authoringTypes = [
   'decision',
   'openapi',
   'http-request',
+  'dedupe',
   'condition',
   'value',
   'wait',
@@ -118,6 +120,7 @@ export const authoringConfigurations = {
   'connector': definitions.connector.omit({ outputMode: true }).strict(),
   'openapi': authoringOpenApiSchema,
   'http-request': httpRequestConfigSchema,
+  'dedupe': dedupeConfigSchema,
   'agent': definitions.agent
     .omit({ prompt: true, tools: true })
     .extend({
@@ -306,17 +309,19 @@ export function authoringSchema(kind?: AuthoringType) {
                       ? 'Configure static parameters with node.add.inputs or input.set. Definitions come from the selected Trigger key; execution output and variable sources are unavailable.'
                       : kind == 'llm'
                         ? 'Configure model settings, message templates and history as defaults. Input bindings with the same names override these defaults; named business inputs can be bound directly. Template strings interpolate {{name}}.'
-                        : kind == 'http-request'
-                          ? 'Configure method, query/headers modes and names, bodyFormat, authentication, responseFormat and statusPolicy. Bind url, query.<name>/header.<name> or whole query/headers objects, body and auth.token (Basic: auth.username/auth.password). Credentials accept variables or upstream outputs only. Outputs: body, statusCode, headers. Authentication is replaced as a complete choice.'
-                          : kind == 'openapi'
-                            ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
-                            : kind == 'workflow'
-                              ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
-                              : kind == 'agent'
-                                ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
-                                : kind == 'code'
-                                  ? codeGuidance
-                                  : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
+                        : kind == 'dedupe'
+                          ? 'Bind an items array. Configure field (dot-separated identity path, empty for scalar items), mode (new or increasing), and space (node or flow). Outputs are items and duplicates. History persists immediately; downstream failures do not roll it back. Increasing mode accepts finite numbers or RFC 3339 timestamps, never mixed types.'
+                          : kind == 'http-request'
+                            ? 'Configure method, query/headers modes and names, bodyFormat, authentication, responseFormat and statusPolicy. Bind url, query.<name>/header.<name> or whole query/headers objects, body and auth.token (Basic: auth.username/auth.password). Credentials accept variables or upstream outputs only. Outputs: body, statusCode, headers. Authentication is replaced as a complete choice.'
+                            : kind == 'openapi'
+                              ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
+                              : kind == 'workflow'
+                                ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
+                                : kind == 'agent'
+                                  ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
+                                  : kind == 'code'
+                                    ? codeGuidance
+                                    : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
         example: {
           op: 'node.add',
           as: 'step',
@@ -330,6 +335,7 @@ export function authoringSchema(kind?: AuthoringType) {
               'connector': { config: { action: '<Action ID>', connectionId: '<Connection ID>' } },
               'poll': { config: { key: '<Trigger key>', schedule: [{ type: 'every', unit: 'minute', value: 5 }] } },
               'integration': { config: { key: '<Trigger key>' } },
+              'dedupe': { config: { field: 'id', mode: 'new', space: 'node' }, inputs: { items: { kind: 'value', value: [{ id: 'a' }, { id: 'b' }] } } },
               'http-request': { config: {}, inputs: { url: { kind: 'value', value: 'https://example.com' } } },
               'openapi': { config: { sourceUrl: 'https://example.com/openapi.json', path: '/items', method: 'get' } },
               'code': { code: 'export default ({value}) => ({result:value})', inputs: { value: { kind: 'value', value: 'Hello' } } },

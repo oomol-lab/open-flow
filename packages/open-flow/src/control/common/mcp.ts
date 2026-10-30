@@ -5,6 +5,7 @@ import { canvasCommandSchema } from '../../canvas/common/commands.ts'
 import { runStatuses } from '../../execution/common/runLifecycle.ts'
 import { waitCommentSchema } from '../../execution/common/wait.ts'
 import { resourceNameIssue } from '../../flow/common/change.ts'
+import { stateQuerySchema, stateClearSchema, dedupeClearSchema } from '../../state/common/state.ts'
 import { authoringReadSchema, authoringSearchSchema, authoringRequestSchema, authoringSchemaQuery } from './authoringSchema.ts'
 import { resultQuerySchema } from './resultQuery.ts'
 
@@ -50,6 +51,21 @@ function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: bool
 }
 
 export const mcpTools = {
+  flow_state: tool(
+    'Inspect Flow state usage, business keys and deduplication spaces. Values are omitted unless requested. Scope is required.',
+    stateQuerySchema.extend({ flowId: flow }),
+    true,
+  ),
+  flow_state_clear: tool(
+    'Delete one business state key or clear all business values. Explicit draft/live scope is required; live changes production state immediately.',
+    stateClearSchema.extend({ flowId: flow }),
+    false,
+  ),
+  flow_dedupe_clear: tool(
+    'Clear one deduplication space (flow or node:<id>). Explicit draft/live scope is required; live changes production history immediately.',
+    dedupeClearSchema.extend({ flowId: flow }),
+    false,
+  ),
   flow_canvas: tool(
     'Broadcast a transient canvas command to connected Workbenches viewing this Flow. Success only confirms Server broadcast, not delivery or execution. No replay, session selection or Presentation save. Pan uses screen pixels (positive right/down); zoom is an absolute ratio (0.1–3); fit includes all nodes. Repeating pan moves again.',
     z.strictObject({ flowId: flow, command: canvasCommandSchema }),

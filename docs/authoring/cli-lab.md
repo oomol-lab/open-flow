@@ -393,3 +393,21 @@ It changes only the name and response format in a later edit. Verification sends
 object to a local HTTP fixture and checks authentication, encoding and credential omission in the
 HTTP node start event. Run `bun run lab test http-request` and
 `bun run lab test http-request --mcp`. These are deterministic reference runs, not model trials.
+
+## Flow State reference scenario
+
+`flow-state` builds an hourly Cron → HTTP Request → Code array validation → Remove Duplicates →
+Outputs flow through public authoring. The deterministic HTTP fixture returns a list with a
+repeated identity. Verification executes the same Draft twice: the first Run emits the two new
+items and one duplicate; the second emits no new items and three duplicates. The scenario also
+renames the dedupe node to verify that history belongs to node identity, not its display name.
+
+```bash
+bun run lab test flow-state
+bun run lab test flow-state --mcp
+```
+
+Both transports share the deployment implementation. The fixture's Code node validates the
+HTTP `body` as an array before connecting it to the node's array input; unknown response data
+is not assumed to meet the downstream contract. This scenario has no paid model or Connector
+calls. Its read-only preview does not replace inspection of the editable Workbench state panel.

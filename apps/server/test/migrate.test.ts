@@ -590,6 +590,7 @@ it('classifies existing automatic runs as Live while preserving their execution 
       original.map((run) =>
         Object.assign({}, run, {
           idempotency_key: JSON.stringify(['operator', run.idempotency_key]),
+          state_writes: 0,
           source: run.source == 'trigger' ? 'live' : run.source,
           failure_detail: null,
           error_source_run_id: null,

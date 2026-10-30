@@ -110,6 +110,8 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['flow/common/workflowFile', 'common/flow-workflowFile'],
   ['flow/common/workflowReferences', 'common/flow-workflowReferences'],
   ['http/common/hosts', 'common/http-hosts'],
+  ['state/common/conformance', 'common/state-conformance'],
+  ['state/common/state', 'common/flow-state'],
   ['http/common/httpRequest', 'common/http-request'],
   ['localization/common/languages', 'common/localization'],
   ['openapi/common/openapi', 'common/openapi'],
@@ -148,6 +150,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   const commonOutputPath = path.join(options.packageRoot, 'dist/common')
   await buildRuntime(options, commonOutputPath, connectorProxyEntryPath, 'connector-proxy', true)
   await buildRuntime(options, commonOutputPath, 'src/decision/common/decision.ts', 'decision', false)
+  await buildRuntime(options, commonOutputPath, 'src/state/common/state.ts', 'flow-state', false)
   await buildRuntime(options, commonOutputPath, 'src/http/common/httpRequest.ts', 'http-request', false)
   await buildRuntime(options, commonOutputPath, 'src/openapi/common/openapi.ts', 'openapi', false)
   await buildRuntime(options, commonOutputPath, 'src/workflow/common/workflow.ts', 'workflow', false)

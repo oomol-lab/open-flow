@@ -15,6 +15,28 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
   const [operation, ...operands] = args.positionals
 
   switch (operation) {
+    case 'state':
+    case 'dedupe': {
+      requireCount(operands, 2, `${runtime.commandPrefix ?? 'oo flow'} ${operation} <show|clear> <flow> --scope <draft|live>`)
+      if (args.scope !== 'draft' && args.scope !== 'live') throw new CliError('cli.invalid-arguments', 'Explicit --scope draft or --scope live is required.')
+      const [action, target] = operands
+      if (action !== 'clear' && !(operation === 'state' && action === 'show')) throw new CliError('cli.invalid-arguments', 'Unknown State operation.')
+      if (action === 'clear' && !args.yes) throw new CliError('cli.invalid-arguments', 'Clearing State requires --yes.')
+      const flow = await referencedFlow(client, target!)
+      if (action === 'show') {
+        const result = await client.getFlowState(flow.flowId, args.scope, args.full)
+        write(runtime, args.json, { kind: 'flow.state', ...result }, JSON.stringify(result, null, 2))
+      } else {
+        if (operation === 'state') await client.clearFlowState(flow.flowId, args.scope, args.key)
+        else {
+          if (args.space == null) throw new CliError('cli.invalid-arguments', '--space is required.')
+          await client.clearFlowDedupe(flow.flowId, args.scope, args.space)
+        }
+        write(runtime, args.json, { kind: 'flow.state.cleared', scope: args.scope }, `Cleared ${args.scope} ${operation}.`)
+      }
+      return
+    }
+
     case 'canvas': {
       requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} canvas <flow> (--input JSON|@file|- | --file path|-) [--json]`)
       if (args.file != null && args.input != null) throw new CliError('cli.invalid-arguments', 'Choose --input or --file.')

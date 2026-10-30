@@ -39,6 +39,7 @@ export class WorkspaceStore {
   readonly #edits: EditSession
   public readonly history$: EditSession['history$']
   readonly #canvasCommandListeners = new Set<(command: CanvasCommand) => void>()
+  readonly state: Pick<WorkbenchClient, 'getFlowState' | 'clearFlowState' | 'clearFlowDedupe'>
   readonly #client: WorkbenchClient
   readonly #i18n: I18n
   readonly #identity: () => string
@@ -77,6 +78,7 @@ export class WorkspaceStore {
     ) => Promise<readonly ConnectorConnection[]>,
   ) {
     this.#client = client
+    this.state = client
     this.#setNotice = setNotice
     this.#identity = identity
     this.#clipboard = new CanvasClipboard(identity, i18n.t)
