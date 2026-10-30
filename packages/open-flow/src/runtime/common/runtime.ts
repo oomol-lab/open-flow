@@ -92,7 +92,135 @@ export default async () => {
       equal(value, { sameReason: true, name: 'AbortError' }, 'Node cancellation')
     },
   },
+  nodejsCase(
+    'resolves prefixed and bare builtin names to the same module and shares globals with their modules',
+    `import { Buffer } from 'node:buffer'; import bare from 'buffer'; import processModule from 'node:process';
+import { URL as ImportedURL, URLSearchParams as ImportedParams } from 'node:url'; import { ReadableStream as ImportedStream } from 'node:stream/web';
+export default () => ({ buffer: Buffer === bare.Buffer && Buffer === globalThis.Buffer, process: process === processModule,
+  url: URL === ImportedURL && URLSearchParams === ImportedParams, stream: ReadableStream === ImportedStream,
+  cwd: process.cwd(), env: Object.keys(process.env) })`,
+    { buffer: true, process: true, url: true, stream: true, cwd: '/tmp', env: [] },
+  ),
+  nodejsCase(
+    'supports events, string decoding, paths, query strings, URLs and promisify',
+    `import { EventEmitter } from 'node:events'; import { StringDecoder } from 'node:string_decoder'; import { Buffer } from 'node:buffer';
+import path from 'node:path'; import qs from 'node:querystring'; import { promisify } from 'node:util';
+export default async () => {
+  const emitter = new EventEmitter(); let count = 0; emitter.once('value', (x) => (count += x)); emitter.emit('value', 7); emitter.emit('value', 9);
+  const decoder = new StringDecoder('utf8'); const bytes = Buffer.from('你好');
+  const incremental = new TextDecoder(); const partial = incremental.decode(new Uint8Array([0xe4, 0xbd]), { stream: true });
+  const url = new URL('../文件?a=1', 'https://example.com/a/b'); url.searchParams.append('b', 'x y');
+  return { count, text: decoder.write(bytes.subarray(0, 2)) + decoder.end(bytes.subarray(2)), partial, rest: incremental.decode(new Uint8Array([0xa0])),
+    path: path.join('/tmp', 'a', '..', 'b'), query: qs.parse('a=1&a=2').a, url: url.href, canParse: URL.canParse('not a url'),
+    value: await promisify((callback) => callback(null, 42))() };
+}`,
+    {
+      count: 7,
+      text: '你好',
+      partial: '',
+      rest: '你',
+      path: '/tmp/b',
+      query: ['1', '2'],
+      url: 'https://example.com/%E6%96%87%E4%BB%B6?a=1&b=x+y',
+      canParse: false,
+      value: 42,
+    },
+  ),
+  nodejsCase(
+    'encodes Buffers and computes hashes, HMACs, gzip and random values',
+    `import { Buffer } from 'node:buffer'; import { createHash, createHmac, randomBytes } from 'node:crypto'; import { gzipSync, gunzipSync, deflateRawSync, inflateRawSync } from 'node:zlib';
+export default () => ({ hex: Buffer.from('你好').toString('hex'), base64: Buffer.from('abc').toString('base64'), latin1: Buffer.from([0xe9]).toString('latin1'),
+  utf16: Buffer.from('a', 'utf16le').length, hash: createHash('sha256').update('a').update('bc').digest('hex'),
+  md5: createHash('md5').update('abc').digest('base64'), hmac: createHmac('sha256', 'key').update('message').digest('hex'),
+  gzip: gunzipSync(gzipSync(Buffer.from('你好'))).toString(), raw: inflateRawSync(deflateRawSync('raw')).toString(),
+  random: randomBytes(12).length, uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(crypto.randomUUID()),
+  values: crypto.getRandomValues(new Uint8Array(4)).length })`,
+    {
+      hex: 'e4bda0e5a5bd',
+      base64: 'YWJj',
+      latin1: 'é',
+      utf16: 2,
+      hash: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+      md5: 'kAFQmDzST7DWlj99KOF/cg==',
+      hmac: '6e9ef29b75fffc5b7abae527d58fdadb2fe42e7219011976917343065f58ed4a',
+      gzip: '你好',
+      raw: 'raw',
+      random: 12,
+      uuid: true,
+      values: 4,
+    },
+  ),
+  nodejsCase(
+    'provides an invocation-local filesystem with Node error codes',
+    `import fs from 'node:fs'; import fsp from 'node:fs/promises';
+export default async () => {
+  await fsp.mkdir('/tmp/nested', { recursive: true });
+  fs.writeFileSync('/tmp/nested/data', '你好');
+  const handle = await fsp.open('/tmp/nested/data', 'r'); const data = await handle.readFile('utf8'); await handle.close();
+  await fsp.rename('/tmp/nested/data', '/tmp/nested/moved');
+  let missing; try { fs.readFileSync('/etc/passwd'); } catch (error) { missing = error.code; }
+  return { data, size: fs.statSync('/tmp/nested/moved').size, entries: fs.readdirSync('/tmp/nested'), missing };
+}`,
+    { data: '你好', size: 6, entries: ['moved'], missing: 'ENOENT' },
+  ),
+  nodejsCase(
+    'runs timers, Node streams, pipelines and Web Streams',
+    `import { setTimeout as delay } from 'node:timers/promises'; import { Readable, Writable } from 'node:stream'; import { pipeline } from 'node:stream/promises';
+export default async () => {
+  let count = 0; const timer = setInterval(() => { count++; clearInterval(timer) }, 1); const removed = setTimeout(() => { count += 100 }, 1); clearTimeout(removed);
+  await delay(10);
+  const data = []; for await (const chunk of Readable.from(['a', 'b'])) data.push(chunk);
+  let piped = ''; await pipeline(Readable.from(['x', 'y']), new Writable({ write(chunk, _encoding, callback) { piped += chunk.toString(); callback() } }));
+  const reader = new ReadableStream({ start(controller) { controller.enqueue('web'); controller.close() } }).getReader();
+  return { count, data, piped, web: (await reader.read()).value };
+}`,
+    { count: 1, data: ['a', 'b'], piped: 'xy', web: 'web' },
+  ),
+  nodejsCase(
+    'supports AbortSignal timeout and pre-aborted signals',
+    `import { setTimeout as delay } from 'node:timers/promises';
+export default async () => { const timeout = AbortSignal.timeout(1); await delay(10); return { timeout: timeout.reason.name, aborted: AbortSignal.abort().aborted } }`,
+    { timeout: 'TimeoutError', aborted: true },
+  ),
+  {
+    name: 'isolates files, globals and builtin module state between Task invocations',
+    async verify(harness) {
+      const invoke = async (invocationId: string, source: string) =>
+        await harness.invoke({
+          capability: async () => ({ body: null, status: 403 }),
+          input: null,
+          invocationId,
+          program: { ...program(harness, source), engineContract: nodejsEngineContract },
+        })
+      await invoke(
+        'nodejs-isolation-write',
+        `import fs from 'node:fs'; import crypto from 'node:crypto';
+export default () => { fs.writeFileSync('/tmp/marker', 'x'); URL.prototype.taskMarker = true; crypto.constants.taskMarker = true; globalThis.taskMarker = true }`,
+      )
+      const value = await invoke(
+        'nodejs-isolation-read',
+        `import fs from 'node:fs'; import crypto from 'node:crypto';
+export default () => ({ file: fs.existsSync('/tmp/marker'), url: 'taskMarker' in URL.prototype, module: 'taskMarker' in crypto.constants, global: 'taskMarker' in globalThis })`,
+      )
+      equal(value, { file: false, url: false, module: false, global: false }, 'Task isolation')
+    },
+  },
 ]
+
+function nodejsCase(name: string, source: string, expected: JsonValue): RuntimeConformanceCase {
+  return {
+    name,
+    async verify(harness) {
+      const value = await harness.invoke({
+        capability: async () => ({ body: null, status: 403 }),
+        input: null,
+        invocationId: `nodejs-${name}`,
+        program: { ...program(harness, source), engineContract: nodejsEngineContract },
+      })
+      equal(value, expected, name)
+    },
+  }
+}
 
 export interface RuntimeProgram {
   readonly engineContract: string

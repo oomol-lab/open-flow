@@ -22,10 +22,37 @@ The allowlist contains `assert`, `assert/strict`, `buffer`, `console`, `constant
 installation.
 
 This contract is a Node compatibility subset, not a claim of complete Node.js or Workers API parity.
-Each deployment must document the APIs it supports and its resource limits. The baseline includes
-Buffer and path operations, asynchronous temporary file reads/writes, and Abort-aware Promise
-timers. `nodejsRuntimeConformanceCases` verifies those behaviors; deployments continue running the
-original runtime conformance for the original contract.
+Each deployment must document its resource limits and any APIs it adds beyond the guaranteed
+behavior below. Deployments continue running the original runtime conformance for the original
+contract.
+
+## Guaranteed behavior
+
+Every deployment of this contract provides the same observable subset; implementation details and
+limits stay with the deployment.
+
+- `node:` and bare builtin names resolve to the same module instance within a Task. `Buffer`,
+  `process`, `URL`, `URLSearchParams`, Web Streams, `AbortController` and `AbortSignal` are also
+  globals and are identical to their module exports.
+- `process.cwd()` is `/tmp` and `process.env` is empty. No host process, environment or machine
+  information is exposed.
+- `events`, `string_decoder`, POSIX `path`, `querystring`, `url` and `util.promisify` follow Node.
+  `URL` follows the WHATWG standard, including `URL.canParse`. Windows paths are not covered.
+- `buffer` supports UTF-8, base64, hex, ASCII, Latin-1 and UTF-16LE encodings.
+- `crypto` provides incremental `createHash` and `createHmac` for the SHA family and MD5,
+  `randomBytes`, `randomUUID` and `getRandomValues`. Web Crypto `subtle` is not part of the contract.
+- `zlib` provides one-shot gzip, gunzip, deflate, inflate, deflateRaw, inflateRaw and unzip. Brotli
+  and Zstandard are not part of the contract.
+- `fs` and `fs/promises` operate on a fresh in-memory filesystem per Task, initially containing
+  `/tmp`, and report Node error codes such as `ENOENT`.
+- `timers`, `timers/promises`, Node streams, `stream/promises` and Web Streams are available.
+  `AbortSignal` supports reasons, `throwIfAborted`, `any`, `timeout` and `abort`. Node event-loop
+  phase ordering is not emulated.
+- Files, globals, intrinsic changes and builtin module state never cross Task invocations.
+
+Networking (`fetch`, HTTP, DNS, TCP, TLS), `async_hooks`, subprocesses, Worker threads, `require`,
+dynamic imports and package installation are outside this contract. `nodejsRuntimeConformanceCases`
+verifies the list above.
 
 Virtual files belong to one Task invocation. They have no implicit connection to the host filesystem
 or to durable storage. Node compatibility does not grant additional business capabilities. Error
