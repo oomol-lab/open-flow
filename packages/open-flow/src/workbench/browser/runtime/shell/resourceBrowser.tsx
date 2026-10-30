@@ -110,14 +110,14 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store, onTagFilter,
   async function rename(event: FormEvent): Promise<void> {
     event.preventDefault()
     const nextName = name.trim()
-    if (resourceNameIssue(nextName) == null && (await store.workspace.renameFlow(flow.flowId, nextName))) {
+    if (resourceNameIssue(nextName) == null && (await store.workspace.renameFlow(flow, nextName))) {
       setMode('idle')
       onChanged()
     }
   }
 
   async function remove(): Promise<void> {
-    if (await store.workspace.deleteFlow(flow.flowId)) {
+    if (await store.workspace.deleteFlow(flow)) {
       setMode('idle')
       onChanged()
     }

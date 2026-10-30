@@ -1744,8 +1744,8 @@
     "notFound": "Cette étiquette n’est plus disponible.",
     "conflict": "Une étiquette portant ce nom existe déjà.",
     "untagged": "Sans étiquette",
-    "add": "Ajouter des tags",
-    "filter": "Filtrer par tags"
+    "add": "Ajouter des étiquettes",
+    "filter": "Filtrer par étiquettes"
   },
   "flowSettings": {
     "title": "Paramètres du workflow",

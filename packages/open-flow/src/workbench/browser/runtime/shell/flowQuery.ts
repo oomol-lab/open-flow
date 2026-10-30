@@ -10,7 +10,9 @@ export function useFlowQuery(store: WorkbenchStore, query: FlowQuery) {
   const [catalog, setCatalog] = useState<FlowCatalog>()
   const identity = JSON.stringify(query)
   const latestQuery = useRef(query)
-  latestQuery.current = query
+  useEffect(() => {
+    latestQuery.current = query
+  })
   useEffect(() => {
     const next = store.createFlowCatalog()
     void next.setQuery(latestQuery.current)

@@ -55,8 +55,8 @@ export class TagStore {
     const ids = [...new Set(tagIds)]
     if (ids.length > 0) {
       const { count } = this.database
-        .prepare(`SELECT COUNT(*) AS count FROM tags WHERE owner_id = ? AND tag_id IN (${ids.map(() => '?').join(',')})`)
-        .get(ownerId, ...ids) as { count: number }
+        .prepare('SELECT COUNT(*) AS count FROM tags WHERE owner_id = ? AND tag_id IN (SELECT value FROM json_each(?))')
+        .get(ownerId, JSON.stringify(ids)) as { count: number }
       if (count != ids.length) throw new TagAssignmentError('A selected tag is unavailable.')
     }
     this.database.prepare('DELETE FROM flow_tags WHERE flow_id = ?').run(flowId)

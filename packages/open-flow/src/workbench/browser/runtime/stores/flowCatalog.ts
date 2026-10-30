@@ -260,13 +260,12 @@ export class FlowCatalog {
     }
   }
 
-  public async delete(flowId: string): Promise<boolean> {
-    const flow = this.flow(flowId)
-    if (flow == null || flow.status == 'retiring') return false
+  public async delete(flow: Flow): Promise<boolean> {
+    if (flow.status == 'retiring') return false
     try {
-      await this.#client.deleteFlow(flowId)
+      await this.#client.deleteFlow(flow.flowId)
       if (this.#disposed) return false
-      this.#remove(flowId)
+      this.#remove(flow.flowId)
       this.#setNotice({ kind: 'success', message: this.#i18n.t('notice.flowDeleteAccepted', { name: flow.name }) })
       return true
     } catch (error) {
@@ -287,13 +286,12 @@ export class FlowCatalog {
     }
   }
 
-  public async rename(flowId: string, name: string): Promise<boolean> {
-    const flow = this.flow(flowId)
+  public async rename(flow: Flow, name: string): Promise<boolean> {
     const nextName = name.trim()
-    if (flow == null || nextName.length == 0) return false
+    if (nextName.length == 0) return false
     if (flow.name == nextName) return true
     try {
-      const changed = await this.#client.renameFlow(flowId, nextName)
+      const changed = await this.#client.renameFlow(flow.flowId, nextName)
       if (this.#disposed) return false
       this.include(changed)
       this.#setNotice({ kind: 'success', message: this.#i18n.t('notice.flowRenamed', { name: nextName }) })

@@ -147,3 +147,13 @@ it('updates the Flow title and memberships atomically without changing its defin
   expect(after.live).toEqual(before.live)
   expect(after.presentation).toEqual(before.presentation)
 })
+
+it('validates large tag selections without exceeding SQLite bind limits', async () => {
+  const { control } = await openService(':memory:')
+  const tag = control.tags.saveTag('owner', 'Existing')
+  const { flow } = await control.flows.createFlow('owner', 'Tagged', 'large-selection', undefined, [tag.tagId])
+  const ids = Array.from({ length: 250_001 }, (_, index) => index.toString(36))
+  expect(() => control.flows.setFlowTags('owner', flow.flowId, ids)).toThrow(expect.objectContaining({ code: 'tag.not-found' }))
+  expect(control.flows.getFlow('owner', flow.flowId).tagIds).toEqual([tag.tagId])
+  expect(control.flows.listFlows('owner', 50, undefined, true, { tagIds: ids }).page).toMatchObject({ flows: [], total: 0 })
+})

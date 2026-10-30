@@ -377,11 +377,11 @@ export class WorkspaceStore {
     return this.#client.getErrorListeners(flowId, signal)
   }
 
-  public async deleteFlow(flowId: string): Promise<boolean> {
+  public async deleteFlow(flow: Flow): Promise<boolean> {
     if (!(await this.saveModuleEditor())) return false
     this.#edits.set({ busy: 'flow' })
     try {
-      return await this.#flows.delete(flowId)
+      return await this.#flows.delete(flow)
     } finally {
       this.#edits.set({ busy: undefined })
     }
@@ -391,10 +391,10 @@ export class WorkspaceStore {
     return this.#flows.updateSettings(flowId, changes)
   }
 
-  public async renameFlow(flowId: string, name: string): Promise<boolean> {
+  public async renameFlow(flow: Flow, name: string): Promise<boolean> {
     this.#edits.set({ busy: 'flow' })
     try {
-      return await this.#flows.rename(flowId, name)
+      return await this.#flows.rename(flow, name)
     } finally {
       this.#edits.set({ busy: undefined })
     }

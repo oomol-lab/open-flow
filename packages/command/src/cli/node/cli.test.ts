@@ -17,6 +17,7 @@ function helpMessage(language: UiLanguage, key: 'options' | 'title'): string {
 }
 
 const flow = {
+  tagIds: [],
   createdAt: '2026-08-14T00:00:00.000Z',
   draftRevisionId: 'revision-1',
   resourceReferences: {

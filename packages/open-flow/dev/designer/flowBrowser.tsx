@@ -29,13 +29,14 @@ const sampleText = JSON.stringify({ ...sampleWorkflow, name: 'GitHub sample' })
 
 function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const importRef = useRef<OpenFlowWorkbenchHandle>(null)
-  const [referenceFailure, setReferenceFailure] = useState<'none' | 'initial' | 'next'>('none')
-  const referenceFailureRef = useRef(referenceFailure)
-  referenceFailureRef.current = referenceFailure
+  const [referenceFailure, setReferenceFailureState] = useState<'none' | 'initial' | 'next'>('none')
+  const referenceFailureRef = useRef<typeof referenceFailure>('none')
+  function setReferenceFailure(next: typeof referenceFailure): void {
+    referenceFailureRef.current = next
+    setReferenceFailureState(next)
+  }
   const [teamState, setTeamState] = useState<'ready' | 'loading' | 'disabled'>('ready')
-  const [tagFailure, setTagFailure] = useState<'none' | 'read' | 'save'>('none')
-  const tagFailureRef = useRef(tagFailure)
-  tagFailureRef.current = tagFailure
+  const tagFailureRef = useRef<'none' | 'read' | 'save'>('none')
   const [failImport, setFailImport] = useState(false)
   const [single, setSingle] = useState(false)
   const [embedded, setEmbedded] = useState(false)
@@ -48,11 +49,15 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
       label: 'Fail next tag read',
       onClick: () => {
         tagFailureRef.current = 'read'
-        setTagFailure('read')
         void session?.store.tags.reload()
       },
     },
-    { label: 'Fail next tag save', onClick: () => setTagFailure('save') },
+    {
+      label: 'Fail next tag save',
+      onClick: () => {
+        tagFailureRef.current = 'save'
+      },
+    },
     { label: referenceFailure == 'initial' ? 'Initial failure armed' : 'Fail initial reference request', onClick: () => setReferenceFailure('initial') },
     { label: referenceFailure == 'next' ? 'Next-page failure armed' : 'Fail next reference page', onClick: () => setReferenceFailure('next') },
     {
@@ -135,7 +140,6 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
           (mutation && (url.startsWith('/v1/tags') || url.endsWith('/tags')) && tagFailureRef.current == 'save')
         ) {
           tagFailureRef.current = 'none'
-          setTagFailure('none')
           return Response.json({ message: 'Tag request failed' }, { status: 500 })
         }
         if (url == '/v1/tags' && !mutation)
@@ -191,7 +195,6 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
           init?.signal?.throwIfAborted()
           const offset = Number(new URL(String(path), 'https://lab.local').searchParams.get('offset') ?? 0)
           if (referenceFailureRef.current == 'initial' || (referenceFailureRef.current == 'next' && offset > 0)) {
-            referenceFailureRef.current = 'none'
             setReferenceFailure('none')
             return Response.json({ message: 'Reference request failed' }, { status: 500 })
           }

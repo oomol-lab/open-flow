@@ -198,8 +198,8 @@ export class FlowStore {
     }
     const membership: string[] = []
     if (filter.tagIds.length) {
-      membership.push(`EXISTS (SELECT 1 FROM flow_tags ft WHERE ft.flow_id = flows.flow_id AND ft.tag_id IN (${filter.tagIds.map(() => '?').join(',')}))`)
-      values.push(...filter.tagIds)
+      membership.push('EXISTS (SELECT 1 FROM flow_tags ft WHERE ft.flow_id = flows.flow_id AND ft.tag_id IN (SELECT value FROM json_each(?)))')
+      values.push(JSON.stringify(filter.tagIds))
     }
     if (filter.untagged) membership.push('NOT EXISTS (SELECT 1 FROM flow_tags ft WHERE ft.flow_id = flows.flow_id)')
     if (membership.length) conditions.push(`(${membership.join(' OR ')})`)
