@@ -87,6 +87,8 @@ See [shared provider event sources](triggers/shared-event-sources.md) for setup 
 ### Flow, Revision, and Presentation
 
 Flow is a deployment-generated top-level resource with a stable identity and independent lifecycle. It does not belong to a Project.
+Flow tags are account-owned organization metadata, independent of Connector Teams and execution definitions. Tag changes do not create Revisions or change publication state. Workflow files carry execution definitions and presentation; tags are assigned separately when creating or importing a Flow.
+
 Each Flow has one mutable Draft head. Revisions are immutable execution definitions that store the graph, node configuration, variable references, and code.
 Start owns `inputDefs` and exposes them as graph outputs.
 A single Outputs node owns `outputDefs` and `outputMappings` and consumes its mappings under ordinary execution dependency rules. Interface configuration follows node creation, deletion, copying and undo. It has no downstream execution or data ports. Its computed values are retained separately from the Run's node results and logs. Call Workflow consumes the successful child Run's business outputs.

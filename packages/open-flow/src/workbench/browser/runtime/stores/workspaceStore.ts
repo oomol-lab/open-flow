@@ -1,5 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../../../canvas/common/commands.ts'
+import type { FlowUpdate } from '../../../../control/common/api.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
 import type { WorkbenchClient, ConnectorConnection, Flow, JsonValue, Live, TriggerKeySnapshot } from '../api.ts'
 import type { DesignerViewport, Point } from '../canvasPresentation.ts'
@@ -340,17 +341,22 @@ export class WorkspaceStore {
     }
   }
 
-  public createFlow(name: string, create?: (name: string) => Promise<string>): Promise<Flow | undefined> {
-    return this.#createFlow(() => this.#flows.create(name, create))
+  public createFlow(
+    name: string,
+    create?: (name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    tagIds?: readonly string[],
+  ): Promise<Flow | undefined> {
+    return this.#createFlow(() => this.#flows.create(name, create, tagIds))
   }
 
   public importFlow(
     file: WorkflowFile,
     name: string,
     key: string,
-    importer?: (file: WorkflowFile, name: string, key: string) => Promise<string>,
+    importer?: (file: WorkflowFile, name: string, key: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    tagIds?: readonly string[],
   ): Promise<Flow | undefined> {
-    return this.#createFlow(() => this.#flows.import(file, name, key, importer))
+    return this.#createFlow(() => this.#flows.import(file, name, key, importer, tagIds))
   }
 
   async #createFlow(create: () => Promise<Flow | undefined>): Promise<Flow | undefined> {
@@ -371,20 +377,24 @@ export class WorkspaceStore {
     return this.#client.getErrorListeners(flowId, signal)
   }
 
-  public async deleteFlow(flowId: string): Promise<boolean> {
+  public async deleteFlow(flow: Flow): Promise<boolean> {
     if (!(await this.saveModuleEditor())) return false
     this.#edits.set({ busy: 'flow' })
     try {
-      return await this.#flows.delete(flowId)
+      return await this.#flows.delete(flow)
     } finally {
       this.#edits.set({ busy: undefined })
     }
   }
 
-  public async renameFlow(flowId: string, name: string): Promise<boolean> {
+  public updateFlowSettings(flowId: string, changes: FlowUpdate): Promise<boolean> {
+    return this.#flows.updateSettings(flowId, changes)
+  }
+
+  public async renameFlow(flow: Flow, name: string): Promise<boolean> {
     this.#edits.set({ busy: 'flow' })
     try {
-      return await this.#flows.rename(flowId, name)
+      return await this.#flows.rename(flow, name)
     } finally {
       this.#edits.set({ busy: undefined })
     }

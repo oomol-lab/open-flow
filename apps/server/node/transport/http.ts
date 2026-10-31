@@ -6,8 +6,7 @@ import type { ResolveControlActor } from './control.ts'
 
 import { serveStatic } from '@hono/node-server/serve-static'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { waitActionBodySchema } from '@oomol-lab/open-flow/control-requests'
-import { resourceNameIssue } from '@oomol-lab/open-flow/flow-change'
+import { controlRequests, waitActionBodySchema } from '@oomol-lab/open-flow/control-requests'
 import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
 import {
   maximumWebhookBodyBytes,
@@ -278,7 +277,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     if (input === false) throw new ControlError(serverErrorCode.requestInvalid, 'Connector Flow request is invalid.')
     const key = context.req.header('idempotency-key')
     if (key == null || key.length == 0 || key.length > 256) throw new ControlError(serverErrorCode.requestInvalid, 'Idempotency-Key is invalid.')
-    const created = await service.control.flows.createFlow(actorId, input.name, key, input.teamId)
+    const created = await service.control.flows.createFlow(actorId, input.name, key, input.teamId, input.tagIds)
     return json(created.created ? 201 : 200, created.flow)
   })
 
@@ -659,27 +658,16 @@ async function readWebhookBody(request: Request): Promise<JsonValue> {
   }
 }
 
-async function connectorFlowRequest(request: Request): Promise<{ readonly name: string; readonly teamId: string } | false> {
-  let value: unknown
+async function connectorFlowRequest(
+  request: Request,
+): Promise<{ readonly name: string; readonly teamId: string; readonly tagIds?: readonly string[] } | false> {
   try {
-    value = JSON.parse(new TextDecoder().decode(await readBody(request, maximumHostRequestBytes, () => new Error('Host request is too large.')))) as unknown
+    const value: unknown = JSON.parse(new TextDecoder().decode(await readBody(request, maximumHostRequestBytes, () => new Error('Host request is too large.'))))
+    const body = controlRequests.createFlow(value)
+    return body.teamId == null ? false : { ...body, teamId: body.teamId }
   } catch {
     return false
   }
-  if (value == null || typeof value != 'object' || Array.isArray(value)) return false
-  const body = value as Record<string, unknown>
-  if (
-    Object.keys(body).length != 3 ||
-    body.version !== 1 ||
-    typeof body.name != 'string' ||
-    body.name != body.name.trim() ||
-    resourceNameIssue(body.name) != null ||
-    typeof body.teamId != 'string' ||
-    body.teamId.length == 0
-  ) {
-    return false
-  }
-  return { name: body.name, teamId: body.teamId }
 }
 
 function text(status: number, body: string | null, headers: Headers): Response {

@@ -1720,5 +1720,39 @@
     "responseOutputs": "Sorties de réponse",
     "authenticationType": "Type",
     "responseSettings": "Paramètres de réponse"
+  },
+  "tags": {
+    "count": "{{count}} au total",
+    "title": "Étiquettes",
+    "search": "Rechercher des étiquettes",
+    "matchAny": "Correspond à au moins une étiquette choisie",
+    "loading": "Chargement des étiquettes…",
+    "noMatches": "Aucune étiquette correspondante",
+    "createNamed": "Créer « {{name}} »",
+    "manage": "Gérer les étiquettes",
+    "remove": "Retirer {{name}}",
+    "expand": "Afficher {{count}} autres étiquettes",
+    "filterBy": "Filtrer par {{name}}",
+    "create": "Nouvelle étiquette",
+    "invalid": "Saisissez un nom valide (80 caractères maximum).",
+    "usage": "Utilisation",
+    "references": "Workflows avec « {{name}} »",
+    "unused": "Aucun workflow ne porte cette étiquette.",
+    "deleteTitle": "Supprimer « {{name}} » ?",
+    "deleteDescription": "Cette étiquette sera retirée de {{count}} workflows. Les workflows seront conservés.",
+    "clear": "Effacer les filtres",
+    "notFound": "Cette étiquette n’est plus disponible.",
+    "conflict": "Une étiquette portant ce nom existe déjà.",
+    "untagged": "Sans étiquette",
+    "add": "Ajouter des étiquettes",
+    "filter": "Filtrer par étiquettes"
+  },
+  "flowSettings": {
+    "title": "Paramètres du workflow",
+    "name": "Titre",
+    "discardTitle": "Ignorer les modifications ?",
+    "discardDescription": "Les modifications des paramètres du workflow n’ont pas été enregistrées.",
+    "continueEditing": "Continuer à modifier",
+    "discardChanges": "Ignorer les modifications"
   }
 }

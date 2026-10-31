@@ -6,11 +6,13 @@ import type { EventSourceControl } from './event-source-control.ts'
 import type { FlowControl } from './flow-control.ts'
 import type { PublicationControl } from './publication-control.ts'
 import type { RunControl } from './run-control.ts'
+import type { TagControl } from './tag-control.ts'
 import type { VariableControl } from './variable-control.ts'
 
 export interface ControlService {
   readonly access: ControlAccess
   readonly eventSources: EventSourceControl
+  readonly tags: TagControl
   readonly variables: VariableControl
   readonly connectors: ConnectorControl
   readonly flows: FlowControl

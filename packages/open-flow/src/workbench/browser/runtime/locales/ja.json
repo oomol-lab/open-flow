@@ -1720,5 +1720,39 @@
     "responseOutputs": "レスポンス出力",
     "authenticationType": "認証方式",
     "responseSettings": "レスポンス設定"
+  },
+  "tags": {
+    "count": "計 {{count}} 件",
+    "title": "タグ",
+    "search": "タグを検索",
+    "matchAny": "選択したいずれかのタグに一致",
+    "loading": "タグを読み込み中…",
+    "noMatches": "一致するタグがありません",
+    "createNamed": "「{{name}}」を作成",
+    "manage": "タグを管理",
+    "remove": "{{name}} を削除",
+    "expand": "他 {{count}} 件のタグを表示",
+    "filterBy": "{{name}} で絞り込む",
+    "create": "新しいタグ",
+    "invalid": "有効なタグ名を入力してください（最大80文字）。",
+    "usage": "使用数",
+    "references": "「{{name}}」を使用するワークフロー",
+    "unused": "このタグを使用するワークフローはありません。",
+    "deleteTitle": "「{{name}}」を削除しますか？",
+    "deleteDescription": "{{count}} 件のワークフローからこのタグを削除します。ワークフローは保持されます。",
+    "clear": "絞り込みを解除",
+    "notFound": "このタグは利用できなくなりました。",
+    "conflict": "同じ名前のタグが既に存在します。",
+    "untagged": "タグなし",
+    "add": "タグを追加",
+    "filter": "タグで絞り込む"
+  },
+  "flowSettings": {
+    "title": "ワークフロー設定",
+    "name": "タイトル",
+    "discardTitle": "変更を破棄しますか？",
+    "discardDescription": "ワークフロー設定の変更は保存されていません。",
+    "continueEditing": "編集を続ける",
+    "discardChanges": "変更を破棄"
   }
 }

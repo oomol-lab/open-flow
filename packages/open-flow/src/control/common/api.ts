@@ -77,6 +77,8 @@ export type { FlowCatalogEvent, FlowChangeEvent } from './flowNotifications.ts'
 
 import { ApiError } from './errors.ts'
 import { randomId } from './random.ts'
+import { decodeTag, decodeTagListItem, normalizeFlowQuery } from './tags.ts'
+export { normalizeFlowQuery } from './tags.ts'
 
 export interface CanvasBroadcast {
   readonly version: 1
@@ -103,7 +105,29 @@ export interface FlowResources {
   }
 }
 
+export interface FlowUpdate {
+  readonly name?: string
+  readonly tagIds?: readonly string[]
+}
+
+export interface FlowQuery {
+  readonly query?: string
+  readonly tagIds?: readonly string[]
+  readonly untagged?: boolean
+}
+
+export interface Tag {
+  readonly tagId: string
+  readonly name: string
+  readonly version: 1
+}
+
+export interface TagListItem extends Tag {
+  readonly referenceCount: number
+}
+
 export interface Flow {
+  readonly tagIds?: readonly string[]
   readonly live?: { readonly enabled: boolean; readonly hasStart: boolean; readonly publicationId: string; readonly revisionId: string }
 
   readonly createdAt: string
@@ -809,9 +833,13 @@ export class ControlClient {
   }
 
   async listFlows(
-    options: { readonly cursor?: string; readonly includeTotal?: boolean; readonly limit?: number; readonly signal?: AbortSignal } = {},
+    options: FlowQuery & { readonly cursor?: string; readonly includeTotal?: boolean; readonly limit?: number; readonly signal?: AbortSignal } = {},
   ): Promise<FlowPage> {
     const parameters = new URLSearchParams()
+    const filter = normalizeFlowQuery(options)
+    if (filter.query) parameters.set('query', filter.query)
+    if (filter.tagIds.length) parameters.set('tagIds', filter.tagIds.join(','))
+    if (filter.untagged) parameters.set('untagged', 'true')
     if (options.cursor != null) parameters.set('cursor', options.cursor)
     if (options.limit != null) parameters.set('limit', String(options.limit))
     if (options.includeTotal != null) parameters.set('includeTotal', String(options.includeTotal))
@@ -897,20 +925,23 @@ export class ControlClient {
     }
   }
 
-  async importFlow(file: WorkflowFile, options: { readonly name?: string; readonly teamId?: string; readonly idempotencyKey?: string } = {}): Promise<Flow> {
+  async importFlow(
+    file: WorkflowFile,
+    options: { readonly name?: string; readonly teamId?: string; readonly idempotencyKey?: string; readonly tagIds?: readonly string[] } = {},
+  ): Promise<Flow> {
     return flow(
       await this.request('/v1/flows/import', {
         method: 'POST',
         headers: { 'Idempotency-Key': options.idempotencyKey ?? `flow-${randomId()}` },
-        body: JSON.stringify({ file, name: options.name, teamId: options.teamId, version: 1 }),
+        body: JSON.stringify({ file, name: options.name, teamId: options.teamId, tagIds: options.tagIds, version: 1 }),
       }),
     )
   }
 
-  async createFlow(name: string, idempotencyKey = `flow-${randomId()}`, teamId?: string): Promise<Flow> {
+  async createFlow(name: string, idempotencyKey = `flow-${randomId()}`, teamId?: string, tagIds?: readonly string[]): Promise<Flow> {
     return flow(
       await this.request('/v1/flows', {
-        body: JSON.stringify({ name, ...(teamId == null ? {} : { teamId }), version: 1 }),
+        body: JSON.stringify({ name, ...(teamId == null ? {} : { teamId }), ...(tagIds == null ? {} : { tagIds }), version: 1 }),
         headers: { 'idempotency-key': idempotencyKey },
         method: 'POST',
       }),
@@ -939,13 +970,35 @@ export class ControlClient {
     return source.listeners.map(errorListener)
   }
 
+  async listTags(signal?: AbortSignal): Promise<{ readonly tags: readonly TagListItem[]; readonly version: 1 }> {
+    const source = record(await this.request('/v1/tags', { signal }))
+    if (source.version != 1 || !Array.isArray(source.tags)) return invalidResponse()
+    return { tags: source.tags.map(decodeTagListItem), version: 1 }
+  }
+
+  async createTag(name: string): Promise<Tag> {
+    return decodeTag(await this.request('/v1/tags', { method: 'POST', body: JSON.stringify({ name, version: 1 }) }))
+  }
+
+  async renameTag(tagId: string, name: string): Promise<Tag> {
+    return decodeTag(await this.request(`/v1/tags/${segment(tagId)}`, { method: 'PATCH', body: JSON.stringify({ name, version: 1 }) }))
+  }
+
+  async deleteTag(tagId: string): Promise<void> {
+    const source = record(await this.request(`/v1/tags/${segment(tagId)}`, { method: 'DELETE' }))
+    if (source.version != 1) invalidResponse()
+  }
+
+  async setFlowTags(flowId: string, tagIds: readonly string[]): Promise<Flow> {
+    return flow(await this.request(`/v1/flows/${segment(flowId)}/tags`, { method: 'PUT', body: JSON.stringify({ tagIds, version: 1 }) }))
+  }
+
+  async updateFlow(flowId: string, changes: FlowUpdate): Promise<Flow> {
+    return flow(await this.request(`/v1/flows/${segment(flowId)}`, { method: 'PATCH', body: JSON.stringify({ ...changes, version: 1 }) }))
+  }
+
   async renameFlow(flowId: string, name: string): Promise<Flow> {
-    return flow(
-      await this.request(`/v1/flows/${segment(flowId)}`, {
-        body: JSON.stringify({ name, version: 1 }),
-        method: 'PATCH',
-      }),
-    )
+    return this.updateFlow(flowId, { name })
   }
 
   async deleteFlow(flowId: string): Promise<Flow> {

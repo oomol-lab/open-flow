@@ -1720,5 +1720,39 @@
     "responseOutputs": "响应输出",
     "authenticationType": "认证方式",
     "responseSettings": "响应配置"
+  },
+  "tags": {
+    "count": "{{count}} 个",
+    "title": "标签",
+    "search": "搜索标签",
+    "matchAny": "匹配任一所选标签",
+    "loading": "正在加载标签…",
+    "noMatches": "没有匹配的标签",
+    "createNamed": "创建「{{name}}」",
+    "manage": "管理标签",
+    "remove": "移除 {{name}}",
+    "expand": "展开其余 {{count}} 个标签",
+    "filterBy": "按 {{name}} 筛选",
+    "create": "新建标签",
+    "invalid": "请输入有效的标签名称（最多 80 个字符）。",
+    "usage": "使用数量",
+    "references": "使用「{{name}}」的工作流",
+    "unused": "没有工作流使用此标签。",
+    "deleteTitle": "删除「{{name}}」？",
+    "deleteDescription": "将从 {{count}} 个工作流中移除此标签，工作流会保留。",
+    "clear": "清除筛选",
+    "notFound": "此标签已不可用。",
+    "conflict": "已有同名标签。",
+    "untagged": "未标记",
+    "add": "添加标签",
+    "filter": "按标签筛选"
+  },
+  "flowSettings": {
+    "title": "工作流设置",
+    "name": "标题",
+    "discardTitle": "放弃修改？",
+    "discardDescription": "工作流设置的修改尚未保存。",
+    "continueEditing": "继续编辑",
+    "discardChanges": "放弃修改"
   }
 }

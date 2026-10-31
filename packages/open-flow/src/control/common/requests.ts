@@ -18,6 +18,8 @@ const json: z.ZodType<JsonValue> = z.json()
 const id = z.string().min(1)
 const version = z.literal(1)
 const flowName = id.refine((value) => value == value.trim() && resourceNameIssue(value) == null, 'Flow name is invalid.')
+const tagIds = z.array(id).transform((ids) => [...new Set(ids)].toSorted())
+const tagName = id.transform((name) => name.trim()).refine((name) => resourceNameIssue(name) == null, 'Tag name is invalid.')
 const inputs = z.record(z.string(), z.record(z.string(), json))
 const trigger = z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) })
 const schemas = {
@@ -31,8 +33,11 @@ const schemas = {
   createEventSource: createEventSourceSchema,
   updateEventSource: updateEventSourceSchema,
   eventSourceRevision: eventSourceRevisionSchema,
-  importFlow: z.strictObject({ file: json, name: flowName.optional(), teamId: id.optional(), version }),
-  createFlow: z.strictObject({ name: flowName, teamId: id.optional(), version }),
+  importFlow: z.strictObject({ file: json, name: flowName.optional(), teamId: id.optional(), tagIds: tagIds.optional(), version }),
+  createFlow: z.strictObject({ name: flowName, teamId: id.optional(), tagIds: tagIds.optional(), version }),
+  saveTag: z.strictObject({ name: tagName, version }),
+  setFlowTags: z.strictObject({ tagIds, version }),
+  updateFlow: z.union([z.strictObject({ name: flowName, tagIds: tagIds.optional(), version }), z.strictObject({ name: flowName.optional(), tagIds, version })]),
   renameFlow: z.strictObject({ name: flowName, version }),
   changeDraft: z.strictObject({ expectedRevisionId: id, operations: z.array(json).min(1), version }),
   repairDraft: z.strictObject({ expectedRevisionId: id, version }),
@@ -79,6 +84,9 @@ export const controlRequests = {
   eventSourceRevision: decoder(schemas.eventSourceRevision),
   importFlow: decoder(schemas.importFlow),
   createFlow: decoder(schemas.createFlow),
+  saveTag: decoder(schemas.saveTag),
+  setFlowTags: decoder(schemas.setFlowTags),
+  updateFlow: decoder(schemas.updateFlow),
   renameFlow: decoder(schemas.renameFlow),
   changeDraft(value: unknown): { expectedRevisionId: string; operations: readonly DraftOperation[]; version: 1 } {
     const body = schemas.changeDraft.parse(value)

@@ -79,6 +79,7 @@
 
   .resource-list-actions {
     display: flex;
+    flex-wrap: wrap;
     min-width: 0;
     align-items: center;
     justify-content: flex-end;
@@ -186,6 +187,22 @@
     min-width: 0;
     flex-direction: column;
     gap: 0;
+  }
+
+  .resource-flow-tags {
+    display: flex;
+    min-width: 0;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .resource-flow-tag {
+    min-width: 0;
+    max-width: 140px;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .resource-primary-heading {

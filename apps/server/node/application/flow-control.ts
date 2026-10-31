@@ -1,4 +1,14 @@
-import type { CanvasBroadcast, CanvasCommand, Flow, FlowCatalogEvent, FlowChangeEvent, FlowListItem, Presentation } from '@oomol-lab/open-flow/control-api'
+import type {
+  CanvasBroadcast,
+  CanvasCommand,
+  Flow,
+  FlowCatalogEvent,
+  FlowChangeEvent,
+  FlowListItem,
+  FlowQuery,
+  FlowUpdate,
+  Presentation,
+} from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { WorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
 import type { Store } from '../storage/store.ts'
@@ -9,12 +19,14 @@ import { resourceNameIssue } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, cleanWorkflowFile, digestBytes, encodeRevision, upgradeRevisionContent } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
 import { ControlError } from '../error.ts'
+import { TagAssignmentError } from '../storage/tag-store.ts'
 import { ControlAccess, notFound } from './control-access.ts'
 import { flow, flowListItem, presentation } from './control-views.ts'
 import { DraftControl, emptyRevision } from './draft-control.ts'
 import { workflowTarget } from './workflow.ts'
 
 export interface FlowPosition {
+  readonly filter?: string
   readonly createdAt: number
   readonly flowId: string
 }
@@ -69,7 +81,15 @@ export class FlowControl {
     }).file
   }
 
-  async importFlow(actorId: string, value: unknown, idempotencyKey: string, name?: string, teamId?: string, defaultName = 'Imported workflow') {
+  async importFlow(
+    actorId: string,
+    value: unknown,
+    idempotencyKey: string,
+    name?: string,
+    teamId?: string,
+    defaultName = 'Imported workflow',
+    tagIds?: readonly string[],
+  ) {
     let file: WorkflowFile
     try {
       const cleaned = cleanWorkflowFile(value).file
@@ -82,6 +102,7 @@ export class FlowControl {
       throw new ControlError(controlErrorCode.flowInvalid, 'Flow name is invalid.')
     return await this.#createFlow({
       actorId,
+      tagIds,
       name: resolvedName,
       idempotencyKey,
       connectorTeamId: teamId,
@@ -96,9 +117,11 @@ export class FlowControl {
     name: string,
     idempotencyKey: string,
     connectorTeamId?: string,
+    tagIds?: readonly string[],
   ): Promise<{ readonly created: boolean; readonly flow: Flow }> {
     return await this.#createFlow({
       actorId,
+      tagIds,
       name,
       idempotencyKey,
       connectorTeamId,
@@ -109,6 +132,7 @@ export class FlowControl {
 
   async #createFlow({
     actorId,
+    tagIds = [],
     name,
     idempotencyKey,
     connectorTeamId,
@@ -117,6 +141,7 @@ export class FlowControl {
     request,
   }: {
     readonly actorId: string
+    readonly tagIds?: readonly string[]
     readonly name: string
     readonly idempotencyKey: string
     readonly connectorTeamId?: string
@@ -124,7 +149,8 @@ export class FlowControl {
     readonly presentation?: Readonly<Record<string, JsonValue>>
     readonly request: JsonValue
   }): Promise<{ readonly created: boolean; readonly flow: Flow }> {
-    const requestDigest = await digestBytes(canonicalJsonBytes(request))
+    const ids = [...new Set(tagIds)].toSorted()
+    const requestDigest = await digestBytes(canonicalJsonBytes(ids.length ? { ...(request as Record<string, JsonValue>), tagIds: ids } : request))
     const replay = this.store.flows.replayCreation(actorId, idempotencyKey, requestDigest)
     if (replay != null) {
       if ('kind' in replay) throw new ControlError(controlErrorCode.flowConflict, 'The idempotency key refers to another Flow request.')
@@ -136,20 +162,24 @@ export class FlowControl {
     }
     const bytes = encodeRevision(content)
     const createdAt = this.clock()
-    const stored = this.store.flows.createFlow({
-      actorId,
-      connectorTeamId: selectedConnectorTeamId,
-      content: new TextDecoder().decode(bytes),
-      createdAt,
-      digest: await digestBytes(bytes),
-      idempotencyKey,
-      modelVersion: content.modelVersion,
-      presentation: initialPresentation,
-      name,
-      flowId: `flow_${randomUUID().replaceAll('-', '')}`,
-      requestDigest,
-      revisionId: `revision_${randomUUID().replaceAll('-', '')}`,
-    })
+    const revisionDigest = await digestBytes(bytes)
+    const stored = this.assignTags(() =>
+      this.store.flows.createFlow({
+        tagIds: ids,
+        actorId,
+        connectorTeamId: selectedConnectorTeamId,
+        content: new TextDecoder().decode(bytes),
+        createdAt,
+        digest: revisionDigest,
+        idempotencyKey,
+        modelVersion: content.modelVersion,
+        presentation: initialPresentation,
+        name,
+        flowId: `flow_${randomUUID().replaceAll('-', '')}`,
+        requestDigest,
+        revisionId: `revision_${randomUUID().replaceAll('-', '')}`,
+      }),
+    )
     if ('kind' in stored) throw new ControlError(controlErrorCode.flowConflict, 'The idempotency key refers to another Flow request.')
     if (stored.created) this.flowCatalogChanged({ kind: 'flow.created', flowId: stored.flow.flowId, version: 1 })
     return { created: stored.created, flow: flow(stored.flow) }
@@ -160,11 +190,12 @@ export class FlowControl {
     limit: number,
     after?: FlowPosition,
     includeTotal = false,
+    query: FlowQuery = {},
   ): {
     readonly next?: FlowPosition
     readonly page: { readonly flows: readonly FlowListItem[]; readonly total?: number; readonly version: 1 }
   } {
-    const stored = this.store.flows.list(limit + 1, after, includeTotal, ownerId)
+    const stored = this.store.flows.list(limit + 1, after, includeTotal, ownerId, query)
     const rows = stored.flows.slice(0, limit)
     const last = rows.at(-1)
     const counts = this.store.resourceReferences.incomingFlowCounts(rows)
@@ -183,12 +214,35 @@ export class FlowControl {
   }
 
   renameFlow(actorId: string, flowId: string, name: string): Flow {
-    this.access.authorize(actorId, { flowId })
+    return this.updateFlow(actorId, flowId, { name })
+  }
 
-    const stored = this.store.flows.rename(flowId, name, this.clock())
-    if (stored == null) notFound()
+  setFlowTags(actorId: string, flowId: string, tagIds: readonly string[]): Flow {
+    return this.updateFlow(actorId, flowId, { tagIds })
+  }
+
+  updateFlow(actorId: string, flowId: string, changes: FlowUpdate): Flow {
+    const current = this.access.requireFlow(actorId, flowId)
+    if (current.status != 'active') throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
+    if (
+      (changes.name == null && changes.tagIds == null) ||
+      (changes.name != null && (changes.name != changes.name.trim() || resourceNameIssue(changes.name) != null))
+    ) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'Flow settings are invalid.')
+    }
+    const stored = this.assignTags(() => this.store.flows.updateMetadata(flowId, changes, this.clock()))
+    if (stored == null) return notFound()
     this.flowCatalogChanged(undefined, stored.ownerId)
     return flow(stored)
+  }
+
+  private assignTags<Value>(operation: () => Value): Value {
+    try {
+      return operation()
+    } catch (error) {
+      if (error instanceof TagAssignmentError) throw new ControlError(controlErrorCode.tagNotFound, error.message)
+      throw error
+    }
   }
 
   retireFlow(actorId: string, flowId: string): Flow {

@@ -31,6 +31,35 @@ const operation = {
 
 afterEach(() => vi.useRealTimers())
 
+it.each(['rename', 'delete'] as const)('can %s a selected Flow outside the workspace page', async (action) => {
+  const client = new WorkbenchClient(vi.fn())
+  const i18n = createI18n()
+  const catalog = new FlowCatalog(client, vi.fn(), i18n)
+  const firstPage = { ...flow, referenceCount: 0 }
+  const selected = { ...flow, flowId: 'later-page', name: 'Later page' }
+  vi.spyOn(client, 'listFlows').mockResolvedValue({ flows: [firstPage], total: 2, nextCursor: 'next', version: 1 })
+  const rename = vi.spyOn(client, 'renameFlow').mockResolvedValue({ ...selected, name: 'Renamed' })
+  const remove = vi.spyOn(client, 'deleteFlow').mockResolvedValue({ ...selected, status: 'retiring' })
+  try {
+    await catalog.reload()
+    expect(catalog.flow(selected.flowId)).toBeUndefined()
+    if (action == 'rename') {
+      expect(await catalog.rename(selected, 'Renamed')).toBe(true)
+      expect(rename).toHaveBeenCalledWith(selected.flowId, 'Renamed')
+      expect(catalog.flow(selected.flowId)?.name).toBe('Renamed')
+      expect(catalog.$.total.value).toBe(2)
+    } else {
+      expect(await catalog.delete(selected)).toBe(true)
+      expect(remove).toHaveBeenCalledWith(selected.flowId)
+      expect(catalog.$.total.value).toBe(1)
+    }
+    expect(catalog.flow(flow.flowId)).toEqual(firstPage)
+  } finally {
+    catalog.dispose()
+    i18n.dispose()
+  }
+})
+
 it.each(['local', 'host'] as const)('imports a Flow through the %s and updates the catalog once', async (source) => {
   const client = new WorkbenchClient(vi.fn())
   const catalog = new FlowCatalog(client, vi.fn(), createI18n())
@@ -72,13 +101,13 @@ it('keeps a failed rename intact and applies the trimmed authoritative result af
     .mockResolvedValue({ ...flow, name: 'Renamed' })
   catalog.include(flow)
   try {
-    expect(await catalog.rename(flow.flowId, '   ')).toBe(false)
-    expect(await catalog.rename(flow.flowId, ` ${flow.name} `)).toBe(true)
+    expect(await catalog.rename(flow, '   ')).toBe(false)
+    expect(await catalog.rename(flow, ` ${flow.name} `)).toBe(true)
     expect(rename).not.toHaveBeenCalled()
-    expect(await catalog.rename(flow.flowId, ' Renamed ')).toBe(false)
+    expect(await catalog.rename(flow, ' Renamed ')).toBe(false)
     expect(catalog.flow(flow.flowId)).toEqual(flow)
     expect(notice).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'error' }))
-    expect(await catalog.rename(flow.flowId, ' Renamed ')).toBe(true)
+    expect(await catalog.rename(flow, ' Renamed ')).toBe(true)
     expect(rename).toHaveBeenLastCalledWith(flow.flowId, 'Renamed')
     expect(catalog.flow(flow.flowId)?.name).toBe('Renamed')
     expect(notice).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'success' }))
@@ -98,14 +127,14 @@ it('retains a Flow after failed deletion and removes it only after acceptance', 
   vi.spyOn(client, 'listFlows').mockResolvedValue({ version: 1, flows: [{ ...flow, status: 'retiring', referenceCount: 0 }], total: 1 })
   try {
     await catalog.reload()
-    expect(await catalog.delete(flow.flowId)).toBe(false)
+    expect(await catalog.delete(catalog.flow(flow.flowId)!)).toBe(false)
     expect(remove).not.toHaveBeenCalled()
     catalog.include(flow)
-    expect(await catalog.delete(flow.flowId)).toBe(false)
+    expect(await catalog.delete(flow)).toBe(false)
     expect(catalog.flow(flow.flowId)).toEqual({ ...flow, referenceCount: 0 })
     expect(catalog.$.total.value).toBe(1)
     expect(notice).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'error' }))
-    expect(await catalog.delete(flow.flowId)).toBe(true)
+    expect(await catalog.delete(flow)).toBe(true)
     expect(remove).toHaveBeenLastCalledWith(flow.flowId)
     expect(catalog.$.flows.value).toEqual([])
     expect(catalog.$.total.value).toBe(0)
@@ -133,7 +162,7 @@ it.each(['create', 'rename', 'delete'] as const)('ignores a pending %s result af
     return { ...flow, status: 'retiring' }
   })
   catalog.include(flow)
-  const saving = action == 'create' ? catalog.create(flow.name) : action == 'rename' ? catalog.rename(flow.flowId, 'Renamed') : catalog.delete(flow.flowId)
+  const saving = action == 'create' ? catalog.create(flow.name) : action == 'rename' ? catalog.rename(flow, 'Renamed') : catalog.delete(flow)
   catalog.dispose()
   pending.resolve()
   expect(await saving).toBe(action == 'create' ? undefined : false)
@@ -257,8 +286,37 @@ it('applies list metadata to detail-only entries when their page is loaded witho
     expect(catalog.$.flows.value[1]).not.toHaveProperty('referenceCount')
     await catalog.loadMore()
     expect(catalog.$.flows.value).toEqual([{ ...flow, referenceCount: 0 }, listed])
-    expect(list).toHaveBeenLastCalledWith({ cursor: 'next', limit: 50 })
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'next', limit: 50 }))
   } finally {
     catalog.dispose()
+  }
+})
+
+it('keeps filtered query pages separate and discards late pages after query changes', async () => {
+  const client = new WorkbenchClient(vi.fn())
+  const first = Promise.withResolvers<Awaited<ReturnType<typeof client.listFlows>>>()
+  const second = Promise.withResolvers<Awaited<ReturnType<typeof client.listFlows>>>()
+  const list = vi.spyOn(client, 'listFlows').mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+  const filtered = new FlowCatalog(client, vi.fn(), createI18n())
+  const workspace = new FlowCatalog(client, vi.fn(), createI18n())
+  workspace.include(flow)
+  try {
+    const initial = filtered.setQuery({ query: 'old', tagIds: ['tag'] })
+    const changed = filtered.setQuery({ query: ' New ', untagged: true })
+    expect(list.mock.calls[0]?.[0]?.signal?.aborted).toBe(true)
+    second.resolve({ version: 1, flows: [{ ...flow, name: 'New', referenceCount: 0 }], total: 1, nextCursor: 'new-page' })
+    await changed
+    first.resolve({ version: 1, flows: [{ ...flow, name: 'Old', referenceCount: 0 }], total: 99, nextCursor: 'old-page' })
+    await initial
+    expect(filtered.$.flows.value.map((item) => item.name)).toEqual(['New'])
+    expect(filtered.$.total.value).toBe(1)
+    expect(filtered.$.nextCursor.value).toBe('new-page')
+    expect(workspace.flow(flow.flowId)).toEqual(flow)
+    list.mockResolvedValueOnce({ version: 1, flows: [], total: 1 })
+    await filtered.loadMore()
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ query: 'new', untagged: true, tagIds: [], cursor: 'new-page' }))
+  } finally {
+    filtered.dispose()
+    workspace.dispose()
   }
 })

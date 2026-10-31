@@ -66,13 +66,18 @@ export class NavigationStore {
     file: WorkflowFile,
     name: string,
     key: string,
-    importer?: (file: WorkflowFile, name: string, key: string) => Promise<string>,
+    importer?: (file: WorkflowFile, name: string, key: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    tagIds?: readonly string[],
   ): Promise<boolean> {
-    return await this.#openNewFlow(() => this.#store.importFlow(file, name, key, importer))
+    return await this.#openNewFlow(() => this.#store.importFlow(file, name, key, importer, tagIds))
   }
 
-  public async createFlow(name: string, create?: (name: string) => Promise<string>): Promise<boolean> {
-    return await this.#openNewFlow(() => this.#store.createFlow(name, create))
+  public async createFlow(
+    name: string,
+    create?: (name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    tagIds?: readonly string[],
+  ): Promise<boolean> {
+    return await this.#openNewFlow(() => this.#store.createFlow(name, create, tagIds))
   }
 
   async #openNewFlow(create: () => Promise<boolean>): Promise<boolean> {

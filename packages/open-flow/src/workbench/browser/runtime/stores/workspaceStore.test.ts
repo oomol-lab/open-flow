@@ -9,6 +9,7 @@ import { WorkspaceStore } from './workspaceStore.ts'
 
 const timestamp = '2026-08-26T00:00:00.000Z'
 const flow = {
+  tagIds: [],
   createdAt: timestamp,
   draftRevisionId: 'revision-1',
   resourceReferences: {

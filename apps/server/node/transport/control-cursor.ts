@@ -1,7 +1,9 @@
+import type { FlowQuery } from '@oomol-lab/open-flow/control-api'
 import type { FlowPosition } from '../application/flow-control.ts'
 import type { PublicationPosition, TriggerActivityPosition } from '../application/publication-control.ts'
 import type { RunPosition } from '../application/run-control.ts'
 
+import { normalizeFlowQuery } from '@oomol-lab/open-flow/control-api'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { ControlError } from '../error.ts'
 
@@ -21,8 +23,14 @@ export function encodeTriggerActivityCursor(flowId: string, triggerNodeId: strin
   return Buffer.from(JSON.stringify({ flowId, kind: 'trigger-activities', triggerNodeId, ...position })).toString('base64url')
 }
 
-export function decodeFlowCursor(value: string): FlowPosition {
-  const decoded = decodeCursor(value, 'flows', ['createdAt', 'flowId', 'kind'])
+export function flowFilterIdentity(query: FlowQuery = {}): string {
+  const normalized = normalizeFlowQuery(query)
+  return normalized.query || normalized.tagIds.length || normalized.untagged ? JSON.stringify(normalized) : ''
+}
+
+export function decodeFlowCursor(value: string, query: FlowQuery = {}): FlowPosition {
+  const decoded = decodeCursor(value, 'flows', ['createdAt', 'flowId', 'kind'], ['filter'])
+  if ((decoded.filter ?? '') != flowFilterIdentity(query)) invalid()
   return { createdAt: decoded.createdAt as number, flowId: decoded.flowId as string }
 }
 
@@ -44,13 +52,15 @@ export function decodeTriggerActivityCursor(value: string, flowId: string, trigg
   return { activityId: decoded.activityId as string, createdAt: decoded.createdAt as number }
 }
 
-function decodeCursor(value: string, kind: string, keys: readonly string[]): Record<string, unknown> {
+function decodeCursor(value: string, kind: string, keys: readonly string[], optionalKeys: readonly string[] = []): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'))
     if (parsed == null || typeof parsed != 'object' || Array.isArray(parsed)) return invalid()
     const decoded = parsed as Record<string, unknown>
     if (
-      Object.keys(decoded).length != keys.length ||
+      Object.keys(decoded).length < keys.length ||
+      Object.keys(decoded).some((key) => !keys.includes(key) && !optionalKeys.includes(key)) ||
+      optionalKeys.some((key) => decoded[key] !== undefined && typeof decoded[key] != 'string') ||
       keys.some((key) =>
         key == 'createdAt' ? !Number.isSafeInteger(decoded[key]) || (decoded[key] as number) < 0 : typeof decoded[key] != 'string' || decoded[key].length == 0,
       ) ||

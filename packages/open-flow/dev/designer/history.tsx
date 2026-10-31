@@ -146,6 +146,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
   return {
     store,
     i18n,
+    notify,
     hold() {
       hold = new Promise<void>((resolve) => {
         release = resolve
@@ -398,6 +399,8 @@ function HistorySession({
 
 function HistoryCanvasActions({ session }: { session: ReturnType<typeof createSession> }) {
   const { store } = session
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [container, setContainer] = useState<HTMLSpanElement | null>(null)
   const history = useVal(store.history$)
   const draft = useVal(store.$.draft)
   const value = draft?.content.document.graph.nodes.value
@@ -425,8 +428,23 @@ function HistoryCanvasActions({ session }: { session: ReturnType<typeof createSe
     },
     { label: 'Hold saves', onClick: () => session.hold() },
     { label: 'Release saves', onClick: () => session.release() },
+    {
+      label: 'Open feedback dialog',
+      onClick: () => {
+        setDialogOpen(true)
+        session.notify({ kind: 'error', message: 'Unable to save changes' })
+      },
+    },
   ])
-  return null
+  return (
+    <span ref={setContainer}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent container={container?.closest<HTMLElement>('.open-flow-workbench') ?? container}>
+          <DialogTitle>Save changes</DialogTitle>
+        </DialogContent>
+      </Dialog>
+    </span>
+  )
 }
 
 function HistorySaveAction({ session }: { session: ReturnType<typeof createSession> }) {
@@ -454,7 +472,7 @@ export const historyStory: FrontendStory = {
   id: 'canvas-history',
   title: 'Canvas operations',
   description:
-    'Delete Input, select Transform and press Backspace once: each node is removed on its first press. Undo/redo restores nodes and edges. Edit code after a canvas action to confirm Undo remains available. Delete the value field to inspect the saved notification and Undo action. Open, resize and close the context panel to check canvas-centered notifications. Hold saves to inspect pending changes.',
+    'Delete Input, select Transform and press Backspace once: each node is removed on its first press. Undo/redo restores nodes and edges. Edit code after a canvas action to confirm Undo remains available. Delete the value field to inspect the saved notification and Undo action. Open, resize and close the context panel to check canvas-centered notifications. Open feedback dialog to check that notifications share the modal’s viewport center, then close it to restore canvas centering. Hold saves to inspect pending changes.',
   standalone: true,
   render: (log, dark, language) => (
     <div

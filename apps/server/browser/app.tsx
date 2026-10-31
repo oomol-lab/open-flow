@@ -361,11 +361,15 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
     }
   }
 
-  async function createHostedFlow(name: string, imported?: { file: import('@oomol-lab/open-flow/control-api').WorkflowFile; key: string }): Promise<string> {
+  async function createHostedFlow(
+    name: string,
+    options?: { readonly tagIds?: readonly string[] },
+    imported?: { file: import('@oomol-lab/open-flow/control-api').WorkflowFile; key: string },
+  ): Promise<string> {
     if (team.kind != 'ready' || team.selectedTeamId == null) throw new Error(t('team.loadFailed'))
     const teamId = team.selectedTeamId
     const response = await fetch(imported == null ? '/connector/flows' : '/v1/flows/import', {
-      body: JSON.stringify({ name, teamId, ...(imported == null ? {} : { file: imported.file }), version: 1 }),
+      body: JSON.stringify({ name, teamId, tagIds: options?.tagIds, ...(imported == null ? {} : { file: imported.file }), version: 1 }),
       credentials: 'same-origin',
       headers: { 'content-type': 'application/json', 'idempotency-key': imported?.key ?? `flow-${idempotencyKey()}` },
       method: 'POST',
@@ -519,7 +523,11 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
               <WorkflowPage catalog={route.flowId == null}>
                 <OpenFlowWorkbench
                   catalogWidth="embedded"
-                  importFlow={team.kind == 'ready' && team.selectedTeamId != null ? (file, name, key) => createHostedFlow(name, { file, key }) : undefined}
+                  importFlow={
+                    team.kind == 'ready' && team.selectedTeamId != null
+                      ? (file, name, key, options) => createHostedFlow(name, options, { file, key })
+                      : undefined
+                  }
                   createFlow={team.kind == 'ready' && team.selectedTeamId != null ? createHostedFlow : undefined}
                   createFlowDisabled={team.kind != 'hidden' && (team.kind != 'ready' || team.selectedTeamId == null)}
                   createFlowField={createFlowField}
