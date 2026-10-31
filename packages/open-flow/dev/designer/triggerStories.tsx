@@ -294,6 +294,8 @@ function RunSample({
       (notice) => logRef.current('run.notice', notice),
       async () => inputs.draft,
       i18n,
+      undefined,
+      state === 'closed' ? { sessionId: 'lab', environment: `lab:run-inputs:${fixture.id}` } : undefined,
     )
     let disposed = false
     void (async () => {
@@ -329,6 +331,7 @@ function RunSample({
     }
   }, [fixture, language, state, downstream, onContractChangeReady])
   const starting = useVal(resource?.store.$.starting) ?? false
+  useVal(resource?.store.$.inputsLoaded)
   const request = useVal(resource?.store.$.inputRequest)
   const valid = useVal(request?.valid)
   return (
@@ -769,7 +772,7 @@ export const triggerStories: readonly FrontendStory[] = [
         group: `Trigger ${fixture.trigger.name}`,
         id: `trigger-${fixture.id}-run`,
         title: 'Run menu states',
-        description: `${fixture.trigger.name} · Run panels shown side by side. Test data contains only the selected trigger’s parameters or outputs. Start parameters allow empty nullable values after confirmation. Triggers with no test inputs run directly.`,
+        description: `${fixture.trigger.name} · Run panels shown side by side. The closed sample saves test data in IndexedDB; run it and reload to verify restoration. Start parameters allow empty nullable values after confirmation. Triggers with no test inputs run directly.`,
         standalone: true,
         render: (log, dark, language) => <RunStory fixture={fixture} log={log} dark={dark} language={language} />,
       },

@@ -961,7 +961,7 @@
   "runInput": {
     "editMissing": "填寫測試資料",
     "editReady": "修改已儲存的測試資料",
-    "remembered": "測試資料僅在本次編輯工作階段中保留。",
+    "remembered": "測試資料儲存在目前的瀏覽器中。",
     "startTest": "開始測試",
     "testTrigger": "測試 {{name}}",
     "triggerCount": "共 {{count}} 個起始節點",

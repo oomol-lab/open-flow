@@ -961,7 +961,7 @@
   "runInput": {
     "editMissing": "Add test data",
     "editReady": "Edit saved test data",
-    "remembered": "Saved for this editing session only.",
+    "remembered": "Test data is saved in this browser.",
     "startTest": "Start test",
     "testTrigger": "Test {{name}}",
     "triggerCount": "{{count}} start nodes",

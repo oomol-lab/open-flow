@@ -290,6 +290,7 @@ export function FlowEditor({
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
+  useVal(store.runRequests.$.inputsLoaded)
   const busy = useVal(store.$.busy)
   const diagnostics = useVal(store.$.diagnostics)
   const diagnosticItems = useVal(store.$.diagnosticItems)

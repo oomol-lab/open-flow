@@ -4,6 +4,7 @@ import type { FlowRunInputEditorStore } from '../../flowRunInputEditorStore.ts'
 import type { WorkbenchClient, Draft, Flow, JsonValue, Run } from '../api.ts'
 import type { Current } from '../stores/latest.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
+import type { RunInputStorageScope, SavedRunInputs } from './runInputStorage.ts'
 import type { RunStore } from './runStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
@@ -15,6 +16,7 @@ import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { Latest } from '../stores/latest.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
+import { readRunInputs, writeRunInputs } from './runInputStorage.ts'
 
 interface RequestState {
   readonly inputRequest?: RunInputRequest
@@ -25,6 +27,7 @@ interface RequestState {
 type Client = Pick<WorkbenchClient, 'createDraftRun' | 'createLiveRun' | 'getLive' | 'getRevision'>
 
 export interface RunRequest$ {
+  readonly inputsLoaded: ReadonlyVal<boolean>
   readonly inputRequest: ReadonlyVal<RunInputRequest | undefined>
   readonly starting: ReadonlyVal<boolean>
   readonly submitting: ReadonlyVal<RunSource | undefined>
@@ -93,14 +96,11 @@ export class RunRequestStore {
   readonly #lifetime = new Latest()
   readonly #requests = new Latest()
   readonly #runs: Pick<RunStore, 'captureSelection' | 'follow' | 'prepareStart'>
-  readonly #savedInputs = new Map<
-    string,
-    {
-      readonly signature: string
-      readonly valid: boolean
-      readonly values: Readonly<Record<string, unknown>>
-    }
-  >()
+  readonly #savedInputs = new Map<string, SavedRunInputs>()
+  readonly #inputsLoaded = val(false)
+  readonly #restoreInputs: Promise<void>
+  #inputSaves: Promise<void> = Promise.resolve()
+  #disposed = false
   readonly #setNotice: SetNotice
   readonly #state: Val<RequestState> = val(initialState)
   #attempt?: { readonly key: string; readonly signature: string }
@@ -114,6 +114,7 @@ export class RunRequestStore {
     prepareDraft: (flowId: string) => Promise<Draft | undefined>,
     i18n: I18n = createI18n(),
     identity: () => string = randomId,
+    private readonly inputStorage?: RunInputStorageScope,
   ) {
     this.#prepareDraft = prepareDraft
     this.#client = client
@@ -122,13 +123,16 @@ export class RunRequestStore {
     this.#i18n = i18n
     this.#identity = identity
     this.$ = {
+      inputsLoaded: this.#inputsLoaded,
       inputRequest: derive(this.#state, (state) => state.inputRequest),
       starting: derive(this.#state, (state) => state.starting),
       submitting: derive(this.#state, (state) => state.submitting),
     }
+    this.#restoreInputs = this.#restoreSavedInputs()
   }
 
   public dispose(): void {
+    this.#disposed = true
     this.#lifetime.invalidate()
     this.#requests.invalidate()
     this.#disposeInputRequest()
@@ -256,6 +260,8 @@ export class RunRequestStore {
     this.#rememberInputs(previous)
     this.#set({ inputRequest: undefined, starting: !edit, submitting: undefined })
     this.#disposeInputRequest(previous)
+    await this.#restoreInputs
+    if (!current()) return 'unavailable'
     const graph = revisionView(revision).graph()
     const triggers = Object.entries(graph?.nodes ?? {}).flatMap(([nodeId, node]) => (!isTriggerNode(node) ? [] : [{ nodeId, title: node.name }]))
     if (triggers.length == 0) {
@@ -324,6 +330,7 @@ export class RunRequestStore {
     this.#set({ starting: true, submitting: source })
     try {
       const prepared = source == 'draft' ? await this.#prepareDraft(flow.flowId) : revision
+      await this.#inputSaves
       if (prepared == null || !alive() || !current() || !requestCurrent()) return false
       const node = revisionView(prepared).trigger(trigger.nodeId)
       if (
@@ -374,13 +381,31 @@ export class RunRequestStore {
     return `${flowId}\u0000${triggerId}`
   }
 
+  async #restoreSavedInputs(): Promise<void> {
+    try {
+      if (this.inputStorage != null) {
+        const inputs = await readRunInputs(this.inputStorage)
+        if (this.#disposed) return
+        for (const [key, value] of inputs) this.#savedInputs.set(key, value)
+      }
+    } catch {
+      // Local test data is optional; keep the in-memory editor usable.
+    } finally {
+      if (!this.#disposed) this.#inputsLoaded.set(true)
+    }
+  }
+
   #rememberInputs(request: RunInputRequest | undefined): void {
     if (request?.triggerId == null || request.editor == null) return
-    this.#savedInputs.set(this.#inputKey(request.flow.flowId, request.triggerId), {
+    const key = this.#inputKey(request.flow.flowId, request.triggerId)
+    const inputs: SavedRunInputs = {
       signature: inputSignature(inputSpec(request.revision, request.triggerId)),
       valid: request.valid.value,
       values: request.editor.values(),
-    })
+    }
+    this.#savedInputs.set(key, inputs)
+    const scope = this.inputStorage
+    if (scope != null) this.#inputSaves = this.#inputSaves.then(() => writeRunInputs(scope, key, inputs)).catch(() => {})
   }
 
   #set(patch: Partial<RequestState>): void {

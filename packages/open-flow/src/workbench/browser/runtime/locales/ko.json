@@ -961,7 +961,7 @@
   "runInput": {
     "editMissing": "테스트 데이터 입력",
     "editReady": "저장된 테스트 데이터 편집",
-    "remembered": "현재 편집 세션에서만 저장됩니다.",
+    "remembered": "테스트 데이터는 현재 브라우저에 저장됩니다.",
     "startTest": "테스트 시작",
     "testTrigger": "테스트 {{name}}",
     "triggerCount": "시작 노드 {{count}}개",

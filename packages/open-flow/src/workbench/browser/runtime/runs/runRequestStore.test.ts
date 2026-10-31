@@ -1,4 +1,5 @@
 import type { Draft, Flow, Port } from '../api.ts'
+import type { RunInputStorageScope } from './runInputStorage.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
@@ -82,7 +83,7 @@ describe('RunRequestStore input preparation', () => {
   })
 })
 
-function harness() {
+function harness(inputStorage?: RunInputStorageScope) {
   const client = {
     createDraftRun: vi.fn().mockResolvedValue({ runId: 'run' }),
     createLiveRun: vi.fn().mockResolvedValue({ runId: 'live-run' }),
@@ -98,7 +99,7 @@ function harness() {
     follow: vi.fn().mockResolvedValue(true),
     prepareStart: vi.fn(() => selection.begin()),
   }
-  const store = new RunRequestStore(client, runs, notice, prepare)
+  const store = new RunRequestStore(client, runs, notice, prepare, undefined, undefined, inputStorage)
   const requestDraft = store.requestDraft.bind(store)
   const editDraft = store.editDraft.bind(store)
   vi.spyOn(store, 'requestDraft').mockImplementation((requestedFlow, revision, triggerId) => {
@@ -497,6 +498,121 @@ function startDraft(required = false): Draft {
     },
   }
 }
+
+it('restores submitted Start parameters from IndexedDB in a new editing session', async () => {
+  const scope = { sessionId: crypto.randomUUID(), environment: 'test', connectorOwnerId: 'team' }
+  const revision = startDraft()
+  const first = harness(scope)
+  await first.store.editDraft(flow, revision, 'start')
+  first.store.$.inputRequest.value!.editor!.setValue('message', 'Keep after refresh')
+  expect(await first.store.confirmInputs()).toBe(true)
+  first.store.dispose()
+
+  const restored = harness(scope)
+  try {
+    expect(await restored.store.requestDraft(flow, revision, 'start')).toBe('started')
+    expect(restored.client.createDraftRun).toHaveBeenCalledWith(
+      flow.flowId,
+      revision.revisionId,
+      expect.objectContaining({ trigger: { nodeId: 'start', outputs: { message: 'Keep after refresh' } } }),
+    )
+    expect(restored.store.$.inputsLoaded.value).toBe(true)
+    expect(restored.store.inputStatus(flow.flowId, revision, 'start')).toBe('ready')
+    await restored.store.editDraft(flow, revision, 'start')
+    expect(restored.store.$.inputRequest.value!.editor!.values()).toEqual({ message: 'Keep after refresh' })
+  } finally {
+    restored.store.dispose()
+  }
+
+  for (const otherScope of [
+    { ...scope, sessionId: 'other-user' },
+    { ...scope, environment: 'other-environment' },
+    { ...scope, connectorOwnerId: 'other-team' },
+  ]) {
+    const other = harness(otherScope)
+    try {
+      expect(await other.store.editDraft(flow, revision, 'start')).toBe('input')
+      expect(other.store.$.inputRequest.value!.editor!.values()).toEqual({})
+      expect(other.store.inputStatus(flow.flowId, revision, 'start')).toBe('missing')
+    } finally {
+      other.store.dispose()
+    }
+  }
+})
+
+it.each([undefined, null, ''])('preserves omitted, null and empty Start values across sessions: %s', async (value) => {
+  const scope = { sessionId: crypto.randomUUID() }
+  const revision = startDraft()
+  const first = harness(scope)
+  await first.store.editDraft(flow, revision, 'start')
+  first.store.$.inputRequest.value!.editor!.setValue('message', value)
+  expect(await first.store.confirmInputs()).toBe(true)
+  first.store.dispose()
+
+  const restored = harness(scope)
+  try {
+    await restored.store.editDraft(flow, revision, 'start')
+    expect(restored.store.$.inputRequest.value!.editor!.values()).toEqual(value === undefined ? {} : { message: value })
+    restored.store.dismissInputs()
+    if (value === undefined) {
+      expect(await restored.store.requestDraft(flow, startDraft(true), 'start')).toBe('input')
+      expect(await restored.store.confirmInputs()).toBe(false)
+      expect(restored.client.createDraftRun).not.toHaveBeenCalled()
+    }
+  } finally {
+    restored.store.dispose()
+  }
+})
+
+it('silently keeps in-memory test data usable when IndexedDB is unavailable', async () => {
+  const open = vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+    throw new Error('Storage unavailable')
+  })
+  const { store, client, notice } = harness({ sessionId: crypto.randomUUID() })
+  try {
+    await store.editDraft(flow, startDraft(), 'start')
+    store.$.inputRequest.value!.editor!.setValue('message', 'Still usable')
+    expect(await store.confirmInputs()).toBe(true)
+    await store.editDraft(flow, startDraft(), 'start')
+    expect(store.$.inputRequest.value!.editor!.values()).toEqual({ message: 'Still usable' })
+    expect(client.createDraftRun).toHaveBeenCalledTimes(1)
+    expect(notice).not.toHaveBeenCalled()
+  } finally {
+    store.dispose()
+    open.mockRestore()
+  }
+})
+
+it('silently tolerates failed writes and retries saving the same test data on the next run', async () => {
+  const scope = { sessionId: crypto.randomUUID() }
+  const { store, notice } = harness(scope)
+  const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+    throw new Error('Storage quota exceeded')
+  })
+  try {
+    await store.editDraft(flow, startDraft(), 'start')
+    expect(notice).not.toHaveBeenCalled()
+    store.$.inputRequest.value!.editor!.setValue('message', 'Retry this data')
+    expect(await store.confirmInputs()).toBe(true)
+    expect(notice).not.toHaveBeenCalled()
+
+    await store.editDraft(flow, startDraft(), 'start')
+    expect(store.$.inputRequest.value!.editor!.values()).toEqual({ message: 'Retry this data' })
+    put.mockRestore()
+    expect(await store.confirmInputs()).toBe(true)
+  } finally {
+    put.mockRestore()
+    store.dispose()
+  }
+
+  const restored = harness(scope)
+  try {
+    await restored.store.editDraft(flow, startDraft(), 'start')
+    expect(restored.store.$.inputRequest.value!.editor!.values()).toEqual({ message: 'Retry this data' })
+  } finally {
+    restored.store.dispose()
+  }
+})
 
 it('shows nullable Start parameters before running and normalizes omissions only on submission', async () => {
   const { client, store } = harness()

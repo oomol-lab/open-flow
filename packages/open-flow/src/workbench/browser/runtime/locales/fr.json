@@ -961,7 +961,7 @@
   "runInput": {
     "editMissing": "Ajouter des données de test",
     "editReady": "Modifier les données de test enregistrées",
-    "remembered": "Conservées uniquement pour cette session de modification.",
+    "remembered": "Les données de test sont enregistrées dans ce navigateur.",
     "startTest": "Démarrer le test",
     "testTrigger": "Tester {{name}}",
     "triggerCount": "{{count}} nœuds de départ",

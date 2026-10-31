@@ -203,6 +203,7 @@ export class WorkbenchStore {
       },
       i18n,
       identity,
+      { sessionId: cacheSessionId, environment: host.cacheEnvironment, connectorOwnerId: host.connectorOwnerId },
     )
     const diagnostics = compute<FlowCheck | undefined>((get) => {
       const check = get(this.workspace.$.diagnostics)
