@@ -166,7 +166,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
       {
         description:
           'The issue title exactly as returned by GitHub. This can be a long description that explains the output in enough detail to verify the tooltip layout.',
-        icon: providerIcon({ icon: ':simple-icons:github:', serviceId: 'github', serviceName: 'GitHub' }, {}),
+        icon: providerIcon({ icon: ':simple-icons:github:', serviceId: 'github', serviceName: 'GitHub' }),
         nodeId: 'github',
         nodeName: 'GitHub issue',
         output: 'title',
@@ -175,7 +175,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
     ],
     groups: [
       {
-        icon: providerIcon({ icon: ':simple-icons:github:', serviceId: 'github', serviceName: 'GitHub' }, {}),
+        icon: providerIcon({ icon: ':simple-icons:github:', serviceId: 'github', serviceName: 'GitHub' }),
         nodeId: 'github',
         nodeName: 'GitHub issue',
         outputs: [{ output: 'title', check: { kind: 'available' as const } }],

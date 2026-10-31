@@ -11,8 +11,11 @@ import { useSpriteStatus } from './spriteResource.ts'
 /** Standalone image capture uses individual, cross-origin-readable images instead of sprites. */
 export const IconImageCrossOriginContext = createContext<'anonymous' | undefined>(undefined)
 
+/** A bundled, theme-aware placeholder that does not load a remote icon. */
+export const placeholderIcon = 'data:application/vnd.open-flow.placeholder-icon,'
+
 export interface ContentIconProps {
-  /** Image URL, Iconify source, or a descriptor created by imageIcon, initialsIcon, or spriteIcon. */
+  /** Image URL, Iconify source, placeholderIcon, or a descriptor created by imageIcon, initialsIcon, or spriteIcon. */
   src?: string
   /** Applied to the icon root, including image, sprite, and initials renderers. */
   className?: string
@@ -37,6 +40,8 @@ export const ContentIcon = ({ src, className, fallback = null, loading = 'lazy',
     ) : (
       <SpriteIcon {...{ className, fallback, loading, decoding }} sprite={sprite} />
     )
+
+  if (source === placeholderIcon) return <i aria-hidden="true" className={clsx('i-lucide-light:plug', className)} />
 
   if (source?.startsWith(initialsIconPrefix)) {
     if (crossOrigin && fallback != null) return <>{fallback}</>

@@ -9,7 +9,6 @@ import { promisify } from 'node:util'
 import { build, esmExternalRequirePlugin } from 'vite'
 import { generateScopedName } from '../../build/node/cssModules.ts'
 import designerUnoConfig from '../../build/node/designerUnoConfig.ts'
-import { providerIconsPlugin } from '../../build/node/providerIcons.ts'
 import { twemojiCollectionPlugin } from '../../build/node/twemojiCollection.ts'
 
 const execFileAsync = promisify(execFile)
@@ -220,7 +219,6 @@ async function buildRuntime(
     logLevel: options.quiet ? 'silent' : 'info',
     plugins: [
       esmExternalRequirePlugin({ external: [/^effect(?:\/.*)?$/, /^react(?:\/.*)?$/, /^react-dom(?:\/.*)?$/] }),
-      providerIconsPlugin(),
       twemojiCollectionPlugin(),
       tailwindcss(),
       UnoCSS(designerUnoConfig),

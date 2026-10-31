@@ -1,30 +1,19 @@
-import { describe, expect, it } from 'vitest'
-import { providerIcon, providerIconSource, providerInitials } from './providerIcon.ts'
+import { expect, it } from 'vitest'
+import { imageIcon, placeholderIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
+import { providerIcon } from './providerIcon.ts'
 
-describe('providerIconSource', () => {
-  it('prefers the provider icon', () => {
-    expect(providerIconSource({ icon: ' https://example.com/icon.svg ', serviceId: 'example' }, { example: 'https://static.oomol.com/example.svg' })).toBe(
-      'https://example.com/icon.svg',
-    )
-  })
-
-  it('uses the bundled OOMOL catalog icon', () => {
-    expect(providerIconSource({ serviceId: 'example' }, { example: 'https://static.oomol.com/example.svg' })).toBe('https://static.oomol.com/example.svg')
-  })
-
-  it('uses the homepage favicon when no icon is mapped', () => {
-    expect(providerIconSource({ homepageUrl: 'https://example.com/docs', serviceId: 'example' }, {})).toBe(
-      'https://www.google.com/s2/favicons?sz=64&domain=example.com',
-    )
-  })
-
-  it('falls back to initials when no icon or valid homepage is available', () => {
-    expect(providerIconSource({ homepageUrl: 'not a URL', serviceId: 'example' }, {})).toBeUndefined()
-    expect(providerInitials('Google Drive')).toBe('GD')
-  })
+it('uses the provider image with a bundled placeholder fallback', () => {
+  expect(providerIcon({ icon: ' https://example.com/icon.svg ', serviceId: 'example', serviceName: 'Example' })).toBe(
+    imageIcon('https://example.com/icon.svg', placeholderIcon),
+  )
 })
 
-it('prefers a valid live sprite and preserves the original fallback chain', () => {
+it.each([undefined, '', '   '])('uses the same placeholder for missing artwork (%j), even with a homepage', (icon) => {
+  expect(providerIcon({ icon, homepageUrl: 'https://example.com', serviceId: 'github', serviceName: 'GitHub' })).toBe(placeholderIcon)
+  expect(providerIcon({ icon, serviceId: 'other', serviceName: 'Other Provider' })).toBe(placeholderIcon)
+})
+
+it('uses a valid runtime sprite with an image or placeholder fallback', () => {
   const iconSprite = {
     version: 'v1',
     pixelRatio: 2,
@@ -41,4 +30,6 @@ it('prefers a valid live sprite and preserves the original fallback chain', () =
   expect(descriptor.iconSprite).toEqual(iconSprite)
   expect(descriptor.fallback).toBe(providerIcon(provider))
   expect(providerIcon({ ...provider, iconSprite, iconSpritePosition: { x: 999, y: 2 } })).toBe(providerIcon(provider))
+  const spriteOnly = providerIcon({ ...provider, icon: undefined, iconSprite, iconSpritePosition: { x: 54, y: 2 } })
+  expect(JSON.parse(decodeURIComponent(spriteOnly.slice(spriteOnly.indexOf(',') + 1))).fallback).toBe(placeholderIcon)
 })

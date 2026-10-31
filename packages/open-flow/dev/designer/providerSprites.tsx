@@ -20,7 +20,17 @@ const samples = [
     }),
   },
   { label: 'No sprite → original icon', src: providerIcon(base) },
-  { label: 'No artwork → initials', src: providerIcon({ serviceId: 'unknown', serviceName: 'Sample Provider' }) },
+  { label: 'No artwork → placeholder', src: providerIcon({ serviceId: 'unknown', serviceName: 'Sample Provider' }) },
+  { label: 'Failed image → placeholder', src: providerIcon({ ...base, icon: 'data:image/png,broken' }) },
+  {
+    label: 'Failed sprite and image → placeholder',
+    src: providerIcon({
+      ...base,
+      icon: 'data:image/png,broken',
+      iconSprite: { ...sampleSprite, lightUrl: 'data:image/png,broken', darkUrl: 'data:image/png,broken' },
+      iconSpritePosition: { x: 2, y: 2 },
+    }),
+  },
 ]
 export const providerSpritesStory: FrontendStory = {
   group: 'Workbench',
@@ -28,7 +38,7 @@ export const providerSpritesStory: FrontendStory = {
   title: 'Provider Sprites',
   standalone: true,
   description:
-    'Physical-pixel crops at multiple sizes, shared failure fallback, and production canvas and picker icons. Toggle the Lab theme to load the other sprite.',
+    'Physical-pixel crops at multiple sizes, a bundled placeholder for missing or failed artwork, and production canvas and picker icons. Toggle the Lab theme to load the other sprite.',
   render: (_log, dark) => (
     <div className="open-flow-theme space-y-6 p-6" data-theme={dark ? 'dark' : 'light'}>
       {samples.map((sample) => (

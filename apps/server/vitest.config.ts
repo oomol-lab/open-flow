@@ -1,9 +1,8 @@
 import { twemojiCollectionPlugin } from '@oomol-lab/open-flow/designer-twemoji-plugin'
-import { providerIconsPlugin } from '@oomol-lab/open-flow/provider-icons-plugin'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  plugins: [providerIconsPlugin({ iconUrls: {} }), twemojiCollectionPlugin()],
+  plugins: [twemojiCollectionPlugin()],
   test: {
     expect: { poll: { timeout: 5_000 } },
     coverage: {

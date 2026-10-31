@@ -6,7 +6,6 @@ import { defineConfig } from 'vite'
 import { generateScopedName } from '../../src/build/node/cssModules.ts'
 import designerUnoConfig, { designerUnoScopes, scopeDesignerSelector } from '../../src/build/node/designerUnoConfig.ts'
 import { fullReloadPlugin } from '../../src/build/node/fullReload.ts'
-import { providerIconsPlugin } from '../../src/build/node/providerIcons.ts'
 import { triggerLocalesPlugin } from '../../src/build/node/triggerLocales.ts'
 import { twemojiCollectionPlugin } from '../../src/build/node/twemojiCollection.ts'
 import { triggerDefinitions } from '../../src/trigger/providers/definitions.ts'
@@ -32,7 +31,6 @@ export default defineConfig({
       load: (id) =>
         id === '\0virtual:lab-trigger-snapshots' ? `export default ${JSON.stringify(triggerDefinitions.map(({ snapshot }) => snapshot))}` : undefined,
     },
-    providerIconsPlugin({ iconUrls: {} }),
     twemojiCollectionPlugin(),
     tailwindcss(),
     UnoCSS({

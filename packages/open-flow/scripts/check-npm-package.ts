@@ -104,6 +104,13 @@ for (const [, asset] of previewStyle.matchAll(/url\((?:["'])?(\.\/assets\/[^)"']
   )
 }
 const workbenchStyle = readPackedText('dist/browser/workbench.css')
+// Provider artwork comes from runtime metadata; published bundles must not embed the online catalog.
+for (const entryName of entryNames.filter((name) => name.startsWith('package/dist/browser/') && name.endsWith('.js'))) {
+  assert.doesNotMatch(readPackedText(entryName.slice('package/'.length)), /https:\/\/static\.oomol\.com\/logo\/(?:third-party|provider-sprites)\//, entryName)
+}
+for (const style of [previewStyle, workbenchStyle]) {
+  assert.ok(style.includes('.i-lucide-light\\:plug'), 'Missing bundled provider placeholder icon.')
+}
 for (const icon of ['i-lucide-light:zoom-in', 'i-lucide-light:zoom-out', 'i-lucide-light:scan', 'i-codicon:copy', 'i-codicon:trash']) {
   assert.ok(workbenchStyle.includes(`.${icon.replaceAll(':', '\\:')}`), `Missing packaged icon CSS for ${icon}.`)
 }
