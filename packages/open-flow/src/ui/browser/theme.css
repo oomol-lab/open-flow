@@ -58,6 +58,8 @@
   --ui-secondary-foreground: var(--_open-flow-secondary-foreground);
   --ui-muted: var(--_open-flow-muted);
   --ui-muted-foreground: var(--_open-flow-muted-foreground);
+  /* Leave omitted input invalid so each control keeps its existing fallback surface. */
+  --ui-control-background: var(--open-flow-control-background);
   --ui-accent: var(--_open-flow-accent);
   --ui-accent-foreground: var(--_open-flow-accent-foreground);
   --ui-destructive: var(--_open-flow-destructive);
@@ -90,7 +92,7 @@
   --ui-input: color-mix(in srgb, var(--ui-border) 70%, var(--_open-flow-node-content));
   --ui-card: var(--_open-flow-node-surface);
   --ui-background: var(--_open-flow-node-surface);
-  --ui-control-background: var(--_open-flow-node-content);
+  --ui-control-background: var(--open-flow-control-background, var(--_open-flow-node-content));
   --ui-control-hover-background: color-mix(in srgb, var(--_open-flow-secondary) 25%, var(--ui-control-background));
   --ui-readonly-focus-outline: 1px solid color-mix(in srgb, var(--ui-ring) 40%, var(--ui-input));
 
@@ -272,7 +274,7 @@
   --widget-background-highlight-color: var(--fill-5);
   --widget-background-mask-highlight-color: rgba(0, 0, 0, 0.1);
 
-  --widget-input-background: var(--fill-3);
+  --widget-input-background: var(--open-flow-control-background, var(--fill-3));
   --widget-input-selection-background-color: var(--open-flow-accent, light-dark(#d1d2f3, #2b4f77));
   --widget-switch-background-color: var(--fill-7);
   --widget-switch-border-color: transparent;

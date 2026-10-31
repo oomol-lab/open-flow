@@ -32,6 +32,7 @@
   --open-flow-destructive: #d73220;
   --open-flow-border: #ece6ea;
   --open-flow-input: #ece6ea;
+  --open-flow-control-background: var(--open-flow-background);
   --open-flow-ring: #453459;
   --open-flow-radius: 8px;
   --open-flow-node-surface: #f5f1f4;

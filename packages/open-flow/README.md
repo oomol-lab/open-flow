@@ -56,6 +56,7 @@ CSS inputs on a **host-owned ancestor** of the Workbench or Preview:
   --open-flow-destructive: var(--destructive);
   --open-flow-border: var(--border);
   --open-flow-input: var(--input);
+  --open-flow-control-background: var(--background);
   --open-flow-ring: var(--ring);
   --open-flow-radius: var(--radius);
   --open-flow-node-surface: var(--muted);
@@ -85,6 +86,10 @@ The semantic palette covers product controls, canvas text, neutral surfaces, bor
 Canvas background and grid are independently configurable with `--open-flow-canvas-background`
 and `--open-flow-canvas-grid`; `--open-flow-canvas-lock-stripe` configures read-only stripes.
 Node shells and content use `--open-flow-node-surface` and `--open-flow-node-content`.
+`--open-flow-control-background` independently sets form control backgrounds, including search
+fields, text inputs, textareas and selects in Workbench, property panels and canvas editors.
+It does not change node or panel surfaces. Omit it to retain each control's default surface;
+`--open-flow-input` continues to configure input borders.
 Optional `--open-flow-comment-surface`, `--open-flow-comment-content` and
 `--open-flow-comment-border` configure comments; `--open-flow-node-running-beam` configures
 the running outline. Unconfigured comments and execution colors retain the product defaults.
