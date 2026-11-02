@@ -69,15 +69,20 @@ interface NodeProjectionContext {
   readonly t: TFunction | undefined
 }
 
-export function semanticNodeIcon(node: ResolvedNode, connectorActions: Readonly<Record<string, ConnectorActionView>>): string | undefined {
+export function semanticNodeIcon(
+  node: ResolvedNode,
+  connectorActions: Readonly<Record<string, ConnectorActionView>>,
+  providers: Readonly<Record<string, ConnectorProvider>> = {},
+): string | undefined {
   if (node.node.icon != null) return node.node.icon
   if (node.kind != 'task' || node.definition == null || !('executor' in node.definition) || node.definition.executor.kind != 'connector') return nodeIcon(node)
-  const action = connectorActions[node.definition.executor.action]
-  return action == null ? nodeIcon(node) : providerIcon(action)
+  const actionId = node.definition.executor.action
+  const provider = connectorActions[actionId] ?? providers[actionId.split('.')[0]!]
+  return provider == null ? nodeIcon(node) : providerIcon(provider)
 }
 
 function sourceNodePresentation(node: ResolvedSelection, context: NodeProjectionContext): { readonly icon?: string; readonly title: string } {
-  if (node.kind != 'trigger') return { icon: semanticNodeIcon(node, context.connectorActions), title: nodeTitle(node, context.t) }
+  if (node.kind != 'trigger') return { icon: semanticNodeIcon(node, context.connectorActions, context.providers), title: nodeTitle(node, context.t) }
   return { icon: triggerNodeIcon(node.trigger, context.providers), title: node.trigger.name }
 }
 
@@ -572,6 +577,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const task = resolved.kind == 'task' ? resolved.definition : undefined
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
   const connectorAction = connector == null ? undefined : context.connectorActions[connector.action]
+  const connectorProvider = connector == null ? undefined : context.providers[connector.action.split('.')[0]!]
   const connections = connectorAction == null ? undefined : context.connectionCatalogs[connectorAction.serviceId]
   const connectionId = connector?.connectionId
   const selectedConnection = connectionId == null ? undefined : connections?.byId.get(connectionId)
@@ -588,7 +594,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
     description: node.description,
     diagnostics: nodeDiagnosticCount(resolved, context.diagnostics),
     fallbackIcon: nodeIcon(resolved),
-    icon: semanticNodeIcon(resolved, context.connectorActions),
+    icon: semanticNodeIcon(resolved, context.connectorActions, context.providers),
     id: nodeId,
     inputs,
     outputs,
@@ -623,7 +629,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
           return input == null || 'group' in input ? [] : [input]
         }),
         kind: node.kind,
-        executorName: executorName(task, connectorAction?.serviceName, context.t),
+        executorName: executorName(task, connectorAction?.serviceName ?? connectorProvider?.serviceName, context.t),
         ...(task != null && 'moduleId' in task
           ? {
               actionSummary: actionSummary(

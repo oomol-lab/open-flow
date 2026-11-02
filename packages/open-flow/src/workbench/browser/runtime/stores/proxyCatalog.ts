@@ -25,7 +25,8 @@ export function proxyResponse(value: unknown, validate?: (item: Readonly<Record<
   return source as unknown as ProxyResponse
 }
 
-export function provider(source: Readonly<Record<string, unknown>>, metadata?: unknown): ConnectorProvider {
+export function provider(value: unknown, metadata?: unknown): ConnectorProvider {
+  const source = record(value)
   if (!Array.isArray(source.authTypes) || source.authTypes.some((item) => typeof item != 'string')) return invalidResponse()
   return {
     ...providerIconAppearance(metadata, source.iconSpritePosition),

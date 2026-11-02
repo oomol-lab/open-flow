@@ -216,6 +216,8 @@ Supply \`draft\`, \`presentation\` (or null), \`language\` and \`theme\`; the en
 \`Draft\`, \`Presentation\` and \`OpenFlowPreviewProps\` types. Give its parent an explicit height.
 It supports temporary node movement, restore layout, read-only properties without
 fetching or saving a workflow. Use a new React key to reset the session when switching examples.
+Provider artwork and names load through the resource-cache App Catalog singleton. Hosts using the
+same singleton share catalog requests, freshness and validation; no Provider prop is required.
 A Shadow DOM host must load the stylesheet inside its shadow root before mounting the component;
 Vite hosts can import \`@oomol-lab/open-flow/preview.css?url\` for the stylesheet URL.
 

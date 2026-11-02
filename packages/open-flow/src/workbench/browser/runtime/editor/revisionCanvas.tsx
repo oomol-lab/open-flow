@@ -1,13 +1,17 @@
+import type { AppCatalogResponse } from '@oomol-lab/resource-cache/oomol'
 import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
-import type { Draft, Presentation } from '../api.ts'
+import type { ConnectorProvider, Draft, Presentation } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { RevisionCanvasSession } from './revisionCanvasSession.ts'
 
-import { useMemo, useRef, useState } from 'react'
+import { loadJson } from '@oomol-lab/resource-cache'
+import { decodeAppCatalogResponse, getAppCatalogCache } from '@oomol-lab/resource-cache/oomol'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { revisionView } from '../revisionView.ts'
+import { provider } from '../stores/proxyCatalog.ts'
 import { designerGraph } from '../workspace.ts'
 import { CommentInspector } from './commentInspector.tsx'
 import { ContextPanel } from './contextPanel.tsx'
@@ -44,7 +48,45 @@ export function RevisionCanvas({
   const [selected, setSelected] = useState<readonly string[]>([])
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [focus, setFocus] = useState<FlowCanvasViewProps['focusNodeRequest']>()
-  const baseline = useMemo(() => designerGraph(draft, presentation?.value, [], {}, {}, t), [draft, presentation, t])
+  const [catalog, setCatalog] = useState<{ language: string; providers: Readonly<Record<string, ConnectorProvider>> }>()
+  const needsProviders = revision.connectorProviderIds.size > 0
+  useEffect(() => {
+    if (!needsProviders) return
+    const controller = new AbortController()
+    const cache = getAppCatalogCache({
+      locale: language.toLowerCase(),
+      schemaVersion: 1,
+      maxAge: 300_000,
+      decode: decodeAppCatalogResponse,
+      load: ({ locale }, validation) =>
+        loadJson(`https://connector.oomol.com/public/v1/apps?locale=${encodeURIComponent(locale)}`, validation, decodeAppCatalogResponse, {
+          credentials: 'omit',
+          signal: AbortSignal.timeout(15_000),
+        }),
+    })
+    const publish = (response: AppCatalogResponse) => {
+      if (controller.signal.aborted) return
+      setCatalog({
+        language,
+        providers: Object.fromEntries(response.data.map((app) => [app.service, provider(app, response.meta.iconSprite)])),
+      })
+    }
+    void (async () => {
+      try {
+        const cached = await cache.peek(undefined)
+        if (cached) publish(cached.data)
+        publish(await cache.get(undefined, { signal: controller.signal }))
+      } catch (error) {
+        if (!controller.signal.aborted) console.warn('Could not load Preview Provider metadata.', error)
+      }
+    })()
+    return () => controller.abort()
+  }, [language, needsProviders])
+  const providerMetadata = catalog?.language === language ? catalog.providers : undefined
+  const baseline = useMemo(
+    () => designerGraph(draft, presentation?.value, [], {}, {}, t, undefined, [], providerMetadata),
+    [draft, presentation, t, providerMetadata],
+  )
   const session = sessions[graphId]
   const model = useMemo(
     () => ({

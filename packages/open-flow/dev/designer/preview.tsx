@@ -4,12 +4,14 @@ import type { ReactNode } from 'react'
 import type { FrontendStory } from './stories.tsx'
 
 import { OpenFlowPreview } from '@oomol-lab/open-flow/preview'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { previewProviderCatalog, previewProviderFixture } from './previewProviderFixture.ts'
 import { publicationFixture } from './publicationFixture.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 const fixture = publicationFixture('preview-lab', 'preview-revision')
+const providerFixture = previewProviderFixture()
 
 /** Lab-only host for interaction checks; it does not verify the standalone CSS dependency set. */
 function ShadowSample({ children }: { readonly children: ReactNode }) {
@@ -60,6 +62,10 @@ function PreviewStory({ dark, language, shadow }: { readonly dark: boolean; read
   const [version, setVersion] = useState(0)
   const [missingLayout, setMissingLayout] = useState(false)
   const [narrow, setNarrow] = useState(false)
+  const [providerExample, setProviderExample] = useState(false)
+  const catalog = useMemo(() => previewProviderCatalog(language), [language])
+  const [loadedCatalog, setLoadedCatalog] = useState<typeof catalog>()
+  const sample = providerExample ? providerFixture : fixture
   useStoryActions([
     { label: 'Reset session', onClick: () => setVersion((value) => value + 1) },
     {
@@ -70,15 +76,29 @@ function PreviewStory({ dark, language, shadow }: { readonly dark: boolean; read
       },
     },
     { label: narrow ? 'Wide container' : 'Narrow container', onClick: () => setNarrow(!narrow) },
+    {
+      label: providerExample ? 'Publication example' : 'Provider example',
+      onClick: async () => {
+        if (!providerExample) await catalog.cache.clear()
+        setProviderExample(!providerExample)
+        setVersion((value) => value + 1)
+      },
+    },
+    ...(providerExample
+      ? [
+          {
+            label: 'Load Provider metadata',
+            disabled: loadedCatalog === catalog,
+            onClick: () => {
+              catalog.resolve()
+              setLoadedCatalog(catalog)
+            },
+          },
+        ]
+      : []),
   ])
   const preview = (
-    <OpenFlowPreview
-      key={version}
-      {...fixture}
-      presentation={missingLayout ? null : fixture.presentation}
-      language={language}
-      theme={dark ? 'dark' : 'light'}
-    />
+    <OpenFlowPreview key={version} {...sample} presentation={missingLayout ? null : sample.presentation} language={language} theme={dark ? 'dark' : 'light'} />
   )
   return <div style={{ height: 640, width: narrow ? 420 : '100%', maxWidth: '100%' }}>{shadow ? <ShadowSample>{preview}</ShadowSample> : preview}</div>
 }
@@ -89,6 +109,6 @@ export const previewStories: readonly FrontendStory[] = [false, true].map((shado
   title: shadow ? 'Preview · Shadow DOM' : 'Preview',
   standalone: true,
   description:
-    'Public offline preview with the standard dotted canvas and no title bar: click a node to replace selection, or box-select multiple nodes without floating toolbars. The properties panel starts closed; double-click a node or use the panel toggle to open or close it. Move nodes temporarily and restore layout. Compare themes, missing layout and narrow containers. No publication API or persistence.',
+    'Public preview with the standard dotted canvas and no title bar. Inspect nodes, move them temporarily and restore layout. Compare themes, missing layout and narrow containers. In the Provider example, move or select a node before loading the deterministic catalog; Connector icons and Agent tool badges read the same resource-cache singleton without resetting the session. No workflow API or persistence.',
   render: (_log, dark, language) => <PreviewStory dark={dark} language={language} shadow={shadow} />,
 }))

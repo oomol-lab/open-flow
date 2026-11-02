@@ -144,7 +144,9 @@ Node and Trigger **Properties** galleries include a **Fixed types · editable va
 
 `?story=preview` and `?story=preview-shadow` use the public `OpenFlowPreview` entry with the
 Publications fixture. Test temporary movement/restoration, properties, theme/language,
-missing layout, and a narrow host. The Shadow DOM host is Lab-only and copies the loaded Lab
+missing layout, and a narrow host. The Provider example initializes the standard App Catalog
+singleton with deterministic data. Move or select a node before loading metadata to verify that
+Connector icons and Agent tool badges update without resetting the session. The Shadow DOM host is Lab-only and copies the loaded Lab
 stylesheets, including production CSS modules; independent published-CSS verification must use
 the packaged `preview.css` without Lab styles.
 

@@ -95,7 +95,7 @@
         "@iconify/types": "^2.0.0",
         "@iconify/utils": "^3.1.4",
         "@lezer/highlight": "^1.2.3",
-        "@oomol-lab/resource-cache": "^0.1.4",
+        "@oomol-lab/resource-cache": "^0.1.6",
         "@rc-component/tooltip": "1.4.0",
         "@tailwindcss/vite": "^4",
         "@types/json-schema": "^7.0.15",
@@ -492,7 +492,7 @@
 
     "@oomol-lab/open-flow-server": ["@oomol-lab/open-flow-server@workspace:apps/server"],
 
-    "@oomol-lab/resource-cache": ["@oomol-lab/resource-cache@0.1.4", "", { "dependencies": { "idb-keyval": "^6.3.0" } }, "sha512-6aWUQSpYa1FNiDR/FSkSz+04RWG80KRxr81Rf4N2f8J6shS5KLEBfHuwT7AUO2HA+IxTTpAYF0VkdwqQMj+rYw=="],
+    "@oomol-lab/resource-cache": ["@oomol-lab/resource-cache@0.1.6", "", { "dependencies": { "idb-keyval": "^6.3.0" } }, "sha512-AC8g3lLqXzWLIaSUeCNvPBCY8qhVHncXphIHyoL906QVh+yNf1uqjRdRp2FU5U/WoRURlmMEy/TarUpTvYl1jw=="],
 
     "@oxc-node/core": ["@oxc-node/core@1.0.1", "", { "dependencies": { "pirates": "^4.0.7" }, "optionalDependencies": { "@oxc-node/core-android-arm-eabi": "1.0.1", "@oxc-node/core-android-arm64": "1.0.1", "@oxc-node/core-darwin-arm64": "1.0.1", "@oxc-node/core-darwin-x64": "1.0.1", "@oxc-node/core-freebsd-x64": "1.0.1", "@oxc-node/core-linux-arm-gnueabihf": "1.0.1", "@oxc-node/core-linux-arm64-gnu": "1.0.1", "@oxc-node/core-linux-arm64-musl": "1.0.1", "@oxc-node/core-linux-ppc64-gnu": "1.0.1", "@oxc-node/core-linux-s390x-gnu": "1.0.1", "@oxc-node/core-linux-x64-gnu": "1.0.1", "@oxc-node/core-linux-x64-musl": "1.0.1", "@oxc-node/core-openharmony-arm64": "1.0.1", "@oxc-node/core-win32-arm64-msvc": "1.0.1", "@oxc-node/core-win32-ia32-msvc": "1.0.1", "@oxc-node/core-win32-x64-msvc": "1.0.1" } }, "sha512-CcUa/itqt0StKfxHyZfLXipaw3bYnWR8t/ypBZOOFYgY1q/CsXJaOlera2pixgZNd/k2bK5MFjcD03rm5Y4Vug=="],
 

@@ -188,7 +188,7 @@ export function ConnectorAccessSettings({
   const referenceIcon = (reference: ConnectorAccountReference): string | undefined => {
     const node = displayed?.node(reference.nodeId)
     if (node == null) return
-    return node.kind == 'trigger' ? triggerNodeIcon(node.trigger, providerMetadata) : semanticNodeIcon(node, actions)
+    return node.kind == 'trigger' ? triggerNodeIcon(node.trigger, providerMetadata) : semanticNodeIcon(node, actions, providerMetadata)
   }
   const affected = removing == null ? undefined : accounts.get(removing)
   return (

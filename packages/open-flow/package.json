@@ -109,7 +109,7 @@
     "@iconify/types": "^2.0.0",
     "@iconify/utils": "^3.1.4",
     "@lezer/highlight": "^1.2.3",
-    "@oomol-lab/resource-cache": "^0.1.4",
+    "@oomol-lab/resource-cache": "^0.1.6",
     "@rc-component/tooltip": "1.4.0",
     "@tailwindcss/vite": "^4",
     "@types/json-schema": "^7.0.15",

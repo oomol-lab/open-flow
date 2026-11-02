@@ -312,6 +312,13 @@ describe('Designer port projection', () => {
 
     expect(designerGraph(draft, {}, []).nodes[0]).toMatchObject({ executorName: 'Connector · hacker-news' })
 
+    const provider = { serviceId: 'hacker-news', serviceName: 'Hacker News', icon: 'https://example.com/hacker-news.svg' }
+    expect(designerGraph(draft, {}, [], {}, {}, undefined, undefined, [], { [provider.serviceId]: provider }).nodes[0]).toMatchObject({
+      icon: providerIcon(provider),
+      executorName: 'Connector · Hacker News',
+      connectionRequired: false,
+    })
+
     const publicNode = designerGraph(draft, {}, [], { [action.actionId]: action }).nodes[0]
     const authenticatedNode = designerGraph(
       draft,
@@ -718,6 +725,24 @@ it('projects Agent tools through the shared action summary', () => {
   expect(first).toMatchObject({
     fallbackIcon: ':carbon:machine-learning-model:',
     actionSummary: { count: 2, providers: [{ id: 'gmail', icon: expect.any(String), label: 'gmail' }] },
+  })
+  const provider = {
+    serviceId: 'gmail',
+    serviceName: 'Gmail',
+    iconSprite: {
+      version: 'v1',
+      pixelRatio: 2,
+      iconSize: 48,
+      bleed: 1,
+      width: 100,
+      height: 50,
+      lightUrl: 'https://example.com/light.png',
+      darkUrl: 'https://example.com/dark.png',
+    },
+    iconSpritePosition: { x: 1, y: 1 },
+  }
+  expect(designerGraph(draft, {}, [], {}, {}, undefined, undefined, [], { gmail: provider }).nodes[0]).toMatchObject({
+    actionSummary: { count: 2, providers: [{ id: 'gmail', icon: providerIcon(provider), label: 'Gmail' }] },
   })
   const agent = ((draft.content.document.graph.nodes['agent'] as TaskNode).task as ManagedTaskDefinition)!
   if (agent.executor.kind != 'agent') throw new Error('Expected Agent.')
