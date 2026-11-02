@@ -291,13 +291,30 @@ export class RunStore {
     ).map((row) => row.flowId)
   }
 
-  workflowCalls(runId: string, jobId?: string) {
+  readyWorkflowRuns(runIds: readonly string[]): readonly string[] {
+    return (
+      this.#database
+        .prepare(`SELECT pending.value AS runId FROM json_each(?) pending
+        LEFT JOIN runs ON runs.run_id = pending.value
+        WHERE runs.run_id IS NULL OR runs.status IN ('completed', 'failed', 'canceled', 'indeterminate')`)
+        .all(JSON.stringify(runIds)) as { runId: string }[]
+    ).map((row) => row.runId)
+  }
+
+  workflowCall(runId: string, jobId: string, callId = '') {
+    return this.#database
+      .prepare(`SELECT node_id AS nodeId, child_run_id AS runId FROM workflow_calls
+        WHERE parent_run_id = ? AND job_id = ? AND call_id = ?`)
+      .get(runId, jobId, callId) as { nodeId: string; runId: string } | undefined
+  }
+
+  workflowCalls(runId: string) {
     return this.#database
       .prepare(`SELECT c.node_id AS nodeId, c.job_id AS jobId, NULLIF(c.call_id, '') AS callId, c.execution_id AS executionId,
       c.child_run_id AS runId, c.child_flow_id AS flowId, r.status, c.deadline_at AS deadlineAt
       FROM workflow_calls c LEFT JOIN runs r ON r.run_id = c.child_run_id
-      WHERE c.parent_run_id = ? ${jobId == null ? '' : 'AND c.job_id = ?'} ORDER BY c.rowid`)
-      .all(...(jobId == null ? [runId] : [runId, jobId])) as unknown as {
+      WHERE c.parent_run_id = ? ORDER BY c.rowid`)
+      .all(runId) as unknown as {
       nodeId: string
       callId: string | null
       jobId: string

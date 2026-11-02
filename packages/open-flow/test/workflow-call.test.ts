@@ -1,5 +1,5 @@
 import type { AuthoringHost } from '../src/control/common/authoring.ts'
-import type { SchedulerEvent } from '../src/execution/common/scheduler.ts'
+import type { SchedulerEvent, TaskInvocation } from '../src/execution/common/scheduler.ts'
 import type { RevisionContent } from '../src/flow/common/change.ts'
 import type { WorkflowContract } from '../src/workflow/common/workflow.ts'
 
@@ -19,6 +19,7 @@ import {
   workflowCandidateGroup,
   workflowTask,
 } from '../src/workflow/common/workflow.ts'
+import { waitHost } from './waitHost.ts'
 const port = { handle: 'answer', jsonSchema: { type: 'number' }, nullable: false } as const
 const contract: WorkflowContract = {
   version: 1,
@@ -92,14 +93,16 @@ it('checkpoints a child call immediately and resumes its execution identity with
         events.push(event)
       }),
   }
+  const invokePending = vi.fn(() => Effect.succeed({ kind: 'calling', childRunId: 'child' }))
   const pending = await Effect.runPromise(
     runFlow(prepared.flow, {
       ...options,
       trigger: { nodeId: created.nodes.start!, outputs: {} },
-      invokeTask: () => Effect.succeed({ kind: 'calling', childRunId: 'child' }),
+      invokeTask: invokePending,
     }),
   )
   expect(pending.kind).toBe('waiting')
+  expect(invokePending).toHaveBeenCalledTimes(1)
   if (pending.kind != 'waiting') throw new Error('Expected pending call')
   expect(pending.checkpoint.waits).toEqual([])
   const checkpoint = decodeFlowRunCheckpoint(JSON.parse(JSON.stringify(pending.checkpoint)))
@@ -116,6 +119,135 @@ it('checkpoints a child call immediately and resumes its execution identity with
   )
   expect(result).toMatchObject({ nodes: [{ outputs: { answer: 42 } }] })
   expect(events.filter((event) => event.type == 'node.started')).toHaveLength(1)
+})
+
+it.each(['completed', 'failed'] as const)('polls after an empty recovery hint despite sibling activity (%s)', async (outcome) => {
+  const created = await create()
+  const edited = await compileAuthoring(
+    created.content,
+    {
+      baseRevision: 'base',
+      requestId: 'siblings',
+      edits: [
+        { op: 'node.add', as: 'wait', type: 'wait', name: 'Wait' },
+        { op: 'edge.connect', source: created.nodes.start!, target: '$wait' },
+        ...Array.from({ length: 15 }, (_, index) => [
+          { op: 'node.add' as const, as: `sibling${index}`, type: 'code' as const, name: `Sibling ${index}`, code: 'export default () => ({})' },
+          {
+            op: 'edge.connect' as const,
+            source: index == 0 ? '$wait' : `$sibling${index - 1}`,
+            ...(index == 0 ? { branch: 'continue' } : {}),
+            target: `$sibling${index}`,
+          },
+        ]).flat(),
+      ],
+    },
+    host,
+  )
+  const prepared = await prepareFlow(edited.content, currentEngineContract, created.nodes.start)
+  if (prepared.kind != 'prepared') throw new Error('Invalid fixture')
+  let siblingsFinished = 0
+  const checkedAt: number[] = []
+  const invoke = (call: TaskInvocation) => {
+    if (call.nodeId != created.nodes.call)
+      return Effect.sleep(100).pipe(
+        Effect.map(() => {
+          siblingsFinished++
+          return {}
+        }),
+      )
+    checkedAt.push(siblingsFinished)
+    if (call.workflowRunId == null) return Effect.succeed({ kind: 'calling', childRunId: 'child' })
+    return outcome == 'completed' ? Effect.succeed({ kind: 'completed', outputs: { answer: 42 } }) : Effect.fail(new Error('Child failed'))
+  }
+  const options = { flowId: 'parent', runId: 'parent-run', createId: () => crypto.randomUUID(), invokeTask: invoke }
+  const pending = await Effect.runPromise(
+    runFlow(prepared.flow, {
+      ...options,
+      trigger: { nodeId: created.nodes.start!, outputs: {} },
+      waits: waitHost(),
+    }),
+  )
+  if (pending.kind != 'waiting') throw new Error('Expected pending call and Wait')
+  const result = Effect.runPromise(
+    runFlow(prepared.flow, {
+      ...options,
+      resume: { checkpoint: pending.checkpoint, readyWorkflowRunIds: [] },
+      waits: waitHost({ [pending.checkpoint.waits[0]!.waitId]: 'continue' }),
+    }),
+  )
+  if (outcome == 'completed') {
+    expect(await result).toMatchObject({ kind: 'node-results' })
+    expect(siblingsFinished).toBe(15)
+  } else await expect(result).rejects.toThrow('Child failed')
+  expect(checkedAt).toHaveLength(2)
+  expect(checkedAt[1]).toBeGreaterThan(0)
+  expect(checkedAt[1]).toBeLessThan(15)
+})
+
+it.each(['omitted', 'empty', 'first'] as const)('uses recovery readiness once and retains unchecked calls (%s)', async (hint) => {
+  const created = await create()
+  const edited = await compileAuthoring(
+    created.content,
+    {
+      baseRevision: 'base',
+      requestId: 'parallel',
+      edits: [
+        { op: 'node.add', as: 'second', type: 'workflow', name: 'Second', config: { flowId: 'target' }, inputs: { answer: { kind: 'value', value: 42 } } },
+        { op: 'edge.connect', source: created.nodes.start!, target: '$second' },
+      ],
+    },
+    host,
+  )
+  const prepared = await prepareFlow(edited.content, currentEngineContract, created.nodes.start)
+  if (prepared.kind != 'prepared') throw new Error('Invalid fixture')
+  const options = { flowId: 'parent', runId: 'parent-run', createId: () => crypto.randomUUID() }
+  const pending = await Effect.runPromise(
+    runFlow(prepared.flow, {
+      ...options,
+      trigger: { nodeId: created.nodes.start!, outputs: {} },
+      invokeTask: (call) => Effect.succeed({ kind: 'calling', childRunId: `child-${call.nodeId}` }),
+    }),
+  )
+  if (pending.kind != 'waiting') throw new Error('Expected pending calls')
+  const readyWorkflowRunIds = hint == 'omitted' ? undefined : hint == 'empty' ? [] : [pending.checkpoint.calls![0]!.childRunId]
+  const invoke = vi.fn(() => Effect.succeed({ kind: 'completed', outputs: { answer: 42 } }))
+  const resumed = await Effect.runPromise(
+    runFlow(prepared.flow, {
+      ...options,
+      resume: { checkpoint: pending.checkpoint, readyWorkflowRunIds },
+      invokeTask: invoke,
+    }),
+  )
+  expect(invoke).toHaveBeenCalledTimes(readyWorkflowRunIds?.length ?? 2)
+  if (readyWorkflowRunIds == null) expect(resumed.kind).toBe('node-results')
+  else {
+    if (resumed.kind != 'waiting') throw new Error('Expected unchecked calls')
+    expect(resumed.checkpoint.calls?.map((call) => call.childRunId).toSorted()).toEqual(
+      pending.checkpoint
+        .calls!.map((call) => call.childRunId)
+        .filter((id) => !readyWorkflowRunIds.includes(id))
+        .toSorted(),
+    )
+    const finished = await Effect.runPromise(
+      runFlow(prepared.flow, {
+        ...options,
+        resume: { checkpoint: resumed.checkpoint },
+        invokeTask: invoke,
+      }),
+    )
+    expect(finished).toMatchObject({ kind: 'node-results', nodes: [{ outputs: { answer: 42 } }, { outputs: { answer: 42 } }] })
+    expect(invoke).toHaveBeenCalledTimes(2)
+  }
+  await expect(
+    Effect.runPromise(
+      runFlow(prepared.flow, {
+        ...options,
+        resume: { checkpoint: pending.checkpoint, readyWorkflowRunIds: ['unrelated'] },
+        invokeTask: invoke,
+      }),
+    ),
+  ).rejects.toThrow('Ready workflow Run is not present')
 })
 it('accepts additive interfaces and catches breaking output contracts', async () => {
   const created = await create()

@@ -774,7 +774,15 @@ Each waitId accepts the first valid, unexpired decision. A running Run wakes its
 
 The `run-lifecycle` model includes `fail-start` and `fail-resume`. Both commit only from `starting`, producing `failed` and `indeterminate`, respectively. Ordinary `commit` accepts terminal results from `running`, cancellation from any nonterminal state, and failure from any nonterminal state. Committed terminal states cannot be overwritten. Deployment lifecycle conformance must use its real authoritative store and cover initial start, Wait recovery, start/resume failures, idempotent admission, and terminal races. A test-only persistence implementation is not a substitute.
 
-Public Scheduler `RunLaunch` is a mutually exclusive union for initial start and Wait recovery. Initial start requires `trigger` and permits `inputs` and `bindingValues`. Recovery accepts only `resume: { checkpoint }`, not those three launch fields. Decisions come from authoritative WaitHost reads. Run list summaries omit wait details.
+Public Scheduler `RunLaunch` is a mutually exclusive union for initial start and checkpoint recovery. Initial start requires `trigger` and permits `inputs` and `bindingValues`. Recovery accepts `resume: { checkpoint, readyWorkflowRunIds? }`, not those three launch fields. Decisions come from authoritative WaitHost reads. Run list summaries omit wait details.
+
+`readyWorkflowRunIds` is an optional deployment readiness hint for the first workflow-call check
+on recovery. Its IDs must belong to pending calls in the checkpoint. Omission checks all pending
+calls; an empty array skips the first check. Selected calls still read their authoritative child Run
+results, and unselected calls remain pending. Later polling ignores the hint. The hint is not
+persisted in checkpoints and does not alter checkpoint or Engine versions. Deployments must recheck
+child terminal states when committing a waiting checkpoint and requeue the parent if a child became
+ready after the hint was read. This prevents a stale hint from losing a wakeup.
 
 ## 6. Trigger and Connector
 

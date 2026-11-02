@@ -30,7 +30,7 @@ import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
-import { requireWorkflowCalls, workflowCallCompatibility, workflowContent, workflowTarget, workflowToolCompatibility, workflowRunOutcome } from './workflow.ts'
+import { requireWorkflowCalls, workflowCallCompatibility, workflowTarget, workflowToolCompatibility, workflowRunOutcome } from './workflow.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
@@ -102,7 +102,7 @@ export class RunControl {
       }),
     )
     const existing = this.replayRun(idempotencyKey, requestDigest, 'draft')
-    if (existing != null) return existing
+    if (existing != null) return { created: existing.created, run: this.runDetails(this.requireRun(existing.runId)) }
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     const stored = readRevisionOrRepair(() => this.store.flows.revision(flowId, revisionId))
     if (stored == null) notFound()
@@ -131,7 +131,8 @@ export class RunControl {
       revisionId,
       variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.bindings)),
     })
-    return this.acceptedRun(flowId, accepted)
+    const result = this.acceptedRun(flowId, accepted)
+    return { created: result.created, run: this.runDetails(this.requireRun(result.runId)) }
   }
 
   async createLiveRun(
@@ -143,40 +144,31 @@ export class RunControl {
     channel: RunInitiator['channel'] = 'api',
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
     this.access.authorize(actorId, { publicationId })
-    return this.admitLiveRun(publicationId, inputs, idempotencyKey, trigger, { initiator: { actorId, channel } })
+    const accepted = await this.admitLiveRun(publicationId, inputs, idempotencyKey, trigger, { initiator: { actorId, channel } })
+    return { created: accepted.created, run: this.runDetails(this.requireRun(accepted.runId)) }
   }
 
   private async admitLiveRun(
     publicationId: string,
     inputs: RunInputs,
     idempotencyKey: string,
-    trigger: TriggerSeed,
+    trigger: TriggerSeed | Omit<TriggerSeed, 'nodeId'>,
     origin: LiveRunOrigin,
-  ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
+  ) {
+    const resolved = 'nodeId' in trigger ? undefined : this.liveRevision(publicationId)
+    if (!('nodeId' in trigger)) {
+      const start = Object.entries(resolved!.content.document.graph.nodes).find(([, node]) => node.kind == 'start')
+      if (start == null) throw new ControlError(controlErrorCode.runInvalid, 'Live Runs can only be started through a Start node.')
+      trigger = { nodeId: start[0], outputs: trigger.outputs }
+    }
     const actorId = origin.initiator?.actorId
     if (actorId != null) idempotencyKey = JSON.stringify([actorId, idempotencyKey])
     const requestDigest = await digestBytes(canonicalJsonBytes({ inputs, trigger: { ...trigger }, kind: 'live', publicationId }))
     const existing = this.replayRun(idempotencyKey, requestDigest, 'live')
     if (existing != null) return existing
 
-    const livePublication = this.store.publications.publicationById(publicationId)
-    if (livePublication == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
+    const { publication: livePublication, content } = resolved ?? this.liveRevision(publicationId)
     const { flowId } = livePublication
-    const currentFlow = this.store.flows.get(flowId)
-    if (currentFlow == null) notFound()
-    if (currentFlow.status != 'active') throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
-    const live = this.store.publications.live(flowId)
-    if (live?.publication.publicationId != publicationId) {
-      throw new ControlError(controlErrorCode.liveConflict, 'The Publication is no longer the current Live target.')
-    }
-    if (findEngineContract(livePublication.engineContract) == null) {
-      throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-    }
-    const stored = readRevisionOrRepair(() => this.store.flows.revision(flowId, livePublication.revisionId))
-    if (stored == null || stored.digest != livePublication.revisionDigest) {
-      throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
-    }
-    const content = revisionContent(stored)
     if (content.document.graph.nodes[trigger.nodeId]?.kind != 'start') {
       throw new ControlError(controlErrorCode.runInvalid, 'Live Runs can only be started through a Start node.')
     }
@@ -209,6 +201,27 @@ export class RunControl {
     return this.acceptedRun(flowId, accepted)
   }
 
+  private liveRevision(publicationId: string) {
+    const publication = this.store.publications.publicationById(publicationId)
+    if (publication == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
+    const { flowId } = publication
+    const currentFlow = this.store.flows.get(flowId)
+    if (currentFlow == null) notFound()
+    if (currentFlow.status != 'active') throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
+    const live = this.store.publications.live(flowId)
+    if (live?.publication.publicationId != publicationId) {
+      throw new ControlError(controlErrorCode.liveConflict, 'The Publication is no longer the current Live target.')
+    }
+    if (findEngineContract(publication.engineContract) == null) {
+      throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
+    }
+    const stored = readRevisionOrRepair(() => this.store.flows.revision(publication.flowId, publication.revisionId))
+    if (stored == null || stored.digest != publication.revisionDigest) {
+      throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
+    }
+    return { publication, content: revisionContent(stored) }
+  }
+
   async invokeWorkflow(parent: StoredRun, nodeId: string, jobId: string, input: Readonly<Record<string, JsonValue>>, node: TaskNode, expectedChild?: string) {
     const task = node.task
     if (!('executor' in task) || task.executor.kind != 'workflow') throw new Error('Expected workflow executor.')
@@ -236,7 +249,7 @@ export class RunControl {
   ) {
     const { expectedChild, callId } = options
     const startedAt = this.clock()
-    let call = this.store.runs.workflowCalls(parent.runId, jobId).find((row) => (row.callId ?? undefined) == callId)
+    let call = this.store.runs.workflowCall(parent.runId, jobId, callId)
     if (call == null) {
       if (expectedChild != null) throw new Error('Saved workflow call is unavailable.')
       if (this.store.runs.callAncestors(parent.runId).includes(target.flowId)) throw new Error('Recursive workflow calls are not supported.')
@@ -245,16 +258,13 @@ export class RunControl {
       const issues =
         options.node == null ? workflowToolCompatibility(this.store, target, contract) : workflowCallCompatibility(this.store, options.node, contract)
       if (issues.length) throw new Error(issues[0]!.message)
-      const content = workflowContent(this.store, contract)
-      const start = Object.entries(content.document.graph.nodes).find(([, entry]) => entry.kind == 'start')
-      if (start == null) throw new ControlError(controlErrorCode.runInvalid, 'Live Runs can only be started through a Start node.')
       const values =
         options.node == null ? input : Object.fromEntries(Object.entries(input).filter(([key]) => contract.inputs.some((port) => port.handle == key)))
       const accepted = await this.admitLiveRun(
         contract.publicationId,
         {},
         JSON.stringify(['workflow', parent.runId, jobId, ...(callId == null ? [] : [callId])]),
-        { nodeId: start[0], outputs: values },
+        { outputs: values },
         {
           call: {
             parentRunId: parent.runId,
@@ -267,10 +277,10 @@ export class RunControl {
           },
         },
       )
-      call = this.store.runs.workflowCalls(parent.runId, jobId).find((row) => row.runId == accepted.run.runId)
+      call = { nodeId, runId: accepted.runId }
     }
     if (call == null || call.nodeId != nodeId || (expectedChild != null && call.runId != expectedChild)) throw new Error('Workflow call identity changed.')
-    const child = this.store.runViews.controlRun(call.runId)
+    const child = this.store.runViews.run(call.runId)
     if (child == null) throw new Error('Called Run is unavailable.')
     const outcome = workflowRunOutcome(child)
     if (outcome.kind == 'completed') return outcome
@@ -457,7 +467,7 @@ export class RunControl {
       throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
     }
     if (existing.status == 'queued' || existing.status == 'starting') this.wake()
-    return { created: false, run: this.runDetails(this.requireRun(existing.runId)) }
+    return { created: false, runId: existing.runId }
   }
 
   private async prepareRun(content: RevisionContent, engineContract: string, triggerId?: string) {
@@ -539,7 +549,7 @@ export class RunControl {
           this.flowChanged({ flowId, kind: 'run.created', runId: accepted.runId, version: 1 })
           this.wake()
         }
-        return { created: accepted.created, run: this.runDetails(this.requireRun(accepted.runId)) }
+        return { created: accepted.created, runId: accepted.runId }
       }
     }
   }

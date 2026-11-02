@@ -5,6 +5,7 @@
   "license": "SEE LICENSE IN ../../LICENSE",
   "type": "module",
   "scripts": {
+    "benchmark:workflow": "node --no-node-snapshot --import @oxc-node/core/register scripts/benchmark-workflow.ts",
     "benchmark:runtime": "bun run build && node --expose-gc --no-node-snapshot scripts/benchmark-runtime.mjs",
     "build": "bun scripts/build.ts",
     "check": "bun run format -- --check && bun run lint && tsc --noEmit",

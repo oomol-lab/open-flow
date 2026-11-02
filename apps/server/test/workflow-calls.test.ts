@@ -79,6 +79,20 @@ it('calls current Live with one execution slot, preserves separate events and du
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
+  const store = (service.control.runs as unknown as { store: Store }).store
+  const revisions = vi.spyOn(store.flows, 'revision')
+  const details = vi.spyOn(store.runViews, 'activeWaits')
+  const admissionReads: number[] = []
+  const detailReads: number[] = []
+  const invoke = service.control.runs.invokeWorkflowTarget.bind(service.control.runs)
+  vi.spyOn(service.control.runs, 'invokeWorkflowTarget').mockImplementation(async (...args) => {
+    const revisionOffset = revisions.mock.calls.length
+    const detailsOffset = details.mock.calls.length
+    const result = await invoke(...args)
+    admissionReads.push(revisions.mock.calls.slice(revisionOffset).filter(([id]) => id == child.flowId).length)
+    if (result.kind == 'calling') detailReads.push(details.mock.calls.slice(detailsOffset).filter(([id]) => id == result.childRunId).length)
+    return result
+  })
   const refs = service.control.flows.getFlowReferences('operator', child.flowId, 'incoming', 0, 50)
   expect(refs.references).toMatchObject([{ flowId: parent.flowId, draft: true, live: null }])
   const accepted = await service.control.runs.createDraftRun(
@@ -92,6 +106,10 @@ it('calls current Live with one execution slot, preserves separate events and du
     'cli',
   )
   await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  expect(admissionReads[0]).toBe(1)
+  expect(admissionReads.slice(1).every((count) => count == 0)).toBe(true)
+  expect(detailReads.length).toBeGreaterThan(0)
+  expect(detailReads.every((count) => count == 0)).toBe(true)
   const run = service.control.runs.getRun('operator', accepted.run.runId)
   expect(run.triggerNodeId).toBe('start')
   expect(run.calls).toHaveLength(1)
@@ -108,13 +126,43 @@ it('calls current Live with one execution slot, preserves separate events and du
   expect(service.run(run.runId)?.result).toMatchObject({ nodes: [{ nodeId: 'call', outputs: { answer: 42 } }] })
   expect(service.events(run.runId).some((event) => event.payload.nodeId == 'outputs')).toBe(false)
   expect(service.events(call.runId).some((event) => event.payload.nodeId == 'outputs')).toBe(true)
-  const store = (service.control.runs as unknown as { store: Store }).store
   store.runs.maintain(Date.now() + 31 * 24 * 60 * 60 * 1000, 100, 1000)
   expect(service.events(run.runId)).toEqual([])
   expect(service.control.runs.getRun('operator', run.runId).initiator).toEqual({ actorId: 'operator', channel: 'cli' })
   expect(service.control.runs.getRun('operator', call.runId).initiator).toEqual({ actorId: 'operator', channel: 'workflow' })
   expect(service.control.runs.getRun('operator', call.runId).caller?.executionId).toBe(call.executionId)
   expect(service.control.runs.getRun('operator', run.runId).calls).toHaveLength(1)
+})
+
+it('checks only ready children on recovery and requeues a stale readiness snapshot', async () => {
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const child = await target(service)
+  const task = workflowTask(service.control.flows.getWorkflowContract('operator', child.flowId))
+  const parent = await create(service, 'Parallel', [
+    { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'start', name: 'Start', inputDefs: [] } },
+    ...Array.from({ length: 8 }, (_, index) => [
+      {
+        kind: 'graph.node.create' as const,
+        nodeId: `call${index}`,
+        node: { kind: 'task' as const, name: `Call ${index}`, inputs: { answer: { kind: 'value' as const, value: 42 } }, task },
+      },
+      { kind: 'graph.edge.connect' as const, edge: { source: 'start', target: `call${index}` } },
+    ]).flat(),
+  ])
+  const store = (service.control.runs as unknown as { store: Store }).store
+  const ready = vi.spyOn(store.runs, 'readyWorkflowRuns').mockReturnValueOnce([])
+  const invoke = vi.spyOn(service.control.runs, 'invokeWorkflowTarget')
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'parallel', {
+    nodeId: 'start',
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  expect(ready).toHaveBeenCalled()
+  expect(invoke).toHaveBeenCalledTimes(16)
+  expect(service.run(accepted.run.runId)?.result).toMatchObject({ nodes: Array.from({ length: 8 }, () => ({ outputs: { answer: 42 } })) })
+  const calls = service.control.runs.getRun('operator', accepted.run.runId).calls!
+  expect(new Set(calls.map((call) => call.runId)).size).toBe(8)
+  expect(calls.every((call) => call.status == 'completed')).toBe(true)
 })
 
 it('keeps the parent pending while a child waits for a human and resumes without another child', async () => {

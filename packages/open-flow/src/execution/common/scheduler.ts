@@ -13,6 +13,7 @@ import * as Effect from 'effect/Effect'
 import * as FiberSet from 'effect/FiberSet'
 import * as Queue from 'effect/Queue'
 import { nanoid } from 'nanoid'
+import { z } from 'zod'
 import { isTriggerNode } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
 import { nodeSystemOutputPorts, supportsNodeErrorHandling } from '../../flow/common/errorHandling.ts'
@@ -217,7 +218,7 @@ export type RunLaunch =
       readonly resume?: never
     }
   | {
-      readonly resume: { readonly checkpoint: unknown }
+      readonly resume: { readonly checkpoint: unknown; readonly readyWorkflowRunIds?: readonly string[] }
       readonly bindingValues?: never
       readonly inputs?: never
       readonly trigger?: never
@@ -250,7 +251,7 @@ function runGraph(
   runId: string,
   launchInputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {},
   trigger?: TriggerSeed,
-  resume?: { readonly checkpoint: FlowRunCheckpoint },
+  resume?: { readonly checkpoint: FlowRunCheckpoint; readonly readyWorkflowRunIds?: ReadonlySet<string> },
 ): Effect.Effect<FlowRunOutcome, Error> {
   return Effect.scoped(
     Effect.gen(function* () {
@@ -292,6 +293,8 @@ function runGraph(
       const changes = yield* Queue.unbounded<void>()
       let remainingMs = context.remainingMs
       let measuredAt = yield* Clock.currentTimeMillis
+      let nextCallCheckAt = measuredAt + (resume == null ? 1000 : 0)
+      let readyWorkflowRunIds = resume?.readyWorkflowRunIds
       let idleSince: number | undefined
       const agents: Record<string, FlowRunCheckpoint['agents'][string]> = { ...resume?.checkpoint.agents }
       const resolveInputs = (nodeId: string, node: ExecutableNode) => resolveNodeInputs(nodeId, node, dependencies, context.bindingValues, launch[nodeId])
@@ -546,15 +549,20 @@ function runGraph(
             ),
             now,
           )
-        for (const call of pendingCalls.values()) {
-          yield* observe(
-            call.nodeId,
-            call.jobId,
-            Effect.gen(function* () {
-              const result = yield* execute(call.nodeId, target.graph.nodes[call.nodeId] as ExecutableNode, call.jobId, call.input)
-              yield* settleNode(call.nodeId, call.jobId, result)
-            }),
-          ).pipe(Effect.catch(() => Effect.void))
+        if (pendingCalls.size > 0 && now >= nextCallCheckAt) {
+          for (const call of pendingCalls.values()) {
+            if (readyWorkflowRunIds != null && !readyWorkflowRunIds.has(call.childRunId)) continue
+            yield* observe(
+              call.nodeId,
+              call.jobId,
+              Effect.gen(function* () {
+                const result = yield* execute(call.nodeId, target.graph.nodes[call.nodeId] as ExecutableNode, call.jobId, call.input)
+                yield* settleNode(call.nodeId, call.jobId, result)
+              }),
+            ).pipe(Effect.catch(() => Effect.void))
+          }
+          readyWorkflowRunIds = undefined
+          nextCallCheckAt = (yield* Clock.currentTimeMillis) + 1000
         }
         const ready = dependencies.ready()
         for (const nodeId of ready) executeReady(nodeId)
@@ -592,7 +600,8 @@ function runGraph(
                 true,
               )
         let next = Effect.raceFirst(activity, decision)
-        if (pendingCalls.size > 0) next = Effect.raceFirst(next, Effect.sleep(1000).pipe(Effect.as({})))
+        if (pendingCalls.size > 0)
+          next = Effect.raceFirst(next, Effect.sleep(Math.max(0, nextCallCheckAt - (yield* Clock.currentTimeMillis))).pipe(Effect.as({})))
         if (left != null) next = Effect.raceFirst(next, Effect.sleep(Math.max(0, left)).pipe(Effect.as({})))
         const resolutions = yield* next
         applyResolutions(resolutions, yield* Clock.currentTimeMillis)
@@ -631,6 +640,11 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
       return yield* Effect.fail(new Error('A resumed Flow Run cannot accept launch inputs, binding values, or a Trigger seed.'))
     }
     const decoded = options.resume == null ? undefined : decodeFlowRunCheckpoint(options.resume.checkpoint)
+    const readyWorkflowRunIds =
+      options.resume?.readyWorkflowRunIds === undefined ? undefined : new Set(z.array(z.string().min(1)).parse(options.resume.readyWorkflowRunIds))
+    if (readyWorkflowRunIds != null && [...readyWorkflowRunIds].some((id) => !decoded?.calls?.some((call) => call.childRunId == id))) {
+      return yield* Effect.fail(new Error('Ready workflow Run is not present in the checkpoint.'))
+    }
     const outputs = (nodeId: string, value: Readonly<Record<string, JsonValue>>) =>
       isResolutionNode(prepared.graph.nodes[nodeId]) && value.pending != null ? { ...value, pending: withWaitNotificationMessage(value.pending) } : value
     const checkpoint =
@@ -692,7 +706,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
       options.runId,
       options.inputs,
       trigger,
-      checkpoint == null ? undefined : { checkpoint },
+      checkpoint == null ? undefined : { checkpoint, readyWorkflowRunIds },
     )
   })
   return program

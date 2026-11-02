@@ -104,6 +104,16 @@ does not narrow it. Root `bun test` is unsuitable: it loads Vitest files with Bu
 Some test scripts include builds; inspect the scripts when choosing checks to avoid duplicate work.
 TypeScript executed directly by Node must use erasable syntax supported by the pinned runtime.
 
+For application-service Flow call measurements, run
+`bun run --cwd apps/server benchmark:workflow 30`. The optional argument is the number of measured
+Runs per scenario (default 15), after one warm-up. The benchmark uses a temporary SQLite database,
+real isolated execution, and one concurrent Run slot. It verifies business outputs and removes its
+database afterward. JSON output includes admission and completion latency, method-call counts,
+SQL preparation counts, and root Flow notifications for direct, nested, parallel-node, Code-tool,
+and logging scenarios. HTTP transport and fixture setup are excluded. Timings include instrumentation
+overhead; counters describe the named methods, not all SQL executions or IPC messages. Compare runs
+on the same machine and runtime, and avoid interpreting these measurements as production latency.
+
 Trigger translations live in `packages/open-flow/src/trigger/providers/<provider>/locales/<language>.json`,
 keyed by Trigger key. Add translations beside the provider definition; do not edit the generated
 language indexes in `providers/locales/`. Development servers regenerate indexes at startup and

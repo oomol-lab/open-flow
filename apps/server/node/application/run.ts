@@ -284,8 +284,15 @@ export class RunExecutor {
 
       let indeterminate = false
       let launch: RunLaunch
-      if (run.resume != null) launch = { resume: run.resume }
-      else {
+      if (run.resume != null) {
+        const calls = run.resume.checkpoint.calls
+        launch = {
+          resume: {
+            checkpoint: run.resume.checkpoint,
+            ...(calls != null && calls.length > 1 ? { readyWorkflowRunIds: this.#store.runs.readyWorkflowRuns(calls.map((call) => call.childRunId)) } : {}),
+          },
+        }
+      } else {
         if (run.trigger == null) {
           this.#failRun(run, startedAt, false, new Error('Stored Run is missing its Trigger seed.'))
           return
@@ -714,7 +721,7 @@ export class RunExecutor {
           }
           const canceled = () => finish(new WorkflowToolError('workflow.canceled', 'Workflow tool call was canceled.'))
           const inspect = () => {
-            const child = this.#store.runViews.controlRun(childRunId!)
+            const child = this.#store.runViews.run(childRunId!)
             if (child == null) return finish(new WorkflowToolError('workflow.unavailable', 'Called Run is unavailable.'))
             const outcome = workflowRunOutcome(child)
             if (outcome.kind == 'completed') return finish(undefined, outcome.outputs)
