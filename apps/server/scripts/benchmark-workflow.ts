@@ -1,5 +1,6 @@
 import * as Effect from 'effect/Effect'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { Session } from 'node:inspector/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -17,7 +18,7 @@ if (!Number.isSafeInteger(samples) || samples < 1) throw new Error('Sample count
 const actor = 'operator'
 const port = { schema: { type: 'number' }, nullable: false }
 
-async function benchmark(service: ServerService) {
+async function benchmark(service: ServerService, profiler: Session) {
   async function create(name: string, edits: Parameters<ServerService['control']['drafts']['editAuthoring']>[2]['edits'], output: string) {
     const { flow } = await service.control.flows.createFlow(actor, name, name)
     const edited = await service.control.drafts.editAuthoring(actor, flow.flowId, {
@@ -74,18 +75,36 @@ async function benchmark(service: ServerService) {
     ],
     '$code',
   )
-  const scenarios = [leaf]
-  let nested = leaf
-  for (let depth = 1; depth <= 8; depth++) {
-    nested = await create(
-      `nested-${depth}`,
-      [
-        { op: 'node.add', as: 'call', type: 'workflow', name: 'Call', config: { flowId: nested.flowId } },
-        { op: 'edge.connect', source: '$start', target: '$call' },
-      ],
-      '$call',
-    )
-    if ([1, 4, 8].includes(depth)) scenarios.push(nested)
+  const large = await create(
+    'large-direct-64',
+    Array.from({ length: 64 }, (_, index) => [
+      {
+        op: 'node.add' as const,
+        as: `code${index}`,
+        type: 'code' as const,
+        name: `Code ${index}`,
+        code: 'export default () => ({answer: 42})',
+        config: { outputs: { answer: port } },
+      },
+      { op: 'edge.connect' as const, source: index == 0 ? '$start' : `$code${index - 1}`, target: `$code${index}` },
+    ]).flat(),
+    '$code63',
+  )
+  const scenarios = []
+  for (const root of [leaf, large]) {
+    scenarios.push(root)
+    let nested = root
+    for (let depth = 1; depth <= 8; depth++) {
+      nested = await create(
+        `${root == leaf ? 'nested' : 'large-nested'}-${depth}`,
+        [
+          { op: 'node.add', as: 'call', type: 'workflow', name: 'Call', config: { flowId: nested.flowId } },
+          { op: 'edge.connect', source: '$start', target: '$call' },
+        ],
+        '$call',
+      )
+      if (depth == 8 || (root == leaf && [1, 4].includes(depth))) scenarios.push(nested)
+    }
   }
   scenarios.push(
     await create(
@@ -142,6 +161,8 @@ async function benchmark(service: ServerService) {
     executorLaunches: mock.method(IsolatedVmHost.prototype, 'run'),
   }
   const rows = []
+  await profiler.post('Profiler.enable')
+  await profiler.post('Profiler.setSamplingInterval', { interval: 100 })
   for (const scenario of scenarios) {
     let notifications = 0
     const unsubscribe = service.subscribeFlow(actor, scenario.flowId, () => notifications++)
@@ -150,6 +171,7 @@ async function benchmark(service: ServerService) {
       if (sample == 1) {
         for (const counter of Object.values(counters)) counter.mock.resetCalls()
         notifications = 0
+        await profiler.post('Profiler.start')
       }
       const start = performance.now()
       const accepted = await service.control.runs.createLiveRun(actor, scenario.publicationId, {}, `${scenario.name}-${sample}`, {
@@ -166,8 +188,27 @@ async function benchmark(service: ServerService) {
       if (sample > 0) durations.push({ admissionMs: admitted - start, completionMs: finished - admitted, totalMs: finished - start })
     }
     unsubscribe()
+    const { profile } = await profiler.post('Profiler.stop')
+    const nodes = new Map(profile.nodes.map((node) => [node.id, node]))
+    const parents = new Map(profile.nodes.flatMap((node) => (node.children ?? []).map((id) => [id, node.id] as const)))
+    const sampled = { revisionRead: 0, revisionDecode: 0, workflowDiagnostics: 0, flowPreparation: 0 }
+    for (const [index, id] of (profile.samples ?? []).entries()) {
+      const phases = new Set<keyof typeof sampled>()
+      let node = nodes.get(id)
+      while (node != null) {
+        const { url, functionName } = node.callFrame
+        if (url.endsWith('/storage/flow-store.ts') && functionName == 'revision') phases.add('revisionRead')
+        if (url.endsWith('/flow/common/encoding.ts') && functionName == 'decodeRevision') phases.add('revisionDecode')
+        if (url.endsWith('/application/workflow.ts') && functionName == 'workflowDiagnostics') phases.add('workflowDiagnostics')
+        if (url.endsWith('/flow/common/semantics.ts') && ['prepareFlow', 'validateFlow', 'flowClosure'].includes(functionName)) phases.add('flowPreparation')
+        const parent = parents.get(node.id)
+        node = parent == null ? undefined : nodes.get(parent)
+      }
+      for (const phase of phases) sampled[phase] += (profile.timeDeltas?.[index] ?? 0) / 1000
+    }
     rows.push({
       scenario: scenario.name,
+      sampledMsPerRun: Object.fromEntries(Object.entries(sampled).map(([phase, milliseconds]) => [phase, milliseconds / samples])),
       timing: Object.fromEntries(
         (['admissionMs', 'completionMs', 'totalMs'] as const).map((key) => {
           const values = durations.map((sample) => sample[key]).toSorted((a, b) => a - b)
@@ -188,7 +229,7 @@ async function benchmark(service: ServerService) {
   }
   mock.restoreAll()
   process.stdout.write(
-    `${JSON.stringify({ samples, maxConcurrentRuns: 1, node: process.version, platform: `${process.platform}/${process.arch}`, notes: 'Instrumented application-service calls on temporary SQLite; excludes HTTP, fixture setup and one warm-up per scenario. resultReads includes one verification read per root Run. sqlPreparations counts prepare calls, not statement executions; workflowRequests counts workflow host requests, not total IPC. Timings include observer overhead.', scenarios: rows }, null, 2)}\n`,
+    `${JSON.stringify({ samples, maxConcurrentRuns: 1, node: process.version, platform: `${process.platform}/${process.arch}`, notes: 'Instrumented application-service calls on temporary SQLite; excludes HTTP, fixture setup and one warm-up per scenario. resultReads includes one verification read per root Run. sqlPreparations counts prepare calls, not statement executions; workflowRequests counts workflow host requests, not total IPC. sampledMsPerRun estimates inclusive main-process stack time at a requested 100 us sampling interval: phases overlap and exclude isolated-process work; flowPreparation covers prepareFlow, validateFlow and flowClosure stacks, not async wall time. Timings include observer and profiler overhead.', scenarios: rows }, null, 2)}\n`,
   )
 }
 
@@ -205,7 +246,15 @@ await Effect.runPromise(
       )
       const service = yield* ServerService.open(database, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
       yield* service.start()
-      yield* Effect.promise(() => benchmark(service))
+      const profiler = yield* Effect.acquireRelease(
+        Effect.sync(() => {
+          const session = new Session()
+          session.connect()
+          return session
+        }),
+        (session) => Effect.sync(() => session.disconnect()),
+      )
+      yield* Effect.promise(() => benchmark(service, profiler))
     }),
   ),
 )

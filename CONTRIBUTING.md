@@ -110,9 +110,16 @@ Runs per scenario (default 15), after one warm-up. The benchmark uses a temporar
 real isolated execution, and one concurrent Run slot. It verifies business outputs and removes its
 database afterward. JSON output includes admission and completion latency, method-call counts,
 SQL preparation counts, and root Flow notifications for direct, nested, parallel-node, Code-tool,
-and logging scenarios. HTTP transport and fixture setup are excluded. Timings include instrumentation
-overhead; counters describe the named methods, not all SQL executions or IPC messages. Compare runs
-on the same machine and runtime, and avoid interpreting these measurements as production latency.
+and logging scenarios, including a larger definition with 64 Code nodes. HTTP transport and fixture
+setup are excluded. Counters describe the named methods, not all SQL executions or IPC messages.
+
+`sampledMsPerRun` estimates inclusive main-process stack time for Revision reads, Revision decoding,
+workflow diagnostics, and Flow preparation using V8 profiling with a requested 100 μs interval.
+The preparation bucket includes `prepareFlow`, `validateFlow`, and `flowClosure` stacks; it does not
+measure their asynchronous wall time. Buckets overlap (diagnostics includes reads and decoding),
+so do not add them together. Isolated executor work is outside this profile. Latencies include
+instrumentation and profiler overhead. Compare runs on the same machine and runtime, and avoid
+interpreting these measurements as production latency.
 
 Trigger translations live in `packages/open-flow/src/trigger/providers/<provider>/locales/<language>.json`,
 keyed by Trigger key. Add translations beside the provider definition; do not edit the generated
