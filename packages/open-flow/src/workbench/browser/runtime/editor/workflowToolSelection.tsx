@@ -109,6 +109,43 @@ export function WorkflowToolPicker({
   )
 }
 
+export function SelectedWorkflowToolRow({
+  entry,
+  workflowName = entry.flowId,
+  title = entry.name,
+  actions,
+  children,
+}: {
+  readonly entry: Pick<WorkflowCapability, 'flowId' | 'name'>
+  readonly workflowName?: string
+  readonly title?: ReactNode
+  readonly actions?: ReactNode
+  readonly children?: ReactNode
+}) {
+  const t = useTranslate()
+  return (
+    <SelectedToolRow
+      icon={
+        <ProviderAppIcon>
+          <i aria-hidden="true" className="i-lucide-light:workflow size-4 text-muted-foreground" />
+        </ProviderAppIcon>
+      }
+      title={title}
+      subtitle={
+        <>
+          <span className="truncate" title={workflowName}>
+            {t('toolPicker.workflow')} · {workflowName}
+          </span>
+          <OpenWorkflowLink flowId={entry.flowId} />
+        </>
+      }
+      actions={actions}
+    >
+      {children}
+    </SelectedToolRow>
+  )
+}
+
 export function SelectedWorkflowTool({
   entry,
   workflowName,
@@ -171,26 +208,15 @@ export function SelectedWorkflowTool({
   const targetName = target?.name ?? workflowName ?? entry.flowId
   const removeLabel = t('actionPicker.remove', { action: targetName })
   return (
-    <SelectedToolRow
-      icon={
-        <ProviderAppIcon>
-          <i aria-hidden="true" className="i-lucide-light:workflow size-4 text-muted-foreground" />
-        </ProviderAppIcon>
-      }
+    <SelectedWorkflowToolRow
+      entry={entry}
+      workflowName={targetName}
       title={
         children == null ? (
           <WorkflowToolTitle name={entry.name} disabled={disabled} onChange={onChange} otherNames={otherNames} onValidChange={onValidChange} />
         ) : (
           entry.name
         )
-      }
-      subtitle={
-        <>
-          <span className="truncate" title={targetName}>
-            {t('toolPicker.workflow')} · {targetName}
-          </span>
-          <OpenWorkflowLink flowId={entry.flowId} />
-        </>
       }
       actions={
         children ?? (
@@ -247,7 +273,7 @@ export function SelectedWorkflowTool({
           <TooltipContent container={portalRoot}>{t('workflow.refresh')}</TooltipContent>
         </Tooltip>
       </div>
-    </SelectedToolRow>
+    </SelectedWorkflowToolRow>
   )
 }
 

@@ -95,13 +95,23 @@ export function previewProviderFixture() {
                     model: 'sample-model',
                     prompt: 'Read related messages and archive the result.',
                     maxRounds: 10,
-                    tools: ['sample-mail.search', 'sample-mail.read', 'sample-files.archive'].map((action) => ({
+                    tools: ['sample-mail.search', 'sample-mail.read', 'sample-files.archive'].map((action, index) => ({
                       id: action,
-                      name: action.replaceAll('.', '_'),
+                      name: index === 0 ? 'find_unread_messages_about_projects_and_release_updates' : action.replaceAll('.', '_'),
                       description: action,
                       action,
                       approval: false,
-                      inputs: [],
+                      inputs:
+                        index === 0
+                          ? [
+                              {
+                                handle: 'query',
+                                jsonSchema: { type: 'string' },
+                                nullable: false,
+                                source: { kind: 'value' as const, value: 'Unread messages about the latest project updates.' },
+                              },
+                            ]
+                          : [],
                     })),
                   },
                 },

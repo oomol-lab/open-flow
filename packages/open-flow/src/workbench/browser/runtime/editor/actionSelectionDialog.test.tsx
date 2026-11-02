@@ -219,7 +219,7 @@ it('keeps protection during saving and removes it on unmount', async () => {
 it('protects an invalid settings draft that has not produced a new tool value', async () => {
   await render([workflow], {
     title: 'Settings',
-    render: ({ onValidChange }) => <button onClick={() => onValidChange('value', false)}>Enter invalid value</button>,
+    render: ({ onValidChange }) => <button onClick={() => onValidChange?.('value', false)}>Enter invalid value</button>,
   })
   await click('Settings · original')
   await click('Enter invalid value')

@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactElement, ReactNode, SetStateAction } from 'react'
 import type { AgentTool } from '../../../../flow/common/change.ts'
 import type { InputPort, ManagedTaskDefinition, ManagedTaskExecutor } from '../../../../flow/common/change.ts'
-import type { ConnectorConnection } from '../api.ts'
+import type { ConnectorConnection, ConnectorProvider } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
@@ -161,6 +161,7 @@ function AgentSettingsContent({
   config,
   nodeId,
   toolsEditor,
+  providers,
   disabled,
   theme,
   validationError,
@@ -173,6 +174,7 @@ function AgentSettingsContent({
   readonly config: Extract<ManagedTaskExecutor, { kind: 'agent' }>
   readonly nodeId: string
   readonly toolsEditor?: ComponentProps<typeof AgentTools>['editor']
+  readonly providers?: Readonly<Record<string, ConnectorProvider>>
   readonly disabled: boolean
   readonly theme: WorkbenchTheme
   readonly validationError?: string
@@ -186,7 +188,7 @@ function AgentSettingsContent({
     <section className="inspector-section inspector-titled-section code-section" data-inspector-section="task">
       <h3 className="inspector-section-title">
         <span className="min-w-0 flex-1">{t('agent.prompt')}</span>
-        <AgentTools config={config} disabled={disabled} inputs={inputs} editor={toolsEditor} />
+        <AgentTools config={config} disabled={disabled} inputs={inputs} editor={toolsEditor} providers={providers} />
       </h3>
       <div className="inspector-section-content" data-inset>
         <ValueEditorFeedback error={validationError}>
@@ -278,13 +280,14 @@ export function AgentSettingsProvider(
     readonly readOnly?: boolean
     readonly store?: WorkspaceStore
     readonly connectors?: ConnectorStore
+    readonly providers?: Readonly<Record<string, ConnectorProvider>>
   },
 ) {
   if (!props.readOnly && props.store != null && props.connectors != null)
     return <EditableAgentSettingsProvider {...props} store={props.store} connectors={props.connectors} />
   if (props.task.executor.kind !== 'agent') return <>{props.children}</>
   return (
-    <AgentSettingsContent task={props.task} config={props.task.executor} nodeId={props.nodeId} disabled theme={props.theme}>
+    <AgentSettingsContent task={props.task} config={props.task.executor} nodeId={props.nodeId} disabled theme={props.theme} providers={props.providers}>
       {props.children}
     </AgentSettingsContent>
   )

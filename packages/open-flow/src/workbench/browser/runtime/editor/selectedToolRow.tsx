@@ -11,7 +11,7 @@ export function SelectedToolRow({
   readonly title: ReactNode
   readonly subtitle: ReactNode
   readonly actions: ReactNode
-  readonly children: ReactNode
+  readonly children?: ReactNode
 }) {
   return (
     <section className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1 py-4 first:pt-1 last:pb-1">
@@ -23,7 +23,7 @@ export function SelectedToolRow({
         <div className="flex min-w-0 items-center gap-1 text-xs leading-5 text-muted-foreground">{subtitle}</div>
       </div>
       {actions}
-      <div className="col-start-2 min-w-0">{children}</div>
+      {children != null && <div className="col-start-2 min-w-0">{children}</div>}
     </section>
   )
 }

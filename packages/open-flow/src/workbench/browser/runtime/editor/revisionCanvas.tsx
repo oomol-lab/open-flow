@@ -176,7 +176,14 @@ export function RevisionCanvas({
             onClose={() => setInspectorOpen(false)}
           >
             {selection != null ? (
-              <NodeInspector readOnly key={`${graphId}:${selection.id}`} revision={revision} selection={selection} theme={theme} />
+              <NodeInspector
+                readOnly
+                key={`${graphId}:${selection.id}`}
+                revision={revision}
+                selection={selection}
+                theme={theme}
+                connectorProviders={providerMetadata}
+              />
             ) : comment?.kind === 'comment' ? (
               <CommentInspector key={comment.id} title={comment.title} content={comment.content ?? ''} dark={theme === 'dark'} readOnly />
             ) : (

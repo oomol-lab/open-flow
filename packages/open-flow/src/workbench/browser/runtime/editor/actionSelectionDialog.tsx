@@ -1,6 +1,6 @@
-import type { ReactElement, ReactNode } from 'react'
+import type { ReactElement, ReactNode, Ref } from 'react'
 import type { WorkflowCapability } from '../../../../flow/common/change.ts'
-import type { ConnectorConnection } from '../api.ts'
+import type { ConnectorConnection, ConnectorProvider } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
@@ -14,10 +14,12 @@ import { workflowToolNameIssue } from '../../../../flow/common/change.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '../../../../ui/browser/empty.tsx'
+import { Input } from '../../../../ui/browser/input.tsx'
 import { Popover, PopoverTrigger, PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
+import { cn } from '../../../../ui/browser/utils.ts'
 import { connectionCatalog } from '../connectionCatalog.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
@@ -25,7 +27,7 @@ import { ActionPicker } from './actionPicker.tsx'
 import { AccountControlButton, AccountSelect } from './connectionSettings.tsx'
 import { ProviderAppIcon } from './providerAppIcon.tsx'
 import { SelectedToolRow } from './selectedToolRow.tsx'
-import { WorkflowToolPicker, SelectedWorkflowTool, useWorkflowToolCatalog } from './workflowToolSelection.tsx'
+import { WorkflowToolPicker, SelectedWorkflowTool, SelectedWorkflowToolRow, useWorkflowToolCatalog } from './workflowToolSelection.tsx'
 
 export interface SelectedAction {
   readonly kind?: 'connector'
@@ -43,9 +45,9 @@ export type PrepareAction = (action: ConnectorActionView) => Promise<PreparedAct
 
 export interface ActionSettingsProps<T> {
   readonly entry: T
-  readonly onChange: (entry: T) => void
+  readonly onChange?: (entry: T) => void
   readonly disabled: boolean
-  readonly onValidChange: (key: string, valid: boolean) => void
+  readonly onValidChange?: (key: string, valid: boolean) => void
 }
 
 interface ActionSettings<T> {
@@ -53,33 +55,32 @@ interface ActionSettings<T> {
   readonly render: (props: ActionSettingsProps<T>) => ReactNode
 }
 
-export function ActionSelectionDialog<T extends SelectedTool>({
-  title,
-  entries,
-  connectors,
-  prepareAction,
-  workflows,
-  disabled,
-  createEntry,
-  onSave,
-  notify,
-  settings,
-  trigger,
-  triggerHint,
-}: {
+type ActionSelectionDialogProps<T extends SelectedTool> = {
   readonly triggerHint?: string
   readonly trigger?: ReactElement<{ children?: ReactNode }>
   readonly title: string
   readonly entries: readonly T[]
-  readonly connectors: ConnectorStore
-  readonly prepareAction?: PrepareAction
-  readonly workflows?: WorkflowToolSelection<T>
-  readonly disabled: boolean
-  readonly createEntry: (action: ConnectorActionView) => T
-  readonly notify: SetNotice
-  readonly onSave: (entries: readonly T[]) => Promise<boolean>
   readonly settings?: ActionSettings<T>
-}) {
+} & (
+  | {
+      readonly readOnly: true
+      readonly providers?: Readonly<Record<string, ConnectorProvider>>
+    }
+  | {
+      readonly readOnly?: false
+      readonly connectors: ConnectorStore
+      readonly prepareAction?: PrepareAction
+      readonly workflows?: WorkflowToolSelection<T>
+      readonly disabled: boolean
+      readonly createEntry: (action: ConnectorActionView) => T
+      readonly notify: SetNotice
+      readonly onSave: (entries: readonly T[]) => Promise<boolean>
+    }
+)
+
+export function ActionSelectionDialog<T extends SelectedTool>(props: ActionSelectionDialogProps<T>) {
+  const { title, entries, settings, trigger, triggerHint } = props
+  const editor = props.readOnly === true ? undefined : props
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [root, setRoot] = useState<HTMLElement | null>(null)
@@ -123,7 +124,7 @@ export function ActionSelectionDialog<T extends SelectedTool>({
             render={
               <DialogTrigger
                 render={trigger ?? <Button type="button" variant="outline" size="xs" />}
-                disabled={disabled}
+                disabled={editor?.disabled ?? false}
                 aria-label={`${title} · ${entries.length}`}
               >
                 {trigger?.props.children ?? `${title} · ${entries.length}`}
@@ -135,34 +136,43 @@ export function ActionSelectionDialog<T extends SelectedTool>({
         <DialogContent
           container={root}
           closeLabel={t('common.close')}
-          className="flex h-[min(640px,85dvh)] flex-col gap-0 p-0 text-[13px] leading-5 font-normal sm:max-w-[min(46rem,calc(100%-2rem))]"
+          className={cn(
+            'flex flex-col gap-0 p-0 text-[13px] leading-5 font-normal',
+            editor == null ? 'max-h-[85dvh] sm:max-w-sm' : 'h-[min(640px,85dvh)] sm:max-w-[min(46rem,calc(100%-2rem))]',
+          )}
           showCloseButton={!pending}
         >
           <DialogTitle className="px-4 py-3 text-[13px] leading-5 font-medium">{title}</DialogTitle>
           <div className="mx-4 h-px shrink-0 bg-border/50" />
-          <DialogDescription className="m-0 shrink-0 px-4 pt-3 text-[13px] leading-5">{t('actionPicker.description')}</DialogDescription>
-          <ActionSelectionEditor
-            notify={notify}
-            entries={entries}
-            connectors={connectors}
-            prepareAction={prepareAction}
-            workflows={workflows}
-            disabled={disabled || pending}
-            createEntry={createEntry}
-            settings={settings}
-            onDirtyChange={setDirty}
-            onCancel={requestClose}
-            onSave={async (next) => {
-              setPending(true)
-              try {
-                const saved = await onSave(next)
-                if (saved) setOpen(false)
-                return saved
-              } finally {
-                setPending(false)
-              }
-            }}
-          />
+          {props.readOnly === true ? (
+            <ReadonlyToolSelection entries={entries} providers={props.providers} settings={settings} />
+          ) : (
+            <>
+              <DialogDescription className="m-0 shrink-0 px-4 pt-3 text-[13px] leading-5">{t('actionPicker.description')}</DialogDescription>
+              <ActionSelectionEditor
+                notify={props.notify}
+                entries={entries}
+                connectors={props.connectors}
+                prepareAction={props.prepareAction}
+                workflows={props.workflows}
+                disabled={props.disabled || pending}
+                createEntry={props.createEntry}
+                settings={settings}
+                onDirtyChange={setDirty}
+                onCancel={requestClose}
+                onSave={async (next) => {
+                  setPending(true)
+                  try {
+                    const saved = await props.onSave(next)
+                    if (saved) setOpen(false)
+                    return saved
+                  } finally {
+                    setPending(false)
+                  }
+                }}
+              />
+            </>
+          )}
           <Dialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
             <DialogContent container={root} className="gap-6 p-6" showCloseButton={false}>
               <DialogHeader className="gap-2">
@@ -188,6 +198,144 @@ export function ActionSelectionDialog<T extends SelectedTool>({
         </DialogContent>
       </Dialog>
     </span>
+  )
+}
+
+function SelectedToolsList({
+  count,
+  actions,
+  children,
+  containerRef,
+  headingRef,
+  className,
+}: {
+  readonly count: number
+  readonly actions?: ReactNode
+  readonly children: ReactNode
+  readonly containerRef?: Ref<HTMLDivElement>
+  readonly headingRef?: Ref<HTMLHeadingElement>
+  readonly className?: string
+}) {
+  const t = useTranslate()
+  return (
+    <div ref={containerRef} className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-2', className)}>
+      <div className="flex h-8 shrink-0 items-center justify-between gap-2 px-4">
+        <h3 ref={headingRef} tabIndex={-1} className="m-0 text-[13px] font-normal text-muted-foreground outline-none">
+          {t('actionPicker.selected', { count })}
+        </h3>
+        {actions}
+      </div>
+      {count === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <i aria-hidden="true" className="i-lucide-light:list-checks size-4" />
+            </EmptyMedia>
+            <EmptyDescription className="text-[13px]">{t('actionPicker.empty')}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="flex flex-col divide-y divide-border/50 px-4">{children}</div>
+        </ScrollArea>
+      )}
+    </div>
+  )
+}
+
+function SelectedToolSettings({
+  title,
+  name,
+  container,
+  disabled = false,
+  footer,
+  children,
+}: {
+  readonly title: string
+  readonly name: string
+  readonly container: HTMLElement | null
+  readonly disabled?: boolean
+  readonly footer?: ReactNode
+  readonly children: ReactNode
+}) {
+  const t = useTranslate()
+  return (
+    <Popover>
+      <Tooltip>
+        <TooltipTrigger
+          render={<PopoverTrigger render={<Button type="button" size="icon-sm" variant="ghost" disabled={disabled} aria-label={`${title} · ${name}`} />} />}
+        >
+          <i aria-hidden="true" className="i-lucide-light:settings size-4 text-muted-foreground" />
+        </TooltipTrigger>
+        <TooltipContent container={container}>{title}</TooltipContent>
+      </Tooltip>
+      <PopoverPanelContent
+        keepMounted
+        container={container}
+        title={title}
+        closeLabel={t('common.close')}
+        className="open-flow-property-panel w-96"
+        footer={footer}
+      >
+        {children}
+      </PopoverPanelContent>
+    </Popover>
+  )
+}
+
+function ReadonlyToolSelection<T extends SelectedTool>({
+  entries,
+  providers,
+  settings,
+}: {
+  readonly entries: readonly T[]
+  readonly providers?: Readonly<Record<string, ConnectorProvider>>
+  readonly settings?: ActionSettings<T>
+}) {
+  const t = useTranslate()
+  const [root, setRoot] = useState<HTMLElement | null>(null)
+  return (
+    <div className="flex min-h-0 flex-1 py-4">
+      <SelectedToolsList count={entries.length} containerRef={setRoot}>
+        {entries.map((entry) => {
+          const name = entry.kind === 'workflow' ? entry.name : entry.action
+          const controls = settings && (
+            <SelectedToolSettings title={settings.title} name={name} container={root}>
+              {settings.render({ entry, disabled: true })}
+            </SelectedToolSettings>
+          )
+          if (entry.kind === 'workflow') return <SelectedWorkflowToolRow key={entry.id ?? entryKey(entry)} entry={entry} actions={controls} />
+          const service = entry.action.split('.')[0]!
+          const provider = providers?.[service]
+          return (
+            <SelectedToolRow
+              key={entry.id ?? entry.action}
+              icon={<ProviderAppIcon src={providerIcon(provider ?? { serviceId: service, serviceName: service })} />}
+              title={name}
+              subtitle={
+                <span className="truncate">
+                  {t('toolPicker.connector')} · {provider?.serviceName ?? service}
+                </span>
+              }
+              actions={controls}
+            >
+              {provider?.noSetup ? (
+                <div className="text-muted-foreground">{t('actionPicker.noAccount')}</div>
+              ) : entry.connectionId == null ? null : (
+                <div className="open-flow-property-panel flex min-h-[30px] min-w-0 items-center [&>*]:w-full">
+                  <Input
+                    controlSize="field"
+                    readOnly
+                    aria-label={t('actionPicker.accountFor', { action: name })}
+                    value={entry.connectionId === '' ? t('inspector.account.deferred') : entry.connectionId}
+                  />
+                </div>
+              )}
+            </SelectedToolRow>
+          )
+        })}
+      </SelectedToolsList>
+    </div>
   )
 }
 
@@ -372,37 +520,24 @@ function ActionSelectionEditor<T extends SelectedTool>({
   }
   const renderSettings = (entry: T, index: number, name: string, ready = true) =>
     settings == null ? undefined : (
-      <Popover>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <PopoverTrigger render={<Button type="button" size="icon-sm" variant="ghost" disabled={disabled} aria-label={`${settings.title} · ${name}`} />} />
-            }
-          >
-            <i aria-hidden="true" className="i-lucide-light:settings size-4 text-muted-foreground" />
-          </TooltipTrigger>
-          <TooltipContent container={portalRoot}>{settings.title}</TooltipContent>
-        </Tooltip>
-        <PopoverPanelContent
-          keepMounted
-          container={portalRoot}
-          title={settings.title}
-          closeLabel={t('common.close')}
-          className="open-flow-property-panel w-96"
-          footer={
-            <Button type="button" size="field" variant="destructive" className="ml-auto" disabled={disabled} onClick={() => remove(index)}>
-              {t('valueEditor.remove')}
-            </Button>
-          }
-        >
-          {settings.render({
-            entry,
-            onChange: (next) => replace(index, next),
-            disabled: disabled || !ready,
-            onValidChange: (key, value) => setValidity(`${entry.id ?? entryKey(entry)}:${key}`, value),
-          })}
-        </PopoverPanelContent>
-      </Popover>
+      <SelectedToolSettings
+        title={settings.title}
+        name={name}
+        container={portalRoot}
+        disabled={disabled}
+        footer={
+          <Button type="button" size="field" variant="destructive" className="ml-auto" disabled={disabled} onClick={() => remove(index)}>
+            {t('valueEditor.remove')}
+          </Button>
+        }
+      >
+        {settings.render({
+          entry,
+          onChange: (next) => replace(index, next),
+          disabled: disabled || !ready,
+          onValidChange: (key, value) => setValidity(`${entry.id ?? entryKey(entry)}:${key}`, value),
+        })}
+      </SelectedToolSettings>
     )
   return (
     <>
@@ -473,11 +608,12 @@ function ActionSelectionEditor<T extends SelectedTool>({
             />
           )}
         </div>
-        <div ref={setPortalRoot} className="flex min-h-0 min-w-0 flex-col gap-2 sm:border-l sm:border-border/50">
-          <div className="flex h-8 shrink-0 items-center justify-between gap-2 px-4">
-            <h3 ref={selectedHeading} tabIndex={-1} className="m-0 text-[13px] font-normal text-muted-foreground outline-none">
-              {t('actionPicker.selected', { count: draft.length })}
-            </h3>
+        <SelectedToolsList
+          count={draft.length}
+          containerRef={setPortalRoot}
+          headingRef={selectedHeading}
+          className="sm:border-l sm:border-border/50"
+          actions={
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -495,128 +631,114 @@ function ActionSelectionEditor<T extends SelectedTool>({
               />
               <TooltipContent container={portalRoot}>{t('actionPicker.refresh')}</TooltipContent>
             </Tooltip>
-          </div>
-          {draft.length == 0 ? (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <i aria-hidden="true" className="i-lucide-light:list-checks size-4" />
-                </EmptyMedia>
-                <EmptyDescription className="text-[13px]">{t('actionPicker.empty')}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="flex flex-col divide-y divide-border/50 px-4">
-                {sortedEntries.map(({ entry, index }) => {
-                  if (entry.kind == 'workflow')
-                    return (
-                      <SelectedWorkflowTool
-                        key={entry.id ?? entryKey(entry)}
-                        entry={entry}
-                        workflowName={workflowCatalog.choices.find((item) => item.flowId == entry.flowId)?.name}
-                        disabled={disabled}
-                        load={workflows?.load}
-                        onChange={(name) => replace(index, { ...entry, name })}
-                        otherNames={workflowEntries.filter((other) => other.flowId != entry.flowId).map((other) => other.name)}
-                        onValidChange={(value) => setValidity(`${entry.id ?? entryKey(entry)}:alias`, value)}
-                        portalRoot={portalRoot}
-                        onRemove={() => remove(index)}
-                        onRefresh={(contract) => {
-                          if (workflows)
-                            setDraft((current) =>
-                              current.map((item) => (item.kind == 'workflow' && item.flowId == entry.flowId ? workflows.refresh(item, contract) : item)),
-                            )
-                        }}
-                      >
-                        {renderSettings(entry, index, entry.name)}
-                      </SelectedWorkflowTool>
-                    )
-                  const resolved = prepared[entry.action]
-                  const action = resolved?.action ?? discovered.current.get(entry.action) ?? actions[entry.action]
-                  const accounts = resolved?.connections ?? []
-                  const selected = connections.find((account) => account.connectionId == entry.connectionId)
-                  const accountInvalid =
-                    resolved != null &&
-                    action?.authenticated &&
-                    entry.connectionId != null &&
-                    entry.connectionId !== '' &&
-                    !accounts.some((account) => account.connectionId == entry.connectionId && account.status == 'active')
-                  return (
-                    <SelectedToolRow
-                      key={entry.id ?? entry.action}
-                      icon={<ProviderAppIcon src={action == null ? undefined : providerIcon(action)} />}
-                      title={action?.name ?? entry.action}
-                      subtitle={
-                        <span className="truncate">
-                          {t('toolPicker.connector')}
-                          {action == null ? '' : ` · ${action.serviceName}`}
-                        </span>
-                      }
-                      actions={
-                        settings ? (
-                          renderSettings(entry, index, action?.name ?? entry.action, resolved != null)
-                        ) : (
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  size="icon-sm"
-                                  variant="ghost"
-                                  disabled={disabled}
-                                  aria-label={t('actionPicker.remove', { action: action?.name ?? entry.action })}
-                                  onClick={() => remove(index)}
-                                >
-                                  <i aria-hidden="true" className="i-lucide-light:trash-2 size-4 text-muted-foreground" />
-                                </Button>
-                              }
-                            />
-                            <TooltipContent container={portalRoot}>{t('actionPicker.remove', { action: action?.name ?? entry.action })}</TooltipContent>
-                          </Tooltip>
-                        )
-                      }
-                    >
-                      <div className="open-flow-property-panel flex min-h-[30px] min-w-0 items-center [&>*]:w-full">
-                        {resolved == null && preparationErrors[entry.action] != null ? (
-                          <AccountControlButton
-                            status="danger"
+          }
+        >
+          {sortedEntries.map(({ entry, index }) => {
+            if (entry.kind == 'workflow')
+              return (
+                <SelectedWorkflowTool
+                  key={entry.id ?? entryKey(entry)}
+                  entry={entry}
+                  workflowName={workflowCatalog.choices.find((item) => item.flowId == entry.flowId)?.name}
+                  disabled={disabled}
+                  load={workflows?.load}
+                  onChange={(name) => replace(index, { ...entry, name })}
+                  otherNames={workflowEntries.filter((other) => other.flowId != entry.flowId).map((other) => other.name)}
+                  onValidChange={(value) => setValidity(`${entry.id ?? entryKey(entry)}:alias`, value)}
+                  portalRoot={portalRoot}
+                  onRemove={() => remove(index)}
+                  onRefresh={(contract) => {
+                    if (workflows)
+                      setDraft((current) =>
+                        current.map((item) => (item.kind == 'workflow' && item.flowId == entry.flowId ? workflows.refresh(item, contract) : item)),
+                      )
+                  }}
+                >
+                  {renderSettings(entry, index, entry.name)}
+                </SelectedWorkflowTool>
+              )
+            const resolved = prepared[entry.action]
+            const action = resolved?.action ?? discovered.current.get(entry.action) ?? actions[entry.action]
+            const accounts = resolved?.connections ?? []
+            const selected = connections.find((account) => account.connectionId == entry.connectionId)
+            const accountInvalid =
+              resolved != null &&
+              action?.authenticated &&
+              entry.connectionId != null &&
+              entry.connectionId !== '' &&
+              !accounts.some((account) => account.connectionId == entry.connectionId && account.status == 'active')
+            return (
+              <SelectedToolRow
+                key={entry.id ?? entry.action}
+                icon={<ProviderAppIcon src={action == null ? undefined : providerIcon(action)} />}
+                title={action?.name ?? entry.action}
+                subtitle={
+                  <span className="truncate">
+                    {t('toolPicker.connector')}
+                    {action == null ? '' : ` · ${action.serviceName}`}
+                  </span>
+                }
+                actions={
+                  settings ? (
+                    renderSettings(entry, index, action?.name ?? entry.action, resolved != null)
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
                             disabled={disabled}
-                            label={t('inspector.account.retry')}
-                            hint={preparationErrors[entry.action]}
-                            onClick={() => {
-                              connectors.retryAction(entry.action)
-                              setAttempt((value) => value + 1)
-                            }}
-                          />
-                        ) : action?.authenticated === false ? (
-                          <div className="text-muted-foreground">{t('actionPicker.noAccount')}</div>
-                        ) : (
-                          <AccountSelect
-                            loading={resolved == null}
-                            connections={accounts.filter((account) => account.status == 'active')}
-                            selectedConnection={selected}
-                            selectedId={entry.connectionId}
-                            invalid={accountInvalid === true}
-                            warning={entry.connectionId == null}
-                            allowDeferred
-                            label={t('actionPicker.accountFor', { action: action?.name ?? entry.action })}
-                            disabled={disabled}
-                            onChange={(connectionId) => {
-                              const { connectionId: _previous, ...rest } = entry
-                              replace(index, (connectionId == null ? rest : { ...rest, connectionId }) as T)
-                            }}
-                            onManage={resolved == null ? undefined : () => void connectors.connect(resolved.action.serviceId)}
-                          />
-                        )}
-                      </div>
-                    </SelectedToolRow>
+                            aria-label={t('actionPicker.remove', { action: action?.name ?? entry.action })}
+                            onClick={() => remove(index)}
+                          >
+                            <i aria-hidden="true" className="i-lucide-light:trash-2 size-4 text-muted-foreground" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent container={portalRoot}>{t('actionPicker.remove', { action: action?.name ?? entry.action })}</TooltipContent>
+                    </Tooltip>
                   )
-                })}
-              </div>
-            </ScrollArea>
-          )}
-        </div>
+                }
+              >
+                <div className="open-flow-property-panel flex min-h-[30px] min-w-0 items-center [&>*]:w-full">
+                  {resolved == null && preparationErrors[entry.action] != null ? (
+                    <AccountControlButton
+                      status="danger"
+                      disabled={disabled}
+                      label={t('inspector.account.retry')}
+                      hint={preparationErrors[entry.action]}
+                      onClick={() => {
+                        connectors.retryAction(entry.action)
+                        setAttempt((value) => value + 1)
+                      }}
+                    />
+                  ) : action?.authenticated === false ? (
+                    <div className="text-muted-foreground">{t('actionPicker.noAccount')}</div>
+                  ) : (
+                    <AccountSelect
+                      loading={resolved == null}
+                      connections={accounts.filter((account) => account.status == 'active')}
+                      selectedConnection={selected}
+                      selectedId={entry.connectionId}
+                      invalid={accountInvalid === true}
+                      warning={entry.connectionId == null}
+                      allowDeferred
+                      label={t('actionPicker.accountFor', { action: action?.name ?? entry.action })}
+                      disabled={disabled}
+                      onChange={(connectionId) => {
+                        const { connectionId: _previous, ...rest } = entry
+                        replace(index, (connectionId == null ? rest : { ...rest, connectionId }) as T)
+                      }}
+                      onManage={resolved == null ? undefined : () => void connectors.connect(resolved.action.serviceId)}
+                    />
+                  )}
+                </div>
+              </SelectedToolRow>
+            )
+          })}
+        </SelectedToolsList>
       </div>
       {attempted && !valid && (
         <div role="alert" className="flex items-center gap-2 px-4 pb-3 text-destructive">

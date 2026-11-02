@@ -2,7 +2,16 @@ import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { GraphNode } from '../../../../flow/common/change.ts'
 import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
-import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort } from '../api.ts'
+import type {
+  ConnectorAccess,
+  ConnectorAccessCandidates,
+  ConnectorAction,
+  ConnectorConnection,
+  ConnectorProvider,
+  Diagnostic,
+  Group,
+  InputPort,
+} from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
@@ -227,6 +236,7 @@ interface Props {
   readonly connectorConnection?: ConnectorConnection
   readonly connectorConnectionError?: string
   readonly activeConnectorConnections?: readonly ConnectorConnection[]
+  readonly connectorProviders?: Readonly<Record<string, ConnectorProvider>>
   readonly connectors?: ConnectorStore
   readonly connectorCandidates?: Readonly<Record<string, ConnectorAccessCandidates | undefined>>
   readonly connectorAccess?: ConnectorAccess
@@ -278,6 +288,7 @@ export function NodeInspector({
   connectorConnection,
   connectorConnectionError,
   activeConnectorConnections,
+  connectorProviders,
   connectors: liveConnectors,
   connectorAccess,
   connectorCandidates,
@@ -1089,6 +1100,7 @@ export function NodeInspector({
       nodeId={selection.id}
       store={store}
       connectors={connectors}
+      providers={connectorProviders}
       prepareAction={prepareConnectorAction}
       disabled={disabled}
       theme={theme}

@@ -22,6 +22,10 @@
   :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) ::before,
   :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) ::after {
     box-sizing: border-box;
+    /* Standalone Shadow Roots do not register Tailwind's @property defaults. */
+    --tw-translate-x: 0;
+    --tw-translate-y: 0;
+    --tw-translate-z: 0;
   }
 
   :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) button,

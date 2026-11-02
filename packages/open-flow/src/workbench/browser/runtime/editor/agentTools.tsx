@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react'
 import type { AgentTool, InputPort, ManagedTaskExecutor } from '../../../../flow/common/change.ts'
+import type { ConnectorProvider } from '../api.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
 import type { ActionSettingsProps, PrepareAction } from './actionSelectionDialog.tsx'
@@ -12,7 +13,6 @@ import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { IconStack } from '../../../../ui/browser/icon-stack.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { PopoverDescription } from '../../../../ui/browser/popover.tsx'
-import { Popover, PopoverTrigger, PopoverContent } from '../../../../ui/browser/popover.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
 import { actionSummary } from '../actionSummary.ts'
 import { ActionSelectionDialog } from './actionSelectionDialog.tsx'
@@ -87,15 +87,13 @@ function AgentToolSettings({
   disabled,
   onValidChange,
   inputs,
-}: Omit<ActionSettingsProps<AgentTool>, 'onChange' | 'onValidChange'> & {
-  readonly onChange?: ActionSettingsProps<AgentTool>['onChange']
-  readonly onValidChange?: ActionSettingsProps<AgentTool>['onValidChange']
+}: ActionSettingsProps<AgentTool> & {
   readonly inputs: readonly InputPort[]
 }) {
   const t = useTranslate()
   return (
     <fieldset className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
-      <PopoverDescription className="m-0 text-xs leading-5">{t('agent.toolSettingsHint')}</PopoverDescription>
+      {onChange != null && <PopoverDescription className="m-0 text-xs leading-5">{t('agent.toolSettingsHint')}</PopoverDescription>}
       <Field className="gap-1.5">
         <FieldLabel className="text-xs font-normal text-muted-foreground">{t('agent.toolName')}</FieldLabel>
         <Input
@@ -135,6 +133,7 @@ function AgentToolSettings({
 
 export function AgentTools(
   props: Pick<ComponentProps<typeof EditableAgentTools>, 'config' | 'disabled' | 'inputs'> & {
+    readonly providers?: Readonly<Record<string, ConnectorProvider>>
     readonly editor?: Pick<ComponentProps<typeof EditableAgentTools>, 'connectors' | 'notify' | 'prepareAction' | 'workflows' | 'onSave'>
   },
 ) {
@@ -142,22 +141,17 @@ export function AgentTools(
   if (props.editor != null) return <EditableAgentTools config={props.config} disabled={props.disabled} inputs={props.inputs} {...props.editor} />
   if (props.config.tools.length === 0) return null
   return (
-    <Popover>
-      <PopoverTrigger render={<Button type="button" variant="ghost" size="sm" />}>{t('agent.tools')}</PopoverTrigger>
-      <PopoverContent>
-        <div className="grid max-h-96 gap-4 overflow-auto">
-          {props.config.tools.map((tool) => (
-            <details key={tool.id}>
-              <summary>{tool.name || (tool.kind == 'workflow' ? tool.flowId : tool.action)}</summary>
-              <p className="reference-value">
-                {tool.kind == 'workflow' ? tool.flowId : tool.action}
-                {tool.connectionId == null ? '' : ` · ${tool.connectionId === '' ? t('inspector.account.deferred') : tool.connectionId}`}
-              </p>
-              <AgentToolSettings entry={tool} disabled inputs={props.inputs} />
-            </details>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
+    <ActionSelectionDialog
+      readOnly
+      title={t('agent.tools')}
+      entries={props.config.tools}
+      providers={props.providers}
+      trigger={
+        <Button type="button" variant="ghost" size="sm">
+          {t('agent.tools')}
+        </Button>
+      }
+      settings={{ title: t('agent.toolSettings'), render: (settings) => <AgentToolSettings {...settings} inputs={props.inputs} /> }}
+    />
   )
 }
