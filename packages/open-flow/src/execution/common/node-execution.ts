@@ -109,6 +109,7 @@ function nodeKind(
   | 'javascript'
   | 'openapi'
   | 'http-request'
+  | 'dedupe'
   | 'llm'
   | 'value'
   | 'wait'
@@ -301,6 +302,7 @@ export function executeNode(
     readonly node: ExecutableNode
     readonly jobId: string
     readonly nodeInputs: Readonly<Record<string, JsonValue>>
+    readonly launchInputs?: Readonly<Record<string, JsonValue>>
     readonly flowId: string
     readonly runId: string
     readonly graph: Graph
@@ -368,6 +370,7 @@ export function executeNode(
               if (additional.has(handle)) return false
               const task = 'executor' in node.task ? node.task : undefined
               if (task == null || !['openapi', 'http-request'].includes(task.executor.kind)) return true
+              if (Object.hasOwn(input.launchInputs ?? {}, handle)) return true
               const mapping = node.inputs[handle]
               return (
                 mapping?.kind != 'unset' &&

@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { createContext, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/browser/dropdown-menu.tsx'
 
+export const NodeHistoryContext = createContext<((nodeId: string) => { label: string; onClick: () => void } | undefined) | undefined>(undefined)
+
 export function NodeActions({
   ignored,
+  history,
   onIgnore,
   onDuplicate,
   onDelete,
@@ -13,6 +16,7 @@ export function NodeActions({
   container,
   align = 'end',
 }: {
+  readonly history?: { label: string; onClick: () => void }
   readonly ignored: boolean
   readonly onIgnore?: (ignored: boolean) => void
   readonly className?: string
@@ -36,6 +40,12 @@ export function NodeActions({
         />
         <DropdownMenuContent align={align} container={container ?? root} className={contentClassName} sideOffset={0}>
           <DropdownMenuGroup>
+            {history && (
+              <DropdownMenuItem onClick={history.onClick}>
+                <i aria-hidden="true" className="i-lucide-light:database" />
+                {history.label}
+              </DropdownMenuItem>
+            )}
             {onDuplicate && (
               <DropdownMenuItem onClick={() => onDuplicate()}>
                 <i className="i-codicon:copy" />

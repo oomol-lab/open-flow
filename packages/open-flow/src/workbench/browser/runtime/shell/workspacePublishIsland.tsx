@@ -24,6 +24,7 @@ export function WorkspacePublishIsland({
   onExport,
   onExportSvg,
   onOpenRuns,
+  onOpenState,
   onPublish,
   state,
 }: {
@@ -32,6 +33,7 @@ export function WorkspacePublishIsland({
   readonly onExportSvg?: (() => Promise<void>) | undefined
   readonly onOpenPublications: () => void
   readonly onOpenRuns: () => void
+  readonly onOpenState?: () => void
   readonly onPublish: () => void
   readonly state: PublishState
 }): ReactElement {
@@ -141,6 +143,12 @@ export function WorkspacePublishIsland({
             <i aria-hidden="true" className="i-lucide-light:cloud-upload size-4 shrink-0 text-foreground/70" />
             <span className="whitespace-nowrap">{historyLabel}</span>
           </DropdownMenuItem>
+          {onOpenState != null && (
+            <DropdownMenuItem className="gap-2 px-2 py-[5px]" onClick={onOpenState}>
+              <i aria-hidden="true" className="i-lucide-light:database size-4 shrink-0 text-foreground/70" />
+              {t('flowState.title')}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem className="gap-2 px-2 py-[5px]" onClick={onOpenRuns}>
             <i aria-hidden="true" className="i-lucide-light:history size-4 shrink-0 text-foreground/70" />
             {runsLabel}

@@ -18,6 +18,7 @@ import { fieldLayoutStory } from './fieldLayout.tsx'
 import { fieldSettingsStory, groupSettingsStory } from './fieldSettings.tsx'
 import { fieldTypesStory } from './fieldTypes.tsx'
 import { flowBrowserStory } from './flowBrowser.tsx'
+import { flowStateStories } from './flowState.tsx'
 import { formStory } from './form.tsx'
 import { historyStory, historyControlsStory, historyKeyboardStory } from './history.tsx'
 import { hostThemeStory } from './hostTheme.tsx'
@@ -127,6 +128,7 @@ export const labStories: readonly FrontendStory[] = [
   decisionStory,
   ...openApiStories,
   ...httpRequestStories,
+  ...flowStateStories,
   ...workflowCallStories,
   metadataStory,
   inspectorPanelStory,

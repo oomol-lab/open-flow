@@ -6,6 +6,7 @@ import { limitDecisionTask } from '../../decision/common/decision.ts'
 import { assertHttpAuthBindings } from '../../http/common/authBindings.ts'
 import { isHttpHost, maxHttpHosts } from '../../http/common/hosts.ts'
 import { httpRequestExecutorSchema } from '../../http/common/httpRequest.ts'
+import { dedupeExecutorSchema } from '../../state/common/state.ts'
 import { checkJsonDepth } from './json.ts'
 import { retryConfigurationSchema } from './retry.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
@@ -13,7 +14,7 @@ import { waitAutoContinueDraftSchema, waitAutoContinueSchema } from './wait.ts'
 import { webhookMethods } from './webhookMethod.ts'
 import { webhookResponseTimeout } from './webhookResponse.ts'
 
-export const currentFlowModelVersion = 12
+export const currentFlowModelVersion = 13
 const text = z.string()
 const actionConnection = text.describe(
   'Account selection: omit while unconfigured; use an account ID to select it; use "" to explicitly defer configuration. Deferred Actions fail if called; deferred Agent tools are excluded from the callable tool set. Not supported by Triggers.',
@@ -129,6 +130,7 @@ const managedFields = z.object({
     }),
     z.strictObject({ kind: z.literal('workflow'), flowId: text, revisionId: text }),
     httpRequestExecutorSchema,
+    dedupeExecutorSchema,
   ]),
 })
 
@@ -318,6 +320,7 @@ const revision = z.object({
     z.literal(9),
     z.literal(10),
     z.literal(11),
+    z.literal(12),
     z.literal(currentFlowModelVersion),
   ]),
   document,
@@ -723,6 +726,13 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 }
 
 function checkModelVersion(content: RevisionContent): void {
+  if (
+    content.modelVersion < 13 &&
+    Object.values(content.document.graph.nodes).some(
+      (candidateNode) => candidateNode.kind === 'task' && 'executor' in candidateNode.task && candidateNode.task.executor.kind === 'dedupe',
+    )
+  )
+    throw new Error('Deduplication requires Flow model v13.')
   if (
     content.modelVersion < 12 &&
     Object.values(content.document.graph.nodes).some(

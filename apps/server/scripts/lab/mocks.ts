@@ -167,6 +167,13 @@ export function createMocks() {
     trigger: async () => unknown(),
   }
   const model = new Hono()
+  model.get('/flow-state', (context) =>
+    context.json([
+      { id: 1, title: 'One' },
+      { id: 2, title: 'Two' },
+      { id: 1, title: 'Duplicate' },
+    ]),
+  )
   model.post('/http-request', async (context) =>
     context.json(
       {

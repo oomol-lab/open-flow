@@ -15,8 +15,9 @@ import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { hashIdentities, itemIdentities, StateError } from '@oomol-lab/open-flow/flow-state'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
-import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
+import { findEngineContract, resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
@@ -30,10 +31,13 @@ import { errorKind } from '../logger.ts'
 import { supportsIsolatedVmEngine, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
 import { ArtifactHostError, RunArtifacts } from './run-artifacts.ts'
+import { RunState } from './run-state.ts'
 import { workflowRunOutcome } from './workflow.ts'
 
 const encoder = new TextEncoder()
 const nodeFailureCodes: ReadonlySet<string> = new Set([
+  'dedupe.full',
+  'limit-exceeded',
   'capability.denied',
   'capability.invalid',
   'connector.access-invalid',
@@ -104,6 +108,7 @@ export class RunExecutor {
   readonly workflowResumptions = new Map<string, () => void>()
   readonly #workflowResumeWaiters = new Map<string, Set<() => void>>()
   readonly #toolCalls = new Map<string, { runId: string; jobId: string; abort: AbortController }>()
+  readonly #state: RunState
   readonly #artifacts: RunArtifacts
 
   constructor(
@@ -125,6 +130,7 @@ export class RunExecutor {
     this.#invokeWorkflow = invokeWorkflow
     this.#store = store
     this.#artifacts = new RunArtifacts(store.runs)
+    this.#state = new RunState(store.state)
     this.#isolatedVm = isolatedVm
     this.#resolveConnector = resolveConnector
     this.#resolveLlm = resolveLlm
@@ -349,6 +355,7 @@ export class RunExecutor {
               error instanceof HttpTaskError ||
               error instanceof WorkflowToolError ||
               error instanceof ArtifactHostError ||
+              error instanceof StateError ||
               error instanceof CodeFetchDeniedError
             )
               return { code: error.code, message: error.message, retryable: error.retryable, catchable: error.catchable }
@@ -427,6 +434,29 @@ export class RunExecutor {
     switch (executor.kind) {
       case 'workflow':
         return this.#invokeWorkflow(run, invocation.nodeId, invocation.jobId, invocation.input, node, invocation.workflowRunId)
+      case 'dedupe': {
+        if (run.source == null) throw new StateError('capability.denied', 'State requires a Run source.')
+        const items = invocation.input.items!
+        const ids = itemIdentities(items, executor.field)
+        const hashes = executor.mode === 'new' ? await hashIdentities(ids) : []
+        invocation.signal.throwIfAborted()
+        this.#store.state.reserveWrite(run.flowId, run.source, run.runId)
+        const space = executor.space === 'flow' ? 'flow' : `node:${invocation.nodeId}`
+        const inserted = this.#store.state.insert(run.flowId, run.source, space, executor.mode, ids, hashes)
+        if (executor.mode === 'new') {
+          const count = this.#store.state.dedupeCount(run.flowId, run.source)
+          const limit = this.#store.state.limits.maxIdentities
+          if (count >= limit * 0.8)
+            await report({
+              code: 'dedupe.near-limit',
+              count,
+              limit,
+              message: 'Flow deduplication history is at least 80% full. Clear history or use increasing mode.',
+            })
+        }
+        const values = items as JsonValue[]
+        return { items: values.filter((_, index) => inserted[index]), duplicates: values.filter((_, index) => !inserted[index]) }
+      }
       case 'http-request':
         return executeHttpRequest(executor, invocation.input, invocation.signal)
       case 'openapi':
@@ -532,6 +562,12 @@ export class RunExecutor {
     flow: PreparedFlow,
     emit: (event: ArtifactEvent) => Promise<void>,
   ): Promise<RuntimeCapabilityResponse> {
+    if (call.kind.startsWith('state.') || call.kind.startsWith('dedupe.')) {
+      const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
+      if (findEngineContract(run.engineContract)?.flowState !== true || node?.kind !== 'task' || !('moduleId' in node.task))
+        throw new StateError('capability.denied', 'State requires a Code Task and an engine with Flow State support.')
+      return this.#state.invoke(run, call)
+    }
     if (call.kind.startsWith('artifact.')) {
       const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
       if (node?.kind != 'task' || !('moduleId' in node.task)) throw new TaskHostError('capability.denied', 'Artifacts require a Code node invocation.')

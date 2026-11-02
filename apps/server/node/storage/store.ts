@@ -12,6 +12,7 @@ import { ResultStore } from './result-store.ts'
 import { RevisionStore } from './revision-store.ts'
 import { RunStore } from './run-store.ts'
 import { RunViewStore } from './run-view-store.ts'
+import { StateStore, stateLimits } from './state-store.ts'
 import { TagStore } from './tag-store.ts'
 import { TriggerStore } from './trigger-store.ts'
 import { UserStore } from './user-store.ts'
@@ -31,6 +32,7 @@ const defaultMaxPendingRuns = 1_000
 export class Store {
   readonly connectorTeams: ConnectorTeamStore
   readonly eventSources: EventSourceStore
+  readonly state: StateStore
   readonly flows: FlowStore
   readonly integrations: IntegrationStore
   readonly polls: PollStore
@@ -51,10 +53,18 @@ export class Store {
     clock: () => number = Date.now,
     runEventRetentionMs = defaultRunEventRetentionMs,
     maxPendingRuns = defaultMaxPendingRuns,
+    limits: Partial<typeof stateLimits> = {},
   ) {
     const connection = database.connection
     const transaction = <Value>(operation: () => Value): Value => database.transaction(operation)
 
+    this.state = new StateStore(connection, transaction, clock, {
+      maxValueBytes: limits.maxValueBytes ?? stateLimits.maxValueBytes,
+      maxValues: limits.maxValues ?? stateLimits.maxValues,
+      maxSpaces: limits.maxSpaces ?? stateLimits.maxSpaces,
+      maxIdentities: limits.maxIdentities ?? stateLimits.maxIdentities,
+      maxRunWrites: limits.maxRunWrites ?? stateLimits.maxRunWrites,
+    })
     this.users = new UserStore(connection)
     this.eventSources = new EventSourceStore(connection, transaction, clock)
     this.tags = new TagStore(connection, transaction)

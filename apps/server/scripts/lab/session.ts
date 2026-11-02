@@ -395,10 +395,11 @@ export class LabSession {
         const triggers = Object.entries(revision.content.document.graph.nodes).filter(([id, node]) =>
           'node' in entry ? id == entry.node : node.kind == entry.kind,
         )
-        if (triggers.length != 1 || (triggers[0]![1].kind != 'start' && this.scenarioId !== 'poll-batch'))
+        if (triggers.length != 1 || (triggers[0]![1].kind != 'start' && this.scenarioId !== 'poll-batch' && this.scenarioId !== 'flow-state'))
           errors.push('The scenario entry must resolve to one Start node.')
         else
           for (const sample of samples(this.scenarioId, this.stage)) {
+            if (this.scenarioId === 'flow-state') sample.parameters = { url: `${this.modelOrigin}/flow-state` }
             if (this.scenarioId == 'http-request') sample.outputs = { ...sample.outputs, url: `${this.modelOrigin}/http-request` }
             Object.assign(this.mocks.sample, sample)
             const offset = this.mocks.calls.length,

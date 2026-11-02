@@ -270,6 +270,7 @@ function EditableCodeTaskSection({
               <TooltipContent>{t('inspector.actions.flowAccessHint')}</TooltipContent>
             </Tooltip>
           )}
+          <CodeHttpHosts key={`${selection.id}-http`} disabled={disabled || pending} hosts={httpHosts} onSave={saveHttpHosts} />
           <ActionSelectionDialog
             notify={store.notify}
             key={selection.id}
@@ -362,7 +363,6 @@ function EditableCodeTaskSection({
           )}
         </div>
       )}
-      <CodeHttpHosts disabled={disabled || pending} hosts={httpHosts} onSave={saveHttpHosts} />
       <ValueEditorFeedback
         error={
           moduleDiagnostics.length > 0

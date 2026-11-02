@@ -1015,3 +1015,14 @@ async function seedDraft(control: ControlClient, args: { flowId: unknown; expect
     args.idempotencyKey,
   )
 }
+
+it('uses the same scoped State service through MCP and rejects omitted scope', async () => {
+  const { call, client, control } = await fixture()
+  const flow = await control.createFlow('State')
+  expect(await call('flow_state', { flowId: flow.flowId, scope: 'draft' })).toEqual(await control.getFlowState(flow.flowId, 'draft'))
+  for (const name of ['flow_state', 'flow_state_clear', 'flow_dedupe_clear']) {
+    expect((await client.callTool({ name, arguments: { flowId: flow.flowId, space: 'flow' } })).isError).toBe(true)
+  }
+  expect(await call('flow_state_clear', { flowId: flow.flowId, scope: 'live' })).toEqual({ version: 1, cleared: true })
+  expect(await call('flow_dedupe_clear', { flowId: flow.flowId, scope: 'draft', space: 'node:removed' })).toEqual({ version: 1, cleared: true })
+})

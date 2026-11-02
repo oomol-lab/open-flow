@@ -218,6 +218,7 @@ describe('isolated-vm runtime conformance', () => {
 
   it.each([
     ['open-flow-engine/v8', false],
+    ['open-flow-engine/v9', true],
     [currentEngineContract, true],
   ])('does not expose host or network globals to the user realm under %s', async (engineContract, nodejs) => {
     await expect(
@@ -236,6 +237,8 @@ describe('isolated-vm runtime conformance', () => {
         require: typeof require,
         WebSocket: typeof WebSocket,
         egress: typeof context.egress,
+        state: typeof context.state,
+        dedupe: typeof context.dedupe,
       })`),
           engineContract,
         },
@@ -250,6 +253,8 @@ describe('isolated-vm runtime conformance', () => {
       require: 'undefined',
       WebSocket: 'undefined',
       egress: nodejs ? 'undefined' : 'function',
+      state: engineContract === currentEngineContract ? 'object' : 'undefined',
+      dedupe: engineContract === currentEngineContract ? 'object' : 'undefined',
     })
   })
 

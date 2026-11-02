@@ -167,6 +167,7 @@ export interface ConditionNode extends GraphNodeBase {
 
 export type ManagedTaskExecutor =
   | import('../../http/common/httpRequest.ts').HttpRequestExecutor
+  | import('../../state/common/state.ts').DedupeExecutor
   | WorkflowExecutor
   | import('../../decision/common/decision.ts').DecisionExecutor
   | import('../../openapi/common/openapi.ts').OpenApiExecutor
@@ -397,7 +398,7 @@ export interface FlowDocument {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 

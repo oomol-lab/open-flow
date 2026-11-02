@@ -1,6 +1,8 @@
 import type { CanvasCommand } from '../../canvas/common/commands.ts'
+import type { FlowStateView, StateScope } from '../../state/common/state.ts'
 
 import { currentEngineContract } from '../../runtime/common/engineContract.ts'
+import { flowStateViewSchema } from '../../state/common/state.ts'
 import { workflowContractSchema, workflowReferencesSchema } from '../../workflow/common/workflow.ts'
 export type { CanvasCommand, CanvasCommandSubscriber } from '../../canvas/common/commands.ts'
 import type { LiveDetails } from './liveDetails.ts'
@@ -701,6 +703,7 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'decision' &&
             nodeKind !== 'openapi' &&
             nodeKind !== 'http-request' &&
+            nodeKind !== 'dedupe' &&
             nodeKind !== 'llm' &&
             nodeKind !== 'agent' &&
             nodeKind !== 'value' &&
@@ -995,6 +998,23 @@ export class ControlClient {
 
   async updateFlow(flowId: string, changes: FlowUpdate): Promise<Flow> {
     return flow(await this.request(`/v1/flows/${segment(flowId)}`, { method: 'PATCH', body: JSON.stringify({ ...changes, version: 1 }) }))
+  }
+
+  async getFlowState(flowId: string, scope: StateScope, values = false): Promise<FlowStateView> {
+    const result = flowStateViewSchema.safeParse(await this.request(`/v1/flows/${segment(flowId)}/state?scope=${scope}&values=${values}`))
+    return result.success && result.data.scope === scope ? result.data : invalidResponse()
+  }
+
+  async clearFlowState(flowId: string, scope: StateScope, key?: string): Promise<void> {
+    const source = record(
+      await this.request(`/v1/flows/${segment(flowId)}/state?scope=${scope}${key == null ? '' : `&key=${encodeURIComponent(key)}`}`, { method: 'DELETE' }),
+    )
+    if (source.version !== 1 || source.cleared !== true) invalidResponse()
+  }
+
+  async clearFlowDedupe(flowId: string, scope: StateScope, space: string): Promise<void> {
+    const source = record(await this.request(`/v1/flows/${segment(flowId)}/dedupe?scope=${scope}&space=${encodeURIComponent(space)}`, { method: 'DELETE' }))
+    if (source.version !== 1 || source.cleared !== true) invalidResponse()
   }
 
   async renameFlow(flowId: string, name: string): Promise<Flow> {

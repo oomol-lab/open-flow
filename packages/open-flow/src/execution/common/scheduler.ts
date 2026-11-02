@@ -70,6 +70,7 @@ export type SchedulerEvent =
         | 'javascript'
         | 'openapi'
         | 'http-request'
+        | 'dedupe'
         | 'llm'
         | 'value'
         | 'wait'
@@ -344,6 +345,7 @@ function runGraph(
           node,
           jobId,
           nodeInputs,
+          launchInputs: launch[nodeId],
           resolution,
           flowId: target.flowId,
           runId,
