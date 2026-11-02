@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dedupeIdentities, hashIdentities, increasingIdentities, itemIdentities, watermarkValue } from './state.ts'
+import { dedupeIdentities, hashIdentities, skipDuplicatesConfigSchema, skipDuplicatesIdentities } from './state.ts'
 
 describe('Flow State identities', () => {
   it('uses deterministic typed hashes and normalizes numeric zero', async () => {
@@ -8,26 +8,44 @@ describe('Flow State identities', () => {
     expect(hashes[0]).not.toEqual(hashes[1])
     expect(hashes[2]).toEqual(hashes[3])
     expect(await hashIdentities([1])).toEqual([hashes[0]])
-  })
-  it('selects nested fields and rejects missing or non-scalar identities', () => {
-    expect(itemIdentities([{ record: { id: 0 } }, { record: { id: 'x' } }], 'record.id')).toEqual([0, 'x'])
-    expect(() => itemIdentities([{}], 'id')).toThrow()
     expect(() => dedupeIdentities([NaN])).toThrow()
   })
-  it('compares against the initial watermark and preserves unsorted new items', () => {
-    expect(increasingIdentities([5, 3, 5, 1, 4], 2)).toEqual({ inserted: [true, true, false, false, true], watermark: 5 })
-    expect(increasingIdentities([], 5)).toEqual({ inserted: [], watermark: 5 })
+  it('preserves field definitions and scalar types in composite identities', async () => {
+    const items = [
+      { record: { id: 1 }, company: 'a' },
+      { record: { id: '1' }, company: 'a' },
+      { record: { id: 1 }, company: 'b' },
+    ]
+    const ids = skipDuplicatesIdentities(items, ['record.id', 'company'])
+    expect(new Set(ids).size).toBe(3)
+    expect(skipDuplicatesIdentities(items, ['company', 'record.id'])).toEqual(ids)
+    expect(skipDuplicatesIdentities([{ a: 1, b: 1 }], ['a'])).not.toEqual(skipDuplicatesIdentities([{ a: 1, b: 1 }], ['b']))
+    expect(await hashIdentities(ids)).toEqual(await hashIdentities(skipDuplicatesIdentities(items, ['company', 'record.id'])))
+    expect(
+      new Set(
+        skipDuplicatesIdentities(
+          [
+            { a: 'x:y', b: 'z' },
+            { a: 'x', b: 'y:z' },
+          ],
+          ['a', 'b'],
+        ),
+      ).size,
+    ).toBe(2)
   })
-  it('compares timestamps by instant, including offsets and equal batch values', () => {
-    expect(increasingIdentities(['2026-10-30T09:00:00+08:00', '2026-10-30T01:00:00Z', '2026-10-30T02:00:00Z'], '2026-10-30T00:00:00Z')).toEqual({
-      inserted: [true, false, true],
-      watermark: '2026-10-30T02:00:00Z',
-    })
+  it('supports scalar lists without fields, including empty strings and numeric zero', () => {
+    const ids = skipDuplicatesIdentities(['', 0, -0, 1, '1'], [])
+    expect(ids[1]).toBe(ids[2])
+    expect(ids[3]).not.toBe(ids[4])
+    expect(skipDuplicatesIdentities([], [])).toEqual([])
   })
-  it('rejects ambiguous times, invalid dates and mixed watermark types', () => {
-    for (const value of ['2026-02-30T00:00:00Z', '2026-10-30', '2026-10-30T00:00:00', '2026-10-30T24:00:00Z', '2026-10-30T00:00:00.0001Z'])
-      expect(() => watermarkValue(value)).toThrow()
-    expect(() => increasingIdentities([1, '2026-10-30T00:00:00Z'], null)).toThrow()
-    expect(() => increasingIdentities([1], '2026-10-30T00:00:00Z')).toThrow()
+  it.each([undefined, null, {}, [], true])('identifies the item and invalid field value %j', (value) => {
+    expect(() => skipDuplicatesIdentities([{ id: 1 }, value === undefined ? {} : { id: value }], ['id'])).toThrow('Item 2, field "id"')
+  })
+  it('rejects complex scalar items and invalid configurations instead of accepting retired options', () => {
+    expect(() => skipDuplicatesIdentities([{}], [])).toThrow('the item itself')
+    expect(() => skipDuplicatesIdentities(null, [])).toThrow('array')
+    for (const fields of [[''], ['a..b'], ['a', 'a']]) expect(skipDuplicatesConfigSchema.safeParse({ fields }).success).toBe(false)
+    expect(skipDuplicatesConfigSchema.safeParse({ field: 'id', mode: 'new', space: 'node' }).success).toBe(false)
   })
 })

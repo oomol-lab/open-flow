@@ -396,11 +396,12 @@ HTTP node start event. Run `bun run lab test http-request` and
 
 ## Flow State reference scenario
 
-`flow-state` builds an hourly Cron → HTTP Request → Code array validation → Remove Duplicates →
-Outputs flow through public authoring. The deterministic HTTP fixture returns a list with a
-repeated identity. Verification executes the same Draft twice: the first Run emits the two new
-items and one duplicate; the second emits no new items and three duplicates. The scenario also
-renames the dedupe node to verify that history belongs to node identity, not its display name.
+`flow-state` builds an hourly Cron → HTTP Request → Code array validation → Skip Duplicates →
+a downstream Code step → Outputs flow through public authoring. The deterministic HTTP fixture returns
+a list with a repeated identity. Verification executes three Runs: the first fails downstream after
+filtering; its successful retry still emits two new items and one duplicate; the final Run emits no
+new items and three duplicates. The Code step uses an unbound boolean `fail` input to request the failure. The scenario also
+renames the Skip Duplicates node to verify that history belongs to node identity, not its display name.
 
 ```bash
 bun run lab test flow-state

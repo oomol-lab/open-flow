@@ -24,6 +24,16 @@ export function runtimeAssertions(
       errors.push('Missing orders must fail at the formatter with the original missing-list error.')
     return errors
   }
+  if (id === 'flow-state' && sample.name === 'failed') {
+    if (status !== 'failed' || !events.some((event) => event.kind === 'node.failed' && event.payload.error.message.includes('Requested downstream failure')))
+      errors.push('The requested downstream failure must fail the Run after Skip Duplicates.')
+    const filterId = Object.entries(content.document.graph.nodes).find(
+      ([, node]) => node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'skip-duplicates',
+    )?.[0]
+    const filtered = events.find((event) => event.kind === 'node.completed' && event.payload.nodeId === filterId)
+    if (filtered == null) errors.push('Skip Duplicates must complete before the downstream failure.')
+    return errors
+  }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
   if (id === 'flow-state') {
     const result = events.find((event) => event.kind === 'run.completed')?.payload.result
@@ -32,7 +42,7 @@ export function runtimeAssertions(
       { id: 2, title: 'Two' },
     ]
     const duplicate = { id: 1, title: 'Duplicate' }
-    const expected = sample.name === 'first' ? { items, duplicates: [duplicate] } : { items: [], duplicates: [...items, duplicate] }
+    const expected = sample.name === 'retried' ? { items, duplicates: [duplicate] } : { items: [], duplicates: [...items, duplicate] }
     if (result == null || typeof result !== 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, expected))
       errors.push('Persist history between Cron Runs and return only new HTTP items, preserving order.')
     return errors

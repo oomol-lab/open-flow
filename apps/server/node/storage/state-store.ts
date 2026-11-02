@@ -1,11 +1,11 @@
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
-import type { DedupeIdentity, FlowStateView, StateScope } from '@oomol-lab/open-flow/flow-state'
+import type { FlowStateView, StateScope } from '@oomol-lab/open-flow/flow-state'
 import type { DatabaseSync } from 'node:sqlite'
 
-import { increasingIdentities, StateError } from '@oomol-lab/open-flow/flow-state'
+import { StateError } from '@oomol-lab/open-flow/flow-state'
 
 export const stateLimits = { maxValueBytes: 64 * 1024, maxValues: 1_000, maxSpaces: 100, maxIdentities: 10_000, maxRunWrites: 1_000 }
-type SpaceRow = { mode: 'new' | 'increasing'; count: number; watermark_json: string | null; updated_at: number }
+type SpaceRow = { space: string; count: number; updated_at: number }
 
 export class StateStore {
   readonly database: DatabaseSync
@@ -72,77 +72,121 @@ export class StateStore {
   }
 
   has(flowId: string, scope: StateScope, space: string, hashes: readonly Uint8Array[]): boolean[] {
-    const row = this.#space(flowId, scope, space)
-    if (row?.mode === 'increasing') throw new StateError('capability.invalid', 'Set membership is unavailable for a watermark space.')
     const query = this.database.prepare('SELECT 1 FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space = ? AND identity = ?')
     return hashes.map((hash) => query.get(flowId, scope, space, hash) != null)
   }
 
-  insert(
-    flowId: string,
-    scope: StateScope,
-    space: string,
-    mode: 'new' | 'increasing',
-    ids: readonly DedupeIdentity[],
-    hashes: readonly Uint8Array[],
-  ): boolean[] {
+  /** Code's explicit set operations persist immediately. */
+  insert(flowId: string, scope: StateScope, space: string, hashes: readonly Uint8Array[]): boolean[] {
     return this.transaction(() => {
-      const old = this.#space(flowId, scope, space)
-      if (ids.length === 0 && (old == null || old.mode === mode)) return []
-      const previous = old?.mode === mode ? old : undefined
-      if (Buffer.byteLength(space) > 256) throw new StateError('capability.invalid', 'Deduplication space names must not exceed 256 UTF-8 bytes.')
-      if (old == null) {
-        const { count } = this.database.prepare('SELECT COUNT(*) AS count FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ?').get(flowId, scope) as {
-          count: number
-        }
-        if (count >= this.limits.maxSpaces) throw new StateError('dedupe.full', 'Flow deduplication space limit reached. Clear unused history.')
-      }
+      const present = this.has(flowId, scope, space, hashes)
+      const seen = new Set<string>()
+      const inserted = hashes.map((hash, index) => {
+        const key = Buffer.from(hash).toString('hex')
+        const fresh = !present[index] && !seen.has(key)
+        seen.add(key)
+        return fresh
+      })
+      this.#reserve(flowId, scope, space, hashes)
+      if (hashes.length === 0) return inserted
       const now = this.clock()
-      let inserted: boolean[]
-      let watermark: DedupeIdentity | null = null
-      let count: number
-      if (mode === 'increasing') {
-        const result = increasingIdentities(ids, previous?.watermark_json == null ? null : (JSON.parse(previous.watermark_json) as DedupeIdentity))
-        inserted = result.inserted
-        watermark = result.watermark
-        count = 0
-      } else {
-        const query = this.database.prepare('SELECT 1 FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space = ? AND identity = ?')
-        const seen = new Set<string>()
-        inserted = hashes.map((hash) => {
-          const key = Buffer.from(hash).toString('hex')
-          const fresh = !seen.has(key) && (previous == null || query.get(flowId, scope, space, hash) == null)
-          seen.add(key)
-          return fresh
-        })
-        const added = inserted.filter(Boolean).length
-        count = (previous?.count ?? 0) + added
-        if (added > 0 && this.dedupeCount(flowId, scope) - (old?.count ?? 0) + count > this.limits.maxIdentities)
-          throw new StateError('dedupe.full', 'Flow deduplication history is full. Clear history or use increasing mode.')
-      }
-      if (old != null && previous == null)
-        this.database.prepare('DELETE FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space = ?').run(flowId, scope, space)
-      if (mode === 'new') {
-        const write = this.database.prepare('INSERT INTO flow_dedupe_identities VALUES (?, ?, ?, ?, ?)')
-        hashes.forEach((hash, index) => {
-          if (inserted[index]) write.run(flowId, scope, space, hash, now)
-        })
-      }
-      this.database
-        .prepare(
-          'INSERT INTO flow_dedupe_spaces VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (flow_id, scope, space) DO UPDATE SET mode = excluded.mode, count = excluded.count, watermark_json = excluded.watermark_json, updated_at = excluded.updated_at',
-        )
-        .run(flowId, scope, space, mode, count, watermark == null ? null : JSON.stringify(watermark), now)
+      const write = this.database.prepare('INSERT OR IGNORE INTO flow_dedupe_identities VALUES (?, ?, ?, ?, ?)')
+      hashes.forEach((hash, index) => {
+        if (inserted[index]) write.run(flowId, scope, space, hash, now)
+      })
+      this.#updateSpace(flowId, scope, space, now)
       return inserted
     })
   }
 
+  /** Only committed history and this Run's provisional history suppress items. */
+  stage(flowId: string, scope: StateScope, runId: string, jobId: string, nodeId: string, hashes: readonly Uint8Array[]): boolean[] {
+    return this.transaction(() => {
+      const active = this.database
+        .prepare("SELECT 1 FROM runs WHERE run_id = ? AND flow_id = ? AND source = ? AND status = 'running'")
+        .get(runId, flowId, scope)
+      if (active == null) throw new StateError('capability.denied', 'Skip Duplicates requires an active Run.')
+      const space = `node:${nodeId}`
+      const present = this.has(flowId, scope, space, hashes)
+      const provisional = this.database.prepare('SELECT 1 FROM flow_dedupe_pending WHERE run_id = ? AND space = ? AND identity = ?')
+      const seen = new Set<string>()
+      const inserted = hashes.map((hash, index) => {
+        const key = Buffer.from(hash).toString('hex')
+        const fresh = !present[index] && !seen.has(key) && provisional.get(runId, space, hash) == null
+        seen.add(key)
+        return fresh
+      })
+      this.#reserve(
+        flowId,
+        scope,
+        space,
+        hashes.filter((_, index) => inserted[index]),
+      )
+      const write = this.database.prepare('INSERT INTO flow_dedupe_pending VALUES (?, ?, ?, ?, ?, ?, ?)')
+      hashes.forEach((hash, index) => {
+        if (inserted[index]) write.run(runId, jobId, flowId, scope, space, hash, this.clock())
+      })
+      return inserted
+    })
+  }
+
+  discardInvocation(runId: string, jobId: string): void {
+    this.database.prepare('DELETE FROM flow_dedupe_pending WHERE run_id = ? AND job_id = ?').run(runId, jobId)
+  }
+
+  /** Called inside the authoritative Run terminal transaction; never opens a nested transaction. */
+  finishRun(runId: string, completed: boolean): void {
+    if (completed) {
+      const spaces = this.database.prepare('SELECT DISTINCT flow_id, scope, space FROM flow_dedupe_pending WHERE run_id = ?').all(runId) as {
+        flow_id: string
+        scope: StateScope
+        space: string
+      }[]
+      this.database
+        .prepare(`INSERT OR IGNORE INTO flow_dedupe_identities (flow_id, scope, space, identity, recorded_at)
+        SELECT flow_id, scope, space, identity, MIN(recorded_at) FROM flow_dedupe_pending WHERE run_id = ? GROUP BY flow_id, scope, space, identity`)
+        .run(runId)
+      for (const row of spaces) this.#updateSpace(row.flow_id, row.scope, row.space, this.clock())
+    }
+    this.database.prepare('DELETE FROM flow_dedupe_pending WHERE run_id = ?').run(runId)
+  }
+
+  /** Reserved identities are counted once across overlapping Runs and committed history. */
   dedupeCount(flowId: string, scope: StateScope): number {
     return (
-      this.database.prepare('SELECT COALESCE(SUM(count), 0) AS count FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ?').get(flowId, scope) as {
-        count: number
-      }
+      this.database
+        .prepare(`SELECT COUNT(*) AS count FROM (
+      SELECT space, identity FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ?
+      UNION SELECT space, identity FROM flow_dedupe_pending WHERE flow_id = ? AND scope = ?
+    )`)
+        .get(flowId, scope, flowId, scope) as { count: number }
     ).count
+  }
+
+  #reserve(flowId: string, scope: StateScope, space: string, hashes: readonly Uint8Array[]): void {
+    if (hashes.length === 0) return
+    if (Buffer.byteLength(space) > 256) throw new StateError('capability.invalid', 'Deduplication space names must not exceed 256 UTF-8 bytes.')
+    const spaces = this.database
+      .prepare(`SELECT space FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ?
+      UNION SELECT space FROM flow_dedupe_pending WHERE flow_id = ? AND scope = ?`)
+      .all(flowId, scope, flowId, scope) as { space: string }[]
+    if (!spaces.some((item) => item.space === space) && spaces.length >= this.limits.maxSpaces)
+      throw new StateError('dedupe.full', 'Flow deduplication space limit reached. Clear unused history.')
+    const reserved = this.database.prepare(`SELECT 1 FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space = ? AND identity = ?
+      UNION ALL SELECT 1 FROM flow_dedupe_pending WHERE flow_id = ? AND scope = ? AND space = ? AND identity = ? LIMIT 1`)
+    const additional = new Set(
+      hashes.filter((hash) => reserved.get(flowId, scope, space, hash, flowId, scope, space, hash) == null).map((hash) => Buffer.from(hash).toString('hex')),
+    ).size
+    if (additional > 0 && this.dedupeCount(flowId, scope) + additional > this.limits.maxIdentities)
+      throw new StateError('dedupe.full', 'Flow deduplication history is full. Clear unused history.')
+  }
+
+  #updateSpace(flowId: string, scope: StateScope, space: string, now: number): void {
+    this.database
+      .prepare(`INSERT INTO flow_dedupe_spaces (flow_id, scope, space, count, updated_at)
+      VALUES (?, ?, ?, (SELECT COUNT(*) FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space = ?), ?)
+      ON CONFLICT (flow_id, scope, space) DO UPDATE SET count = excluded.count, updated_at = excluded.updated_at`)
+      .run(flowId, scope, space, flowId, scope, space, now)
   }
 
   clearValues(flowId: string, scope: StateScope, key?: string): void {
@@ -153,10 +197,13 @@ export class StateStore {
     })
   }
 
-  clearSpace(flowId: string, scope: StateScope, space: string): void {
-    this.transaction(() => {
+  clearSpace(flowId: string, scope: StateScope, space: string): boolean {
+    return this.transaction(() => {
+      if (this.database.prepare('SELECT 1 FROM flow_dedupe_pending WHERE flow_id = ? AND scope = ? AND space = ? LIMIT 1').get(flowId, scope, space) != null)
+        return false
       this.database.prepare('DELETE FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space = ?').run(flowId, scope, space)
       this.database.prepare('DELETE FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ? AND space = ?').run(flowId, scope, space)
+      return true
     })
   }
 
@@ -164,9 +211,12 @@ export class StateStore {
     const values = this.database
       .prepare(`SELECT key, size, updated_at${includeValues ? ', value_json' : ''} FROM flow_state_values WHERE flow_id = ? AND scope = ? ORDER BY key`)
       .all(flowId, scope) as { key: string; size: number; updated_at: number; value_json?: string }[]
-    const spaces = this.database.prepare('SELECT * FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ? ORDER BY space').all(flowId, scope) as (SpaceRow & {
-      space: string
-    })[]
+    const spaces = this.database
+      .prepare(`SELECT space, MAX(count) AS count, MAX(updated_at) AS updated_at FROM (
+      SELECT space, count, updated_at FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ?
+      UNION ALL SELECT space, 0 AS count, recorded_at AS updated_at FROM flow_dedupe_pending WHERE flow_id = ? AND scope = ?
+    ) GROUP BY space ORDER BY space`)
+      .all(flowId, scope, flowId, scope) as SpaceRow[]
     return {
       version: 1,
       scope,
@@ -177,19 +227,20 @@ export class StateStore {
           row.value_json == null ? {} : { value: JSON.parse(row.value_json) as JsonValue },
         ),
       ),
-      spaces: spaces.map((row) => ({
-        space: row.space,
-        mode: row.mode,
-        count: row.count,
-        updatedAt: row.updated_at,
-        watermark: row.watermark_json == null ? null : (JSON.parse(row.watermark_json) as DedupeIdentity),
-      })),
+      spaces: spaces.map((row) => {
+        const pending = this.database
+          .prepare(`SELECT COUNT(DISTINCT identity) AS count, COUNT(DISTINCT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM flow_dedupe_identities i WHERE i.flow_id = p.flow_id AND i.scope = p.scope AND i.space = p.space AND i.identity = p.identity
+          ) THEN identity END) AS additional FROM flow_dedupe_pending p WHERE flow_id = ? AND scope = ? AND space = ?`)
+          .get(flowId, scope, row.space) as { count: number; additional: number }
+        return {
+          space: row.space,
+          count: row.count,
+          pendingCount: pending.count,
+          reservedCount: row.count + pending.additional,
+          updatedAt: row.updated_at,
+        }
+      }),
     }
-  }
-
-  #space(flowId: string, scope: StateScope, space: string): SpaceRow | undefined {
-    return this.database.prepare('SELECT * FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ? AND space = ?').get(flowId, scope, space) as
-      | SpaceRow
-      | undefined
   }
 }

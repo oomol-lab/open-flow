@@ -11,8 +11,8 @@ export const scenarios = [
     id: 'flow-state',
     entry: { kind: 'cron' },
     name: 'Fetch only new HTTP items',
-    version: 1,
-    task: 'Create an hourly Cron trigger, an HTTP Request that fetches a JSON list using an unbound url input, and a Remove Duplicates node using the id field in its node space. Return items and duplicates through Outputs. Rename the dedupe node to New items in a later edit without changing its mode, space or bindings. Check the workflow. Verification supplies the HTTP URL and simulates two Cron Runs against the same list; the second Run must return no new items.',
+    version: 2,
+    task: 'Create an hourly Cron trigger, an HTTP Request that fetches a JSON list using an unbound url input, and a Skip Duplicates node using the id field. Add a downstream Code step that accepts unbound boolean fail: when true throw "Requested downstream failure", otherwise forward items and duplicates through Outputs. Rename the Skip Duplicates node to New items in a later edit without changing its identity fields or bindings. Check the workflow. Verification supplies the HTTP URL and simulates a failed Run, a successful retry and another successful Run against the same list. The retry must still return both new items; the final Run must return no new items.',
   },
   {
     id: 'http-request',
@@ -414,7 +414,13 @@ export function samples(id: string, stage = 0): Sample[] {
       },
     }))
   if (id == 'flow-state')
-    return ['first', 'second'].map((name) => ({ name, orders: [], order, outputs: { scheduledAt: '2026-10-30T00:00:00Z' }, parameters: { url: '' } }))
+    return ['failed', 'retried', 'repeated'].map((name) => ({
+      name,
+      orders: [],
+      order,
+      outputs: { scheduledAt: '2026-10-30T00:00:00Z' },
+      parameters: { url: '', fail: name === 'failed' },
+    }))
   if (id == 'http-request')
     return [null, { message: 'Hello', count: 0 }].map((payload) => ({
       name: payload == null ? 'null-body' : 'json-body',
@@ -527,10 +533,9 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
     const filtered = Object.values(current.document.graph.nodes).find((candidate) => candidate.name === 'New items')
     return filtered?.kind === 'task' &&
       'executor' in filtered.task &&
-      filtered.task.executor.kind === 'dedupe' &&
-      filtered.task.executor.field === 'id' &&
-      filtered.task.executor.mode === 'new' &&
-      filtered.task.executor.space === 'node'
+      filtered.task.executor.kind === 'skip-duplicates' &&
+      filtered.task.executor.fields.length === 1 &&
+      filtered.task.executor.fields[0] === 'id'
       ? []
       : ['Preserve the dedupe configuration while renaming.']
   }

@@ -394,10 +394,51 @@ describe('business configuration authoring contracts', () => {
     })
   })
 
+  it('rejects retired node and config shapes without silently converting them', () => {
+    expect(() =>
+      decodeRevisionContent({
+        ...empty,
+        document: {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: {
+              old: {
+                kind: 'task',
+                name: 'Old node',
+                inputs: {},
+                task: { name: 'Old node', inputs: [], outputs: [], executor: { kind: 'dedupe', field: 'id', mode: 'new', space: 'node' } },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow()
+    expect(() =>
+      decodeRevisionContent({
+        ...empty,
+        document: {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: {
+              old: {
+                kind: 'task',
+                name: 'Old config',
+                inputs: {},
+                task: { name: 'Old config', inputs: [], outputs: [], executor: { kind: 'skip-duplicates', field: 'id', mode: 'new', space: 'node' } },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow()
+  })
+
   it('advertises dedupe error handling independently from retries', async () => {
-    const contract = authoringSchema('dedupe')
+    const contract = authoringSchema('skip-duplicates')
     expect(contract).toMatchObject({ onError: { enum: ['stop', 'error'] }, retry: false })
-    const created = await edit(empty, [{ op: 'node.add', type: 'dedupe', as: 'step', name: 'Dedupe', onError: 'error' }])
+    const created = await edit(empty, [{ op: 'node.add', type: 'skip-duplicates', as: 'step', name: 'Dedupe', onError: 'error' }])
     expect(authoringNode(created.content, created.nodes.step!).onError).toBe('error')
     await roundTrip(created.content, created.nodes.step!)
   })

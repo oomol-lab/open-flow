@@ -6,7 +6,7 @@ import { limitDecisionTask } from '../../decision/common/decision.ts'
 import { assertHttpAuthBindings } from '../../http/common/authBindings.ts'
 import { isHttpHost, maxHttpHosts } from '../../http/common/hosts.ts'
 import { httpRequestExecutorSchema } from '../../http/common/httpRequest.ts'
-import { dedupeExecutorSchema } from '../../state/common/state.ts'
+import { skipDuplicatesExecutorSchema } from '../../state/common/state.ts'
 import { checkJsonDepth } from './json.ts'
 import { retryConfigurationSchema } from './retry.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
@@ -130,7 +130,7 @@ const managedFields = z.object({
     }),
     z.strictObject({ kind: z.literal('workflow'), flowId: text, revisionId: text }),
     httpRequestExecutorSchema,
-    dedupeExecutorSchema,
+    skipDuplicatesExecutorSchema,
   ]),
 })
 
@@ -729,10 +729,10 @@ function checkModelVersion(content: RevisionContent): void {
   if (
     content.modelVersion < 13 &&
     Object.values(content.document.graph.nodes).some(
-      (candidateNode) => candidateNode.kind === 'task' && 'executor' in candidateNode.task && candidateNode.task.executor.kind === 'dedupe',
+      (candidateNode) => candidateNode.kind === 'task' && 'executor' in candidateNode.task && candidateNode.task.executor.kind === 'skip-duplicates',
     )
   )
-    throw new Error('Deduplication requires Flow model v13.')
+    throw new Error('Skip Duplicates requires Flow model v13.')
   if (
     content.modelVersion < 12 &&
     Object.values(content.document.graph.nodes).some(

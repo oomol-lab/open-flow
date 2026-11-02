@@ -1,5 +1,5 @@
 import type { JsonValue } from '../../flow/common/model.ts'
-import type { DedupeConfig } from './state.ts'
+import type { SkipDuplicatesConfig } from './state.ts'
 
 import { dequal } from 'dequal/lite'
 
@@ -7,31 +7,26 @@ export interface StateConformanceHarness {
   readonly maxIdentities: number
   /** Executes Code on the same initially empty Flow and scope on every call; returns its `result` output. */
   run(source: string): Promise<JsonValue>
-  /** Executes the same dedupe node across Runs, updating its business config and items. */
-  dedupe(config: DedupeConfig, items: JsonValue[]): Promise<{ items: JsonValue[]; duplicates: JsonValue[] }>
+  /** Executes the same Skip Duplicates node across Runs, updating its business config and items. */
+  skipDuplicates(config: SkipDuplicatesConfig, items: JsonValue[]): Promise<{ items: JsonValue[]; duplicates: JsonValue[] }>
 }
 
 export const stateConformanceCases: readonly { name: string; verify(harness: StateConformanceHarness): Promise<void> }[] = [
   {
-    name: 'persists watermarks by instant and resets changed modes atomically',
+    name: 'skips composite identities across successful Runs without depending on field order',
     async verify(harness) {
-      const config: DedupeConfig = { field: '', mode: 'increasing', space: 'node' }
-      const first = await harness.dedupe(config, ['2026-10-30T09:00:00+08:00', '2026-10-30T01:00:00Z', '2026-10-30T02:00:00Z'])
-      if (!dequal(first, { items: ['2026-10-30T09:00:00+08:00', '2026-10-30T02:00:00Z'], duplicates: ['2026-10-30T01:00:00Z'] }))
-        throw new Error('Watermarks must compare instants and preserve item order.')
-      let rejected = false
-      try {
-        await harness.dedupe(config, [1])
-      } catch {
-        rejected = true
-      }
-      if (!rejected) throw new Error('Mixed watermark types must fail.')
-      const second = await harness.dedupe(config, ['2026-10-30T02:00:00Z', '2026-10-30T03:00:00Z'])
-      if (!dequal(second, { items: ['2026-10-30T03:00:00Z'], duplicates: ['2026-10-30T02:00:00Z'] }))
-        throw new Error('A failed batch must preserve the previous watermark.')
-      await harness.dedupe({ ...config, mode: 'new' }, [])
-      const reset = await harness.dedupe(config, [5, 3, 5])
-      if (!dequal(reset, { items: [5, 3], duplicates: [5] })) throw new Error('A mode reset must discard previous watermarks, including on empty batches.')
+      const items = [
+        { company: 'a', id: 1 },
+        { company: 'b', id: 1 },
+        { company: 'a', id: 1 },
+      ]
+      const first = await harness.skipDuplicates({ fields: ['company', 'id'] }, items)
+      if (!dequal(first, { items: items.slice(0, 2), duplicates: [items[2]] }))
+        throw new Error('Composite identities must retain the first item in input order.')
+      const second = await harness.skipDuplicates({ fields: ['id', 'company'] }, items)
+      if (!dequal(second, { items: [], duplicates: items })) throw new Error('Successful Run history must persist independently of field order.')
+      const changed = await harness.skipDuplicates({ fields: ['id'] }, items)
+      if (!dequal(changed, { items: [items[0]], duplicates: items.slice(1) })) throw new Error('The field definition must participate in identity.')
     },
   },
   {

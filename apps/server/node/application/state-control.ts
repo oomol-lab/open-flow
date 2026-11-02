@@ -32,7 +32,8 @@ export class StateControl {
     this.access.authorize(actorId, { flowId })
     const parsed = dedupeClearSchema.safeParse(query)
     if (!parsed.success) throw new ControlError(controlErrorCode.flowInvalid, parsed.error.message)
-    this.store.clearSpace(flowId, parsed.data.scope, parsed.data.space)
+    if (!this.store.clearSpace(flowId, parsed.data.scope, parsed.data.space))
+      throw new ControlError(controlErrorCode.flowConflict, 'This history has pending Run records. Finish or cancel those Runs before clearing it.')
     return { version: 1 as const, cleared: true as const }
   }
 }

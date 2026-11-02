@@ -2,7 +2,7 @@ import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { dedupeTask, stateConformanceCases } from '@oomol-lab/open-flow/flow-state'
+import { skipDuplicatesTask, stateConformanceCases } from '@oomol-lab/open-flow/flow-state'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -17,10 +17,10 @@ afterEach(async () => {
   await closeOpenServices()
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
-async function createService(stateLimits?: import('../node/application/service-options.ts').ServerRuntime['stateLimits']) {
+async function createService(stateLimits?: import('../node/application/service-options.ts').ServerRuntime['stateLimits'], runTimeoutMs?: number) {
   const directory = await mkdtemp(path.join(tmpdir(), 'flow-state-'))
   directories.push(directory)
-  const service = await openService(path.join(directory, 'state.sqlite'), { runtime: { stateLimits } })
+  const service = await openService(path.join(directory, 'state.sqlite'), { runtime: { stateLimits, runTimeoutMs } })
   await startService(service)
   return service
 }
@@ -94,15 +94,15 @@ it('records node history across Runs and separates node and shared Flow spaces',
             kind: 'task',
             name: 'Filter',
             inputs: { items: { kind: 'value', value: [{ id: 1 }, { id: 1 }, { id: 2 }] } },
-            task: dedupeTask({ field: 'id', mode: 'new', space: 'node' }),
+            task: skipDuplicatesTask({ fields: ['id'] }),
           },
         },
       },
     },
   }
-  const stored = await storeRevision(host, revision, 'dedupe')
+  const stored = await storeRevision(host, revision, 'skip-duplicates')
   for (const index of [1, 2]) {
-    const accepted = await acceptRun(host, { flowId: stored.flowId, revision, revisionId: 'dedupe', idempotencyKey: `node-${index}` })
+    const accepted = await acceptRun(host, { flowId: stored.flowId, revision, revisionId: 'skip-duplicates', idempotencyKey: `node-${index}` })
     if (accepted.kind !== 'accepted') throw new Error('Run not accepted')
     await host.waitForIdle()
     expect(host.events(accepted.runId).find((event) => event.kind === 'node.completed' && event.payload.nodeId === 'filter')?.value).toEqual(
@@ -136,12 +136,12 @@ for (const scenario of stateConformanceCases)
     const host = await createService()
     let identity = 0
     let dedupeRevision: { flowId: string; revisionId: string } | undefined
-    let previousTask = dedupeTask()
+    let previousTask = skipDuplicatesTask()
     let previousItems: import('@oomol-lab/open-flow/flow-change').JsonValue[] = []
     await scenario.verify({
       maxIdentities: 10000,
-      dedupe: async (config, items) => {
-        const task = dedupeTask(config)
+      skipDuplicates: async (config, items) => {
+        const task = skipDuplicatesTask(config)
         if (dedupeRevision == null) {
           dedupeRevision = await storeRevision(
             host,
@@ -153,7 +153,7 @@ for (const scenario of stateConformanceCases)
                 graph: { edges: [], nodes: { filter: { kind: 'task', name: 'Filter', inputs: { items: { kind: 'value', value: items } }, task } } },
               },
             },
-            'watermarks',
+            'identity-fields',
           )
         } else {
           const changed = await host.control.drafts.changeDraft('test', dedupeRevision.flowId, dedupeRevision.revisionId, [
@@ -176,7 +176,7 @@ for (const scenario of stateConformanceCases)
           dedupeRevision.revisionId,
           currentEngineContract,
           {},
-          `watermark-${identity++}`,
+          `identity-${identity++}`,
           { nodeId: 'start', outputs: {} },
         )
         await host.waitForIdle()
@@ -295,7 +295,7 @@ it.each([1, 2])('handles managed-node capacity failures and reports usage withou
             name: 'Filter',
             onError: 'error',
             inputs: { items: { kind: 'value', value: ['private-a', 'private-b'] } },
-            task: dedupeTask(),
+            task: skipDuplicatesTask(),
           },
         },
       },
@@ -315,4 +315,120 @@ it.each([1, 2])('handles managed-node capacity failures and reports usage withou
     expect(logs).toContain('dedupe.near-limit')
     expect(logs).not.toContain('private-')
   }
+})
+
+function skipFlow(source: string, onError?: 'error'): RevisionContent {
+  const code = codeFlow(source, onError)
+  return {
+    ...code,
+    document: {
+      ...code.document,
+      graph: {
+        edges: [{ source: 'filter', target: 'code' }],
+        nodes: {
+          ...code.document.graph.nodes,
+          filter: {
+            kind: 'task',
+            name: 'Skip Duplicates',
+            inputs: { items: { kind: 'value', value: [{ id: 1 }, { id: 1 }, { id: 2 }] } },
+            task: skipDuplicatesTask({ fields: ['id'] }),
+          },
+        },
+      },
+    },
+  }
+}
+
+it.each([false, true])('commits Skip Duplicates only after Run success while Code writes remain immediate (handled=%s)', async (handled) => {
+  const host = await createService()
+  const revision = skipFlow(
+    `export default async (_, context) => {
+    await context.state.set('attempts', (await context.state.get('attempts') ?? 0) + 1);
+    throw new Error('downstream failed');
+  }`,
+    handled ? 'error' : undefined,
+  )
+  const stored = await storeRevision(host, revision, 'downstream')
+  for (const index of [1, 2]) {
+    const accepted = await acceptRun(host, { flowId: stored.flowId, revision, revisionId: 'downstream', idempotencyKey: `attempt-${index}` })
+    if (accepted.kind !== 'accepted') throw new Error('Run not accepted')
+    await host.waitForIdle()
+    expect(host.run(accepted.runId)?.status).toBe(handled ? 'completed' : 'failed')
+    const output = host.events(accepted.runId).find((event) => event.kind === 'node.completed' && event.payload.nodeId === 'filter')?.value
+    expect(output).toMatchObject({ items: handled && index === 2 ? [] : [{ id: 1 }, { id: 2 }] })
+    const state = host.control.state.read('test', stored.flowId, { scope: 'draft', values: true })
+    expect(state.spaces).toEqual(handled ? [expect.objectContaining({ count: 2, pendingCount: 0 })] : [])
+    expect(state.values[0]?.value).toBe(index)
+  }
+})
+
+it.each(['cancel', 'timeout'] as const)('releases pending node history on %s', async (outcome) => {
+  const host = await createService(undefined, outcome === 'timeout' ? 500 : undefined)
+  const revision = skipFlow('export default async () => { await new Promise(() => {}); return {result: null} }')
+  const stored = await storeRevision(host, revision, 'pending')
+  const accepted = await acceptRun(host, { flowId: stored.flowId, revision, revisionId: 'pending', idempotencyKey: outcome })
+  if (accepted.kind !== 'accepted') throw new Error('Run not accepted')
+  await expect.poll(() => host.control.state.read('test', stored.flowId, { scope: 'draft' }).spaces[0]?.pendingCount).toBe(2)
+  expect(() => host.control.state.clearDedupe('test', stored.flowId, { scope: 'draft', space: 'node:filter' })).toThrow(
+    expect.objectContaining({ code: 'flow.conflict' }),
+  )
+  if (outcome === 'cancel') host.control.runs.cancelRun('test', accepted.runId)
+  await host.waitForIdle()
+  expect(host.run(accepted.runId)?.status).toBe(outcome === 'cancel' ? 'canceled' : 'failed')
+  expect(host.control.state.read('test', stored.flowId, { scope: 'draft' }).spaces).toEqual([])
+})
+
+it('rejects the complete invalid identity batch even when the node error is handled', async () => {
+  const host = await createService()
+  const base = skipFlow('export default () => ({result: true})')
+  const revision: RevisionContent = {
+    ...base,
+    document: {
+      ...base.document,
+      graph: {
+        ...base.document.graph,
+        nodes: {
+          ...base.document.graph.nodes,
+          filter: {
+            kind: 'task',
+            name: 'Skip Duplicates',
+            onError: 'error',
+            task: skipDuplicatesTask({ fields: ['id'] }),
+            inputs: { items: { kind: 'value', value: [{ id: 1 }, { id: null }] } },
+          },
+        },
+      },
+    },
+  }
+  const stored = await storeRevision(host, revision, 'invalid-batch')
+  const accepted = await acceptRun(host, { flowId: stored.flowId, revision, revisionId: 'invalid-batch', idempotencyKey: 'invalid' })
+  if (accepted.kind !== 'accepted') throw new Error('Run not accepted')
+  await host.waitForIdle()
+  expect(host.run(accepted.runId)?.status).toBe('completed')
+  expect(host.events(accepted.runId).find((event) => event.kind === 'node.failed')?.payload).toMatchObject({
+    handled: true,
+    error: { message: expect.stringContaining('Item 2, field "id"') },
+  })
+  expect(host.control.state.read('test', stored.flowId, { scope: 'draft' }).spaces).toEqual([])
+})
+
+it('keeps node history independent between real Draft and Live Runs', async () => {
+  const host = await createService()
+  const revision = skipFlow('export default () => ({result: true})')
+  const stored = await storeRevision(host, revision, 'node-scopes')
+  const app = createServerApp(host, { resolveControlActor: () => 'test' })
+  const client = new ControlClient(async (url, init) => app.request(url, init))
+  await client.publishFlow(stored.flowId, stored.revisionId, null)
+  await host.tickMaintenance()
+  const publicationId = (await client.getLive(stored.flowId)).publication!.publicationId
+  await client.createDraftRun(stored.flowId, stored.revisionId, { trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'draft' })
+  await host.waitForIdle()
+  expect((await client.getFlowState(stored.flowId, 'live')).spaces).toEqual([])
+  const live = await client.createLiveRun(publicationId, { trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'live' })
+  await host.waitForIdle()
+  expect(host.events(live.runId).find((event) => event.kind === 'node.completed' && event.payload.nodeId === 'filter')?.value).toMatchObject({
+    items: [{ id: 1 }, { id: 2 }],
+  })
+  expect((await client.getFlowState(stored.flowId, 'draft')).spaces).toMatchObject([{ count: 2, pendingCount: 0 }])
+  expect((await client.getFlowState(stored.flowId, 'live')).spaces).toMatchObject([{ count: 2, pendingCount: 0 }])
 })

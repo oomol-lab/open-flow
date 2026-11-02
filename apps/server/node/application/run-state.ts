@@ -62,7 +62,7 @@ export class RunState {
         active()
         if (call.kind === 'dedupe.has') return { status: 200, body: { present: this.store.has(run.flowId, scope, 'flow', hashes) } }
         write()
-        return { status: 200, body: { inserted: this.store.insert(run.flowId, scope, 'flow', 'new', ids, hashes) } }
+        return { status: 200, body: { inserted: this.store.insert(run.flowId, scope, 'flow', hashes) } }
       }
       default:
         throw new StateError('capability.denied', 'Unknown State capability.')

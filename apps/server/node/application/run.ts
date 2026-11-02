@@ -15,7 +15,7 @@ import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
-import { hashIdentities, itemIdentities, StateError } from '@oomol-lab/open-flow/flow-state'
+import { hashIdentities, skipDuplicatesIdentities, StateError } from '@oomol-lab/open-flow/flow-state'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { findEngineContract, resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
@@ -295,6 +295,7 @@ export class RunExecutor {
       const emit = async (event: Parameters<NonNullable<Parameters<IsolatedVmHost['run']>[1]['emit']>>[0] | ArtifactEvent): Promise<void> => {
         if (event.type == 'run.started' && event.runId == run.runId) return
         if ((event.type == 'node.completed' || event.type == 'node.failed') && 'jobId' in event) {
+          if (event.type === 'node.failed') this.#store.state.discardInvocation(run.runId, event.jobId)
           this.#cancelNodeTools(run.runId, event.jobId)
           this.#artifacts.discard(run.runId, event.jobId)
         }
@@ -434,26 +435,22 @@ export class RunExecutor {
     switch (executor.kind) {
       case 'workflow':
         return this.#invokeWorkflow(run, invocation.nodeId, invocation.jobId, invocation.input, node, invocation.workflowRunId)
-      case 'dedupe': {
+      case 'skip-duplicates': {
         if (run.source == null) throw new StateError('capability.denied', 'State requires a Run source.')
         const items = invocation.input.items!
-        const ids = itemIdentities(items, executor.field)
-        const hashes = executor.mode === 'new' ? await hashIdentities(ids) : []
+        const hashes = await hashIdentities(skipDuplicatesIdentities(items, executor.fields))
         invocation.signal.throwIfAborted()
         this.#store.state.reserveWrite(run.flowId, run.source, run.runId)
-        const space = executor.space === 'flow' ? 'flow' : `node:${invocation.nodeId}`
-        const inserted = this.#store.state.insert(run.flowId, run.source, space, executor.mode, ids, hashes)
-        if (executor.mode === 'new') {
-          const count = this.#store.state.dedupeCount(run.flowId, run.source)
-          const limit = this.#store.state.limits.maxIdentities
-          if (count >= limit * 0.8)
-            await report({
-              code: 'dedupe.near-limit',
-              count,
-              limit,
-              message: 'Flow deduplication history is at least 80% full. Clear history or use increasing mode.',
-            })
-        }
+        const inserted = this.#store.state.stage(run.flowId, run.source, run.runId, invocation.jobId, invocation.nodeId, hashes)
+        const count = this.#store.state.dedupeCount(run.flowId, run.source)
+        const limit = this.#store.state.limits.maxIdentities
+        if (count >= limit * 0.8)
+          await report({
+            code: 'dedupe.near-limit',
+            count,
+            limit,
+            message: 'Flow deduplication history is at least 80% full. Clear unused history.',
+          })
         const values = items as JsonValue[]
         return { items: values.filter((_, index) => inserted[index]), duplicates: values.filter((_, index) => !inserted[index]) }
       }

@@ -97,6 +97,7 @@ export class Store {
       { maxPendingRuns, runEventRetentionMs },
       {
         connectorTeams: this.connectorTeams,
+        state: this.state,
         flows: this.flows,
         environment,
         publications: this.publications,

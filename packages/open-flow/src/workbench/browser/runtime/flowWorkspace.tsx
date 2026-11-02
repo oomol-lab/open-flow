@@ -291,7 +291,7 @@ export function FlowEditor({
   const connections = useVal(store.connectors.$.pickerConnections)
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
-  const [stateTarget, setStateTarget] = useState<{ history?: { nodeId: string; space: string } }>()
+  const [stateTarget, setStateTarget] = useState<{ history?: { nodeId: string } }>()
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   useVal(store.runRequests.$.inputsLoaded)
   const busy = useVal(store.$.busy)
@@ -452,9 +452,8 @@ export function FlowEditor({
     <NodeHistoryContext.Provider
       value={(nodeId) => {
         const node = revision?.graph().nodes[nodeId]
-        if (flowId == null || node?.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'dedupe') return undefined
-        const space = node.task.executor.space === 'flow' ? 'flow' : `node:${nodeId}`
-        return { label: t('flowState.history'), onClick: () => setStateTarget({ history: { nodeId, space } }) }
+        if (flowId == null || node?.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'skip-duplicates') return undefined
+        return { label: t('flowState.history'), onClick: () => setStateTarget({ history: { nodeId } }) }
       }}
     >
       <CanvasHistoryScope
