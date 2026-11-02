@@ -1051,14 +1051,13 @@ export function createBase64() {
       const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0
       const bytes = new Uint8Array((text.length / 4) * 3 - padding)
       for (let index = 0, offset = 0; index < text.length; index += 4) {
-        const digits = [0, 1, 2, 3].map((position) => {
+        let value = 0
+        for (let position = 0; position < 4; position++) {
           const code = text.charCodeAt(index + position)
-          if (code == 61 && index + position >= text.length - padding) return 0
-          const value = code < 128 ? values[code]! : 255
-          if (value == 255) throw new TypeError('Base64 content is invalid.')
-          return value
-        })
-        const value = (digits[0]! << 18) | (digits[1]! << 12) | (digits[2]! << 6) | digits[3]!
+          const digit = code == 61 && index + position >= text.length - padding ? 0 : code < 128 ? values[code]! : 255
+          if (digit == 255) throw new TypeError('Base64 content is invalid.')
+          value = (value << 6) | digit
+        }
         if (offset < bytes.length) bytes[offset++] = value >> 16
         if (offset < bytes.length) bytes[offset++] = (value >> 8) & 255
         if (offset < bytes.length) bytes[offset++] = value & 255
