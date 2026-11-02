@@ -659,7 +659,7 @@ export function NodeInspector({
                   client={store.state}
                   flowId={store.$.flowId.value}
                   nodeIds={Object.keys(revision.graph()?.nodes ?? {})}
-                  space={task.executor.space === 'flow' ? 'flow' : `node:${selection!.id}`}
+                  history={{ nodeId: selection!.id, space: task.executor.space === 'flow' ? 'flow' : `node:${selection!.id}` }}
                 />
               ) : undefined
             }

@@ -1741,8 +1741,10 @@ a dedupe space does not touch business values or other spaces.
 contain `key`, JSON UTF-8 byte `size`, and epoch-millisecond `updatedAt`; `value` is included only when
 requested. Space entries contain `space`, `mode`, `count`, `watermark`, and epoch-millisecond
 `updatedAt`. Hashes and original identity lists are never returned. Deleted-node spaces remain
-visible until explicitly cleared. Limits are `maxValueBytes` (65,536), `maxValues` (1,000), `maxIdentities` (10,000),
-`maxSpaces` (100), and `maxRunWrites` (1,000). Each Flow/source has independent limits.
+visible until explicitly cleared. Server defaults are `maxValueBytes` (65,536), `maxValues` (1,000), `maxIdentities` (10,000),
+`maxSpaces` (100), and `maxRunWrites` (1,000). Deployments can override these through
+`ServerRuntime.stateLimits`; clients must use the returned `limits` for the active deployment.
+Each Flow/source has independent limits.
 Identity counts are shared across all spaces; watermark spaces consume only a space slot.
 There is no total byte quota. Updates to existing keys and duplicate-only batches remain allowed at capacity.
 

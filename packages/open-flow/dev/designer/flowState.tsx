@@ -17,6 +17,7 @@ const sample: FlowStateView = {
   limits: { maxValueBytes: 65536, maxValues: 1000, maxSpaces: 100, maxIdentities: 10000, maxRunWrites: 1000 },
   values: [{ key: 'cursor', size: 80, updatedAt: 1793322000000, value: { page: 3 } }],
   spaces: [
+    { space: 'flow', mode: 'new', count: 500, watermark: null, updatedAt: 1793322000000 },
     { space: 'node:filter', mode: 'new', count: 9000, watermark: null, updatedAt: 1793322000000 },
     { space: 'node:removed', mode: 'increasing', count: 0, watermark: '2026-10-30T01:00:00Z', updatedAt: 1793322000000 },
   ],
@@ -72,7 +73,15 @@ function StateStory({ language, dark }: { language: string; dark: boolean }) {
           <div className="flex justify-end">
             <NodeActions ignored={false} history={{ label: i18n.t('flowState.history'), onClick: () => setHistoryOpen(true) }} />
           </div>
-          {historyOpen && <FlowStateButton client={client} flowId="sample" nodeIds={['filter']} space="node:filter" onClose={() => setHistoryOpen(false)} />}
+          {historyOpen && (
+            <FlowStateButton
+              client={client}
+              flowId="sample"
+              nodeIds={['filter']}
+              history={{ nodeId: 'filter', space: task.executor.kind === 'dedupe' && task.executor.space === 'flow' ? 'flow' : 'node:filter' }}
+              onClose={() => setHistoryOpen(false)}
+            />
+          )}
           <DedupeSection
             task={task}
             disabled={false}
@@ -80,7 +89,14 @@ function StateStory({ language, dark }: { language: string; dark: boolean }) {
               setTask(next)
               return true
             }}
-            history={<FlowStateButton client={client} flowId="sample" nodeIds={['filter']} space="node:filter" />}
+            history={
+              <FlowStateButton
+                client={client}
+                flowId="sample"
+                nodeIds={['filter']}
+                history={{ nodeId: 'filter', space: task.executor.kind === 'dedupe' && task.executor.space === 'flow' ? 'flow' : 'node:filter' }}
+              />
+            }
           />
         </div>
         <div className="flex flex-col gap-4 rounded border border-border p-4">
@@ -114,7 +130,7 @@ export const flowStateStories: FrontendStory[] = [
     title: 'State and history',
     standalone: true,
     description:
-      'Configure identity, mode and space. Inspect saved-entry counts, shared Flow identity counts, watermark slots and orphaned spaces together. Empty state uses short labels without inactive clear controls. Storage rules disclose isolation, retention and size/space limits on demand. Open persistent data from the publish menu, switch to production and clear a space to inspect production confirmation. Reset restores the examples.',
+      'Configure identity, mode and space. Inspect saved-entry counts, shared Flow identity counts, watermark slots and orphaned spaces together. Empty state uses short labels without inactive clear controls. Storage rules disclose isolation, retention and size/space limits on demand. Open persistent data from the publish menu, switch to production and clear a space to inspect production confirmation. Node history follows the configured Draft space; production shows both node and shared Flow history. Reset restores the examples.',
     render: (_log, _dark, language) => <StateStory language={language} dark={_dark} />,
   },
 ]

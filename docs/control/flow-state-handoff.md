@@ -1,8 +1,7 @@
 # Flow State 实现交接
 
-交接时间：2026-10-30。当前本仓库实现已完成，验证记录见下文。设计的唯一事实来源是
-[Flow State 设计计划](flow-state-plan.md)；本文只补充实现所需的上下文、顺序与已知风险，与计划冲突时以计划为准，
-并回写计划。
+交接时间：2026-10-30。当前本仓库实现已完成，验证记录见下文。[Flow State 设计计划](flow-state-plan.md) 记录实施设计；本文补充上下文、顺序与已知风险。
+公共模型、接口、执行协议与兼容性规则分别以对应技术契约为准，计划和交接文档不得覆盖这些契约。
 
 ## Implementation baseline update (2026-10-30)
 
@@ -20,7 +19,7 @@ S1、S2、S3、S5 与架构更新已完成，Cloud S4 未改动。
 - 七种语言文案与 Lab story 已补齐。跨 Run conformance 从公共 `flow-state` 入口导出，参数验证与 Task 结束取消用例在公共 runtime conformance 中。
 - CLI Lab 验收发现原 HTTP/OpenAPI 执行输入过滤会丢弃无绑定的 Run 参数；已在公共执行 owner 修复，并由新 Cron/HTTP 场景覆盖。
 
-验证记录（2026-10-30）：
+初次实施验证记录（2026-10-30，原始提交 `52e7a284`；不是最终 PR 验证结果）：
 
 | 验证                             | 结果                                                                                            |
 | -------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -40,12 +39,8 @@ S1、S2、S3、S5 与架构更新已完成，Cloud S4 未改动。
 
 ## 工作区
 
-- Worktree：`/Users/su/oomol-lab/open-flow/.claude/worktrees/flow-state`，分支 `feat/flow-state`，基于
-  `fd93811d`（`chore: release open-flow 0.1.0-beta.76`）。所有命令在该目录运行。
-- 主 checkout（`/Users/su/oomol-lab/open-flow`）不要改动。它有两个未跟踪文件
-  `docs/control/flow-state-plan.md` 与 `docs/control/code-runtime-alignment-plan.md`，已复制到本 worktree；以本
-  worktree 中的版本为准。
-- 本 worktree 包含 Flow State 实现、测试、文档更新；三个原始计划/交接文档随实现纳入版本管理。
+- 在仓库根目录运行下述命令；需要隔离开发时，按仓库约定创建独立 worktree，并在该 worktree 根目录运行。
+- 实现、测试和 `docs/control/` 下的计划与交接文档均纳入版本管理，以当前 checkout 的已跟踪文件为准。
 - 提交与推送只在用户要求时进行。提交前在仓库根目录运行 `bun run check` 并通过；提交信息与 PR 描述不加任何 AI
   署名。
 
@@ -61,7 +56,7 @@ S1、S2、S3、S5 与架构更新已完成，Cloud S4 未改动。
 | S3   | Control API、CLI、MCP 的状态查看与清空                                        |
 | S5   | Workbench 去重节点菜单与 Flow 状态面板、Lab story                             |
 
-不在范围：S4 Cloud（`/Users/su/oomol/open-flow`）。它需要先发布包含本修订的公共包，再由 Cloud 仓库按其
+不在范围：S4 Cloud（独立 Cloud 仓库）。它需要先发布包含本修订的公共包，再由 Cloud 仓库按其
 `AGENTS.md` 单独实现。完成后在交付说明中列出 Cloud 需要实现的内容（D1 迁移、内部执行协议操作、去重节点执行、
 engine digest）。
 
@@ -107,8 +102,9 @@ engine digest）。
 
 - **标识哈希放在公共包 common 层。** 规范化（`typeof` 标记加规范文本）与 SHA-256 截断 16 字节必须由 Server 与
   Cloud 共用，否则同一 Flow 在两端的去重结果不同。common 代码不能依赖 Node，使用 WebCrypto `crypto.subtle`。
-- **水位模式比较规则需先写定。** 计划只说“严格大于水位”。在契约中明确：数字按数值比较；字符串只接受
-  ISO 8601 时间并按时间比较，或按其他明确规则；类型混用与无法解析的值如何报错。写定后回写设计计划。
+- **水位模式遵循 [Node 运行时契约](contracts/nodejs-runtime.md)。** 有限数字按数值比较；字符串仅接受带秒、
+  显式时区且最多三位小数秒的 RFC 3339 时间戳，按 epoch 毫秒比较。无效日期或类型混用（包括已保存水位）使整批失败。
+  每项与批次开始时的水位比较，相等值只计一次，批次完成后保存最大值，并保留输入顺序。
 - 去重节点的业务配置、输入、输出按计划“去重节点”一节，节点名称与 kind 遵循现有命名惯例。上限由部署提供，不进入
   节点配置。
 - `TaskContext` 增加 `state` 与 `dedupe`；Code 编辑器类型同步（`workbench/browser/codeTypes.ts`）。

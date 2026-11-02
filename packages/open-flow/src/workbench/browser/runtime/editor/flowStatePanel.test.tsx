@@ -26,6 +26,7 @@ const client = {
 }
 beforeEach(async () => {
   vi.clearAllMocks()
+  client.getFlowState.mockImplementation(async (_flowId, scope) => ({ ...value, scope }))
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   container = document.createElement('div')
   container.className = 'open-flow-theme'
@@ -104,4 +105,43 @@ it('keeps the Flow-wide total visible when inspecting one node history', async (
   expect(container.textContent).toContain('9,000 records')
   expect(container.textContent).not.toContain('500 records')
   expect(container.textContent).not.toContain(i18n.t('flowState.values'))
+})
+
+it.each(['node:filter', 'flow'])('shows both possible Live histories when Draft uses %s', async (space) => {
+  client.getFlowState.mockImplementation(async (_flowId, scope) => ({
+    ...value,
+    scope,
+    spaces: [
+      ...value.spaces,
+      { space: 'flow', mode: 'new', count: 500, watermark: null, updatedAt: 1 },
+      { space: 'node:other', mode: 'new', count: 12, watermark: null, updatedAt: 1 },
+    ],
+  }))
+  await act(async () =>
+    root.render(
+      <I18nProvider i18n={i18n}>
+        <FlowStateButton client={client} flowId="flow" nodeIds={['filter', 'other']} history={{ nodeId: 'filter', space }} onClose={() => {}} />
+      </I18nProvider>,
+    ),
+  )
+  await click(i18n.t('flowState.refresh'))
+  expect(document.body.textContent).toContain(space === 'flow' ? '500 records' : '9,000 records')
+  expect(document.body.textContent).not.toContain(space === 'flow' ? '9,000 records' : '500 records')
+  const select = document.querySelector<HTMLSelectElement>('select[aria-label="Scope"]')!
+  await act(async () => {
+    select.value = 'live'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  expect(document.body.textContent).toContain('9,000 records')
+  expect(document.body.textContent).toContain('500 records')
+  expect(document.body.textContent).not.toContain('12 records')
+  await click(i18n.t('flowState.clear'))
+  expect(client.clearFlowDedupe).not.toHaveBeenCalled()
+  await click(i18n.t('flowState.clear'), document.querySelector('[role="alert"]')!)
+  expect(client.clearFlowDedupe).toHaveBeenCalledWith('flow', 'live', 'node:filter')
+  await act(async () => {
+    select.value = 'draft'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  expect(document.body.textContent).not.toContain(space === 'flow' ? '9,000 records' : '500 records')
 })

@@ -23,13 +23,13 @@ export function FlowStatePanel({
   value: FlowStateView
   nodeIds: readonly string[]
   busy: boolean
-  space?: string
+  space?: string | readonly string[]
   onClearValues: (key?: string) => void
   onClearSpace: (space: string) => void
 }) {
   const t = useTranslate()
   const count = value.spaces.reduce((total, item) => total + item.count, 0)
-  const spaces = space == null ? value.spaces : value.spaces.filter((item) => item.space === space)
+  const spaces = space == null ? value.spaces : value.spaces.filter((item) => (typeof space === 'string' ? item.space === space : space.includes(item.space)))
   return (
     <div className="flex flex-col gap-4">
       {space == null && (
@@ -101,13 +101,13 @@ export function FlowStateButton({
   client,
   flowId,
   nodeIds,
-  space,
+  history,
   onClose,
 }: {
   client: FlowStateClient
   flowId: string
   nodeIds: readonly string[]
-  space?: string
+  history?: { nodeId: string; space: string }
   onClose?: () => void
 }) {
   const t = useTranslate()
@@ -117,6 +117,7 @@ export function FlowStateButton({
   }, [])
   const [open, setOpen] = useState(onClose != null)
   const [scope, setScope] = useState<StateScope>('draft')
+  const space = history?.space
   const [values, setValues] = useState(false)
   const [data, setData] = useState<FlowStateView>()
   const [error, setError] = useState<string>()
@@ -248,7 +249,7 @@ export function FlowStateButton({
           ) : (
             <FlowStatePanel
               value={data}
-              space={space}
+              space={scope === 'live' && history != null ? ['flow', `node:${history.nodeId}`] : space}
               nodeIds={nodeIds}
               busy={busy}
               onClearValues={(key) => request({ key })}

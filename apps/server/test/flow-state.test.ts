@@ -239,6 +239,11 @@ it('isolates actual Live Runs and requires explicit scope at the management boun
   expect((await client.getFlowState(stored.flowId, 'draft', true)).values[0]?.value).toBe(2)
   expect((await client.getFlowState(stored.flowId, 'live', true)).values[0]?.value).toBe(1)
   expect((await client.getFlowState(stored.flowId, 'live')).values[0]).not.toHaveProperty('value')
+  for (const values of ['true', 'false']) {
+    const response = await app.request(`/v1/flows/${stored.flowId}/state?scope=draft&values=${values}`)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+  }
   for (const route of ['state', 'dedupe?space=flow', 'state?scope=invalid', 'state?scope=draft&values=invalid']) {
     expect((await app.request(`/v1/flows/${stored.flowId}/${route}`, { method: route.startsWith('dedupe') ? 'DELETE' : 'GET' })).status).toBe(400)
   }

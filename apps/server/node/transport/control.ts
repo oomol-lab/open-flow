@@ -329,13 +329,15 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     query(context.req.raw, ['scope', 'values'], controlErrorCode.flowInvalid)
     const values = context.req.query('values')
     if (values != null && values !== 'true' && values !== 'false') throw new ControlError(controlErrorCode.flowInvalid, 'values must be true or false.')
-    return response(
+    const result = response(
       200,
       service.state.read(context.get('actorId'), context.req.param('flowId'), {
         scope: context.req.query('scope'),
         ...(values == null ? {} : { values: values === 'true' }),
       }),
     )
+    result.headers.set('Cache-Control', 'no-store')
+    return result
   })
   app.delete('/flows/:flowId/state', (context) => {
     query(context.req.raw, ['scope', 'key'], controlErrorCode.flowInvalid)

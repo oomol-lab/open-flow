@@ -32,13 +32,13 @@ Code dedupe uses set mode: insert resets increasing spaces; has rejects them wit
 
 ## n8n 参照
 
-| 方面     | n8n                                                                     | 本计划                                      |
-| -------- | ----------------------------------------------------------------------- | ------------------------------------------- |
-| 业务状态 | `$getWorkflowStaticData` 返回可变对象，执行结束时整体写回               | `context.state` 异步 KV，每次写入立即持久化 |
-| 去重     | Remove Duplicates 节点按节点或 workflow 范围记录历史，独立于 staticData | 去重节点与 `context.dedupe`，独立于业务状态 |
-| 测试执行 | 手动执行的 staticData 修改丢弃                                          | Draft 使用独立 scope（D-S1）                |
-| 并发     | 并发执行时后写覆盖                                                      | 同一 Flow 的 Run 串行，去重批次原子提交     |
-| 上限     | staticData 无上限                                                       | 业务状态按字节，去重按标识数，均有部署上限  |
+| 方面     | n8n                                                                     | 本计划                                               |
+| -------- | ----------------------------------------------------------------------- | ---------------------------------------------------- |
+| 业务状态 | `$getWorkflowStaticData` 返回可变对象，执行结束时整体写回               | `context.state` 异步 KV，每次写入立即持久化          |
+| 去重     | Remove Duplicates 节点按节点或 workflow 范围记录历史，独立于 staticData | 去重节点与 `context.dedupe`，独立于业务状态          |
+| 测试执行 | 手动执行的 staticData 修改丢弃                                          | Draft 使用独立 scope（D-S1）                         |
+| 并发     | 并发执行时后写覆盖                                                      | 同一 Flow 的 Run 串行，去重批次原子提交              |
+| 上限     | staticData 无上限                                                       | 业务状态按键数和单值字节，去重按标识数，均有部署上限 |
 
 n8n 的“执行结束时写回”不适用于 Open Flow：Run 可以在 Wait 或审批中挂起数天，并跨 Executor session 与 checkpoint
 恢复。结束时写回要求把脏状态写进 checkpoint，Cloud 的 Workflow checkpoint 与内部执行协议都要改动。
@@ -63,7 +63,7 @@ State Store 是一个部署存储 owner，持有两类记录：
 | 记录大小 | 可变                                     | 固定                                                     |
 | 核心操作 | `get`、`set`、`insert`、`delete`、`list` | 整批检查并记录                                           |
 | 访问     | Code 通过 `context.state`                | 节点空间仅限所属去重节点；Flow 空间通过 `context.dedupe` |
-| 单项上限 | 单值字节数                               | 单空间标识数                                             |
+| 单项上限 | 单值字节数                               | 单 Flow/source 标识总数                                  |
 | 淘汰     | 永不淘汰                                 | 首期不淘汰，后续 TTL 或最近 N 项                         |
 | 清空入口 | Flow 状态面板                            | 节点菜单（节点空间）、Flow 状态面板（全部空间）          |
 
@@ -76,7 +76,7 @@ State Store 是一个部署存储 owner，持有两类记录：
   使用子 Flow 自己的状态与子 Run 的来源，不继承父 Flow。
 - **生命周期。** 状态不进入 Revision、Publication 或 digest；Publish、Rollback 与 Draft 编辑都不改变状态。Flow
   删除时由既有 lifecycle owner 在同一清理流程中删除两类记录。
-- **Flow 总配额。** 每个 `(flow, scope)` 的总字节数计入同一上限；去重标识按固定行大小计入。
+- **Flow 配额。** 每个 `(flow, scope)` 独立限制业务键数、单值字节数、空间数和跨空间标识总数；不设总字节配额。
 - **Capability 宿主。** 同一宿主校验当前 Flow、Run、Task、invocation 与 Run 状态，并按调用身份控制空间访问；
   Task 或 Run 结束后调用 fail closed。
 - **写入语义（D-S2）。** 每次写入在宿主确认后即持久化，是普通副作用，与 Connector 调用同等对待：不重放，结果
@@ -326,7 +326,7 @@ CLI Lab 完成“Cron 定时拉取 HTTP 列表，只处理新条目”场景，�
   不采用 n8n 的“Draft 只读 Live 状态并丢弃写入”，因为调试时无法观察写入结果。
 - **D-S2**：每次写入立即持久化。不采用“Task 成功时原子提交缓冲写入”：失败 Task 会推进状态，由文档提示规避；
   换来的是 Cloud 的 Task 结果提交路径与内部协议保持不变。
-- **D-S3**：上限采用上表初值，部署可调整。业务状态只按字节限制，不限制键数，以免与去重标识数冲突。
+- **D-S3**：上限采用上表初值，部署可调整。业务状态默认每个 `(flow, scope)` 最多 1,000 个键、每值 64 KiB；新增键超过键数限制时返回 `limit-exceeded`，更新已有键仍允许。不设总字节配额。
 - **D-S4**：首期提供水位模式。持续产生新标识的数据源在无淘汰时必然写满，水位模式对按递增 ID 或时间拉取的场景
   不随条目增长。集合模式继续依赖 80% 提示与手动清空。
 - **D-S5**：去重空间已满为可被 `onError` 处理的业务失败 `dedupe.full`。满额是用户数据状态，不是资源失控，用户
