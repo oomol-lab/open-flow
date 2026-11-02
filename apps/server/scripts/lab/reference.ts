@@ -32,7 +32,7 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
   if (id === 'flow-state') {
-    await call('flow_schema', { type: 'dedupe' })
+    await call('flow_schema', { type: 'skip-duplicates' })
     const before = await read()
     await submit(before.revision, [
       { op: 'node.add', type: 'cron', as: 'cron', name: 'Hourly', config: { schedule: [{ type: 'every', unit: 'hour', value: 1 }] } },
@@ -48,11 +48,23 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
       },
       {
         op: 'node.add',
-        type: 'dedupe',
+        type: 'skip-duplicates',
         as: 'dedupe',
         name: 'Filter items',
-        config: { field: 'id', mode: 'new', space: 'node' },
+        config: { fields: ['id'] },
         inputs: { items: { kind: 'output', node: '$validate', port: 'items' } },
+      },
+      {
+        op: 'node.add',
+        type: 'code',
+        as: 'process',
+        name: 'Process items',
+        code: 'export default ({items, duplicates, fail}) => { if (fail) throw new Error("Requested downstream failure"); return {items, duplicates} }',
+        config: {
+          inputs: { fail: { schema: { type: 'boolean' }, nullable: false } },
+          outputs: { items: { schema: { type: 'array' }, nullable: false }, duplicates: { schema: { type: 'array' }, nullable: false } },
+        },
+        inputs: { items: { kind: 'output', node: '$dedupe', port: 'items' }, duplicates: { kind: 'output', node: '$dedupe', port: 'duplicates' } },
       },
       {
         op: 'node.add',
@@ -60,12 +72,13 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
         as: 'out',
         name: 'Outputs',
         config: { outputDefs: { items: { schema: { type: 'array' }, nullable: false }, duplicates: { schema: { type: 'array' }, nullable: false } } },
-        inputs: { items: { kind: 'output', node: '$dedupe', port: 'items' }, duplicates: { kind: 'output', node: '$dedupe', port: 'duplicates' } },
+        inputs: { items: { kind: 'output', node: '$process', port: 'items' }, duplicates: { kind: 'output', node: '$process', port: 'duplicates' } },
       },
       { op: 'edge.connect', source: '$cron', target: '$http' },
       { op: 'edge.connect', source: '$http', target: '$validate' },
       { op: 'edge.connect', source: '$validate', target: '$dedupe' },
-      { op: 'edge.connect', source: '$dedupe', target: '$out' },
+      { op: 'edge.connect', source: '$dedupe', target: '$process' },
+      { op: 'edge.connect', source: '$process', target: '$out' },
     ])
     const node = await find('Filter items')
     await submit(savedRevision, [{ op: 'node.update', node, set: { name: 'New items' } }])

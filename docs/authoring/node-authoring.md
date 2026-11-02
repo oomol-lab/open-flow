@@ -271,13 +271,25 @@ The node supports ordinary `retry` and `onError`; it has no separate error execu
 Use `statusPolicy: "all"` to inspect non-2xx responses with a Condition node. Network and parsing
 failures still fail. See the Control API HTTP Request contract for wire formats and limits.
 
-## Remove Duplicates
+## Skip Duplicates
 
-Public type `dedupe` uses config `{ field, mode, space }`. Field is a dot-separated identity path;
-an empty path uses the scalar item itself. Mode defaults to `new`, with `increasing` available for
-monotonic numbers or RFC 3339 timestamps. Space defaults to `node`; `flow` shares Code dedupe
-history. Bind the fixed `items` array input. Outputs `items` and `duplicates` retain input order.
-History records immediately: downstream failure does not roll it back, so later Runs skip those
-items. New node IDs start independent histories; renaming preserves history. Deleted node spaces
-remain until explicitly cleared. Limits belong to the deployment, not node configuration.
-The node supports `onError: "stop" | "error"` but does not support retries.
+Public type `skip-duplicates` uses config `{ fields: string[] }`. Each field is a dot-separated
+identity path. An empty list uses each scalar item itself. Identity values must be strings or finite
+numbers; missing, null or complex values reject the complete batch with its item position and field.
+Field paths must be nonempty and distinct. Composite identities retain scalar types and include the
+field definition; field order does not affect identity.
+
+Bind the fixed `items` array input. Outputs `items` and `duplicates` retain input order. History is
+private to the stable node ID and isolated by Run source. Renaming preserves history; copying creates
+independent history. Changing fields does not delete records. Deleted-node spaces remain until cleared.
+
+The node stages identities durably during execution and commits them only when its Run completes
+successfully. The same Run filters its own staged identities. A failed node invocation releases its
+batch; failed, canceled and indeterminate Runs discard all staged identities. Wait retains staged
+records across recovery. A handled downstream error followed by Run completion commits history.
+Overlapping Runs see only committed history from other Runs and can process the same items. Downstream
+side effects can repeat after failure; this is not an exactly-once processing guarantee.
+
+Limits belong to the deployment. Pending identities reserve capacity. The node supports
+`onError: "stop" | "error"` but does not support retries. It has no mode, shared-space or time-window
+configuration. Code KV and `context.dedupe` remain independent immediately persistent APIs.

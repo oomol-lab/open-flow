@@ -1,7 +1,7 @@
 import type { ControlClient } from '../../../../control/common/api.ts'
 import type { FlowStateView, StateScope } from '../../../../state/common/state.ts'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
@@ -23,13 +23,13 @@ export function FlowStatePanel({
   value: FlowStateView
   nodeIds: readonly string[]
   busy: boolean
-  space?: string | readonly string[]
-  onClearValues: (key?: string) => void
-  onClearSpace: (space: string) => void
+  space?: string
+  onClearValues: (key?: string, trigger?: HTMLElement) => void
+  onClearSpace: (space: string, trigger?: HTMLElement) => void
 }) {
   const t = useTranslate()
-  const count = value.spaces.reduce((total, item) => total + item.count, 0)
-  const spaces = space == null ? value.spaces : value.spaces.filter((item) => (typeof space === 'string' ? item.space === space : space.includes(item.space)))
+  const count = value.spaces.reduce((total, item) => total + item.reservedCount, 0)
+  const spaces = space == null ? value.spaces : value.spaces.filter((item) => item.space === space)
   return (
     <div className="flex flex-col gap-4">
       {space == null && (
@@ -40,7 +40,7 @@ export function FlowStatePanel({
               {t('flowState.entries', { count: value.values.length.toLocaleString(), limit: value.limits.maxValues.toLocaleString() })}
             </span>
             {value.values.length > 0 && (
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => onClearValues()}>
+              <Button variant="outline" size="sm" disabled={busy} onClick={(event) => onClearValues(undefined, event.currentTarget)}>
                 {t('flowState.clearAll')}
               </Button>
             )}
@@ -54,7 +54,7 @@ export function FlowStatePanel({
                   <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(item.value, null, 2)}</pre>
                 )}
               </div>
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => onClearValues(item.key)}>
+              <Button variant="outline" size="sm" disabled={busy} onClick={(event) => onClearValues(item.key, event.currentTarget)}>
                 {t('flowState.delete')}
               </Button>
             </div>
@@ -84,10 +84,11 @@ export function FlowStatePanel({
                 )}
               </p>
               <p className="m-0 text-xs">
-                {item.mode === 'new' ? t('flowState.records', { count: item.count.toLocaleString() }) : `${t('flowState.watermark')}: ${item.watermark ?? '-'}`}
+                {t('flowState.records', { count: item.count.toLocaleString() })}
+                {item.pendingCount > 0 && <> · {t('flowState.pendingRecords', { count: item.pendingCount.toLocaleString() })}</>}
               </p>
             </div>
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => onClearSpace(item.space)}>
+            <Button variant="outline" size="sm" disabled={busy || item.pendingCount > 0} onClick={(event) => onClearSpace(item.space, event.currentTarget)}>
               {t('flowState.clear')}
             </Button>
           </div>
@@ -107,7 +108,7 @@ export function FlowStateButton({
   client: FlowStateClient
   flowId: string
   nodeIds: readonly string[]
-  history?: { nodeId: string; space: string }
+  history?: { nodeId: string }
   onClose?: () => void
 }) {
   const t = useTranslate()
@@ -117,15 +118,24 @@ export function FlowStateButton({
   }, [])
   const [open, setOpen] = useState(onClose != null)
   const [scope, setScope] = useState<StateScope>('draft')
-  const space = history?.space
+  const space = history == null ? undefined : `node:${history.nodeId}`
   const [values, setValues] = useState(false)
   const [data, setData] = useState<FlowStateView>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [refresh, setRefresh] = useState(0)
   const [confirm, setConfirm] = useState<{ key?: string; space?: string }>()
+  const cancelButton = useRef<HTMLButtonElement>(null)
+  const confirmTrigger = useRef<HTMLElement>()
   useEffect(() => {
-    if (!open && space == null) return
+    if (confirm != null) cancelButton.current?.focus()
+  }, [confirm])
+  const cancelConfirm = () => {
+    setConfirm(undefined)
+    confirmTrigger.current?.focus()
+  }
+  useEffect(() => {
+    if (!open) return
     let active = true
     setData(undefined)
     setError(undefined)
@@ -155,7 +165,11 @@ export function FlowStateButton({
       setBusy(false)
     }
   }
-  const request = (target: { key?: string; space?: string }) => (scope === 'live' ? setConfirm(target) : void clear(target))
+  const request = (target: { key?: string; space?: string }, trigger?: HTMLElement) => {
+    confirmTrigger.current = trigger
+    if (scope === 'live') setConfirm(target)
+    else void clear(target)
+  }
   return (
     <span className="contents" ref={portal}>
       <Dialog
@@ -163,30 +177,23 @@ export function FlowStateButton({
         onOpenChange={(next) => {
           if (!busy) {
             setOpen(next)
+            if (next) {
+              setScope('draft')
+              setValues(false)
+            }
             if (!next) onClose?.()
             setConfirm(undefined)
           }
         }}
       >
         {onClose == null && (
-          <DialogTrigger
-            render={
-              <Button
-                variant={
-                  space != null && data != null && data.spaces.reduce((total, item) => total + item.count, 0) >= data.limits.maxIdentities * 0.8
-                    ? 'destructive'
-                    : 'ghost'
-                }
-                size="sm"
-              />
-            }
-          >
+          <DialogTrigger render={<Button variant="ghost" size="sm" />}>
             <i aria-hidden="true" className="i-lucide-light:database" />
             {t(space == null ? 'flowState.title' : 'flowState.history')}
           </DialogTrigger>
         )}
         <DialogContent container={container} className="max-h-[80vh] overflow-auto" closeLabel={t('common.close')}>
-          <DialogTitle>{t('flowState.title')}</DialogTitle>
+          <DialogTitle>{t(space == null ? 'flowState.title' : 'flowState.history')}</DialogTitle>
           <div className="flex flex-wrap items-center gap-3">
             <NativeSelect
               aria-label={t('flowState.scope')}
@@ -238,7 +245,7 @@ export function FlowStateButton({
                 <Button disabled={busy} variant="destructive" onClick={() => void clear(confirm)}>
                   {t('flowState.clear')}
                 </Button>
-                <Button disabled={busy} variant="outline" onClick={() => setConfirm(undefined)}>
+                <Button ref={cancelButton} disabled={busy} variant="outline" onClick={cancelConfirm}>
                   {t('flowState.cancel')}
                 </Button>
               </div>
@@ -249,11 +256,11 @@ export function FlowStateButton({
           ) : (
             <FlowStatePanel
               value={data}
-              space={scope === 'live' && history != null ? ['flow', `node:${history.nodeId}`] : space}
+              space={space}
               nodeIds={nodeIds}
               busy={busy}
-              onClearValues={(key) => request({ key })}
-              onClearSpace={(targetSpace) => request({ space: targetSpace })}
+              onClearValues={(key, trigger) => request({ key }, trigger)}
+              onClearSpace={(targetSpace, trigger) => request({ space: targetSpace }, trigger)}
             />
           )}
         </DialogContent>

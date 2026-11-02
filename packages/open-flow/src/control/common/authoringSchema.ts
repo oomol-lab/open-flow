@@ -12,7 +12,7 @@ import {
 import { retryConfigurationSchema, retryNodeTypes } from '../../flow/common/retry.ts'
 import { httpRequestConfigSchema } from '../../http/common/httpRequest.ts'
 import { currentEngineContract, findEngineContract } from '../../runtime/common/engineContract.ts'
-import { dedupeConfigSchema } from '../../state/common/state.ts'
+import { skipDuplicatesConfigSchema } from '../../state/common/state.ts'
 import { authoringLlmConfiguration } from './authoringLlm.ts'
 import { authoringOpenApiSchema } from './authoringOpenApi.ts'
 
@@ -36,7 +36,7 @@ export const authoringTypes = [
   'decision',
   'openapi',
   'http-request',
-  'dedupe',
+  'skip-duplicates',
   'condition',
   'value',
   'wait',
@@ -120,7 +120,7 @@ export const authoringConfigurations = {
   'connector': definitions.connector.omit({ outputMode: true }).strict(),
   'openapi': authoringOpenApiSchema,
   'http-request': httpRequestConfigSchema,
-  'dedupe': dedupeConfigSchema,
+  'skip-duplicates': skipDuplicatesConfigSchema,
   'agent': definitions.agent
     .omit({ prompt: true, tools: true })
     .extend({
@@ -286,7 +286,7 @@ export function authoringSchema(kind?: AuthoringType) {
       }
     : {
         type: kind,
-        onError: kind == 'dedupe' || retryNodeTypes.some((nodeType) => nodeType == kind) ? { enum: ['stop', 'error'] } : false,
+        onError: kind == 'skip-duplicates' || retryNodeTypes.some((nodeType) => nodeType == kind) ? { enum: ['stop', 'error'] } : false,
         retry: retryNodeTypes.some((nodeType) => nodeType == kind) ? z.toJSONSchema(retryConfigurationSchema) : false,
         inputSources: ['poll', 'integration'].includes(kind)
           ? ['value', 'unset', 'default']
@@ -309,8 +309,8 @@ export function authoringSchema(kind?: AuthoringType) {
                       ? 'Configure static parameters with node.add.inputs or input.set. Definitions come from the selected Trigger key; execution output and variable sources are unavailable.'
                       : kind == 'llm'
                         ? 'Configure model settings, message templates and history as defaults. Input bindings with the same names override these defaults; named business inputs can be bound directly. Template strings interpolate {{name}}.'
-                        : kind == 'dedupe'
-                          ? 'Bind an items array. Configure field (dot-separated identity path, empty for scalar items), mode (new or increasing), and space (node or flow). Outputs are items and duplicates. History persists immediately; downstream failures do not roll it back. Increasing mode accepts finite numbers or RFC 3339 timestamps, never mixed types.'
+                        : kind == 'skip-duplicates'
+                          ? 'Bind an items array. Configure fields as dot-separated identity paths; an empty list uses each scalar item. Outputs are items and duplicates. History belongs to this node and commits only when the Run completes successfully. Fields accept strings or finite numbers; missing or complex values reject the batch.'
                           : kind == 'http-request'
                             ? 'Configure method, query/headers modes and names, bodyFormat, authentication, responseFormat and statusPolicy. Bind url, query.<name>/header.<name> or whole query/headers objects, body and auth.token (Basic: auth.username/auth.password). Credentials accept variables or upstream outputs only. Outputs: body, statusCode, headers. Authentication is replaced as a complete choice.'
                             : kind == 'openapi'
@@ -335,7 +335,7 @@ export function authoringSchema(kind?: AuthoringType) {
               'connector': { config: { action: '<Action ID>', connectionId: '<Connection ID>' } },
               'poll': { config: { key: '<Trigger key>', schedule: [{ type: 'every', unit: 'minute', value: 5 }] } },
               'integration': { config: { key: '<Trigger key>' } },
-              'dedupe': { config: { field: 'id', mode: 'new', space: 'node' }, inputs: { items: { kind: 'value', value: [{ id: 'a' }, { id: 'b' }] } } },
+              'skip-duplicates': { config: { fields: ['id'] }, inputs: { items: { kind: 'value', value: [{ id: 'a' }, { id: 'b' }] } } },
               'http-request': { config: {}, inputs: { url: { kind: 'value', value: 'https://example.com' } } },
               'openapi': { config: { sourceUrl: 'https://example.com/openapi.json', path: '/items', method: 'get' } },
               'code': { code: 'export default ({value}) => ({result:value})', inputs: { value: { kind: 'value', value: 'Hello' } } },

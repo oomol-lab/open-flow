@@ -399,7 +399,7 @@ export class LabSession {
           errors.push('The scenario entry must resolve to one Start node.')
         else
           for (const sample of samples(this.scenarioId, this.stage)) {
-            if (this.scenarioId === 'flow-state') sample.parameters = { url: `${this.modelOrigin}/flow-state` }
+            if (this.scenarioId === 'flow-state') sample.parameters = { ...sample.parameters, url: `${this.modelOrigin}/flow-state` }
             if (this.scenarioId == 'http-request') sample.outputs = { ...sample.outputs, url: `${this.modelOrigin}/http-request` }
             Object.assign(this.mocks.sample, sample)
             const offset = this.mocks.calls.length,

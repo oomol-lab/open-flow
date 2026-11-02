@@ -174,8 +174,12 @@ State Store owns explicitly written cross-Run business values and deduplication 
 Records belong to a Flow and its Run source (`draft` or `live`), independently of Revisions,
 Publications, Run storage and Trigger progress. Deployments own persistence, quotas and lifecycle
 cleanup. Publishing, rollback and editing do not mutate State. State exposes no arbitrary node
-results. Writes persist immediately as ordinary side effects, survive Task failure or cancellation,
-and follow the existing no-replay rule when their outcome is unknown. State is not a secret store.
+results. Explicit Code writes persist immediately as ordinary side effects, survive Task failure or cancellation,
+and follow the existing no-replay rule when their outcome is unknown. Skip Duplicates owns node-private
+history: its invocation-owned provisional identities persist across Wait, but become committed history
+only in the authoritative Run success transaction. Failed invocations and non-success terminals
+release their provisional identities and capacity. Other Runs cannot use provisional history to
+suppress items. State is not a secret store.
 
 ### Workflow calls
 

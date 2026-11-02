@@ -13,7 +13,7 @@ import {
 } from '../../flow/common/nodeChanges.ts'
 import { httpRequestTask } from '../../http/common/httpRequest.ts'
 import { openApiTask, selectOperation } from '../../openapi/common/openapi.ts'
-import { dedupeTask } from '../../state/common/state.ts'
+import { skipDuplicatesTask } from '../../state/common/state.ts'
 
 const descriptions = {
   'start': 'A Start node with a required message parameter. Supply it through trigger.outputs.',
@@ -24,7 +24,8 @@ const descriptions = {
   'poll': 'Gmail polling by key; replace CONNECTION_ID with an active Gmail connection.',
   'integration': 'Telegram webhook integration by key; replace CONNECTION_ID with an active Telegram connection.',
   'decision': 'AI Decision evaluates named questions against target and returns a complete answer object per output. Configure target before running.',
-  'dedupe': 'Filter items using persistent history. Records immediately, including when downstream work fails. Empty field uses each scalar item as identity.',
+  'skip-duplicates':
+    'Skip items already recorded by successful Runs. Configure identity fields; an empty list uses each string or numeric item. History is private to the node and only commits after Run success.',
   'http-request': 'A single HTTP request. Bind url and request inputs; outputs are body, statusCode and headers.',
   'openapi': 'A fixed JSON API operation. Replace the example document and URL before running.',
   'connector':
@@ -59,10 +60,10 @@ export function authoringExample(name: string): { version: 1; operations: readon
         { name: 'needs_support', type: 'noul', instructions: 'Does the customer need support?' },
       ])
       break
-    case 'dedupe':
+    case 'skip-duplicates':
       operations = [
-        ...createManagedTask({ nodeId: 'dedupe' }, dedupeTask()),
-        { kind: 'graph.node.input.set', nodeId: 'dedupe', handle: 'items', value: { kind: 'value', value: ['a', 'b', 'a'] } },
+        ...createManagedTask({ nodeId: 'skip-duplicates' }, skipDuplicatesTask()),
+        { kind: 'graph.node.input.set', nodeId: 'skip-duplicates', handle: 'items', value: { kind: 'value', value: ['a', 'b', 'a'] } },
       ]
       break
     case 'http-request':

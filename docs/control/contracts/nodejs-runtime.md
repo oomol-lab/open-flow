@@ -146,12 +146,22 @@ No original identities are stored. Code uses only the shared `flow` space; node 
 Run source fixes isolated Draft or Live scope. Calls after Task or Run termination are denied.
 Agent code tools do not receive State. State calls emit no events and do not log values.
 
-Increasing mode compares finite numbers numerically or RFC 3339 timestamps by epoch milliseconds.
-Timestamps require seconds, an explicit Z or numeric timezone and at most three fractional digits.
-Invalid dates or mixed types (including the saved watermark) fail the whole batch. Items compare
-to the initial watermark, equal values count once, and the maximum is committed after the batch.
-Input order is retained. Empty batches preserve the watermark in the same mode; switching modes resets the space even with an empty batch. Code insert resets increasing spaces
-to set mode atomically; Code has rejects increasing spaces without changing them.
+Skip Duplicates (`skip-duplicates`) consumes an `items` array and config `{ fields: string[] }`.
+Fields are distinct nonempty dot-separated paths; an empty list identifies scalar items. Each selected
+value must be a string or finite number. Missing, null and complex values reject the whole batch and
+identify the item position and field. Identity encoding is `JSON.stringify([sortedFields, values])`,
+where values follow the sorted paths (or contain the scalar item when fields is empty). That encoded
+string uses the same typed SHA-256 helper. Field definitions and scalar types participate in identity;
+field ordering and numeric negative zero do not change it. Outputs `items` and `duplicates` retain
+input order, keeping only the first occurrence of each new identity.
+
+Node history uses `node:<nodeId>` and commits only with the Run's `completed` terminal transaction.
+Staged records are durable, attributed to Run and node invocation, and visible to membership checks
+only within their own Run. Node failure discards its staged batch. All non-success terminals discard
+remaining staged records. Wait and recovery preserve them until an authoritative terminal occurs.
+Handled downstream failure followed by successful Run completion commits the node's history.
+Different overlapping Runs may process the same items before either completes. Downstream effects
+are not rolled back, and unknown execution outcomes are never automatically replayed.
 
 Capability kinds and payloads: `state.get`/`state.delete` use `{ key }`, `state.set`/`state.insert`
 use `{ key, value }`, `state.list` uses `{}`, and `dedupe.insert`/`dedupe.has` use `{ ids }`.
@@ -159,11 +169,15 @@ Responses respectively contain `{ value }`, null, null, `{ inserted }`, `{ keys 
 `{ inserted }` and `{ present }`. Invalid parameters fail with `capability.invalid`.
 Exhausted identity or space slots fail with catchable `dedupe.full`; exhausted saved-key slots, oversized values or the write budget fail with
 non-catchable `limit-exceeded`. Capacity failure writes nothing, while all-duplicate batches still
-succeed at capacity. Mode switches and record counts commit in the same transaction.
+succeed at capacity. Membership changes and record counts commit in the same transaction.
 
 Default limits per Flow/source are 1,000 saved keys, 64 KiB per JSON value, 10,000 identities shared across all spaces, 100 spaces, and
 1,000 attempted writes per Run. Each set/insert/delete or dedupe batch consumes one durable write
 allowance, including failed writes. Reads consume no
 write allowance. Publishing, rollback and node editing do not clear history.
 
-State count limits allow updates and deletion at capacity. Keys and dedupe space names are limited to 256 UTF-8 bytes. Watermark spaces consume one space slot but no identity slots. Switching mode releases the previous identities atomically; rejected batches preserve the previous state. There is no separate total byte quota.
+State count limits allow updates and deletion at capacity. Keys and dedupe space names are limited
+to 256 UTF-8 bytes. Pending node records reserve distinct identity/space slots alongside committed
+history; Code insert observes the same reservation limits. Finalizing staged records does not consume
+another Run write. Rejected batches preserve previous state. Clearing a space with pending records
+returns a conflict until its Runs finish or are canceled. There is no separate total byte quota.

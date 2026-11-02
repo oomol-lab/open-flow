@@ -1,19 +1,24 @@
 # Public contracts and version evolution
 
-## Flow State: pending Model v13 and Engine v10
+## Skip Duplicates: Flow model v13 and Engine v10
 
-The implementation baseline checked on 2026-10-30 is published beta.76, gitHead
-`fd93811d8fdccc98be4511a43106bbc0fb7a6572`. Its tarball establishes Model v12 / Engine v9.
-Model v13 adds the dedupe executor; older model envelopes reject it. Engine v10 adds Code
-`context.state` and `context.dedupe`; earlier engines reject dedupe nodes and expose neither API.
-Existing v9 Publications and Runs retain their contract and isolation digest. The new runtime
-digest appends `state/1`. Revisions and checkpoints are not rewritten. Migration 57 creates
-Flow State tables and a durable Run write counter. Flow deletion removes all State records.
+On 2026-11-02 npm `next` beta.77, gitHead `e25a738d170322734572a0b8a1323cb00b9d355a`,
+was verified from its tarball to contain Model v13 / Engine v10 and the original Flow State node.
+The product owner explicitly chose to replace that unused node in place without allocating another
+contract revision or retaining the retired implementation. This is an intentional coordinated change,
+not a claim of compatibility with old dedupe nodes.
 
-Upgrade Server and clients together. Cloud must implement tenant D1 persistence and quotas,
-execution-protocol forwarding, Code capabilities, dedupe execution and lifecycle cleanup before
-releasing clients which require v10. Cloud integration is a separate repository task; this
-implementation does not establish Cloud conformance.
+`skip-duplicates` replaces `dedupe` and accepts only `{ fields: string[] }`. History commits on Run
+success; failed/canceled/indeterminate Runs release provisional records. Old node/config shapes are
+rejected normally, with no alias, migration or compatibility executor. Code KV and Code dedupe remain
+immediately persistent. Model v13, Engine v10 and checkpoint v6 remain; the implementation digest
+adds `skip-duplicates/1`. SQLite migration 60 adds invocation-owned provisional identities and removes
+retired watermark fields while preserving KV values and set identities.
+
+Upgrade Server and clients together. Historical Revision bytes are not silently rewritten. Cloud
+integration remains a separate repository task and must implement staging, reservations, atomic
+terminal finalization and lifecycle cleanup before deploying the matching client/runtime. Earlier
+Engine contracts retain their unrelated compatibility paths.
 
 ## Code runtime alignment: pending Flow model v12 and Engine v9
 

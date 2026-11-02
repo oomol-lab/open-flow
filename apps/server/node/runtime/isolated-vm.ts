@@ -43,7 +43,7 @@ const v8EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated
 
 const v9EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1').digest('hex')}`
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1').digest('hex')}`
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1 skip-duplicates/1').digest('hex')}`
 
 const v6EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1').digest('hex')}`
 

@@ -12,6 +12,7 @@ import type { FlowStore } from './flow-store.ts'
 import type { PublicationStore } from './publication-store.ts'
 import type { RevisionStore } from './revision-store.ts'
 import type { RunViewStore, StoredControlRun } from './run-view-store.ts'
+import type { StateStore } from './state-store.ts'
 import type { RunAdmission, TriggerOccurrenceInput } from './trigger-store.ts'
 import type { VariableStore } from './variable-store.ts'
 
@@ -81,6 +82,7 @@ export interface RunEnvironment {
 }
 
 export interface RunStoreDependencies {
+  readonly state: StateStore
   readonly connectorTeams: ConnectorTeamStore
   readonly flows: FlowStore
   readonly environment: RunEnvironment
@@ -1291,6 +1293,7 @@ export class RunStore {
       .prepare(`UPDATE runs SET status = ?, result = ?, finished_at = ?, events_expires_at = ? WHERE run_id = ? AND ${condition}`)
       .run(status, JSON.stringify(result), finishedAt, finishedAt + this.#runEventRetentionMs, runId, ...conditionParams)
     if (changed.changes != 1) return false
+    this.#deps.state.finishRun(runId, status === 'completed')
     if (status != 'completed') {
       this.#interrupts.add(runId)
       for (const call of this.workflowCalls(runId))
@@ -1406,7 +1409,7 @@ export class RunStore {
         ),
       )
     }
-    this.#expireWaits(this.#clock(), Number.MAX_SAFE_INTEGER)
+    this.#transaction(() => this.#expireWaits(this.#clock(), Number.MAX_SAFE_INTEGER))
   }
 
   #checkpointValid(source: string | null, digest: string | null, bytes: number | null): boolean {

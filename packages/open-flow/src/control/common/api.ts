@@ -703,7 +703,7 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'decision' &&
             nodeKind !== 'openapi' &&
             nodeKind !== 'http-request' &&
-            nodeKind !== 'dedupe' &&
+            nodeKind !== 'skip-duplicates' &&
             nodeKind !== 'llm' &&
             nodeKind !== 'agent' &&
             nodeKind !== 'value' &&

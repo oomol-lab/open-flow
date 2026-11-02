@@ -167,7 +167,7 @@ export interface ConditionNode extends GraphNodeBase {
 
 export type ManagedTaskExecutor =
   | import('../../http/common/httpRequest.ts').HttpRequestExecutor
-  | import('../../state/common/state.ts').DedupeExecutor
+  | import('../../state/common/state.ts').SkipDuplicatesExecutor
   | WorkflowExecutor
   | import('../../decision/common/decision.ts').DecisionExecutor
   | import('../../openapi/common/openapi.ts').OpenApiExecutor

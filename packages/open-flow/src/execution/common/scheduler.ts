@@ -70,7 +70,7 @@ export type SchedulerEvent =
         | 'javascript'
         | 'openapi'
         | 'http-request'
-        | 'dedupe'
+        | 'skip-duplicates'
         | 'llm'
         | 'value'
         | 'wait'

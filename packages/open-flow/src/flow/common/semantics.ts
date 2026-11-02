@@ -2,7 +2,7 @@ import { dequal } from 'dequal/lite'
 import { decisionTaskIssues } from '../../decision/common/decision.ts'
 import { httpRequestIssues, httpAuthHandles, httpRequestTask, httpRequestUrl } from '../../http/common/httpRequest.ts'
 import { openApiIssues, authHandles } from '../../openapi/common/openapi.ts'
-import { dedupeTask } from '../../state/common/state.ts'
+import { skipDuplicatesTask } from '../../state/common/state.ts'
 import { isTriggerNode } from './change.ts'
 import { nodeWorkflowReferences } from './workflowReferences.ts'
 export { renderPrompt } from './promptTemplate.ts'
@@ -274,14 +274,14 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
       })
     for (const message of openApiIssues(task))
       checked.diagnostics.push({ code: 'openapi.config-invalid', column: 0, line: 1, message, path: `/document/graph/nodes/${nodeId}/task/executor` })
-    if (task.executor.kind === 'dedupe') {
-      const expected = dedupeTask(task.executor)
+    if (task.executor.kind === 'skip-duplicates') {
+      const expected = skipDuplicatesTask(task.executor)
       if (
         !dequal(httpPortContracts(task.inputs), httpPortContracts(expected.inputs)) ||
         !dequal(httpPortContracts(task.outputs), httpPortContracts(expected.outputs))
       )
         checked.diagnostics.push({
-          code: 'dedupe.ports-invalid',
+          code: 'skip-duplicates.ports-invalid',
           column: 0,
           line: 1,
           message: 'Deduplication ports must match the fixed contract.',
@@ -457,7 +457,9 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
   if (engine == null) return { kind: 'engine-unsupported' }
   if (
     !engine.flowState &&
-    Object.values(revision.document.graph.nodes).some((node) => node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'dedupe')
+    Object.values(revision.document.graph.nodes).some(
+      (node) => node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'skip-duplicates',
+    )
   )
     return { kind: 'engine-unsupported' }
   if (

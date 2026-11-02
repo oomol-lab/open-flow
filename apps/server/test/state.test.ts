@@ -35,10 +35,10 @@ describe('Flow State storage', () => {
     const store = setup({ ...stateLimits, maxIdentities: 2 })
     const ids = ['a', 'b', 'c']
     const hashes = await hashIdentities(ids)
-    expect(store.insert('f', 'draft', 'flow', 'new', ids.slice(0, 2), hashes.slice(0, 2))).toEqual([true, true])
-    expect(() => store.insert('f', 'draft', 'flow', 'new', ids, hashes)).toThrow('full')
+    expect(store.insert('f', 'draft', 'flow', hashes.slice(0, 2))).toEqual([true, true])
+    expect(() => store.insert('f', 'draft', 'flow', hashes)).toThrow('full')
     expect(store.has('f', 'draft', 'flow', hashes)).toEqual([true, true, false])
-    expect(store.insert('f', 'draft', 'flow', 'new', ['b', 'b'], [hashes[1]!, hashes[1]!])).toEqual([false, false])
+    expect(store.insert('f', 'draft', 'flow', [hashes[1]!, hashes[1]!])).toEqual([false, false])
     expect(store.dedupeCount('f', 'draft')).toBe(2)
     store.clearSpace('f', 'draft', 'flow')
     expect(store.dedupeCount('f', 'draft')).toBe(0)
@@ -47,26 +47,14 @@ describe('Flow State storage', () => {
     const store = setup({ ...stateLimits, maxIdentities: 2 })
     const ids = ['a', 'b', 'c']
     const hashes = await hashIdentities(ids)
-    store.insert('f', 'draft', 'flow', 'new', ids.slice(0, 2), hashes.slice(0, 2))
+    store.insert('f', 'draft', 'flow', hashes.slice(0, 2))
     const reduced = new StateStore(store.database, store.transaction, store.clock, { ...stateLimits, maxIdentities: 1 })
-    expect(reduced.insert('f', 'draft', 'flow', 'new', ['b', 'b'], [hashes[1]!, hashes[1]!])).toEqual([false, false])
-    expect(() => reduced.insert('f', 'draft', 'flow', 'new', ids, hashes)).toThrow('full')
+    expect(reduced.insert('f', 'draft', 'flow', [hashes[1]!, hashes[1]!])).toEqual([false, false])
+    expect(() => reduced.insert('f', 'draft', 'flow', hashes)).toThrow('full')
     expect(reduced.has('f', 'draft', 'flow', hashes)).toEqual([true, true, false])
     expect(reduced.dedupeCount('f', 'draft')).toBe(2)
   })
-  it('changes modes atomically and leaves prior history intact after invalid watermarks', async () => {
-    const store = setup()
-    const ids = ['a']
-    const hashes = await hashIdentities(ids)
-    store.insert('f', 'draft', 'flow', 'new', ids, hashes)
-    expect(() => store.insert('f', 'draft', 'flow', 'increasing', ['invalid'], [])).toThrow()
-    expect(store.has('f', 'draft', 'flow', hashes)).toEqual([true])
-    expect(store.insert('f', 'draft', 'flow', 'increasing', [10, 2, 10], [])).toEqual([true, true, false])
-    expect(store.insert('f', 'draft', 'flow', 'increasing', [9, 11], [])).toEqual([false, true])
-    expect(() => store.has('f', 'draft', 'flow', hashes)).toThrow()
-    expect(store.insert('f', 'draft', 'flow', 'new', ids, hashes)).toEqual([true])
-    expect(store.dedupeCount('f', 'draft')).toBe(1)
-  })
+
   it('limits distinct keys while allowing updates, conditional inserts, deletions and independent scopes', () => {
     const store = setup({ ...stateLimits, maxValues: 1, maxValueBytes: 9 })
     store.set('f', 'draft', 'r', 'k', 'x')
@@ -82,35 +70,7 @@ describe('Flow State storage', () => {
     store.clearValues('f', 'draft')
     expect(store.list('f', 'draft')).toEqual([])
   })
-  it('shares identity capacity across spaces and frees it on clearing or switching to a watermark', async () => {
-    const store = setup({ ...stateLimits, maxIdentities: 2 })
-    const hashes = await hashIdentities(['a', 'b'])
-    store.insert('f', 'draft', 'flow', 'new', ['a'], [hashes[0]!])
-    store.insert('f', 'draft', 'node:a', 'new', ['a'], [hashes[0]!])
-    expect(() => store.insert('f', 'draft', 'node:b', 'new', ['b'], [hashes[1]!])).toThrow('full')
-    expect(store.view('f', 'draft').spaces).toHaveLength(2)
-    store.insert('f', 'live', 'flow', 'new', ['a', 'b'], hashes)
-    store.insert('f', 'draft', 'node:a', 'increasing', [1], [])
-    store.insert('f', 'draft', 'node:b', 'new', ['b'], [hashes[1]!])
-    expect(() => store.insert('f', 'draft', 'node:a', 'new', ['a'], [hashes[0]!])).toThrow('full')
-    expect(store.view('f', 'draft').spaces.find((item) => item.space === 'node:a')?.watermark).toBe(1)
-    store.clearSpace('f', 'draft', 'flow')
-    store.insert('f', 'draft', 'node:a', 'new', ['a'], [hashes[0]!])
-    expect(store.dedupeCount('f', 'draft')).toBe(2)
-  })
-  it('bounds watermark spaces, including empty switched spaces, and releases slots on clearing', async () => {
-    const store = setup({ ...stateLimits, maxSpaces: 1 })
-    store.insert('f', 'draft', 'node:a', 'increasing', [1], [])
-    expect(() => store.insert('f', 'draft', 'node:b', 'increasing', [2], [])).toThrow('space limit')
-    expect(store.insert('f', 'draft', 'node:b', 'increasing', [], [])).toEqual([])
-    store.insert('f', 'draft', 'node:a', 'increasing', [2], [])
-    store.insert('f', 'draft', 'node:a', 'new', [], [])
-    expect(() => store.insert('f', 'draft', 'node:b', 'increasing', [2], [])).toThrow('space limit')
-    store.clearSpace('f', 'draft', 'node:a')
-    expect(() => store.insert('f', 'draft', 'node:' + 'x'.repeat(252), 'increasing', [1], [])).toThrow('256')
-    store.insert('f', 'draft', 'node:b', 'increasing', [2], [])
-    expect(store.view('f', 'draft').spaces).toHaveLength(1)
-  })
+
   it('accepts values beyond the retired total byte quota when each value and the entry count fit', () => {
     const store = setup()
     const value = 'x'.repeat(stateLimits.maxValueBytes - 2)
@@ -138,21 +98,16 @@ it('removes values, spaces, hashes for both scopes when a Flow is physically del
   const hashes = await hashIdentities(['a'])
   for (const scope of ['draft', 'live'] as const) {
     store.state.set('flow', scope, 'run', 'value', 1)
-    store.state.insert('flow', scope, 'node:removed', 'new', ['a'], hashes)
+    store.state.insert('flow', scope, 'node:removed', hashes)
+    database.connection
+      .prepare('INSERT INTO flow_dedupe_pending VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(`orphan-${scope}`, 'job', 'flow', scope, 'node:pending', hashes[0]!, 0)
   }
   store.flows.retire('flow', 2)
   expect(store.flows.delete('flow')).toBe(true)
-  for (const table of ['flow_state_values', 'flow_dedupe_spaces', 'flow_dedupe_identities']) {
+  for (const table of ['flow_state_values', 'flow_dedupe_spaces', 'flow_dedupe_identities', 'flow_dedupe_pending']) {
     expect(database.connection.prepare(`SELECT * FROM ${table} WHERE flow_id = ?`).all('flow')).toEqual([])
   }
-})
-
-it('resets a changed mode even when the first batch is empty', async () => {
-  const store = setup()
-  const hashes = await hashIdentities(['a'])
-  store.insert('f', 'draft', 'flow', 'new', ['a'], hashes)
-  expect(store.insert('f', 'draft', 'flow', 'increasing', [], [])).toEqual([])
-  expect(store.view('f', 'draft')).toMatchObject({ spaces: [{ mode: 'increasing', watermark: null, count: 0 }] })
 })
 
 it('allows deletion even when the configured value limit is smaller than serialized null', () => {
@@ -168,11 +123,106 @@ it('migrates byte-accounted data without losing values or history', async () => 
   databases.push(database)
   const store = new StateStore(database.connection, (operation) => database.transaction(operation))
   store.set('f', 'draft', 'r', 'key', '你好')
-  store.insert('f', 'draft', 'flow', 'new', ['a'], await hashIdentities(['a']))
+  store.insert('f', 'draft', 'flow', await hashIdentities(['a']))
   database.connection.exec(
-    'CREATE TABLE flow_state_usage (flow_id TEXT, scope TEXT, bytes INTEGER); UPDATE flow_state_values SET size = 999; PRAGMA user_version = 58',
+    "CREATE TABLE flow_state_usage (flow_id TEXT, scope TEXT, bytes INTEGER); ALTER TABLE flow_dedupe_spaces ADD COLUMN mode TEXT NOT NULL DEFAULT 'new'; ALTER TABLE flow_dedupe_spaces ADD COLUMN watermark_json TEXT; DROP TABLE flow_dedupe_pending; UPDATE flow_state_values SET size = 999; PRAGMA user_version = 58",
   )
   migrate(database)
   expect(store.view('f', 'draft', true)).toMatchObject({ values: [{ key: 'key', value: '你好', size: 8 }], spaces: [{ count: 1 }] })
   expect(database.connection.prepare("SELECT name FROM sqlite_master WHERE name = 'flow_state_usage'").get()).toBeUndefined()
+})
+
+function activeRun(store: StateStore, runId: string, scope: 'draft' | 'live' = 'draft') {
+  store.database
+    .prepare(`INSERT INTO runs (run_id, idempotency_key, request_digest, flow_id, revision_id, revision_digest,
+    closure_digest, model_version, engine_contract, engine_digest, inputs, source, status, created_at)
+    VALUES (?, ?, ?, 'f', 'revision', 'digest', 'closure', 13, 'engine', 'digest', '{}', ?, 'running', 0)`)
+    .run(runId, runId, runId, scope)
+}
+
+it('stages per invocation, filters within a Run, and commits idempotently', async () => {
+  const store = setup()
+  activeRun(store, 'r1')
+  const hashes = await hashIdentities(['a', 'b', 'a'])
+  expect(store.stage('f', 'draft', 'r1', 'job1', 'filter', hashes)).toEqual([true, true, false])
+  expect(store.has('f', 'draft', 'node:filter', hashes)).toEqual([false, false, false])
+  expect(store.stage('f', 'draft', 'r1', 'job2', 'filter', hashes)).toEqual([false, false, false])
+  expect(store.view('f', 'draft').spaces).toMatchObject([{ count: 0, pendingCount: 2 }])
+  expect(store.clearSpace('f', 'draft', 'node:filter')).toBe(false)
+  store.transaction(() => store.finishRun('r1', true))
+  store.transaction(() => store.finishRun('r1', true))
+  expect(store.has('f', 'draft', 'node:filter', hashes)).toEqual([true, true, true])
+  expect(store.view('f', 'draft').spaces).toMatchObject([{ count: 2, pendingCount: 0 }])
+  expect(store.clearSpace('f', 'draft', 'node:filter')).toBe(true)
+})
+
+it('releases failed invocation reservations without losing other successful invocations', async () => {
+  const store = setup()
+  activeRun(store, 'r1')
+  const hashes = await hashIdentities(['a', 'b'])
+  store.stage('f', 'draft', 'r1', 'job1', 'filter', hashes.slice(0, 1))
+  store.stage('f', 'draft', 'r1', 'job2', 'filter', hashes.slice(1))
+  store.discardInvocation('r1', 'job2')
+  store.transaction(() => store.finishRun('r1', true))
+  expect(store.has('f', 'draft', 'node:filter', hashes)).toEqual([true, false])
+})
+
+it('reserves capacity across pending Runs and Code writes without suppressing another Run', async () => {
+  const store = setup({ ...stateLimits, maxIdentities: 2, maxSpaces: 1 })
+  activeRun(store, 'r1')
+  activeRun(store, 'r2')
+  const hashes = await hashIdentities(['a', 'b', 'c'])
+  expect(store.stage('f', 'draft', 'r1', 'job1', 'filter', hashes.slice(0, 2))).toEqual([true, true])
+  expect(store.stage('f', 'draft', 'r2', 'job1', 'filter', hashes.slice(0, 2))).toEqual([true, true])
+  expect(store.dedupeCount('f', 'draft')).toBe(2)
+  expect(() => store.stage('f', 'draft', 'r2', 'job2', 'filter', hashes)).toThrow('full')
+  expect(() => store.insert('f', 'draft', 'flow', hashes.slice(2))).toThrow('space limit')
+  store.transaction(() => store.finishRun('r1', false))
+  expect(store.dedupeCount('f', 'draft')).toBe(2)
+  store.transaction(() => store.finishRun('r2', false))
+  expect(store.view('f', 'draft').spaces).toEqual([])
+  store.insert('f', 'draft', 'flow', hashes.slice(2))
+  expect(store.view('f', 'draft').spaces).toMatchObject([{ count: 1, pendingCount: 0 }])
+})
+
+it('includes pending reservations in Code identity capacity and isolates scopes', async () => {
+  const store = setup({ ...stateLimits, maxIdentities: 1 })
+  activeRun(store, 'r1')
+  const hashes = await hashIdentities(['a'])
+  store.stage('f', 'draft', 'r1', 'job1', 'filter', hashes)
+  expect(() => store.insert('f', 'draft', 'flow', hashes)).toThrow('full')
+  expect(store.insert('f', 'live', 'flow', hashes)).toEqual([true])
+  store.transaction(() => store.finishRun('r1', false))
+  expect(store.insert('f', 'draft', 'flow', hashes)).toEqual([true])
+})
+
+it('does not publish or release provisional history when the terminal transaction rolls back', async () => {
+  const store = setup()
+  activeRun(store, 'r1')
+  const hashes = await hashIdentities(['a'])
+  store.stage('f', 'draft', 'r1', 'job1', 'filter', hashes)
+  expect(() =>
+    store.transaction(() => {
+      store.finishRun('r1', true)
+      throw new Error('terminal failure')
+    }),
+  ).toThrow('terminal failure')
+  expect(store.view('f', 'draft').spaces).toMatchObject([{ count: 0, pendingCount: 1 }])
+  expect(store.has('f', 'draft', 'node:filter', hashes)).toEqual([false])
+})
+
+it('does not double count overlapping reservations after another Run commits but still protects reset', async () => {
+  const store = setup({ ...stateLimits, maxIdentities: 1 })
+  activeRun(store, 'r1')
+  activeRun(store, 'r2')
+  const hashes = await hashIdentities(['a'])
+  store.stage('f', 'draft', 'r1', 'job1', 'filter', hashes)
+  store.stage('f', 'draft', 'r2', 'job1', 'filter', hashes)
+  store.transaction(() => store.finishRun('r1', true))
+  expect(store.view('f', 'draft').spaces).toMatchObject([{ count: 1, pendingCount: 1, reservedCount: 1 }])
+  expect(store.dedupeCount('f', 'draft')).toBe(1)
+  expect(store.clearSpace('f', 'draft', 'node:filter')).toBe(false)
+  store.transaction(() => store.finishRun('r2', false))
+  expect(store.has('f', 'draft', 'node:filter', hashes)).toEqual([true])
+  expect(store.clearSpace('f', 'draft', 'node:filter')).toBe(true)
 })

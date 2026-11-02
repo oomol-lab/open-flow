@@ -6,7 +6,7 @@ import { act } from 'react'
 import { val } from 'value-enhancer'
 import { expect, it, vi } from 'vitest'
 import { publicationFixture } from '../../../../../dev/designer/publicationFixture.ts'
-import { click, render } from '../../../../../test/support/render.tsx'
+import { click, input as enterInput, render } from '../../../../../test/support/render.tsx'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { CodeEditor } from './codeEditor.tsx'
@@ -324,7 +324,7 @@ it.each([
   ['node', true],
   ['flow', false],
   ['flow', true],
-] as const)('isolates dedupe edits when switching %s with pending=%s', async (switchBy, pending) => {
+] as const)('isolates Skip Duplicates edits when switching %s with pending=%s', async (switchBy, pending) => {
   const deferred = Promise.withResolvers<boolean>()
   const saveTaskSettings = vi
     .fn()
@@ -337,7 +337,7 @@ it.each([
       kind: 'task',
       name: 'Dedupe',
       inputs: {},
-      task: { name: 'Dedupe', inputs: [], outputs: [], executor: { kind: 'dedupe', mode: 'new', field: '', space: 'node' } },
+      task: { name: 'Dedupe', inputs: [], outputs: [], executor: { kind: 'skip-duplicates', fields: [] } },
     }
     const revision = revisionView({
       ...draft,
@@ -359,25 +359,23 @@ it.each([
     )
   }
   const view = render(section('first', 'node-a'))
-  const mode = view.container.querySelector<HTMLSelectElement>('select[id$="-mode"]')!
-  await act(async () => {
-    mode.value = 'increasing'
-    mode.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  const field = view.container.querySelector<HTMLInputElement>('input[id$="-field-0"]')!
+  await enterInput(field, 'id')
+  await act(async () => field.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
   expect(saveTaskSettings).toHaveBeenCalledTimes(1)
   const nextId = switchBy === 'node' ? 'node-b' : 'node-a'
   view.rerender(section(switchBy === 'flow' ? 'second' : 'first', nextId))
-  expect(view.container.querySelector<HTMLSelectElement>('select[id$="-mode"]')?.value).toBe('new')
-  expect(view.container.textContent).not.toContain(view.i18n.t('httpRequest.saveFailed'))
-  const space = view.container.querySelector<HTMLSelectElement>('select[id$="-space"]')!
+  expect(view.container.querySelector<HTMLInputElement>('input[id$="-field-0"]')?.value).toBe('')
+  expect(view.container.textContent).not.toContain(view.i18n.t('flowState.saveFailed'))
+  const nextField = view.container.querySelector<HTMLInputElement>('input[id$="-field-0"]')!
+  await enterInput(nextField, 'url')
   await act(async () => {
-    space.value = 'flow'
-    space.dispatchEvent(new Event('change', { bubbles: true }))
+    nextField.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
     deferred.resolve(true)
   })
   expect(saveTaskSettings).toHaveBeenCalledTimes(2)
   expect(saveTaskSettings).toHaveBeenLastCalledWith(
     nextId,
-    expect.objectContaining({ task: expect.objectContaining({ executor: { kind: 'dedupe', mode: 'new', field: '', space: 'flow' } }) }),
+    expect.objectContaining({ task: expect.objectContaining({ executor: { kind: 'skip-duplicates', fields: ['url'] } }) }),
   )
 })

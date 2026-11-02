@@ -6,7 +6,7 @@ import type { AddNodeIntent } from './flowChanges.ts'
 
 import { decisionTask } from '../../../../decision/common/decision.ts'
 import { httpRequestTask } from '../../../../http/common/httpRequest.ts'
-import { dedupeTask } from '../../../../state/common/state.ts'
+import { skipDuplicatesTask } from '../../../../state/common/state.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { revisionView } from '../revisionView.ts'
 
@@ -59,7 +59,7 @@ export type AddNodeOption = AddNodeOptionBase &
     | { readonly kind: 'agent' }
     | { readonly kind: 'openapi' }
     | { readonly kind: 'http-request' }
-    | { readonly kind: 'dedupe' }
+    | { readonly kind: 'skip-duplicates' }
     | { readonly kind: 'workflow' }
     | { readonly kind: 'llm' }
     | { readonly kind: 'new-task' }
@@ -144,10 +144,10 @@ function builtinOptions(_draft: Draft, t: TFunction): readonly AddNodeOption[] {
       description: t('flowState.warning'),
       group,
       icon: ':lucide-light:list-filter:',
-      id: 'dedupe',
-      inputs: dedupeTask().inputs.filter((port) => 'handle' in port),
-      outputs: dedupeTask().outputs.filter((port) => 'handle' in port),
-      kind: 'dedupe',
+      id: 'skip-duplicates',
+      inputs: skipDuplicatesTask().inputs.filter((port) => 'handle' in port),
+      outputs: skipDuplicatesTask().outputs.filter((port) => 'handle' in port),
+      kind: 'skip-duplicates',
       label: t('flowState.nodeTitle'),
     },
     { description: t('openapi.description'), group, icon: ':logos:openapi-icon:', id: 'openapi', inputs: [], outputs: [], kind: 'openapi', label: 'OpenAPI' },
@@ -311,8 +311,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, t: 
       }
     case 'decision':
       return { kind: 'decision', name: t('addNode.decision') }
-    case 'dedupe':
-      return { kind: 'dedupe', name: t('flowState.nodeTitle') }
+    case 'skip-duplicates':
+      return { kind: 'skip-duplicates', name: t('flowState.nodeTitle') }
     case 'http-request':
       return { kind: 'http-request', name: t('httpRequest.title') }
     case 'openapi':

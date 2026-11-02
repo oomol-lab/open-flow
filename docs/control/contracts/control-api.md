@@ -1734,18 +1734,21 @@ management operations require the same Flow access as editing. They do not chang
 Unknown query fields, omitted/invalid scope, invalid boolean values, empty/oversized keys and
 invalid space names are rejected with `400 flow.invalid`. DELETE is idempotent; an absent key
 or space is already clear. Clearing business values does not clear dedupe history, and clearing
-a dedupe space does not touch business values or other spaces.
+a dedupe space does not touch business values or other spaces. A space with pending Run records returns
+`409 flow.conflict`; finish or cancel its Runs before clearing it.
 
 `FlowStateView` and its schema are exported from `@oomol-lab/open-flow/flow-state`. Its root has
 `version: 1`, `scope`, deployment `limits`, `values`, and `spaces`. Value entries
 contain `key`, JSON UTF-8 byte `size`, and epoch-millisecond `updatedAt`; `value` is included only when
-requested. Space entries contain `space`, `mode`, `count`, `watermark`, and epoch-millisecond
-`updatedAt`. Hashes and original identity lists are never returned. Deleted-node spaces remain
+requested. Space entries contain `space`, committed `count`, distinct provisional `pendingCount`,
+`reservedCount` (the union of committed and provisional identities), and epoch-millisecond
+`updatedAt`. Pending identities can overlap committed history when another Run finishes first;
+they still prevent reset, while capacity counts each identity once. Hashes and original identity lists are never returned. Deleted-node spaces remain
 visible until explicitly cleared. Server defaults are `maxValueBytes` (65,536), `maxValues` (1,000), `maxIdentities` (10,000),
 `maxSpaces` (100), and `maxRunWrites` (1,000). Deployments can override these through
 `ServerRuntime.stateLimits`; clients must use the returned `limits` for the active deployment.
 Each Flow/source has independent limits.
-Identity counts are shared across all spaces; watermark spaces consume only a space slot.
+Identity and space limits include pending reservations. A reserved identity is counted once across overlapping Runs.
 There is no total byte quota. Updates to existing keys and duplicate-only batches remain allowed at capacity.
 
 The public client exposes `getFlowState(flowId, scope, values?)`,
@@ -1764,7 +1767,8 @@ CLI clearing requires `--yes`. MCP tools are `flow_state`, `flow_state_clear`, a
 for separate confirmation before clearing Live. Live clearing immediately affects future
 membership checks and may cause items to be processed again.
 
-The `dedupe` authoring node owns its `items` array input and `items` / `duplicates` array outputs.
-Callers supply `config: { field, mode, space }` and input mappings; they do not construct executor
-ports. See [Node authoring](../../authoring/node-authoring.md) and the
-[State runtime contract](nodejs-runtime.md) for record timing, watermark comparison and quotas.
+The `skip-duplicates` authoring node owns its `items` array input and `items` / `duplicates` array outputs.
+Callers supply `config: { fields: string[] }` and input mappings; they do not construct executor ports.
+History is private to the node and commits only after Run success. The retired `dedupe` type and
+`field`/`mode`/`space` config are rejected. See [Node authoring](../../authoring/node-authoring.md) and
+the [State runtime contract](nodejs-runtime.md) for identity encoding, submission timing and quotas.

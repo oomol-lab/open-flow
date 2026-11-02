@@ -16,21 +16,25 @@ export const stateClearSchema = z.strictObject({
 })
 export const dedupeClearSchema = z.strictObject({ scope: z.enum(['draft', 'live']), space: z.string().regex(/^(flow|node:.+)$/) })
 export type DedupeIdentity = string | number
-export const dedupeConfigSchema = z.strictObject({
-  field: z.string().default(''),
-  mode: z.enum(['new', 'increasing']).default('new'),
-  space: z.enum(['node', 'flow']).default('node'),
+export const skipDuplicatesConfigSchema = z.strictObject({
+  fields: z
+    .array(z.string().refine((field) => field.length > 0 && field.split('.').every((part) => part.length > 0), 'Use a nonempty dot-separated field path.'))
+    .refine((fields) => new Set(fields).size === fields.length, 'Identity fields must be distinct.')
+    .default([]),
 })
-export type DedupeConfig = z.infer<typeof dedupeConfigSchema>
-export interface DedupeExecutor extends DedupeConfig {
-  readonly kind: 'dedupe'
+export type SkipDuplicatesConfig = z.infer<typeof skipDuplicatesConfigSchema>
+export interface SkipDuplicatesExecutor extends SkipDuplicatesConfig {
+  readonly kind: 'skip-duplicates'
 }
-export const dedupeExecutorSchema = dedupeConfigSchema.extend({ kind: z.literal('dedupe') })
+export const skipDuplicatesExecutorSchema = skipDuplicatesConfigSchema.extend({ kind: z.literal('skip-duplicates') })
 
-export function dedupeTask(config: DedupeConfig = dedupeConfigSchema.parse({}), name = 'Remove Duplicates'): ManagedTaskDefinitionOf<DedupeExecutor> {
+export function skipDuplicatesTask(
+  config: SkipDuplicatesConfig = skipDuplicatesConfigSchema.parse({}),
+  name = 'Skip Duplicates',
+): ManagedTaskDefinitionOf<SkipDuplicatesExecutor> {
   return {
     name,
-    executor: { ...config, kind: 'dedupe' },
+    executor: { ...config, kind: 'skip-duplicates' },
     inputs: [{ handle: 'items', jsonSchema: { type: 'array' }, nullable: false }],
     outputs: ['items', 'duplicates'].map((handle) => ({ handle, jsonSchema: { type: 'array' }, nullable: false })),
   }
@@ -39,13 +43,13 @@ export function dedupeTask(config: DedupeConfig = dedupeConfigSchema.parse({}), 
 export class StateError extends Error {
   readonly retryable = false
   readonly catchable: boolean
-  readonly code: 'capability.invalid' | 'capability.denied' | 'dedupe.full' | 'limit-exceeded'
+  readonly code: 'capability.invalid' | 'capability.denied' | 'dedupe.full' | 'limit-exceeded' | 'node.input-invalid'
 
   constructor(code: StateError['code'], message: string) {
     super(message)
     this.name = 'StateError'
     this.code = code
-    this.catchable = code === 'dedupe.full'
+    this.catchable = code === 'dedupe.full' || code === 'node.input-invalid'
   }
 }
 
@@ -67,63 +71,31 @@ export async function hashIdentities(ids: readonly DedupeIdentity[]): Promise<Ui
   )
 }
 
-export function watermarkValue(id: DedupeIdentity): number {
-  if (typeof id === 'number') {
-    if (!Number.isFinite(id)) throw new StateError('capability.invalid', 'Watermarks must be finite.')
-    return id
-  }
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/.exec(id)
-  if (match == null) throw new StateError('capability.invalid', 'Watermarks require RFC 3339 timestamps with an explicit timezone.')
-  const [, year, month, day, hour, minute, second, , zone] = match
-  const y = Number(year)
-  const days = [31, y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][Number(month) - 1] ?? 0
-  const result = Date.parse(id)
-  if (
-    Number(month) < 1 ||
-    Number(month) > 12 ||
-    Number(day) < 1 ||
-    Number(day) > days ||
-    Number(hour) > 23 ||
-    Number(minute) > 59 ||
-    Number(second) > 59 ||
-    (zone !== 'Z' && (Number(zone!.slice(1, 3)) > 23 || Number(zone!.slice(4)) > 59)) ||
-    !Number.isFinite(result)
-  )
-    throw new StateError('capability.invalid', 'Watermarks require valid calendar timestamps.')
-  return result
-}
-
-export function increasingIdentities(ids: readonly DedupeIdentity[], watermark: DedupeIdentity | null) {
-  const type = typeof (watermark ?? ids[0])
-  if (ids.some((id) => typeof id !== type)) throw new StateError('capability.invalid', 'Watermark types must not be mixed.')
-  const initial = watermark == null ? -Infinity : watermarkValue(watermark)
-  const seen = new Set<number>()
-  let maximum = initial
-  let next = watermark
-  const inserted = ids.map((id) => {
-    const value = watermarkValue(id)
-    const fresh = value > initial && !seen.has(value)
-    seen.add(value)
-    if (value > maximum) {
-      maximum = value
-      next = id
-    }
-    return fresh
+/** Canonical identities include the field definition and preserve scalar types. */
+export function skipDuplicatesIdentities(items: JsonValue, fields: readonly string[]): string[] {
+  if (!Array.isArray(items)) throw new StateError('node.input-invalid', 'Skip Duplicates requires an array of items.')
+  const paths = fields.toSorted()
+  return items.map((item, index) => {
+    const values = (paths.length === 0 ? [''] : paths).map((field) => {
+      const value =
+        field === ''
+          ? item
+          : field
+              .split('.')
+              .reduce<JsonValue | undefined>(
+                (current, key) =>
+                  current != null && typeof current === 'object' && Object.hasOwn(current, key) ? (current as Record<string, JsonValue>)[key] : undefined,
+                item,
+              )
+      if (typeof value !== 'string' && !(typeof value === 'number' && Number.isFinite(value)))
+        throw new StateError(
+          'node.input-invalid',
+          `Item ${index + 1}, ${field === '' ? 'the item itself' : `field ${JSON.stringify(field)}`} must be a string or finite number.`,
+        )
+      return value
+    })
+    return JSON.stringify([paths, values])
   })
-  return { inserted, watermark: next }
-}
-
-export function itemIdentities(items: JsonValue, field: string): DedupeIdentity[] {
-  if (!Array.isArray(items)) throw new StateError('capability.invalid', 'Deduplication requires an array of items.')
-  const path = field === '' ? [] : field.split('.')
-  return dedupeIdentities(
-    items.map((item) =>
-      path.reduce<JsonValue | undefined>(
-        (value, key) => (value != null && typeof value === 'object' && Object.hasOwn(value, key) ? (value as Record<string, JsonValue>)[key] : undefined),
-        item,
-      ),
-    ),
-  )
 }
 
 export interface FlowStateView {
@@ -139,9 +111,9 @@ export interface FlowStateView {
   readonly values: readonly { readonly key: string; readonly size: number; readonly updatedAt: number; readonly value?: JsonValue }[]
   readonly spaces: readonly {
     readonly space: string
-    readonly mode: 'new' | 'increasing'
     readonly count: number
-    readonly watermark: DedupeIdentity | null
+    readonly pendingCount: number
+    readonly reservedCount: number
     readonly updatedAt: number
   }[]
 }
@@ -160,9 +132,9 @@ export const flowStateViewSchema = z.object({
   spaces: z.array(
     z.object({
       space: z.string(),
-      mode: z.enum(['new', 'increasing']),
       count: z.number().nonnegative(),
-      watermark: z.union([z.string(), z.number(), z.null()]),
+      pendingCount: z.number().nonnegative(),
+      reservedCount: z.number().nonnegative(),
       updatedAt: z.number(),
     }),
   ),

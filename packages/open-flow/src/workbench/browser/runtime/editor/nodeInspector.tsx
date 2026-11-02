@@ -46,7 +46,6 @@ import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { ConnectorAccount, TriggerConnection, SavedConnectionReference } from './connectionSettings.tsx'
 import { presentConnectorInputs } from './connectorInputPresentation.ts'
 import { DecisionSection } from './decisionSection.tsx'
-import { DedupeSection } from './dedupeSection.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { EventSourceTriggerConfig } from './eventSourceTriggerConfig.tsx'
@@ -64,6 +63,7 @@ import { OpenApiSection } from './openApiSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { presentProviderOutputDescription, presentProviderSourceCandidates, presentProviderTriggerConfig } from './providerTriggerPresentation.ts'
 import { ResolutionDefinition } from './resolutionDefinition.tsx'
+import { SkipDuplicatesSection } from './skipDuplicatesSection.tsx'
 import { TallyTriggerConfig } from './tallyTriggerConfig.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
@@ -84,7 +84,7 @@ export function inspectorIcon(node: ResolvedSelection | undefined): IconName {
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
     if (node.definition.executor.kind == 'decision') return 'decision'
     if (node.definition.executor.kind == 'workflow') return 'flow'
-    if (node.definition.executor.kind == 'openapi' || node.definition.executor.kind == 'http-request' || node.definition.executor.kind == 'dedupe')
+    if (node.definition.executor.kind == 'openapi' || node.definition.executor.kind == 'http-request' || node.definition.executor.kind == 'skip-duplicates')
       return 'task'
     return node.definition.executor.kind == 'connector' ? 'connection' : 'llm'
   }
@@ -139,7 +139,7 @@ function nodePurposePlaceholder(
           return t('decision.description')
         case 'workflow':
           return t('workflow.description')
-        case 'dedupe':
+        case 'skip-duplicates':
           return undefined
         case 'http-request':
           return t('httpRequest.description')
@@ -658,27 +658,6 @@ export function NodeInspector({
           />
         )}
 
-        {task != null && 'executor' in task && task.executor.kind === 'dedupe' && (
-          <DedupeSection
-            key={`${revision.revision.flowId}:${selection!.id}`}
-            task={task}
-            disabled={disabled}
-            history={
-              store != null && store.$.flowId.value != null ? (
-                <FlowStateButton
-                  key={selection!.id}
-                  client={store.state}
-                  flowId={store.$.flowId.value}
-                  nodeIds={Object.keys(revision.graph()?.nodes ?? {})}
-                  history={{ nodeId: selection!.id, space: task.executor.space === 'flow' ? 'flow' : `node:${selection!.id}` }}
-                />
-              ) : undefined
-            }
-            onSave={(before, value) =>
-              store?.nodes.saveTaskSettings(selection!.id, { kind: 'dedupe', name: task.name, before, task: value }) ?? Promise.resolve(false)
-            }
-          />
-        )}
         {isHttpRequest && task != null && 'executor' in task && (
           <HttpRequestSection
             key={`http:${selection?.id}`}
@@ -1052,6 +1031,27 @@ export function NodeInspector({
               onChange={() => {}}
             />
           </section>
+        )}
+        {task != null && 'executor' in task && task.executor.kind === 'skip-duplicates' && (
+          <SkipDuplicatesSection
+            key={`${revision.revision.flowId}:${selection!.id}`}
+            task={task}
+            disabled={disabled}
+            history={
+              store != null && store.$.flowId.value != null ? (
+                <FlowStateButton
+                  key={selection!.id}
+                  client={store.state}
+                  flowId={store.$.flowId.value}
+                  nodeIds={Object.keys(revision.graph()?.nodes ?? {})}
+                  history={{ nodeId: selection!.id }}
+                />
+              ) : undefined
+            }
+            onSave={(before, value) =>
+              store?.nodes.saveTaskSettings(selection!.id, { kind: 'skip-duplicates', name: task.name, before, task: value }) ?? Promise.resolve(false)
+            }
+          />
         )}
         {selection == null ? (
           <div className="inspector-empty">{t('inspector.selectNode')}</div>
