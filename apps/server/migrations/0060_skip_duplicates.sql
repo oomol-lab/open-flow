@@ -12,3 +12,4 @@ CREATE TABLE flow_dedupe_pending (
   PRIMARY KEY (run_id, job_id, space, identity)
 );
 CREATE INDEX flow_dedupe_pending_scope ON flow_dedupe_pending (flow_id, scope, space, identity);
+CREATE INDEX flow_dedupe_pending_run ON flow_dedupe_pending (run_id, space, identity);

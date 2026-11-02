@@ -1,7 +1,7 @@
 import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 
 import { dequal } from 'dequal/lite'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { skipDuplicatesConfigSchema } from '../../../../state/common/state.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -24,9 +24,11 @@ export function SkipDuplicatesSection({
   const t = useTranslate()
   const id = useId()
   const taskRef = useRef(task)
-  taskRef.current = task
   const saveRef = useRef(onSave)
-  saveRef.current = onSave
+  useLayoutEffect(() => {
+    taskRef.current = task
+    saveRef.current = onSave
+  }, [task, onSave])
   const request = useRef<AbortController>()
   const [changes] = useState(
     () =>

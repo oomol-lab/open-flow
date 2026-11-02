@@ -872,3 +872,20 @@ it('adds tags to version 56 without rewriting existing Flow metadata', async () 
     upgraded.close()
   }
 })
+
+it('indexes pending identity lookup by Run, space and identity when upgrading version 59', async () => {
+  const file = await databaseFile()
+  legacyDatabase(file, 59).close()
+  const upgraded = Database.open(file)
+  try {
+    const plan = upgraded.connection
+      .prepare('EXPLAIN QUERY PLAN SELECT 1 FROM flow_dedupe_pending WHERE run_id = ? AND space = ? AND identity = ?')
+      .all('run', 'node:filter', new Uint8Array(16))
+      .map((row) => row.detail)
+      .join('\n')
+    expect(plan).toContain('COVERING INDEX')
+    expect(plan).toContain('(run_id=? AND space=? AND identity=?)')
+  } finally {
+    upgraded.close()
+  }
+})

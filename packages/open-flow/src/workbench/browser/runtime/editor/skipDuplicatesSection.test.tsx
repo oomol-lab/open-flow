@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act } from 'react'
+import { act, startTransition, Suspense } from 'react'
 import { expect, it, vi } from 'vitest'
 import { click, input, render } from '../../../../../test/support/render.tsx'
 import { skipDuplicatesTask } from '../../../../state/common/state.ts'
@@ -113,4 +113,46 @@ it('returns keyboard focus to a field after removing the last row', async () => 
   await act(async () => remove.focus())
   await click(remove)
   expect(document.activeElement).toBe(view.container.querySelector('input'))
+})
+
+it('uses only committed task settings and save callbacks for queued saves', async () => {
+  let finish!: (saved: boolean) => void
+  const save = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve
+        }),
+    )
+    .mockResolvedValue(true)
+  const uncommittedSave = vi.fn(async () => true)
+  const task = skipDuplicatesTask({ fields: ['id'] })
+  const pending = new Promise<void>(() => {})
+  function Suspend(): never {
+    throw pending
+  }
+  const editor = (suspend: boolean) => (
+    <Suspense fallback="Loading">
+      <SkipDuplicatesSection task={suspend ? { ...task, name: 'Uncommitted task' } : task} disabled={false} onSave={suspend ? uncommittedSave : save} />
+      {suspend && <Suspend />}
+    </Suspense>
+  )
+  const view = render(editor(false))
+  const field = view.container.querySelector('input')!
+  for (const value of ['url', 'record.id']) {
+    await input(field, value)
+    await act(async () => field.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+  }
+  expect(save).toHaveBeenCalledTimes(1)
+  await act(async () => {
+    startTransition(() => {
+      view.rerender(editor(true))
+    })
+  })
+  expect(view.container.querySelector('input')).toBe(field)
+  await act(async () => finish(true))
+  expect(uncommittedSave).not.toHaveBeenCalled()
+  expect(save).toHaveBeenCalledTimes(2)
+  expect(save).toHaveBeenLastCalledWith(task, { ...task, executor: { kind: 'skip-duplicates', fields: ['record.id'] } })
 })
