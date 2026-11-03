@@ -1,7 +1,9 @@
 import type { I18n } from 'val-i18n'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../../../canvas/common/commands.ts'
+import type { CanvasDirection } from '../../../../canvas/common/direction.ts'
 import type { FlowUpdate } from '../../../../control/common/api.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
+import type { FlowCreationOptions } from '../api.ts'
 import type { WorkbenchClient, ConnectorConnection, Flow, JsonValue, Live, TriggerKeySnapshot } from '../api.ts'
 import type { DesignerViewport, Point } from '../canvasPresentation.ts'
 import type { FlowChangeEvent } from '../contract.ts'
@@ -19,7 +21,16 @@ import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '
 import { encodeWorkflowFile, workflowFileName } from '../../../../flow/common/workflowFile.ts'
 import { workflowCandidate } from '../../../../workflow/common/workflow.ts'
 import { ApiError } from '../api.ts'
-import { commentIds, removeComments, setComment, setFlowViewport, setNodePositions, setNodeContentHidden } from '../canvasPresentation.ts'
+import {
+  commentIds,
+  removeComments,
+  setCanvasLayout,
+  setComment,
+  setFlowViewport,
+  setNodePositions,
+  setNodeContentHidden,
+  setVerticalNodeWidth,
+} from '../canvasPresentation.ts'
 import { connectionCatalog } from '../connectionCatalog.ts'
 import { addNodeIntent } from '../editor/addNodeOptions.ts'
 import { CanvasClipboard } from '../editor/canvasClipboard.ts'
@@ -345,10 +356,11 @@ export class WorkspaceStore {
 
   public createFlow(
     name: string,
-    create?: (name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    create?: (name: string, options?: FlowCreationOptions) => Promise<string>,
     tagIds?: readonly string[],
+    presentation?: FlowCreationOptions['presentation'],
   ): Promise<Flow | undefined> {
-    return this.#createFlow(() => this.#flows.create(name, create, tagIds))
+    return this.#createFlow(() => this.#flows.create(name, create, tagIds, presentation))
   }
 
   public importFlow(
@@ -506,7 +518,10 @@ export class WorkspaceStore {
       changes,
       (value) => {
         let next = commentNodes.size == 0 ? value : removeComments(value, commentNodes)
-        for (const nodeId of selectedNodeIds) next = setNodeContentHidden(next, nodeId, false)
+        for (const nodeId of selectedNodeIds) {
+          next = setNodeContentHidden(next, nodeId, false)
+          next = setVerticalNodeWidth(next, nodeId, undefined)
+        }
         return next
       },
       [],
@@ -536,6 +551,14 @@ export class WorkspaceStore {
     const node = this.#designer().nodes.find((candidate) => candidate.id == nodeId)
     if (node == null || node.kind == 'condition') return
     await this.#edits.canvasChange('edit', 1, [], (value) => setNodeContentHidden(value, nodeId, hidden))
+  }
+
+  public async saveNodeWidth(nodeId: string, width: number | undefined, position?: Point): Promise<boolean> {
+    if (this.#model.value.draft == null || !this.#designer().nodes.some((node) => node.id === nodeId && node.kind === 'condition')) return false
+    return await this.#edits.canvasChange('edit', 1, [], (value) => {
+      const next = setVerticalNodeWidth(value, nodeId, width)
+      return position == null ? next : setNodePositions(next, { [nodeId]: position })
+    })
   }
 
   public async saveComment(nodeId: string, comment: { readonly content: string; readonly title: string }): Promise<void> {
@@ -598,6 +621,10 @@ export class WorkspaceStore {
 
   public saveModuleEditor(): Promise<boolean> {
     return this.#edits.saveModuleEditor()
+  }
+
+  public async changeDirection(direction: CanvasDirection, positions: Readonly<Record<string, Point>>): Promise<boolean> {
+    return await this.#edits.canvasChange('move', Object.keys(positions).length, [], (value) => setCanvasLayout(value, direction, positions))
   }
 
   public async moveNodes(positions: Readonly<Record<string, Point>>): Promise<void> {

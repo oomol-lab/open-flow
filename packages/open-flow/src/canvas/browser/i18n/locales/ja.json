@@ -653,5 +653,17 @@
     "Europe/Moscow": "モスクワ",
     "Australia/Sydney": "シドニー",
     "Pacific/Auckland": "オークランド"
+  },
+  "layoutDirection": {
+    "title": "レイアウトの方向",
+    "horizontal": "横方向",
+    "vertical": "縦方向",
+    "verticalDescription": "上から下に進み、分岐を横に並べます。",
+    "horizontalDescription": "左から右に進み、分岐を縦に並べます。"
+  },
+  "nodeWidth": {
+    "resizeLeft": "左端から幅を変更",
+    "resizeRight": "右端から幅を変更",
+    "reset": "幅を自動調整に戻す"
   }
 }

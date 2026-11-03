@@ -10,7 +10,7 @@ import { Toaster, toast } from 'sonner'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
-import { createCodeTask, createBuiltinTrigger, createValue } from '../../src/flow/common/nodeChanges.ts'
+import { createCodeTask, createBuiltinTrigger, createCondition, createValue } from '../../src/flow/common/nodeChanges.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../src/ui/browser/dialog.tsx'
 import { notificationToasterProps, NotificationUndoLabel } from '../../src/ui/browser/public.ts'
@@ -37,12 +37,14 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
       ...createBuiltinTrigger('trigger', { kind: 'cron', name: 'Schedule', cronTimes: [] }),
       ...createValue('value', 'Input'),
       ...createCodeTask({ nodeId: 'code', moduleId: 'module' }, 'Transform'),
+      ...createCondition('condition', 'Route result'),
       { kind: 'graph.edge.connect', edge: { source: 'value', target: 'code' } },
       { kind: 'graph.edge.connect', edge: { source: 'trigger', target: 'code' } },
+      { kind: 'graph.edge.connect', edge: { source: 'code', target: 'condition' } },
     ],
   )
   let value: Readonly<Record<string, JsonValue>> = setComment(
-    setNodePositions({}, { trigger: { x: 430, y: 200 }, value: { x: 0, y: 0 }, code: { x: 430, y: 0 } }),
+    setNodePositions({}, { trigger: { x: 430, y: 200 }, value: { x: 0, y: 0 }, code: { x: 430, y: 0 }, condition: { x: 860, y: 0 } }),
     'note',
     {
       title: 'Review notes',
@@ -362,11 +364,13 @@ function HistorySession({
               onDeleteEdge={(edge) => void store.disconnect(edge)}
               onDeleteNodes={() => void store.deleteSelectedNodes()}
               onChangeNodeContentHidden={(id, hidden) => void store.saveNodeContentHidden(id, hidden)}
+              onChangeNodeWidth={(id, width, position) => store.saveNodeWidth(id, width, position)}
               onChangeComment={(id, comment) => void store.saveComment(id, comment)}
               onCopy={() => store.copySelectedNodes()}
               onDuplicate={(...args) => void store.duplicateSelectedNodes(...args)}
               onPaste={() => void store.pasteNodes()}
               onMoveNodes={(positions) => void store.moveNodes(positions)}
+              onChangeDirection={(direction, positions) => store.changeDirection(direction, positions)}
               onMoveViewport={(viewport) => void store.moveViewport(viewport)}
               onSelectNodes={(ids) => store.selectNodes(ids)}
               onToggleInspector={() => setInspectorOpen((open) => !open)}
@@ -429,6 +433,20 @@ function HistoryCanvasActions({ session }: { session: ReturnType<typeof createSe
     { label: 'Hold saves', onClick: () => session.hold() },
     { label: 'Release saves', onClick: () => session.release() },
     {
+      label: 'Reload saved data',
+      onClick: async () => {
+        if (await store.saveDraft()) await store.selectFlow(store.$.flowId.value)
+      },
+    },
+    { label: 'Fail next save', onClick: () => session.fail() },
+    {
+      label: 'Recover connection',
+      onClick: async () => {
+        session.online()
+        await store.retryHistorySync()
+      },
+    },
+    {
       label: 'Open feedback dialog',
       onClick: () => {
         setDialogOpen(true)
@@ -472,7 +490,7 @@ export const historyStory: FrontendStory = {
   id: 'canvas-history',
   title: 'Canvas operations',
   description:
-    'Delete Input, select Transform and press Backspace once: each node is removed on its first press. Undo/redo restores nodes and edges. Edit code after a canvas action to confirm Undo remains available. Delete the value field to inspect the saved notification and Undo action. Open, resize and close the context panel to check canvas-centered notifications. Open feedback dialog to check that notifications share the modal’s viewport center, then close it to restore canvas centering. Hold saves to inspect pending changes.',
+    'Delete Input, select Transform and press Backspace once: each node is removed on its first press. Undo/redo restores nodes and edges. Edit code after a canvas action to confirm Undo remains available. Delete the value field to inspect the saved notification and Undo action. Open, resize and close the context panel to check canvas-centered notifications. Open feedback dialog to check that notifications share the modal’s viewport center, then close it to restore canvas centering. Switch direction in the lower-left controls, then undo, redo or reload saved data. Hold saves or fail the next save to inspect recovery.',
   standalone: true,
   render: (log, dark, language) => (
     <div

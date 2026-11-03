@@ -1,6 +1,8 @@
+import type { CanvasDirection } from '../../../canvas/common/direction.ts'
 import type { JsonValue } from './api.ts'
 
 import { dequal } from 'dequal/lite'
+import { canvasDirection } from '../../../canvas/common/direction.ts'
 
 export interface Point {
   readonly x: number
@@ -30,6 +32,22 @@ export function flowPresentation(value: Readonly<Record<string, JsonValue>>): Re
   const designer = record(value.designer)
   if (designer?.version != 1) return undefined
   return record(designer.flow)
+}
+
+export function savedDirection(value: Readonly<Record<string, JsonValue>>): CanvasDirection {
+  return canvasDirection(flowPresentation(value)?.direction)
+}
+
+export function setCanvasLayout(
+  value: Readonly<Record<string, JsonValue>>,
+  direction: CanvasDirection,
+  positions: Readonly<Record<string, Point>> = {},
+): Readonly<Record<string, JsonValue>> {
+  const positioned = setNodePositions(value, positions)
+  return {
+    ...positioned,
+    designer: replaceFlowPresentation(designerPresentation(positioned), { ...normalizedFlow(positioned), direction }),
+  }
 }
 
 export function savedPositions(value: Readonly<Record<string, JsonValue>>): Readonly<Record<string, { readonly x: number; readonly y: number }>> {
@@ -186,20 +204,24 @@ export function setFlowViewport(value: Readonly<Record<string, JsonValue>>, view
   }
 }
 
-/** Only changed node presentation is retained; viewport navigation is never restored. */
+/** Retain changed node presentation and layout direction; viewport navigation is never restored. */
 export interface CanvasPresentationChange {
   readonly before: Readonly<Record<string, JsonValue>>
   readonly after: Readonly<Record<string, JsonValue>>
   readonly nodeIds: readonly string[]
+  readonly directionChanged?: boolean
   readonly beforeOrder: readonly string[]
   readonly afterOrder: readonly string[]
 }
 
+const nodePresentationFields = ['nodes', 'comments', 'hiddenNodeContent', 'verticalNodeWidths'] as const
+
 export function canvasPresentationChange(before: Readonly<Record<string, JsonValue>>, after: Readonly<Record<string, JsonValue>>): CanvasPresentationChange {
   const first = normalizedFlow(before)
   const last = normalizedFlow(after)
+  const directionChanged = !dequal(first.direction, last.direction)
   const nodeIds = new Set<string>()
-  for (const field of ['nodes', 'comments', 'hiddenNodeContent']) {
+  for (const field of nodePresentationFields) {
     const previous = record(first[field]) ?? {}
     const next = record(last[field]) ?? {}
     for (const id of new Set([...Object.keys(previous), ...Object.keys(next)])) {
@@ -208,12 +230,20 @@ export function canvasPresentationChange(before: Readonly<Record<string, JsonVal
   }
   const select = (value: Record<string, JsonValue>): Record<string, JsonValue> =>
     Object.fromEntries(
-      ['nodes', 'comments', 'hiddenNodeContent'].map((field) => [
-        field,
-        Object.fromEntries(Object.entries(record(value[field]) ?? {}).filter(([id]) => nodeIds.has(id))),
-      ]),
+      nodePresentationFields.map((field) => [field, Object.fromEntries(Object.entries(record(value[field]) ?? {}).filter(([id]) => nodeIds.has(id)))]),
     )
-  return { before: select(first), after: select(last), nodeIds: [...nodeIds], beforeOrder: savedOrder(before), afterOrder: savedOrder(after) }
+  const snapshot = (value: Record<string, JsonValue>) => ({
+    ...select(value),
+    ...(directionChanged && value.direction !== undefined ? { direction: value.direction } : {}),
+  })
+  return {
+    before: snapshot(first),
+    after: snapshot(last),
+    nodeIds: [...nodeIds],
+    directionChanged,
+    beforeOrder: savedOrder(before),
+    afterOrder: savedOrder(after),
+  }
 }
 
 export function restoreCanvasPresentation(
@@ -221,17 +251,21 @@ export function restoreCanvasPresentation(
   change: CanvasPresentationChange,
   redo: boolean,
 ): Readonly<Record<string, JsonValue>> {
-  if (change.nodeIds.length == 0) return value
+  if (change.nodeIds.length == 0 && !change.directionChanged) return value
   const current = normalizedFlow(value)
   const saved = redo ? change.after : change.before
-  for (const field of ['nodes', 'comments', 'hiddenNodeContent']) {
+  for (const field of nodePresentationFields) {
     const next = { ...record(current[field]) }
     const source = record(saved[field]) ?? {}
     for (const id of change.nodeIds) {
       if (source[id] == null) delete next[id]
       else next[id] = source[id]!
     }
-    current[field] = next
+    if (Object.keys(next).length > 0 || current[field] !== undefined) current[field] = next
+  }
+  if (change.directionChanged) {
+    if (saved.direction === undefined) delete current.direction
+    else current.direction = saved.direction
   }
   current.order = [...(redo ? change.afterOrder : change.beforeOrder)]
   return { ...value, designer: replaceFlowPresentation(designerPresentation(value), current) }
@@ -239,4 +273,27 @@ export function restoreCanvasPresentation(
 
 export function savedHiddenNodeContent(value: Readonly<Record<string, JsonValue>>) {
   return record(flowPresentation(value)?.hiddenNodeContent)
+}
+
+export function savedVerticalNodeWidths(value: Readonly<Record<string, JsonValue>>): Readonly<Record<string, number>> {
+  return Object.fromEntries(
+    Object.entries(record(flowPresentation(value)?.verticalNodeWidths) ?? {}).flatMap(([nodeId, candidate]) => {
+      const width = finite(candidate)
+      return width == null || width <= 0 ? [] : [[nodeId, width]]
+    }),
+  )
+}
+
+export function setVerticalNodeWidth(
+  value: Readonly<Record<string, JsonValue>>,
+  nodeId: string,
+  width: number | undefined,
+): Readonly<Record<string, JsonValue>> {
+  if (width !== undefined && (!Number.isFinite(width) || width <= 0)) throw new RangeError('Node width must be a positive finite number.')
+  if (savedVerticalNodeWidths(value)[nodeId] === width) return value
+  const current = normalizedFlow(value)
+  const verticalNodeWidths = { ...record(current.verticalNodeWidths) }
+  if (width === undefined) delete verticalNodeWidths[nodeId]
+  else verticalNodeWidths[nodeId] = width
+  return { ...value, designer: replaceFlowPresentation(designerPresentation(value), { ...current, verticalNodeWidths }) }
 }

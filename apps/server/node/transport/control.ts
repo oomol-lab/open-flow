@@ -288,6 +288,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
       body.teamId,
       body.tagIds,
+      body.presentation,
     )
     return response(created.created ? 201 : 200, created.flow)
   })

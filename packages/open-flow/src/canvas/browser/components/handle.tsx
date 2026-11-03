@@ -3,23 +3,17 @@ import styles from './handle.module.scss'
 import { clsx } from 'clsx'
 import { createContext, useContext } from 'react'
 
-export type HandleKind = 'primitive' | 'bin' | 'string' | 'error'
+export type HandlePosition = 'left' | 'right' | 'top' | 'bottom'
 
 export interface HandleProps {
   id?: string
   type: 'input' | 'output'
   /** Defaults to `"left"` if `type` is `"input"`, `"right"` if `type` is `"output"`. */
-  position?: 'left' | 'right'
+  position?: HandlePosition
+  selected?: boolean
   className?: string
-  active?: boolean
-  hasData?: boolean
-  // String handles currently use the default color to avoid excessive visual noise.
-  /** Default is not colored. */
-  kind?: HandleKind
-  disabled?: boolean
   isConnectable?: boolean
   children?: React.ReactNode
-  onPointerDown?: React.PointerEventHandler<HTMLDivElement>
   tabIndex?: number
   ariaHidden?: React.AriaAttributes['aria-hidden']
 }
@@ -32,22 +26,12 @@ export function Handle(props: HandleProps): React.ReactElement | null {
   const position = props.position ?? (props.type === 'input' ? 'left' : 'right')
 
   return (
-    <div
-      className={clsx(
-        styles.wrapper,
-        position === 'left' ? styles.left : styles.right,
-        props.disabled && styles.disabled,
-        props.onPointerDown && styles.pointerDown,
-        props.className,
-      )}
-      onPointerDown={props.onPointerDown}
-      style={props.kind && { ['--bg' as any]: `var(--edge-${props.kind})` }}
-    >
+    <div className={clsx(styles.wrapper, styles[position], props.selected && styles.selected, props.className)}>
       <Component
         id={props.id}
         type={props.type === 'input' ? 'target' : 'source'}
-        position={position === 'left' ? 'left' : 'right'}
-        className={clsx(styles.handle, props.active && styles.active, props.hasData && styles.hasData)}
+        position={position}
+        className={styles.handle}
         isConnectable={props.isConnectable}
         tabIndex={props.tabIndex}
         aria-hidden={props.ariaHidden}
@@ -64,7 +48,7 @@ function HandleImpl(props: HandleImplProps) {
 export interface HandleImplProps extends React.AriaAttributes {
   id?: string
   type: 'source' | 'target'
-  position: 'left' | 'right'
+  position: HandlePosition
   className?: string
   isConnectable?: boolean
   tabIndex?: number

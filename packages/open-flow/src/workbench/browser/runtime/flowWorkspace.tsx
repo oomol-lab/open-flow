@@ -601,12 +601,14 @@ export function FlowEditor({
           }}
           onConnect={(edge) => void store.workspace.connect(edge)}
           onChangeNodeContentHidden={(nodeId, hidden) => void store.workspace.saveNodeContentHidden(nodeId, hidden)}
+          onChangeNodeWidth={(nodeId, width, position) => store.workspace.saveNodeWidth(nodeId, width, position)}
           onChangeComment={(nodeId, value) => void store.workspace.saveComment(nodeId, value)}
           onCopy={() => store.workspace.copySelectedNodes()}
           onDeleteEdge={(edge) => void store.workspace.disconnect(edge)}
           onDeleteNodes={() => void store.workspace.deleteSelectedNodes()}
           onDuplicate={(positions, offset) => void store.workspace.duplicateSelectedNodes(positions, offset)}
           onMoveNodes={(positions) => void store.workspace.moveNodes(positions)}
+          onChangeDirection={(direction, positions) => store.changeDirection(direction, positions)}
           onMoveViewport={(viewport) => void store.workspace.moveViewport(viewport)}
           onPaste={() => void store.workspace.pasteNodes()}
           provideAddNodeOptions={store.provideAddNodeOptions}

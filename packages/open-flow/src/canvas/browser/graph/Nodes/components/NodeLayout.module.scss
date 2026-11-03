@@ -1,6 +1,5 @@
 .outerContainer {
   box-sizing: content-box;
-  padding: 8px;
   overflow: visible;
 
   &.enter {
@@ -102,39 +101,117 @@
   }
 }
 
-.executionBranch {
-  grid-column: 1 / -1;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  min-height: var(--widget-height);
-  padding: 4px 14px;
-  color: var(--text-4);
-  font-size: 11px;
-  line-height: 20px;
-  border-top: 1px solid var(--node-border-color);
-  background: transparent;
-  padding-right: 18px;
+.branchList {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12px 84px;
+  column-gap: 12px;
 }
 
 .branchRow {
+  grid-column: 1 / -1;
   grid-template-columns: subgrid;
   column-gap: inherit;
   display: grid;
+  position: relative;
+  min-width: 0;
   min-height: 30px;
   margin: 4px 8px 0;
   padding: 5px 14px 5px 12px;
-  border-top: 0;
   border-radius: 10px;
   background: color-mix(in srgb, var(--node-background-color) 72%, transparent);
+  color: var(--text-4);
+  font-size: 11px;
+  line-height: 20px;
 }
 
-.branchRow .branchName {
-  width: 100%;
-  max-width: none;
-  text-align: right;
+.branchContent {
+  display: contents;
+}
+
+.vertical {
+  .branchList {
+    grid-template-columns: repeat(var(--branch-count), minmax(0, 1fr));
+    gap: var(--branch-gap);
+    margin-bottom: -8px;
+    padding: 2px var(--branch-inline-padding) 0;
+  }
+
+  .branchRow {
+    display: block;
+    grid-column: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0 0 8px;
+    background: transparent;
+  }
+
+  .branchContent {
+    display: grid;
+    grid-template-rows: minmax(32px, 1fr) auto;
+    min-width: 0;
+    min-height: 64px;
+    align-items: center;
+    padding: 6px 5px;
+    border-radius: 12px;
+    background: var(--node-background-color);
+  }
+
+  .branchRule,
+  .branchName {
+    display: block;
+    width: 100%;
+    text-align: center;
+    line-height: 16px;
+  }
+
+  .branchName {
+    grid-row: 2;
+  }
+
+  .branchRule {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .branchArrow {
+    display: none;
+  }
+
+  .branchRow > .executionHandle {
+    bottom: -9px;
+  }
+}
+
+.widthResize {
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  width: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--node-selected-border-color);
+    outline-offset: 2px;
+  }
+}
+
+.widthResizeLeft {
+  left: -6px;
+}
+.widthResizeRight {
+  right: -6px;
+}
+
+:global(.react-flow__node.selected) .vertical .branchRow > .executionHandle {
+  bottom: -10px;
 }
 
 .branchRule,
@@ -145,7 +222,6 @@
 }
 
 .branchRule {
-  flex: 1;
   min-width: 0;
   color: var(--text-2);
   font-family: var(--font-monospace);
@@ -154,12 +230,26 @@
 .branchGroup,
 .branchExpression {
   display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 0.45em;
 }
 
 .branchGroup + .branchGroup {
   margin-left: 0.45em;
+}
+
+.branchOperand {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branchOperator {
+  flex: none;
+  white-space: nowrap;
 }
 
 .branchOperandIcon {
@@ -176,116 +266,32 @@
 }
 
 .branchArrow {
-  flex: none;
   color: var(--text-1);
   opacity: 0.55;
   text-align: center;
 }
 
 .branchName {
-  flex: none;
-  max-width: 50%;
+  width: 100%;
+  text-align: right;
   font-weight: 500;
 }
 
 .executionHandle.executionHandle {
   visibility: visible;
+}
+
+.cardContainer:not(.vertical) > .executionHead > .executionHandle {
+  top: calc(var(--header-handle-y) - 8px);
+}
+
+.cardContainer:not(.vertical) .branchRow > .executionHandle {
   top: calc(50% - 8px);
-  margin-top: 0;
-  --bg: var(--edge-primitive);
-
-  > :global(.react-flow__handle) {
-    top: 0;
-    left: 0;
-    right: auto;
-    cursor: crosshair;
-
-    &:hover::after,
-    &:global(.connectingfrom)::after,
-    &:global(.connectingto.valid)::after {
-      background: var(--brand-highlight-color);
-    }
-  }
-}
-
-.cardContainer > .executionHead > .executionHandle {
-  top: 30px;
-}
-
-// Branch rows sit inside the card's 1px border; align their ports with the outer edge.
-.cardContainer .executionBranch > .executionHandle {
-  right: -9px;
-}
-
-.cardContainer .branchRow > .executionHandle {
   right: -17px;
 }
 
-:global(.react-flow__node.selected) .cardContainer .branchRow > .executionHandle {
+:global(.react-flow__node.selected) .cardContainer:not(.vertical) .branchRow > .executionHandle {
   right: -18px;
-}
-
-.cardContainer .executionHandle > :global(.react-flow__handle) {
-  width: 2px;
-  min-width: 0;
-  height: 12px;
-  top: 2px;
-  left: 6px;
-  background: transparent;
-
-  &::before {
-    border: 0;
-    border-radius: 0.5px;
-    background: var(--execution-port-color);
-    box-shadow: none;
-    opacity: var(--execution-port-opacity);
-  }
-
-  &::after {
-    inset: -3px -8px;
-    background: transparent;
-  }
-
-  &:hover::after,
-  &:global(.connectingfrom)::after,
-  &:global(.connectingto.valid)::after {
-    background: transparent;
-  }
-
-  &:hover::before,
-  &:global(.connectingfrom)::before,
-  &:global(.connectingto.valid)::before {
-    background: var(--execution-port-active-color);
-    opacity: 1;
-  }
-}
-
-.cardContainer .executionHandle > :global(.react-flow__handle-right) {
-  left: 8px;
-}
-
-// Keep the outer edge fixed while overlapping the selected card border to avoid subpixel gaps.
-:global(.react-flow__node.selected) .cardContainer .executionHandle > :global(.react-flow__handle) {
-  width: 3px;
-}
-
-:global(.react-flow__node.selected) .cardContainer .executionHandle > :global(.react-flow__handle-right) {
-  left: 7px;
-}
-
-// Extend error marks inward without moving the outer edge or narrowing the visible port.
-.cardContainer .executionHandle > :global(.react-flow__handle-left) {
-  --port-inset-right: calc(0px - var(--execution-port-overlap, 0px));
-}
-
-.cardContainer .executionHandle > :global(.react-flow__handle-right) {
-  --port-inset-left: calc(0px - var(--execution-port-overlap, 0px));
-}
-
-// Keep the outward connection point aligned with the measured handle bounds.
-.cardContainer .executionHandle > :global(.react-flow__handle)::before,
-:global(.react-flow__node.selected) .cardContainer .executionHandle > :global(.react-flow__handle)::before {
-  inset: 0 var(--port-inset-right, 0px) 0 var(--port-inset-left, 0px);
 }
 
 .cardContainer .executionHandle.connected,
@@ -294,7 +300,8 @@
 }
 
 .connectionHint {
-  --hint-nudge: 2px;
+  --hint-x: 2px;
+  --hint-y: 0px;
   // Center the icon independently of the branch row’s text baseline.
   display: flex;
   align-items: center;
@@ -320,10 +327,27 @@
   color: var(--execution-port-active-color);
 }
 
-.inputHint {
-  --hint-nudge: -2px;
+.leftHint {
+  --hint-x: -2px;
   left: auto;
   right: 20px;
+}
+
+.topHint,
+.bottomHint {
+  --hint-x: 0px;
+  left: 0;
+}
+
+.topHint {
+  --hint-y: -2px;
+  top: auto;
+  bottom: 20px;
+}
+
+.bottomHint {
+  --hint-y: 2px;
+  top: 20px;
 }
 
 // The component ends the sequence after ten rounds; keep moving through the fade.
@@ -348,10 +372,10 @@
 @keyframes connection-hint-nudge {
   0%,
   100% {
-    transform: translateX(0);
+    transform: translate(0, 0);
   }
   50% {
-    transform: translateX(var(--hint-nudge));
+    transform: translate(var(--hint-x), var(--hint-y));
   }
 }
 
@@ -365,7 +389,11 @@
   background: var(--node-background-color);
   visibility: visible;
 
-  > :not(.executionHandle) {
+  .branchContent > * {
     visibility: hidden;
   }
+}
+
+.vertical.compactContent .branchRow {
+  background: transparent;
 }

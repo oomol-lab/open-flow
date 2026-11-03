@@ -653,5 +653,17 @@
     "Europe/Moscow": "Moscow",
     "Australia/Sydney": "Sydney",
     "Pacific/Auckland": "Auckland"
+  },
+  "layoutDirection": {
+    "title": "Layout direction",
+    "horizontal": "Horizontal",
+    "vertical": "Vertical",
+    "verticalDescription": "Flow from top to bottom, with branches side by side.",
+    "horizontalDescription": "Flow from left to right, with branches stacked."
+  },
+  "nodeWidth": {
+    "resizeLeft": "Resize from left",
+    "resizeRight": "Resize from right",
+    "reset": "Restore automatic width"
   }
 }

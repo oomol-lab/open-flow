@@ -1,6 +1,7 @@
 @use '../../../../../ui/browser/focus.scss' as focus;
 
 .chip.chip {
+  --record-icon-size: 11px;
   display: inline-flex;
   align-items: center;
   width: auto;
@@ -15,6 +16,9 @@
   font-weight: 500;
   line-height: 18px;
   cursor: pointer;
+  > i {
+    font-size: var(--record-icon-size);
+  }
   &:hover,
   &[data-popup-open] {
     background: var(--fill-5);
@@ -158,24 +162,25 @@
 .row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 2px 8px;
+  flex: none;
+  gap: 2px;
   min-height: 26px;
 }
 .links {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
-  margin-left: auto;
 }
-.status.status {
-  font-weight: 400;
-  margin-left: -5px;
-  > i {
-    font-size: 13px;
-  }
+
+.statusIndicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+}
+
+.status.status,
+.statusIndicator {
   &[data-status='success'] > i {
     color: var(--accent-green-3);
   }
@@ -190,13 +195,23 @@
     animation: run-spin 1.2s linear infinite;
   }
 }
+
+.chip.compactChip {
+  --record-icon-size: 16px;
+  width: 26px;
+  justify-content: center;
+  padding: 3px;
+  margin-left: 0;
+}
+
 @keyframes run-spin {
   to {
     transform: rotate(360deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .status.status[data-status='running'] > i {
+  .status.status[data-status='running'] > i,
+  .statusIndicator[data-status='running'] > i {
     animation: none;
   }
 }
@@ -205,6 +220,7 @@
   box-shadow: 0 1px 4px rgb(0 0 0 / 8%);
 }
 
-:global([data-theme='dark']) .status.status[data-status='success'] > i {
+:global([data-theme='dark']) .status.status[data-status='success'] > i,
+:global([data-theme='dark']) .statusIndicator[data-status='success'] > i {
   color: var(--accent-green-1);
 }

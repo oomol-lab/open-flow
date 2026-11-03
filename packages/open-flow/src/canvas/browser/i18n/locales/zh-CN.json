@@ -653,5 +653,17 @@
     "Europe/Moscow": "莫斯科",
     "Australia/Sydney": "悉尼",
     "Pacific/Auckland": "奥克兰"
+  },
+  "layoutDirection": {
+    "title": "布局方向",
+    "horizontal": "横向",
+    "vertical": "竖向",
+    "verticalDescription": "从上向下展开，分支左右排列。",
+    "horizontalDescription": "从左向右展开，分支上下排列。"
+  },
+  "nodeWidth": {
+    "resizeLeft": "调整左侧宽度",
+    "resizeRight": "调整右侧宽度",
+    "reset": "恢复自动宽度"
   }
 }

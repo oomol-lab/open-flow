@@ -6,10 +6,11 @@ import type { DesignerGraph } from '../workspace.ts'
 import type { FlowChanges } from './flowChanges.ts'
 import type { NodeClipboard } from './nodeClipboard.ts'
 
-import { setComment, setNodeContentHidden, setNodePositions } from '../canvasPresentation.ts'
+import { setComment, setNodeContentHidden, setNodePositions, setVerticalNodeWidth } from '../canvasPresentation.ts'
 import { copyNodes, pasteNodes } from './nodeClipboard.ts'
 
 interface Clipboard {
+  readonly verticalNodeWidths: Readonly<Record<string, number>>
   readonly hiddenNodeIds: readonly string[]
   readonly comments: readonly {
     readonly content: string
@@ -37,6 +38,11 @@ export class CanvasClipboard {
   public copy(revision: RevisionView, graph: DesignerGraph, nodeIds: readonly string[]): void {
     const selected = new Set(nodeIds)
     this.#value = {
+      verticalNodeWidths: Object.fromEntries(
+        graph.nodes.flatMap((node) =>
+          node.kind === 'condition' && node.verticalWidth != null && selected.has(node.id) ? [[node.id, node.verticalWidth]] : [],
+        ),
+      ),
       hiddenNodeIds: graph.nodes.flatMap((node) => (node.contentHidden && selected.has(node.id) ? [node.id] : [])),
       comments: graph.nodes.flatMap((node) =>
         node.kind == 'comment' && selected.has(node.id)
@@ -62,6 +68,7 @@ export class CanvasClipboard {
   ): PastedCanvas | undefined {
     if (this.#value == null) return
     const hiddenNodeIds = new Set(this.#value.hiddenNodeIds)
+    const verticalNodeWidths = this.#value.verticalNodeWidths
     const pasted = pasteNodes(revision, this.#value.nodes, this.identity)
     const comments = this.#value.comments.map((comment) => ({
       ...comment,
@@ -98,6 +105,7 @@ export class CanvasClipboard {
         let next = setNodePositions(value, positions)
         for (const [index, sourceId] of pasted.sourceIds.entries()) {
           if (hiddenNodeIds.has(sourceId)) next = setNodeContentHidden(next, pasted.nodeIds[index]!, true)
+          if (verticalNodeWidths[sourceId] != null) next = setVerticalNodeWidth(next, pasted.nodeIds[index]!, verticalNodeWidths[sourceId])
         }
         for (const comment of comments) {
           if (hiddenNodeIds.has(comment.sourceId)) next = setNodeContentHidden(next, comment.nodeId, true)

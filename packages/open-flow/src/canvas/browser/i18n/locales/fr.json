@@ -653,5 +653,17 @@
     "Europe/Moscow": "Moscou",
     "Australia/Sydney": "Sydney",
     "Pacific/Auckland": "Auckland"
+  },
+  "layoutDirection": {
+    "title": "Sens du diagramme",
+    "horizontal": "Horizontal",
+    "vertical": "Vertical",
+    "verticalDescription": "De haut en bas, avec les branches côte à côte.",
+    "horizontalDescription": "De gauche à droite, avec les branches superposées."
+  },
+  "nodeWidth": {
+    "resizeLeft": "Redimensionner depuis la gauche",
+    "resizeRight": "Redimensionner depuis la droite",
+    "reset": "Rétablir la largeur automatique"
   }
 }

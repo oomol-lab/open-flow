@@ -1,6 +1,7 @@
 import styles from './CanvasNode.module.scss'
 import type { ReactNode } from 'react'
 import type { NodeStore } from '../../../stores/node/node.store.ts'
+import type { CanvasCardDiagnostic } from './CanvasCard.tsx'
 
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
@@ -13,18 +14,18 @@ import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
 import { CanvasCard } from './CanvasCard.tsx'
 import { CanvasNodeIcon } from './CanvasNodeIcon.tsx'
 import { NodeContentRows } from './NodeContentRows.tsx'
-import { RunChips, ImagePreview } from './RunChips.tsx'
+import { ImagePreview } from './RunChips.tsx'
 import { ValuePreview } from './ValuePreview.tsx'
 
 export function CanvasNode({
   nodeStore,
-  problem,
+  diagnostic,
   branches,
   compact = false,
   compactContent = false,
 }: {
   readonly nodeStore: NodeStore
-  readonly problem?: string
+  readonly diagnostic?: string
   readonly branches?: ReactNode
   readonly compact?: boolean
   readonly compactContent?: boolean
@@ -55,9 +56,15 @@ export function CanvasNode({
       : node.kind == 'trigger' && triggerSource
         ? `${t('canvasCard.kind.trigger')} · ${triggerSource}`
         : t(`canvasCard.kind.${kind}`)
-  const runContent = node?.run == null || node.run.status == 'idle' ? undefined : <RunChips run={node.run} />
   const connectionRequired = (node.kind == 'task' || node.kind == 'trigger') && node.connectionRequired
-  const connectionDeferred = node.kind == 'task' && node.connectionDeferred && !connectionRequired && !problem
+  const connectionDeferred = node.kind == 'task' && node.connectionDeferred && !connectionRequired && !diagnostic && node.run?.status !== 'error'
+  const cardDiagnostic: CanvasCardDiagnostic | undefined = connectionRequired
+    ? { message: t('nodeStatus.connectionRequired'), icon: <i aria-hidden="true" className="i-lucide-light:unplug" /> }
+    : diagnostic
+      ? { message: diagnostic }
+      : connectionDeferred
+        ? { message: t('nodeStatus.connectionDeferred'), tone: 'warning', icon: <i aria-hidden="true" className="i-lucide-light:unplug" /> }
+        : undefined
   return (
     <div className={NODE_HANDLE_CLASSNAME}>
       <CanvasCard
@@ -65,7 +72,6 @@ export function CanvasNode({
         compact={compact}
         compactContent={compactContent}
         contentHidden={hidden}
-        footerHidden={hidden && !runContent}
         title={title}
         icon={<CanvasNodeIcon icon={node.icon} fallbackIcon={node.fallbackIcon} kind={node.kind} nodeType={nodeStore.nodeType} />}
         subtitle={subtitle}
@@ -79,12 +85,9 @@ export function CanvasNode({
           ) : undefined
         }
         selected={selected}
-        running={node.run?.status === 'running'}
-        problem={connectionRequired ? t('nodeStatus.connectionRequired') : (problem ?? (connectionDeferred ? t('nodeStatus.connectionDeferred') : undefined))}
-        problemTone={connectionDeferred ? 'warning' : 'danger'}
-        problemIcon={connectionRequired || connectionDeferred ? <i aria-hidden="true" className="i-lucide-light:unplug" /> : undefined}
+        diagnostic={cardDiagnostic}
+        run={node.run}
         branches={branches}
-        footer={runContent ? <div className={styles.footer}>{runContent}</div> : undefined}
         preview={
           (values.length > 0 || Boolean(schedules?.length) || (node?.run != null && images.length > 0)) && (
             <>

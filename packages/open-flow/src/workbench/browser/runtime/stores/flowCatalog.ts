@@ -3,6 +3,7 @@ import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { FlowQuery, FlowUpdate } from '../../../../control/common/api.ts'
 import type { RevisionContent } from '../../../../flow/common/change.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
+import type { FlowCreationOptions } from '../api.ts'
 import type { WorkbenchClient, Flow } from '../api.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 
@@ -223,15 +224,18 @@ export class FlowCatalog {
 
   public create(
     name: string,
-    create?: (name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    create?: (name: string, options?: FlowCreationOptions) => Promise<string>,
     tagIds?: readonly string[],
+    presentation?: FlowCreationOptions['presentation'],
   ): Promise<Flow | undefined> {
     return this.#create(async () =>
       create == null
-        ? tagIds == null
-          ? this.#client.createFlow(name)
-          : this.#client.createFlow(name, undefined, undefined, tagIds)
-        : this.#client.getFlow(await (tagIds == null ? create(name) : create(name, { tagIds }))),
+        ? this.#client.createFlow(name, undefined, undefined, tagIds, presentation)
+        : this.#client.getFlow(
+            await (tagIds == null && presentation == null
+              ? create(name)
+              : create(name, { ...(tagIds == null ? {} : { tagIds }), ...(presentation == null ? {} : { presentation }) })),
+          ),
     )
   }
 

@@ -27,6 +27,7 @@ export type {
   PublicationPage,
   PublishOperation,
   Flow,
+  FlowCreationOptions,
   FlowCheck,
   ErrorListener,
   FlowPage,

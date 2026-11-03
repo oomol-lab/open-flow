@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import type { CanvasDirection } from '../../../common/direction.ts'
+export type { CanvasDirection } from '../../../common/direction.ts'
 import type { Val } from 'value-enhancer'
 import type { GroupDividerDef } from '../../../../schema/index.ts'
 import type { CanvasCommandSubscriber } from '../../../common/commands.ts'
@@ -121,6 +123,8 @@ export interface FlowCanvasViewTaskNode extends FlowCanvasViewNodeBase {
 }
 
 export interface FlowCanvasViewConditionNode extends FlowCanvasViewNodeBase {
+  /** Preferred card width in vertical layouts; horizontal layouts ignore it. */
+  readonly verticalWidth?: number
   readonly matchMode: 'first' | 'all'
   readonly cases: readonly FlowCanvasViewConditionCase[]
   readonly defaultOutput: 'otherwise'
@@ -180,6 +184,7 @@ export type FlowCanvasViewNode =
 export type FlowCanvasViewSemanticNode = Exclude<FlowCanvasViewNode, FlowCanvasViewCommentNode>
 
 export interface FlowCanvasViewModel {
+  readonly direction?: CanvasDirection
   readonly edges: readonly FlowCanvasViewEdge[]
   readonly nodes: readonly FlowCanvasViewNode[]
   readonly runStatus?: 'idle' | 'running'
@@ -199,7 +204,7 @@ export interface FlowCanvasViewProps {
   readonly onRequestAddNode?: (request: {
     readonly position: FlowCanvasViewPosition
     readonly screenPosition: FlowCanvasViewPosition
-    readonly connectionSide?: 'left' | 'right'
+    readonly connectionDirection?: 'upstream' | 'downstream'
     readonly connection?: (nodeId: string) => Omit<FlowCanvasViewEdge, 'id'>
   }) => void
   readonly ignoredNodeIds: readonly string[]
@@ -248,10 +253,13 @@ export interface FlowCanvasViewProps {
   ) => Promise<string | undefined> | string | undefined
   readonly onConnect?: (edge: Omit<FlowCanvasViewEdge, 'id'>) => void
   readonly onChangeNodeContentHidden?: (nodeId: string, hidden: boolean) => void
+  readonly onChangeNodeWidth?: (nodeId: string, width: number | undefined, position?: FlowCanvasViewPosition) => Promise<boolean> | boolean
   readonly onChangeComment?: (nodeId: string, value: { readonly content: string; readonly title: string }) => void
   readonly onDeleteNodes?: (nodeIds: readonly string[]) => void
   readonly onDisconnect?: (edge: FlowCanvasViewEdge) => void
   readonly onDuplicate?: (nodeIds: readonly string[], offset?: FlowCanvasViewPosition, positions?: Readonly<Record<string, FlowCanvasViewPosition>>) => void
+  /** Save direction and its measured layout as one edit. */
+  readonly onChangeDirection?: (direction: CanvasDirection, positions: Readonly<Record<string, FlowCanvasViewPosition>>) => Promise<boolean> | boolean
   readonly onMoveNodes: (positions: Readonly<Record<string, FlowCanvasViewPosition>>) => void
   readonly onMoveViewport: (viewport: FlowCanvasViewViewport) => void
   readonly onCopy?: (nodeIds: readonly string[]) => void
@@ -271,10 +279,12 @@ export interface FlowCanvasViewProps {
 
 export interface ViewCallbacks {
   readonly onIgnoreNodes?: FlowCanvasViewProps['onIgnoreNodes']
+  readonly onChangeDirection?: FlowCanvasViewProps['onChangeDirection']
   readonly onMoveNodes: FlowCanvasViewProps['onMoveNodes']
   readonly onAddNode?: FlowCanvasViewProps['onAddNode']
   readonly onConnect?: FlowCanvasViewProps['onConnect']
   readonly onChangeNodeContentHidden?: FlowCanvasViewProps['onChangeNodeContentHidden']
+  readonly onChangeNodeWidth?: FlowCanvasViewProps['onChangeNodeWidth']
   readonly onChangeComment: FlowCanvasViewProps['onChangeComment']
   readonly onDeleteNodes?: FlowCanvasViewProps['onDeleteNodes']
   readonly onDisconnect?: FlowCanvasViewProps['onDisconnect']

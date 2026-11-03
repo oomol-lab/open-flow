@@ -9,6 +9,7 @@ import { agentStory, codeActionsStory } from './agent.tsx'
 import { cardStories } from './cards.tsx'
 import { commentPropertiesStory } from './commentProperties.tsx'
 import { conditionEditorStory } from './conditionEditor.tsx'
+import { conditionVerticalStory } from './conditionVertical.tsx'
 import { connectionPathsStory } from './connectionPaths.tsx'
 import { connectorAccessStory } from './connectorAccess.tsx'
 import { decisionStory } from './decision.tsx'
@@ -53,6 +54,7 @@ import { triggerStories } from './triggerStories.tsx'
 import { valueEditorDangerStory } from './valueEditorDanger.tsx'
 import { additionalInputsStory, lazyFieldsStory, groupedInputsStory, outputPortsStory, valueNodeStory } from './valueNode.tsx'
 import { variablesStory } from './variables.tsx'
+import { verticalWorkflowStory } from './verticalWorkflow.tsx'
 import { waitConfigurationStory } from './waitConfiguration.tsx'
 import { executionLogsStory, runHistoryStory, runStatusIslandStory, waitRunsStory } from './waitRuns.tsx'
 import { webhookStory } from './webhook.tsx'
@@ -113,6 +115,7 @@ export const labStories: readonly FrontendStory[] = [
   errorWorkflowStory,
   ...cardStories,
   ...workflowStories,
+  verticalWorkflowStory,
   workspaceRecoveryStory,
   flowBrowserStory,
   connectionPathsStory,
@@ -140,6 +143,7 @@ export const labStories: readonly FrontendStory[] = [
   diagnosticsStory,
   webhookStory,
   conditionEditorStory,
+  conditionVerticalStory,
   variablesStory,
   eventSourcesStory,
   createEventSourceStory,

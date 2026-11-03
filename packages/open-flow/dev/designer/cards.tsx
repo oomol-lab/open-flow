@@ -7,7 +7,7 @@ import { useRef, useMemo } from 'react'
 import { Toaster } from 'sonner'
 import { I18nProvider } from 'val-i18n-react'
 import { CanvasCard } from '../../src/canvas/browser/graph/Nodes/components/CanvasCard.tsx'
-import { ImagePreview, RunChips } from '../../src/canvas/browser/graph/Nodes/components/RunChips.tsx'
+import { ImagePreview } from '../../src/canvas/browser/graph/Nodes/components/RunChips.tsx'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { ContentIcon, initialsIcon } from '../../src/ui/browser/icons/ContentIcon.tsx'
@@ -74,7 +74,7 @@ export const cardStories: readonly FrontendStory[] = [
     group: 'Canvas',
     id: 'canvas-card-indicators',
     title: 'Cards · Identity indicators',
-    description: 'Trigger and task error indicators at normal and compact zoom.',
+    description: 'Node diagnostics, run status and data-record controls at normal and compact zoom. Execution failure keeps available results and logs.',
     standalone: true,
     render: (_log, dark, language) => (
       <CardStage dark={dark} language={language}>
@@ -95,16 +95,39 @@ export const cardStories: readonly FrontendStory[] = [
                 label: 'Gmail disconnected',
                 problem: 'A connection is missing or unavailable. Reconnect or select an available connection in the node settings.',
                 disconnected: true,
+                run: completed,
               },
+              { label: 'Completed', problem: undefined, disconnected: false, run: completed },
+              {
+                label: 'Running',
+                problem: undefined,
+                disconnected: false,
+                run: { ...completed, status: 'running' as const, finishedAt: undefined, progress: 42 },
+              },
+              {
+                label: 'Failed with records',
+                problem: undefined,
+                disconnected: false,
+                run: { ...completed, status: 'error' as const, error: { message: 'The retry failed. Previous results remain available.' } },
+              },
+              { label: 'Failed without records', problem: undefined, disconnected: false, run: { status: 'error' as const } },
             ].map((state) => (
               <CanvasCard
                 key={`${compact}-${state.label}`}
                 title={`${state.label} · ${compact ? 'Compact' : 'Normal'}`}
                 subtitle={state.disconnected ? 'Connector · Gmail' : state.label == 'GitHub trigger' ? 'Trigger · GitHub' : 'Identity indicators'}
                 icon={<i className="i-carbon:code" />}
-                problem={state.problem}
-                problemTone={'deferred' in state && state.deferred ? 'warning' : 'danger'}
-                problemIcon={state.disconnected ? <i aria-hidden="true" className="i-lucide-light:unplug" /> : undefined}
+                diagnostic={
+                  state.problem
+                    ? {
+                        message: state.problem,
+                        tone: 'deferred' in state && state.deferred ? 'warning' : 'danger',
+                        icon: state.disconnected ? <i aria-hidden="true" className="i-lucide-light:unplug" /> : undefined,
+                      }
+                    : undefined
+                }
+                run={'run' in state ? state.run : undefined}
+
                 compact={compact}
               />
             )),
@@ -133,7 +156,7 @@ export const cardStories: readonly FrontendStory[] = [
                 title={`${tone ?? 'Neutral'} · ${state.label}`}
                 tone={tone}
                 selected={state.selected}
-                problem={state.problem}
+                diagnostic={state.problem ? { message: state.problem } : undefined}
               >
                 Selection rings follow the border color. Shadows stay subtle and neutral.
               </CanvasCard>
@@ -166,7 +189,7 @@ export const cardStories: readonly FrontendStory[] = [
           <CanvasCard
             title="register_trackings"
             subtitle="Connect account"
-            problem="Connection required"
+            diagnostic={{ message: 'Connection required' }}
             selected
             icon={<ContentIcon src={trackingAppIcon} />}
           />
@@ -187,12 +210,7 @@ export const cardStories: readonly FrontendStory[] = [
               Asia / Shanghai
             </p>
           </CanvasCard>
-          <CanvasCard
-            title="Find qualified customers"
-            subtitle="Condition"
-            icon={<i className="i-carbon:decision-tree" />}
-            footer={<RunChips run={completed} />}
-          >
+          <CanvasCard title="Find qualified customers" subtitle="Condition" icon={<i className="i-carbon:decision-tree" />} run={completed}>
             <p>
               Score ≥ 80
               <br />
@@ -203,7 +221,7 @@ export const cardStories: readonly FrontendStory[] = [
             title="Review the campaign"
             subtitle="Approval"
             icon={<i className="i-carbon:time" />}
-            footer={<RunChips run={{ status: 'waiting', runId: completed.runId }} />}
+            run={{ status: 'waiting', runId: completed.runId }}
           >
             <p>Waiting for the campaign owner to approve the message and audience.</p>
           </CanvasCard>
@@ -211,7 +229,7 @@ export const cardStories: readonly FrontendStory[] = [
             title="Create the weekly report"
             subtitle="JavaScript"
             icon={<i className="i-carbon:chart-column" />}
-            footer={<RunChips run={{ ...completed, finishedAt: '2026-09-05T02:02:00Z' }} />}
+            run={{ ...completed, finishedAt: '2026-09-05T02:02:00Z' }}
             preview={<ReportPreview />}
           >
             <p>A summary of this week’s customer activity.</p>
@@ -226,30 +244,27 @@ export const cardStories: readonly FrontendStory[] = [
             subtitle="Research"
             selected
             icon={<i className="i-carbon:search" />}
-            footer={<RunChips run={{ status: 'running', progress: 42, runId: completed.runId, startedAt: completed.startedAt }} />}
-            running
+            run={{ status: 'running', progress: 42, runId: completed.runId, startedAt: completed.startedAt }}
           >
             <p>Gather company size, sector and recent announcements.</p>
           </CanvasCard>
           <CanvasCard
             title="Send the campaign"
             subtitle="Connector · Gmail"
-            problem="A connection is missing or unavailable. Reconnect or select an available connection in the node settings."
-            problemIcon={<i aria-hidden="true" className="i-lucide-light:unplug" />}
+            diagnostic={{
+              message: 'A connection is missing or unavailable. Reconnect or select an available connection in the node settings.',
+              icon: <i aria-hidden="true" className="i-lucide-light:unplug" />,
+            }}
             icon={<i className="i-carbon:email" />}
-            footer={
-              <RunChips
-                run={{
-                  ...completed,
-                  status: 'error',
-                  finishedAt: '2026-09-05T01:00:00.028Z',
-                  outputs: undefined,
-                  logs: undefined,
-                  artifacts: undefined,
-                  error: { code: 'connector.connection-required', message: 'Reconnect the sending account.' },
-                }}
-              />
-            }
+            run={{
+              ...completed,
+              status: 'error',
+              finishedAt: '2026-09-05T01:00:00.028Z',
+              outputs: undefined,
+              logs: undefined,
+              artifacts: undefined,
+              error: { code: 'connector.connection-required', message: 'Reconnect the sending account.' },
+            }}
           >
             <p>Send the approved campaign to the selected customers.</p>
           </CanvasCard>

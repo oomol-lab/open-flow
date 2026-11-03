@@ -6,13 +6,21 @@ import type { HandleProps } from '../../../components/handle.tsx'
 import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
 import type { FlowCanvasViewConditionCase, FlowCanvasViewConditionOperand } from '../../FlowCanvas/model.ts'
 
-import { useConnection, useNodeConnections, useStore } from '@xyflow/react'
+import { useConnection, useNodeConnections, useStore, useUpdateNodeInternals } from '@xyflow/react'
 import { clsx } from 'clsx'
 import { Zap } from 'lucide-react'
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { ContentIcon } from '../../../../../ui/browser/icons/ContentIcon.tsx'
+import {
+  CANVAS_BRANCH_GAP,
+  CANVAS_BRANCH_INLINE_PADDING,
+  CANVAS_NODE_PADDING,
+  CANVAS_HEADER_HANDLE_Y,
+  canvasCardWidth,
+  minimumCanvasCardWidth,
+} from '../../../base/canvas.ts'
 import { toRFHandleName } from '../../../base/rfHelpers.ts'
 import { Handle } from '../../../components/handle.tsx'
 import { NodeMiniMapPhase, NodeMiniMapProvider, useNodeMiniMapPhase } from '../../../components/minimap.tsx'
@@ -27,6 +35,7 @@ import { conditionBranchSummary, conditionCaseHasExpressions, conditionGroupNeed
 import { NodeStoreContext } from '../NodeStoreContext.tsx'
 import { CanvasNode } from './CanvasNode.tsx'
 import { CommentCard } from './CommentCard.tsx'
+import { ConditionWidthControls } from './ConditionWidthControls.tsx'
 import { NodeFloatBar, NodeHeadContextMenu } from './NodeHeadMoreMenu.tsx'
 import { NodeMinimap } from './NodeMinimap.tsx'
 import { useShowNodeError } from './useShowNodeError.ts'
@@ -37,10 +46,8 @@ export interface NodeLayoutProps {
   visible: boolean
 }
 
-const CARD_WIDTH = 320
-
 function ConditionOperand({ operand }: { readonly operand: FlowCanvasViewConditionOperand }) {
-  if (typeof operand == 'string') return operand
+  if (typeof operand == 'string') return <span className={styles.branchOperand}>{operand}</span>
   if (operand.kind == 'environment') {
     return <i aria-label={operand.label} className="i-lucide-light:sliders-horizontal" role="img" />
   }
@@ -57,7 +64,7 @@ function ConditionRule({ item, t }: { readonly item: FlowCanvasViewConditionCase
     const expressions = group.expressions.map((expression, expressionIndex) => (
       <span className={styles.branchExpression} key={expressionIndex}>
         <ConditionOperand operand={expression.left} />
-        <span>{conditionOperatorSummary(expression.operator, t)}</span>
+        <span className={styles.branchOperator}>{conditionOperatorSummary(expression.operator, t)}</span>
         {expression.right !== undefined && <ConditionOperand operand={expression.right} />}
         {expressionIndex < group.expressions.length - 1 && <span>∧</span>}
       </span>
@@ -75,6 +82,9 @@ function ConditionRule({ item, t }: { readonly item: FlowCanvasViewConditionCase
 
 export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ canvasStore, nodeStore, visible }) => {
   const t = useTranslate()
+  const direction = useVal(canvasStore.$.direction)
+  const vertical = direction === 'vertical'
+  const updateNodeInternals = useUpdateNodeInternals()
   const modelNode = useVal(NodeStore.to(nodeStore)?.content$)
   const annotation = useNodeAnnotation(modelNode)
 
@@ -82,11 +92,23 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
     modelNode?.kind == 'condition' || modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
       ? modelNode.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))
       : undefined
+  const branchHandles = branches?.join('\0')
+  const [previewWidth, setPreviewWidth] = useState<number>()
+  const minimumWidth = minimumCanvasCardWidth(direction, branches?.length ?? 0)
+  const savedWidth = modelNode?.kind === 'condition' ? modelNode.verticalWidth : undefined
+  const width = canvasCardWidth(direction, branches?.length ?? 0, previewWidth ?? savedWidth)
+  useLayoutEffect(() => {
+    const frame = requestAnimationFrame(() => updateNodeInternals(nodeStore.rfNodeId))
+    return () => cancelAnimationFrame(frame)
+  }, [direction, branchHandles, width, nodeStore.rfNodeId, updateNodeInternals])
+  useEffect(() => {
+    setPreviewWidth(undefined)
+  }, [direction])
   const executionInput = modelNode != null && modelNode.kind != 'trigger' && modelNode.kind != 'value'
   const editable = useVal(canvasStore.$.editable)
   const selected = useVal(nodeStore.$.selected)
   const showError = useShowNodeError(nodeStore)
-  const problem = showError ? t('nodeStatus.hasError') : modelNode?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
+  const diagnostic = showError ? t('nodeStatus.hasError') : undefined
   const [hovered, setHovered] = useState(false)
   const [hintTriggered, setHintTriggered] = useState(false)
   // Only uninterrupted hover starts a hint session; selection can preserve it after the delay.
@@ -109,15 +131,20 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const animateEntry = useRef(initialized).current
 
   const executionPortColor = useVal(cardStore?.$.executionPortColor)
-  const problemColor = problem ? 'var(--accent-red-1)' : undefined
+  const hasError = showError || modelNode?.run?.status === 'error'
+  const errorColor = hasError ? 'var(--accent-red-1)' : undefined
   const conditionNode = modelNode?.kind == 'condition' ? modelNode : undefined
 
   const containerStyle: CSSProperties = {
-    width: cardStore ? CARD_WIDTH : undefined,
-    ['--node-selected-border-color' as any]: problemColor,
+    width: cardStore ? width : undefined,
+    ['--branch-count' as string]: branches?.length ?? 0,
+    ['--branch-gap' as string]: `${CANVAS_BRANCH_GAP}px`,
+    ['--branch-inline-padding' as string]: `${CANVAS_BRANCH_INLINE_PADDING}px`,
+    ['--node-selected-border-color' as any]: errorColor,
+    ['--header-handle-y' as any]: `${CANVAS_HEADER_HANDLE_Y}px`,
     ['--execution-port-color' as any]: executionPortColor,
-    ['--execution-port-active-color' as any]: problemColor,
-    ['--execution-port-overlap' as any]: problem ? '1px' : undefined,
+    ['--execution-port-active-color' as any]: errorColor,
+    ['--execution-port-overlap' as any]: hasError ? '1px' : undefined,
     ['--node-selected-shadow' as any]: showError ? 'var(--node-error-selected-shadow)' : undefined,
   }
   const card = cardStore ? (
@@ -125,53 +152,67 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
       nodeStore={cardStore}
       compact={canvasMiniMapPhase !== NodeMiniMapPhase.None}
       compactContent={compactContent}
-      problem={problem}
-      branches={branches?.map((branch) => {
-        const conditionCase = conditionNode?.cases.find((item) => item.output == branch)
-        const caseDescription = conditionCase?.description?.trim() || undefined
-        const summary =
-          conditionNode != null
-            ? conditionBranchSummary(conditionNode, branch, t)
-            : modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
-              ? t(`canvasCard.waitBranch.${branch}`)
-              : ''
-        const tooltip =
-          modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
-            ? waitBranchDescription(t, modelNode.kind, branch)
-            : conditionNode?.defaultOutput === branch
-              ? t('condition.defaultHelp')
-              : undefined
-        return (
-          <CanvasTooltip key={branch} placement="top" sideOffset={12} title={tooltip}>
-            <div className={clsx(styles.executionBranch, styles.branchRow)} tabIndex={tooltip ? 0 : undefined}>
-              {summary && (
-                <span
-                  className={styles.branchRule}
-                  style={conditionNode && branch !== conditionNode.defaultOutput ? { color: problemColor } : undefined}
-                  title={conditionNode && !tooltip ? summary : undefined}
-                >
-                  {conditionCase != null &&
-                  caseDescription == null &&
-                  conditionCaseHasExpressions(conditionCase) &&
-                  (conditionNode?.diagnostics ?? 0) === 0 &&
-                  conditionNode?.run?.status !== 'error' ? (
-                    <ConditionRule item={conditionCase} t={t} />
-                  ) : (
-                    summary
-                  )}
-                </span>
-              )}
-              {summary && (
-                <span aria-hidden="true" className={styles.branchArrow}>
-                  →
-                </span>
-              )}
-              <span className={styles.branchName}>{conditionNode?.defaultOutput === branch ? 'default' : branch}</span>
-              <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} hintRequested={hintRequested} />
-            </div>
-          </CanvasTooltip>
+      diagnostic={diagnostic}
+      branches={
+        branches && (
+          <div className={styles.branchList}>
+            {branches.map((branch) => {
+              const conditionCase = conditionNode?.cases.find((item) => item.output == branch)
+              const caseDescription = conditionCase?.description?.trim() || undefined
+              const summary =
+                conditionNode != null
+                  ? conditionBranchSummary(conditionNode, branch, t)
+                  : modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
+                    ? t(`canvasCard.waitBranch.${branch}`)
+                    : ''
+              const tooltip =
+                modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
+                  ? waitBranchDescription(t, modelNode.kind, branch)
+                  : conditionNode?.defaultOutput === branch
+                    ? t('condition.defaultHelp')
+                    : undefined
+              return (
+                <CanvasTooltip key={branch} placement="top" sideOffset={12} title={tooltip}>
+                  <div className={styles.branchRow} tabIndex={tooltip ? 0 : undefined}>
+                    <div className={styles.branchContent}>
+                      {summary && (
+                        <span
+                          className={styles.branchRule}
+                          style={conditionNode && branch !== conditionNode.defaultOutput ? { color: errorColor } : undefined}
+                          title={conditionNode && !tooltip ? summary : undefined}
+                        >
+                          {conditionCase != null &&
+                          caseDescription == null &&
+                          conditionCaseHasExpressions(conditionCase) &&
+                          (conditionNode?.diagnostics ?? 0) === 0 &&
+                          conditionNode?.run?.status !== 'error' ? (
+                            <ConditionRule item={conditionCase} t={t} />
+                          ) : (
+                            summary
+                          )}
+                        </span>
+                      )}
+                      {summary && (
+                        <span aria-hidden="true" className={styles.branchArrow}>
+                          →
+                        </span>
+                      )}
+                      <span className={styles.branchName}>{conditionNode?.defaultOutput === branch ? 'default' : branch}</span>
+                    </div>
+                    <ExecutionHandle
+                      id={toRFHandleName(`$branch:${branch}` as HandleName)}
+                      type="output"
+                      position={vertical ? 'bottom' : 'right'}
+                      isConnectable={editable}
+                      hintRequested={hintRequested}
+                    />
+                  </div>
+                </CanvasTooltip>
+              )
+            })}
+          </div>
         )
-      })}
+      }
     />
   ) : undefined
 
@@ -180,6 +221,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
       <NodeStoreContext.Provider value={nodeStore}>
         <div
           {...annotation}
+          style={{ padding: CANVAS_NODE_PADDING }}
           className={clsx(
             styles.outerContainer,
             animateEntry && styles.enter,
@@ -201,6 +243,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
               className={clsx(
                 styles.container,
                 styles.cardContainer,
+                vertical && styles.vertical,
                 canvasMiniMapPhase !== NodeMiniMapPhase.None && styles.compact,
                 compactContent && styles.compactContent,
                 skip && styles.skip,
@@ -215,12 +258,27 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
                   <CommentCard store={nodeStore} />
                 ) : null}
                 {executionInput && (
-                  <ExecutionHandle id={toRFHandleName('$in' as HandleName)} type="input" isConnectable={editable} hintRequested={hintRequested} />
+                  <ExecutionHandle
+                    id={toRFHandleName('$in' as HandleName)}
+                    type="input"
+                    position={vertical ? 'top' : 'left'}
+                    isConnectable={editable}
+                    hintRequested={hintRequested}
+                  />
                 )}
                 {nodeStore.nodeType != NODE_TYPE.CommentNode && modelNode?.kind != 'outputs' && branches == null && (
-                  <ExecutionHandle id={toRFHandleName('$out' as HandleName)} type="output" isConnectable={editable} hintRequested={hintRequested} />
+                  <ExecutionHandle
+                    id={toRFHandleName('$out' as HandleName)}
+                    type="output"
+                    position={vertical ? 'bottom' : 'right'}
+                    isConnectable={editable}
+                    hintRequested={hintRequested}
+                  />
                 )}
               </div>
+              {cardStore && vertical && conditionNode && editable && canvasStore.canChangeNodeWidth && (
+                <ConditionWidthControls canvasStore={canvasStore} nodeStore={cardStore} minimum={minimumWidth} width={width} onPreview={setPreviewWidth} />
+              )}
             </main>
           </div>
         </div>
@@ -229,7 +287,13 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   )
 })
 
-function ExecutionHandle({ id, type, isConnectable, hintRequested }: Pick<HandleProps, 'id' | 'type' | 'isConnectable'> & { hintRequested: boolean }) {
+function ExecutionHandle({
+  id,
+  type,
+  position,
+  isConnectable,
+  hintRequested,
+}: Pick<HandleProps, 'id' | 'type' | 'position' | 'isConnectable'> & { hintRequested: boolean }) {
   const handleType = type == 'input' ? 'target' : 'source'
   // Any connection on this side makes all of its ports visible and suppresses hints.
   const sideConnections = useNodeConnections({ handleType })
@@ -258,15 +322,27 @@ function ExecutionHandle({ id, type, isConnectable, hintRequested }: Pick<Handle
     <Handle
       id={id}
       type={type}
+      position={position}
+
       isConnectable={isConnectable}
       className={clsx(styles.executionHandle, sideConnections.length > 0 && styles.connected, isConnectable && connecting && styles.connecting)}
     >
       {canHint && hintMounted && (
         <span
           aria-hidden="true"
-          className={clsx(styles.connectionHint, type === 'input' && styles.inputHint, (!showHint || hintFinished) && styles.hintLeaving)}
+          className={clsx(styles.connectionHint, position && styles[`${position}Hint`], (!showHint || hintFinished) && styles.hintLeaving)}
         >
-          <i className={type === 'input' ? 'i-lucide:chevron-left' : 'i-lucide:chevron-right'} />
+          <i
+            className={
+              position === 'top'
+                ? 'i-lucide-light:chevron-up'
+                : position === 'bottom'
+                  ? 'i-lucide-light:chevron-down'
+                  : position === 'left'
+                    ? 'i-lucide-light:chevron-left'
+                    : 'i-lucide-light:chevron-right'
+            }
+          />
         </span>
       )}
     </Handle>

@@ -1,10 +1,18 @@
 import styles from './CanvasCard.module.scss'
 import type { ReactNode } from 'react'
+import type { FlowCanvasViewNodeRun } from '../../FlowCanvas/model.ts'
 
 import { clsx } from 'clsx'
 import { Children, useLayoutEffect, useRef, useState } from 'react'
 import { isEmptyReactNode } from '../../../../../ui/browser/hooks.ts'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
+import { hasRunRecords, RunChips, RunStatusIndicator } from './RunChips.tsx'
+
+export interface CanvasCardDiagnostic {
+  readonly message: string
+  readonly icon?: ReactNode
+  readonly tone?: 'danger' | 'warning'
+}
 
 // Normalize every card perimeter to the same units used by the CSS animation.
 const runningBeamPathLength = 1000
@@ -35,24 +43,20 @@ export function CanvasCard({
   children,
   preview,
   branches,
-  footer,
   actions,
-  problem,
-  problemIcon,
-  problemTone = 'danger',
+  diagnostic,
+  run,
   selected,
-  running = false,
+  running = run?.status === 'running',
   fill = false,
   compact = false,
   compactContent = false,
   contentHidden = false,
-  footerHidden = false,
 }: {
   readonly fill?: boolean
   readonly compact?: boolean
   readonly compactContent?: boolean
   readonly contentHidden?: boolean
-  readonly footerHidden?: boolean
   readonly tone?: 'comment' | 'value'
   readonly titleContent?: ReactNode
   readonly title: string
@@ -62,26 +66,26 @@ export function CanvasCard({
   readonly children?: ReactNode
   readonly preview?: ReactNode
   readonly branches?: ReactNode
-  readonly footer?: ReactNode
   readonly actions?: ReactNode
-  readonly problemIcon?: ReactNode
-  readonly problemTone?: 'danger' | 'warning'
-  readonly problem?: string
+  readonly diagnostic?: CanvasCardDiagnostic
+  readonly run?: FlowCanvasViewNodeRun
   readonly selected?: boolean
   readonly running?: boolean
 }) {
   const hasContent = Children.toArray(children).some((child) => typeof child != 'string' || child.trim().length > 0)
   const hasBranches = !isEmptyReactNode(branches)
-  const hasBody = (!contentHidden && (hasContent || !isEmptyReactNode(preview))) || hasBranches || (!footerHidden && !isEmptyReactNode(footer))
-  const statusIndicator = problem && (
-    <CanvasTooltip title={problem} placement="top">
+  const runControls = hasRunRecords(run) ? <RunChips run={run} /> : undefined
+  const hasBody = (!contentHidden && (hasContent || !isEmptyReactNode(preview))) || hasBranches
+  const hasError = run?.status === 'error' || (diagnostic != null && diagnostic.tone !== 'warning')
+  const diagnosticIndicator = diagnostic && (
+    <CanvasTooltip title={diagnostic.message} placement="top">
       <span
-        className={clsx(styles.icon, styles.indicator, problemTone == 'warning' ? styles.warning : styles.danger)}
-        aria-label={problem}
+        className={clsx(styles.icon, styles.indicator, diagnostic.tone === 'warning' ? styles.warning : styles.danger)}
+        aria-label={diagnostic.message}
         role="img"
         tabIndex={0}
       >
-        {problemIcon ?? <i aria-hidden="true" className="i-lucide-light:triangle-alert" />}
+        {diagnostic.icon ?? <i aria-hidden="true" className="i-lucide-light:triangle-alert" />}
       </span>
     </CanvasTooltip>
   )
@@ -94,15 +98,22 @@ export function CanvasCard({
         compactContent && styles.compactContent,
         tone && styles[tone],
         selected && styles.selected,
-        problem && problemTone == 'danger' && styles.problem,
+        hasError && styles.problem,
       )}
     >
       <header className={clsx(styles.header, hasBody && styles.withBody)}>
-        <div className={styles.compactIdentity}>
-          <span className={styles.icon}>{icon}</span>
-          <strong title={title}>{title}</strong>
-          {statusIndicator}
-        </div>
+        {compact && (
+          <div className={styles.compactIdentity}>
+            <span className={styles.icon}>{icon}</span>
+            <strong title={title}>{title}</strong>
+            {diagnosticIndicator ||
+              (run && run.status !== 'idle' && (
+                <span className={clsx(styles.icon, styles.indicator)}>
+                  <RunStatusIndicator run={run} />
+                </span>
+              ))}
+          </div>
+        )}
 
         <span className={styles.icon}>{icon}</span>
         <div className={styles.identity}>
@@ -114,7 +125,7 @@ export function CanvasCard({
             </span>
           )}
         </div>
-        {statusIndicator}
+        {diagnosticIndicator || runControls}
         {actions}
       </header>
       <div className={clsx(hasBody && !hasBranches && styles.singleContent)}>
@@ -125,11 +136,6 @@ export function CanvasCard({
           </CardCollapse>
         )}
         {!isEmptyReactNode(branches) && <div className={styles.branches}>{branches}</div>}
-        {!isEmptyReactNode(footer) && (
-          <CardCollapse hidden={footerHidden}>
-            <footer className={clsx(styles.footer, !contentHidden && !isEmptyReactNode(preview) && styles.afterPreview)}>{footer}</footer>
-          </CardCollapse>
-        )}
       </div>
       {running && (
         <svg className={styles.runningBeam} aria-hidden="true">

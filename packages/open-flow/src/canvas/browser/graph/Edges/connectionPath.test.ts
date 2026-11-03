@@ -269,3 +269,47 @@ describe('connection routing', () => {
     }
   })
 })
+
+function transposeBounds(rect: Params['sourceBounds']) {
+  return rect && { x: rect.y, y: rect.x, width: rect.height, height: rect.width }
+}
+
+function transpose(params: Params): Params {
+  return {
+    sourceX: params.sourceY,
+    sourceY: params.sourceX,
+    targetX: params.targetY,
+    targetY: params.targetX,
+    sourcePosition: params.sourcePosition === Position.Left ? Position.Top : Position.Bottom,
+    targetPosition: params.targetPosition === Position.Right ? Position.Bottom : Position.Top,
+    sourceBounds: transposeBounds(params.sourceBounds),
+    targetBounds: transposeBounds(params.targetBounds),
+  }
+}
+
+function pairs(path: string) {
+  return path
+    .match(/-?\d+(?:\.\d+)?/g)!
+    .map(Number)
+    .reduce<number[][]>((all, n, index) => {
+      if (index % 2 === 0) all.push([n])
+      else all.at(-1)!.push(n)
+      return all
+    }, [])
+}
+
+it.each([backward, reversed(backward), { ...backward, sourceBounds: { ...backward.sourceBounds!, height: 1000 } }])(
+  'uses the same return routing in vertical layouts and input-origin drags',
+  (params) => {
+    const horizontal = getConnectionPath(params)
+    const vertical = getConnectionPath(transpose(params))
+
+    expect(pairs(vertical[0])).toEqual(pairs(horizontal[0]).map(([x, y]) => [y, x]))
+    expect(vertical.slice(1)).toEqual([horizontal[2], horizontal[1]])
+  },
+)
+
+it('preserves forward vertical Bézier geometry', () => {
+  const params = transpose({ ...backward, sourceX: 320, targetX: 550 })
+  expect(getConnectionPath(params)).toEqual(getBezierPath(params).slice(0, 3))
+})

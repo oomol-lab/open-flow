@@ -363,13 +363,19 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
 
   async function createHostedFlow(
     name: string,
-    options?: { readonly tagIds?: readonly string[] },
+    options?: Parameters<NonNullable<OpenFlowWorkbenchProps['createFlow']>>[1],
     imported?: { file: import('@oomol-lab/open-flow/control-api').WorkflowFile; key: string },
   ): Promise<string> {
     if (team.kind != 'ready' || team.selectedTeamId == null) throw new Error(t('team.loadFailed'))
     const teamId = team.selectedTeamId
     const response = await fetch(imported == null ? '/connector/flows' : '/v1/flows/import', {
-      body: JSON.stringify({ name, teamId, tagIds: options?.tagIds, ...(imported == null ? {} : { file: imported.file }), version: 1 }),
+      body: JSON.stringify({
+        name,
+        teamId,
+        tagIds: options?.tagIds,
+        ...(imported == null ? { presentation: options?.presentation } : { file: imported.file }),
+        version: 1,
+      }),
       credentials: 'same-origin',
       headers: { 'content-type': 'application/json', 'idempotency-key': imported?.key ?? `flow-${idempotencyKey()}` },
       method: 'POST',

@@ -653,5 +653,17 @@
     "Europe/Moscow": "모스크바",
     "Australia/Sydney": "시드니",
     "Pacific/Auckland": "오클랜드"
+  },
+  "layoutDirection": {
+    "title": "레이아웃 방향",
+    "horizontal": "가로",
+    "vertical": "세로",
+    "verticalDescription": "위에서 아래로 진행하며 분기를 가로로 배치합니다.",
+    "horizontalDescription": "왼쪽에서 오른쪽으로 진행하며 분기를 세로로 배치합니다."
+  },
+  "nodeWidth": {
+    "resizeLeft": "왼쪽에서 너비 조절",
+    "resizeRight": "오른쪽에서 너비 조절",
+    "reset": "자동 너비 복원"
   }
 }

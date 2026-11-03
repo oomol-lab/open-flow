@@ -2,104 +2,138 @@
   width: 16px;
   height: 16px;
   position: absolute;
-  // Extend beyond the node container.
   z-index: 50;
   visibility: visible;
 }
 
-.left {
-  margin-top: 2px;
-  left: -8px;
+.handle.handle {
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+  width: 2px;
+  height: 12px;
+  top: 2px;
+  left: 6px;
+  right: auto;
+  bottom: auto;
+  border: 0;
+  border-radius: 0;
+  transform: none;
+  background: transparent;
+  cursor: crosshair;
+  z-index: 100;
 
-  :global(.react-flow__node.selected) & {
-    left: -9px;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: var(--port-inset-top, 0px) var(--port-inset-right, 0px) var(--port-inset-bottom, 0px) var(--port-inset-left, 0px);
+    border-radius: 0.5px;
+    background: var(--execution-port-color, var(--edge-primitive));
+    opacity: var(--execution-port-opacity, 1);
   }
 
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -3px -8px;
+  }
+
+  &:hover::before,
+  &:global(.connectingfrom)::before,
+  &:global(.connectingto.valid)::before {
+    background: var(--execution-port-active-color, var(--text-3));
+    opacity: 1;
+  }
+}
+
+.left {
+  left: -8px;
+
   .handle {
-    --angle: 270deg;
+    --port-inset-right: calc(0px - var(--execution-port-overlap, 0px));
   }
 }
 
 .right {
   right: -8px;
 
-  :global(.react-flow__node.selected) & {
-    right: -9px;
-  }
-
   .handle {
-    --angle: 90deg;
+    left: 8px;
+    --port-inset-left: calc(0px - var(--execution-port-overlap, 0px));
   }
 }
 
-.handle.handle {
-  top: unset;
-  width: 100%;
-  height: 100%;
-  border: none;
-  transform: unset;
-  z-index: 100;
+.top,
+.bottom {
+  left: calc(50% - 8px);
 
-  --border-color: var(--handle-border-color, var(--node-outline-color, var(--node-border-color)));
-  --surface-color: var(--handle-background-color, var(--node-background-color));
-  background: linear-gradient(var(--angle, 270deg), var(--surface-color) 0%, var(--surface-color) 50%, var(--border-color) 50%, var(--border-color) 100%);
-  border-radius: 50%;
+  .handle {
+    width: 12px;
+    height: 2px;
+    left: 2px;
 
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    background-color: var(--surface-color);
-    border-radius: 50%;
+    &::after {
+      inset: -8px -3px;
+    }
   }
+}
 
-  :global(.react-flow__node.selected) &::before {
-    inset: 2px;
+.top {
+  top: -8px;
+
+  .handle {
+    top: 6px;
+    --port-inset-bottom: calc(0px - var(--execution-port-overlap, 0px));
   }
+}
 
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 4px;
-    background-color: var(--bg, var(--widget-background));
-    border-radius: 50%;
+.bottom {
+  bottom: -8px;
+
+  .handle {
+    top: 8px;
+    --port-inset-top: calc(0px - var(--execution-port-overlap, 0px));
   }
+}
 
-  &:hover::after {
-    filter: brightness(0.9);
+// Selection adds one outward pixel while leaving the attachment on the card edge.
+:global(.react-flow__node.selected) .wrapper,
+.wrapper.selected {
+  .handle {
+    width: 3px;
 
-    :global(.open-flow-canvas.dark) & {
-      filter: brightness(1.1);
+    &::before {
+      background: var(--execution-port-color, var(--node-selected-border-color));
     }
   }
 
-  &.active::after {
-    background-color: var(--brand-highlight-color);
+  &.left {
+    left: -9px;
   }
 
-  &.hasData::after {
-    box-shadow: 0px 0px 6px var(--highlight-indicate-color);
+  &.right {
+    right: -9px;
+
+    .handle {
+      left: 7px;
+    }
   }
-}
 
-:global(.react-flow__node-input_node) .handle,
-:global(.react-flow__node-output_node) .handle {
-  --border-color: var(--handle-border-color, var(--pseudo-outline-color));
-}
-
-:global(.react-flow__node.selectable.selected) .handle {
-  --border-color: var(--handle-border-color, var(--node-selected-border-color));
-}
-
-.disabled {
-  pointer-events: none;
-
-  > :global(.react-flow__handle) {
-    pointer-events: none;
+  &.top {
+    top: -9px;
   }
-}
 
-.pointerDown {
-  cursor: not-allowed;
-  pointer-events: auto;
+  &.bottom {
+    bottom: -9px;
+
+    .handle {
+      top: 7px;
+    }
+  }
+
+  &.top .handle,
+  &.bottom .handle {
+    width: 12px;
+    height: 3px;
+  }
 }

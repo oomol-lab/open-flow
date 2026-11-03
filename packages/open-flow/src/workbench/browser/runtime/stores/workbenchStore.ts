@@ -2,8 +2,10 @@ import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { FlowSvgOptions } from '../../../../canvas/browser/graph/FlowCanvas/exportSvg.ts'
 import type { InteractiveMode } from '../../../../canvas/browser/stores/canvas/canvas.store.ts'
+import type { CanvasDirection } from '../../../../canvas/common/direction.ts'
 import type { FlowUpdate } from '../../../../control/common/api.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
+import type { FlowCreationOptions } from '../api.ts'
 import type { ConnectorConnection, WorkbenchClient, Draft, Flow, FlowCheck, Run, RunEvent } from '../api.ts'
 import type { Point } from '../canvasPresentation.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
@@ -19,7 +21,7 @@ import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
-import { flowPresentation } from '../canvasPresentation.ts'
+import { flowPresentation, setCanvasLayout } from '../canvasPresentation.ts'
 import { actionWithConnections } from '../connectionCatalog.ts'
 import { diagnosticItems } from '../editor/diagnostics.ts'
 import { presentTriggerDiagnostics } from '../editor/triggerDiagnosticPresentation.ts'
@@ -30,6 +32,7 @@ import { RunRequestStore } from '../runs/runRequestStore.ts'
 import { RunStore } from '../runs/runStore.ts'
 import { designerGraph } from '../workspace.ts'
 import { ActorStore } from './actorStore.ts'
+import { readCanvasDirection, writeCanvasDirection } from './canvasDirection.ts'
 import { readCanvasInteractiveMode, writeCanvasInteractiveMode } from './canvasInteractiveMode.ts'
 import { CatalogStores } from './catalogStores.ts'
 import { ConnectorAccessStore } from './connectorAccessStore.ts'
@@ -135,6 +138,7 @@ export class WorkbenchStore {
 
   public readonly preferences: WorkbenchPreferences
   public readonly interactiveMode$: Val<InteractiveMode>
+  #defaultDirection: CanvasDirection
   public readonly $: Workbench$
   public readonly connectors: ConnectorStore
   public readonly connectorAccess: ConnectorAccessStore
@@ -156,6 +160,7 @@ export class WorkbenchStore {
   ) {
     this.actors = new ActorStore(host.resolveActor)
     this.preferences = preferences
+    this.#defaultDirection = readCanvasDirection(preferences)
     this.interactiveMode$ = val(readCanvasInteractiveMode(preferences))
     this.interactiveMode$.reaction((mode) => writeCanvasInteractiveMode(preferences, mode), true)
     this.#client = client
@@ -423,10 +428,17 @@ export class WorkbenchStore {
 
   public async createFlow(
     name: string,
-    create?: (name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
+    create?: (name: string, options?: FlowCreationOptions) => Promise<string>,
     tagIds?: readonly string[],
   ): Promise<boolean> {
-    return await this.#openNewFlow(await this.workspace.createFlow(name, create, tagIds))
+    return await this.#openNewFlow(await this.workspace.createFlow(name, create, tagIds, setCanvasLayout({}, this.#defaultDirection)))
+  }
+
+  public async changeDirection(direction: CanvasDirection, positions: Readonly<Record<string, Point>>): Promise<boolean> {
+    if (!(await this.workspace.changeDirection(direction, positions))) return false
+    this.#defaultDirection = direction
+    writeCanvasDirection(this.preferences, direction)
+    return true
   }
 
   async #openNewFlow(created: Flow | undefined, notice?: 'notice.flowImported'): Promise<boolean> {

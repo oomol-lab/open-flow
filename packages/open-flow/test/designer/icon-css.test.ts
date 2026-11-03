@@ -8,10 +8,14 @@ const generatedSourcePatterns = ['src/build/node/fileIcons.ts']
 const iconTokenPattern = /^(?:[a-z\d_-]+:)*i-[a-z\d_][a-z\d_:-]*[a-z\d_]$/i
 
 describe('Designer icon CSS', () => {
-  it('generates lighter Lucide strokes without changing the standard collection', async () => {
+  it.each([
+    ['lucide', 'scan'],
+    ['tabler', 'arrow-autofit-down'],
+    ['tabler', 'arrow-autofit-right'],
+  ])('generates lighter %s:%s strokes without changing the standard collection', async (collection, icon) => {
     const uno = await createGenerator(unoConfig)
-    const light = await uno.generate('i-lucide-light:scan')
-    const standard = await uno.generate('i-lucide:scan')
+    const light = await uno.generate(`i-${collection}-light:${icon}`)
+    const standard = await uno.generate(`i-${collection}:${icon}`)
 
     expect(light.css).toContain("stroke-width='1.5'")
     expect(standard.css).toContain("stroke-width='2'")

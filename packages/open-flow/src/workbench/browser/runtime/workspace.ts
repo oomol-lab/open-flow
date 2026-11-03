@@ -22,7 +22,15 @@ import { resolutionOutputPorts } from '../../../flow/common/graph.ts'
 import { sourceOutputLabel } from '../../../flow/common/sourceField.ts'
 import { triggerOutputPorts } from '../../../trigger/common/contract.ts'
 import { actionSummary } from './actionSummary.ts'
-import { savedPositions, savedOrder, savedViewport, savedComments, savedHiddenNodeContent } from './canvasPresentation.ts'
+import {
+  savedDirection,
+  savedPositions,
+  savedOrder,
+  savedViewport,
+  savedComments,
+  savedHiddenNodeContent,
+  savedVerticalNodeWidths,
+} from './canvasPresentation.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 
@@ -680,8 +688,10 @@ export function designerGraph(
   const ports = new Map([...definitions].map(([nodeId, node]) => [nodeId, nodePorts(node, revision)]))
   const edgeProjection = projectEdges(graph, nodeIds)
   const layout = layoutNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
+  const direction = savedDirection(presentation)
   const positions = savedPositions(presentation)
   const hiddenNodeContent = savedHiddenNodeContent(presentation)
+  const verticalNodeWidths = savedVerticalNodeWidths(presentation)
   const context: NodeProjectionContext = {
     connectionCatalogs,
     connectorActions,
@@ -693,14 +703,15 @@ export function designerGraph(
     t,
   }
   const rows = new Map<number, number>()
-  const automaticPositions = wrapLayout(
-    layout.ordered.map((nodeId) => {
-      const column = layout.depth.get(nodeId) ?? 0
-      const row = rows.get(column) ?? 0
-      rows.set(column, row + 1)
-      return { id: nodeId, column, x: 80 + column * 500, y: 80 + row * 240, width: 420, height: 240 }
-    }),
-  )
+  const defaultNodes = layout.ordered.map((nodeId) => {
+    const column = layout.depth.get(nodeId) ?? 0
+    const row = rows.get(column) ?? 0
+    rows.set(column, row + 1)
+    return direction === 'vertical'
+      ? { id: nodeId, column, x: 80 + row * 400, y: 80 + column * 240, width: 320, height: 160 }
+      : { id: nodeId, column, x: 80 + column * 500, y: 80 + row * 240, width: 420, height: 240 }
+  })
+  const automaticPositions = direction === 'horizontal' ? wrapLayout(defaultNodes) : Object.fromEntries(defaultNodes.map(({ id, x, y }) => [id, { x, y }]))
   const nodes: DesignerNode[] = []
   for (const nodeId of layout.ordered) {
     const position = positions[nodeId] ?? automaticPositions[nodeId]!
@@ -713,7 +724,11 @@ export function designerGraph(
       continue
     }
     const node = semanticDesignerNode(nodeId, resolved, ports.get(nodeId)!, position, context)
-    nodes.push({ ...node, contentHidden: hiddenNodeContent?.[nodeId] === true })
+    nodes.push({
+      ...node,
+      contentHidden: hiddenNodeContent?.[nodeId] === true,
+      ...(node.kind === 'condition' ? { verticalWidth: verticalNodeWidths[nodeId] } : {}),
+    })
   }
   for (const [nodeId, comment] of Object.entries(savedComments(presentation, positions)).toSorted(([left], [right]) => left.localeCompare(right))) {
     nodes.push({
@@ -726,6 +741,7 @@ export function designerGraph(
   const order = new Map(savedOrder(presentation).map((nodeId, index) => [nodeId, index]))
   nodes.sort((left, right) => (order.get(left.id) ?? -1) - (order.get(right.id) ?? -1))
   return {
+    direction,
     edges: edgeProjection.edges,
     nodes,
     ...(projectedRun.status == null ? {} : { runStatus: projectedRun.status }),
