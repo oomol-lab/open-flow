@@ -121,6 +121,7 @@ export function CanvasNodePicker({
       {...props}
       anchor={request.screenPosition}
       centered={centered}
+      initialTab={request.connectionDirection != null ? 'nodes' : props.initialTab}
       isOptionDisabled={(option) =>
         request.connectionDirection != null &&
         (option.kind == 'trigger' ||

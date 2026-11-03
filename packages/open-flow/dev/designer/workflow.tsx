@@ -319,7 +319,16 @@ function WorkflowStory({
     }
   }, [])
   const i18n = useMemo(() => createI18n(language), [language])
-  const triggers = model.nodes.filter((node) => node.kind === 'trigger')
+  const [hideTriggers, setHideTriggers] = useState(false)
+  const hiddenNodeIds = new Set(hideTriggers ? model.nodes.filter((node) => node.kind == 'trigger').map((node) => node.id) : [])
+  const visibleModel = hideTriggers
+    ? {
+        ...model,
+        nodes: model.nodes.filter((node) => !hiddenNodeIds.has(node.id)),
+        edges: model.edges.filter((edge) => !hiddenNodeIds.has(edge.source) && !hiddenNodeIds.has(edge.target)),
+      }
+    : model
+  const triggers = visibleModel.nodes.filter((node) => node.kind === 'trigger')
   const [selectedTriggerId, setSelectedTriggerId] = useState(triggers[0]?.id ?? '')
   const [version, setVersion] = useState(0)
   const [editable, setEditable] = useState(true)
@@ -331,6 +340,17 @@ function WorkflowStory({
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(String(version))
   const [selected, setSelected] = useState<readonly string[]>(initialSelectedNodeIds)
   useStoryActions([
+    ...(picker
+      ? [
+          {
+            label: hideTriggers ? 'Show triggers' : 'Hide triggers',
+            onClick: () => {
+              setHideTriggers((value) => !value)
+              setPickerRequest(undefined)
+            },
+          },
+        ]
+      : []),
     ...(completedModel ? [{ label: runCompleted ? 'Restart running nodes' : 'Finish running nodes', onClick: () => setRunCompleted((value) => !value) }] : []),
     ...(remoteCommands
       ? [
@@ -354,6 +374,7 @@ function WorkflowStory({
         setSelected(initialSelectedNodeIds)
         setEditable(true)
         setRunCompleted(false)
+        setHideTriggers(false)
         setVersion((value) => value + 1)
         log('samples.reset')
       },
@@ -373,6 +394,7 @@ function WorkflowStory({
                 deriveAddNodeOptions(pickerDraft, i18n.t).filter((option) => option.label.toLowerCase().includes(query.toLowerCase()))
               }
               provideChoices={async () => []}
+              initialTab={triggers.length == 0 ? 'triggers' : 'nodes'}
               disabled={!editable}
               focusRequest={0}
               onClose={() => setPickerRequest(undefined)}
@@ -394,7 +416,7 @@ function WorkflowStory({
             language={language}
             layoutMotion={false}
             editable={editable}
-            model={runCompleted && completedModel ? completedModel : model}
+            model={runCompleted && completedModel ? completedModel : visibleModel}
             toolbar={
               <WorkbenchCanvasActions
                 pickerOpen={addNodeRequest != null}
@@ -551,7 +573,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'node-picker',
     title: 'Canvas Node Picker',
     description:
-      'Right-click the canvas or drop an execution connection on empty space to open Add node near the pointer. Choose a node to log its position and connection. Compare both port directions, search, edge placement, and read-only behavior.',
+      'Right-click the canvas or drop an execution connection on empty space to open Add node near the pointer. Hide triggers to check that ordinary openings default to Triggers while both port directions open Blocks. Choose a node to log its position and connection. Compare search, edge placement, and read-only behavior.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={workflow} picker />,
   },
