@@ -2,6 +2,7 @@ import type { EventSource } from '../../src/control/common/api.ts'
 import type { ChangeOperation, RevisionContent, TriggerNode } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { WorkbenchHost } from '../../src/workbench/browser/runtime/contract.ts'
+import type { CatalogStores } from '../../src/workbench/browser/runtime/stores/catalogStores.ts'
 import type { LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -25,6 +26,7 @@ export function createTriggerSession(
   create = false,
   catalog?: {
     request: (url: URL, init?: RequestInit) => Promise<Response>
+    stores?: CatalogStores
   },
   eventSources?: readonly EventSource[],
   triggerAccess?: 'alternative' | 'none',
@@ -246,7 +248,7 @@ export function createTriggerSession(
     create ? () => (identity++ === 0 ? nodeId : `${nodeId}-${identity}`) : undefined,
     i18n,
     undefined,
-    undefined,
+    catalog?.stores,
     undefined,
     undefined,
     async (flowId, definition, connections) => {

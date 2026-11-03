@@ -1,7 +1,7 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
-import type { WorkbenchClient, ConnectorConnection, TriggerKeySnapshot } from '../api.ts'
+import type { WorkbenchClient, ConnectorConnection, ConnectorProvider, TriggerKeySnapshot } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { ResolvedSelection } from '../revisionView.ts'
@@ -62,11 +62,11 @@ function target(selection: ResolvedSelection | undefined): TriggerTarget | undef
   }
 }
 
-function option(definition: TriggerKeySnapshot, i18n: I18n, display?: TriggerDisplay): AddNodeOption {
+function option(definition: TriggerKeySnapshot, i18n: I18n, display?: TriggerDisplay, provider?: ConnectorProvider): AddNodeOption {
   return {
     description: display?.description ?? definition.description,
     group: i18n.t('addNode.integrationTriggers'),
-    icon: providerIcon({ serviceId: definition.provider, serviceName: definition.provider }),
+    icon: providerIcon(provider ?? { serviceId: definition.provider, serviceName: definition.provider }),
     id: `${optionPrefix}${definition.key}`,
     inputs: [],
     kind: 'trigger',
@@ -165,6 +165,7 @@ export class TriggerStore {
     return scopedValue(signal, (get) => {
       const state = get(source)
       get(this.#i18n.t$)
+      const providers = get(this.#workspace.catalogs.providers.get(undefined, this.#i18n.lang)).data
       const enabled = get(this.#workspace.$.flowId) != null && get(this.#workspace.$.draft) != null
       const catalog = state.data
       const definitions = catalog?.definitions.filter(
@@ -181,7 +182,19 @@ export class TriggerStore {
             item.type,
           ].some((value) => value?.toLowerCase().includes(query)),
       )
-      return { ...state, data: !enabled ? [] : definitions?.map((definition) => option(definition, this.#i18n, catalog!.display[definition.key])) }
+      return {
+        ...state,
+        data: !enabled
+          ? []
+          : definitions?.map((definition) =>
+              option(
+                definition,
+                this.#i18n,
+                catalog!.display[definition.key],
+                providers?.find((provider) => provider.serviceId == definition.provider),
+              ),
+            ),
+      }
     })
   }
 

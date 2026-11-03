@@ -33,9 +33,11 @@ const connectionFetcher = () => vi.fn(async (_service: string, _flowId: string |
 function createSetup(language: 'en' | 'zh-CN' = 'en') {
   const requests: string[] = []
   const fetchConnections = connectionFetcher()
+  const fetchProviders = vi.fn(async (): Promise<Response> => Response.json({ success: true, data: [] }))
   let revision = 1
   const request = vi.fn(async (path: string, init?: RequestInit) => {
     requests.push(path)
+    if (path == `/v1/connector/proxy/providers?locale=${language}`) return fetchProviders()
     if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [{ ...flow, referenceCount: 0 }], total: 1, version: 1 })
     if (path == `/v1/flows/${flow.flowId}/editor`) {
       return Response.json({
@@ -167,7 +169,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
   const workspace = new WorkspaceStore(client, vi.fn())
   const triggers = new TriggerStore(client, workspace, vi.fn(), { openExternalPage: async () => true }, createI18n(language))
   const signal = new AbortController().signal
-  return { client, workspace, triggers, requests, request, signal }
+  return { client, workspace, triggers, requests, request, signal, fetchProviders }
 }
 
 describe('TriggerStore', () => {
@@ -192,6 +194,77 @@ describe('TriggerStore', () => {
       expect(searched?.map((option) => option.id)).toEqual(['trigger:github.on_repo_event'])
       expect(requests.filter((path) => path == '/v1/trigger-keys/catalog?locale=en')).toHaveLength(1)
       expect(requests.some((path) => path.startsWith('/v1/connector/connections'))).toBe(false)
+    } finally {
+      triggers.dispose()
+      workspace.dispose()
+    }
+  })
+
+  it.each(['image', 'sprite'] as const)('updates browse and search icons when Provider %s artwork arrives', async (artwork) => {
+    const { workspace, triggers, requests, signal, fetchProviders } = createSetup()
+    const iconSprite = {
+      version: 'test',
+      pixelRatio: 2,
+      iconSize: 48,
+      bleed: 2,
+      width: 52,
+      height: 52,
+      lightUrl: 'https://test.invalid/light.png',
+      darkUrl: 'https://test.invalid/dark.png',
+    }
+    const provider = {
+      serviceId: 'github',
+      serviceName: 'GitHub',
+      icon: 'https://test.invalid/github.svg',
+      ...(artwork == 'sprite' ? { iconSprite, iconSpritePosition: { x: 2, y: 2 } } : {}),
+    }
+    const { promise, resolve } = Promise.withResolvers<Response>()
+    fetchProviders.mockReturnValue(promise)
+
+    try {
+      await workspace.start(flow.flowId)
+      const browsed = triggers.browseAddNodeOptions(signal)
+      const searched = triggers.provideAddNodeOptions('repository', signal)
+      expect((await resourceValue(browsed))[0]?.icon).toBe(providerIcon({ serviceId: 'github', serviceName: 'github' }))
+      expect((await resourceValue(searched))[0]?.icon).toBe(providerIcon({ serviceId: 'github', serviceName: 'github' }))
+
+      resolve(
+        Response.json({
+          success: true,
+          data: [
+            {
+              service: provider.serviceId,
+              displayName: provider.serviceName,
+              authTypes: ['oauth2'],
+              iconUrl: provider.icon,
+              iconSpritePosition: provider.iconSpritePosition,
+            },
+          ],
+          meta: artwork == 'sprite' ? { iconSprite } : undefined,
+        }),
+      )
+      await resourceValue(workspace.catalogs.providers.get(undefined, 'en'))
+
+      expect(browsed.value.data?.[0]?.icon).toBe(providerIcon(provider))
+      expect(searched.value.data?.[0]?.icon).toBe(providerIcon(provider))
+      expect(requests.filter((path) => path == '/v1/connector/proxy/providers?locale=en')).toHaveLength(1)
+      expect(requests.some((path) => /connector\/(connections|proxy\/actions)/.test(path))).toBe(false)
+    } finally {
+      triggers.dispose()
+      workspace.dispose()
+    }
+  })
+
+  it('keeps Trigger options available when Provider metadata fails', async () => {
+    const { workspace, triggers, signal, fetchProviders } = createSetup()
+    fetchProviders.mockRejectedValue(new Error('Provider catalog unavailable'))
+    try {
+      await workspace.start(flow.flowId)
+      const source = triggers.browseAddNodeOptions(signal)
+      expect(await resourceValue(source)).toHaveLength(1)
+      await expect(resourceValue(workspace.catalogs.providers.get(undefined, 'en'))).rejects.toThrow('Provider catalog unavailable')
+      expect(source.value.error).toBeUndefined()
+      expect(source.value.data?.[0]?.icon).toBe(providerIcon({ serviceId: 'github', serviceName: 'github' }))
     } finally {
       triggers.dispose()
       workspace.dispose()

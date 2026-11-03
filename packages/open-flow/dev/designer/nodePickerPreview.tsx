@@ -87,6 +87,8 @@ const sampleProviders = [
   { service: 'wecom', displayName: '企业微信', authTypes: ['oauth2'] },
   { service: '17track', displayName: '17TRACK', authTypes: ['no_auth'] },
   { service: 'seedream', displayName: 'Doubao Seedream', authTypes: ['api_key'] },
+  { service: 'feishu_app_bot', displayName: 'Feishu App Bot', authTypes: ['oauth2'], iconSpritePosition: { x: 54, y: 2 } },
+  { service: 'outlook', displayName: 'Outlook', authTypes: ['oauth2'], iconSpritePosition: { x: 2, y: 2 } },
 ]
 
 const sampleConnections = ['feishu', 'gmail', 'seedream'].map((serviceId) => ({
@@ -141,23 +143,10 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const [configuredOnly, setConfiguredOnly] = useState(false)
   const [slowAdd, setSlowAdd] = useState(false)
   const [cancelAdd, setCancelAdd] = useState(false)
-  const session = useMemo(
-    () =>
-      createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
-        request: async () =>
-          Response.json({
-            version: 1,
-            locale: language,
-            definitions: snapshots,
-            display: Object.fromEntries(await Promise.all(snapshots.map(async (definition) => [definition.key, await localizeTrigger(definition, language)]))),
-          }),
-      }),
-    [language, log],
-  )
-  const sampleCatalog = useMemo(() => {
+  const { session, connectors } = useMemo(() => {
     const providers = sampleProviders.map((provider) =>
       Object.assign({}, provider, {
-        displayName: session.i18n.lang.startsWith('zh')
+        displayName: language.startsWith('zh')
           ? provider.displayName
           : provider.service == 'feishu'
             ? 'Feishu'
@@ -176,11 +165,25 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       await new Promise((resolve) => setTimeout(resolve, 1500))
       return Response.json(url.pathname.endsWith('/actions') ? proxyActions(String(path)) : sampleActionData(String(path)))
     })
-    const data = new CatalogStores(client, { sessionId: 'lab', environment: 'lab' })
-    const store = new ConnectorStore(client, session.workspace, (notice) => log('notice', notice), { openExternalPage: async () => false }, session.i18n, data)
-    return { store, data }
-  }, [session, log])
-  const connectors = sampleCatalog.store
+    const nextSession = createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
+      stores: new CatalogStores(client, { sessionId: 'lab', environment: 'lab' }),
+      request: async () =>
+        Response.json({
+          version: 3,
+          locale: language,
+          definitions: snapshots,
+          display: Object.fromEntries(await Promise.all(snapshots.map(async (definition) => [definition.key, await localizeTrigger(definition, language)]))),
+        }),
+    })
+    const nextConnectors = new ConnectorStore(
+      client,
+      nextSession.workspace,
+      (notice) => log('notice', notice),
+      { openExternalPage: async () => false },
+      nextSession.i18n,
+    )
+    return { session: nextSession, connectors: nextConnectors }
+  }, [language, log])
   const lifetime = useMemo(() => ({ users: 0 }), [session, connectors])
   useEffect(() => {
     lifetime.users++
@@ -190,12 +193,11 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       queueMicrotask(() => {
         if (lifetime.users == 0) {
           connectors.dispose()
-          sampleCatalog.data.dispose()
           session.dispose()
         }
       })
     }
-  }, [session, connectors, lifetime, sampleCatalog])
+  }, [session, connectors, lifetime])
   const options = useVal(session.workspace.$.addNodeOptions)
   const connections = useVal(connectors.$.pickerConnections)
   useStoryActions([
@@ -334,6 +336,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'The production empty canvas opens the centered picker on Triggers from its Add node button or the A key. Compare the 10px search, tab track and provider-header corners with the 12px node/app rows and outer popover in both themes. The selected tab uses a 7px radius to follow the track’s 3px inset. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and a flat back button with a subtle hover fill, keyboard focus outline and localized tooltip, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Connected services show an inline status independently of Flow authorization. Includes cached loading and 1,000-app scrolling. Scroll the node, provider and action lists to check overlay scrollbars with the shared 6px handle width, equal 12px side insets, sticky group headings and transitions between groups. Browse into an app and return to check restored scroll position; use 1,000 apps to check virtualization. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent.',
+    'The production empty canvas opens the centered picker on Triggers from its Add node button or the A key. Trigger rows use the shared Provider artwork; Feishu App Bot and Outlook show theme-aware sprites after the delayed Provider response. Compare the 10px search, tab track and provider-header corners with the 12px node/app rows and outer popover in both themes. The selected tab uses a 7px radius to follow the track’s 3px inset. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and a flat back button with a subtle hover fill, keyboard focus outline and localized tooltip, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Connected services show an inline status independently of Flow authorization. Includes cached loading and 1,000-app scrolling. Scroll the node, provider and action lists to check overlay scrollbars with the shared 6px handle width, equal 12px side insets, sticky group headings and transitions between groups. Browse into an app and return to check restored scroll position; use 1,000 apps to check virtualization. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }
