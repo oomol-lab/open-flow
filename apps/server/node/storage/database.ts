@@ -1,5 +1,9 @@
+import type { StatementSync } from 'node:sqlite'
+
 import { DatabaseSync } from 'node:sqlite'
 import { migrate } from './migrate.ts'
+
+const maxCachedStatements = 512
 
 /**
  * Owns the single SQLite connection for one deployment database file.
@@ -10,6 +14,7 @@ import { migrate } from './migrate.ts'
  */
 export class Database {
   readonly connection: DatabaseSync
+  readonly #statements = new Map<string, StatementSync>()
 
   private constructor(file: string) {
     this.connection = new DatabaseSync(file, { timeout: 5_000 })
@@ -17,6 +22,17 @@ export class Database {
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = NORMAL;
     `)
+    // Stores prepare SQL at each call site; the connection reuses compiled statements, which reset after every execution.
+    this.connection.prepare = (sql, options) => {
+      if (options != null) return DatabaseSync.prototype.prepare.call(this.connection, sql, options)
+      let statement = this.#statements.get(sql)
+      if (statement == null) {
+        statement = DatabaseSync.prototype.prepare.call(this.connection, sql)
+        if (this.#statements.size >= maxCachedStatements) this.#statements.delete(this.#statements.keys().next().value!)
+      } else this.#statements.delete(sql)
+      this.#statements.set(sql, statement)
+      return statement
+    }
   }
 
   /** Opens a database file and brings its schema to the current version. */
@@ -50,6 +66,7 @@ export class Database {
   }
 
   close(): void {
+    this.#statements.clear()
     this.connection.close()
   }
 }
