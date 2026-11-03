@@ -81,9 +81,12 @@ export function readRevisionOrRepair(read: () => StoredFlowRevision | undefined)
   }
 }
 
-export function revisionContent(stored: { readonly content: string }): RevisionContent {
+export function revisionContent(
+  stored: { readonly content: string },
+  decode: (content: string) => RevisionContent = (content) => decodeRevision(new TextEncoder().encode(content)),
+): RevisionContent {
   try {
-    return decodeRevision(new TextEncoder().encode(stored.content))
+    return decode(stored.content)
   } catch (error) {
     if (error instanceof ControlError) throw error
     const kind = revisionRepairKind(new TextEncoder().encode(stored.content))
