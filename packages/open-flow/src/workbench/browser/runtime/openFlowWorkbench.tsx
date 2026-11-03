@@ -140,6 +140,8 @@ interface WorkbenchProps {
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?: OpenFlowWorkbenchProps['createFlowField']
   readonly connectionHref?: ConnectionHref | undefined
+  /** Commit page content with the host's route and layout, after selection finishes loading. */
+  readonly flowId: string | undefined
   readonly hrefFor: (location: WorkbenchLocation) => string
   readonly initializing: boolean
   readonly language: WorkbenchLanguage
@@ -160,6 +162,7 @@ function Workbench({
   createFlowField,
   connectionHref,
   hrefFor,
+  flowId,
   initializing,
   language,
   navigation,
@@ -169,7 +172,6 @@ function Workbench({
   store,
   theme,
 }: WorkbenchProps): ReactElement {
-  const flowId = useVal(store.workspace.$.flowId)
   return (
     <div className="app-shell">
       {flowId == null ? (
@@ -372,6 +374,7 @@ const Session = forwardRef<OpenFlowWorkbenchHandle, SessionProps>(function Sessi
               createFlowField={createFlowField}
               connectionHref={connectionHref}
               hrefFor={hrefFor}
+              flowId={location.flowId}
               initializing={!started}
               language={language}
               navigation={navigation}
