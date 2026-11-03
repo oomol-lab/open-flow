@@ -543,7 +543,8 @@ export class RunStore {
     return row == null ? undefined : { content: row.content ?? new Uint8Array(0), size: row.size }
   }
 
-  append(runId: string, event: ProjectedRunEvent): boolean {
+  append(runId: string, ...events: readonly ProjectedRunEvent[]): boolean {
+    if (events.length == 0) return false
     return this.#transaction(() => {
       const run = this.#database.prepare('SELECT status, event_count AS eventCount, event_bytes AS eventBytes FROM runs WHERE run_id = ?').get(runId) as {
         readonly eventBytes: number
@@ -551,25 +552,38 @@ export class RunStore {
         readonly status: RunStatus
       }
       if (run.status != 'running') return false
-      const responseChanged =
-        event.kind === 'node.completed' &&
-        event.response != null &&
+      let eventCount = run.eventCount
+      let eventBytes = run.eventBytes
+      let truncated = false
+      let responseChanged = false
+      for (const event of events) {
+        if (event.kind === 'node.completed' && event.response != null) {
+          const inserted =
+            this.#database
+              .prepare('INSERT OR IGNORE INTO webhook_responses (run_id, node_id, response) VALUES (?, ?, ?)')
+              .run(runId, String(event.payload.nodeId), JSON.stringify(event.response)).changes > 0
+          responseChanged ||= inserted
+        }
+        if (event.kind == 'node.failed' && event.payload.terminal === true) {
+          const error = { ...(event.payload.error as object), nodeId: event.payload.nodeId, jobId: event.payload.executionId, path: event.payload.path ?? [] }
+          this.#database.prepare('UPDATE runs SET failure_detail = ? WHERE run_id = ? AND failure_detail IS NULL').run(JSON.stringify(error), runId)
+          continue
+        }
+        const historyEvent = event.kind === 'node.completed' ? { kind: event.kind, payload: event.payload, value: event.value } : event
+        const bytes = encoder.encode(JSON.stringify(historyEvent)).byteLength
+        if (bytes > maxEventBytes || eventCount >= maxEventCount || eventBytes + bytes > maxEventTotalBytes) {
+          truncated = true
+          continue
+        }
+        this.#insertEvent(runId, event.kind, event.payload, 'value' in event ? event.value : undefined)
+        eventCount++
+        eventBytes += bytes
+      }
+      if (eventCount != run.eventCount || truncated) {
         this.#database
-          .prepare('INSERT OR IGNORE INTO webhook_responses (run_id, node_id, response) VALUES (?, ?, ?)')
-          .run(runId, String(event.payload.nodeId), JSON.stringify(event.response)).changes > 0
-      if (event.kind == 'node.failed' && event.payload.terminal === true) {
-        const error = { ...(event.payload.error as object), nodeId: event.payload.nodeId, jobId: event.payload.executionId, path: event.payload.path ?? [] }
-        this.#database.prepare('UPDATE runs SET failure_detail = ? WHERE run_id = ? AND failure_detail IS NULL').run(JSON.stringify(error), runId)
-        return false
+          .prepare('UPDATE runs SET event_count = ?, event_bytes = ?, events_truncated = MAX(events_truncated, ?) WHERE run_id = ?')
+          .run(eventCount, eventBytes, truncated ? 1 : 0, runId)
       }
-      const historyEvent = event.kind === 'node.completed' ? { kind: event.kind, payload: event.payload, value: event.value } : event
-      const bytes = encoder.encode(JSON.stringify(historyEvent)).byteLength
-      if (bytes > maxEventBytes || run.eventCount >= maxEventCount || run.eventBytes + bytes > maxEventTotalBytes) {
-        this.#database.prepare('UPDATE runs SET events_truncated = 1 WHERE run_id = ?').run(runId)
-        return responseChanged
-      }
-      this.#insertEvent(runId, event.kind, event.payload, 'value' in event ? event.value : undefined)
-      this.#database.prepare('UPDATE runs SET event_count = event_count + 1, event_bytes = event_bytes + ? WHERE run_id = ?').run(bytes, runId)
       return responseChanged
     })
   }

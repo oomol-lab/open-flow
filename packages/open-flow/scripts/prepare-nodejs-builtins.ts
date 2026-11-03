@@ -180,6 +180,20 @@ Object.assign(options.alias!, {
 const outdir = path.join(root, 'node_modules/.cache/open-flow-nodejs-builtins')
 const output = await build({
   ...options,
+  plugins: [
+    {
+      name: 'standalone-abort',
+      setup(plugin) {
+        plugin.onResolve({ filter: /^(?:.*compat-abort\.js|abort-controller)$/ }, () => ({ path: 'abort', namespace: 'standalone-abort' }))
+        // Bundle this facade so CommonJS consumers also resolve through a static ESM import.
+        plugin.onLoad({ filter: /.*/, namespace: 'standalone-abort' }, () => ({
+          contents: "export { default, AbortController, AbortSignal } from 'guest:abort';",
+        }))
+        plugin.onResolve({ filter: /^guest:abort$/ }, () => ({ path: 'guest:abort', external: true }))
+      },
+    },
+    ...options.plugins!,
+  ],
   format: 'esm',
   splitting: true,
   outdir,
@@ -188,16 +202,32 @@ const output = await build({
   chunkNames: 'chunks/[name]-[hash]',
   entryPoints: Object.fromEntries([
     ['deferred/crypto', 'deferred:crypto'],
-    ...Object.keys(globals).map((name) => [`globals/${name}`, `environment:${name}`]),
+    ...Object.keys(globals)
+      .filter((name) => name != 'abort')
+      .map((name) => [`globals/${name}`, `environment:${name}`]),
     ...Object.keys(entries).map((name) => [`builtin/${name}`, `compat:${name}`]),
   ]),
 })
 const modules: Record<string, string> = Object.fromEntries(
   output.outputFiles!.map((file) => [
     `engine/${path.relative(outdir, file.path)}`,
-    file.text.replaceAll('"guest:primitives"', JSON.stringify(path.relative(path.dirname(file.path), path.join(outdir, 'web.mjs')))),
+    file.text
+      .replaceAll('"guest:primitives"', JSON.stringify(path.relative(path.dirname(file.path), path.join(outdir, 'web.mjs'))))
+      .replaceAll('"guest:abort"', JSON.stringify(`./${path.relative(path.dirname(file.path), path.join(outdir, 'globals/abort.mjs'))}`)),
   ]),
 )
+// Keep abort independent of the injected Buffer/process shared chunks used by the other builtins.
+const abort = await build({
+  entryPoints: [path.join(sources, 'compat-abort.js')],
+  bundle: true,
+  write: false,
+  format: 'esm',
+  platform: 'browser',
+  target: 'es2022',
+  minify: true,
+  keepNames: true,
+})
+modules['engine/globals/abort.mjs'] = abort.outputFiles![0]!.text
 modules['engine/globals/url.mjs'] = await readFile(path.join(sources, 'url.guest.js'), 'utf8')
 modules['engine/web.mjs'] = await readFile(path.join(sources, 'web.guest.js'), 'utf8')
 modules['engine/globals.mjs'] = (await readFile(path.join(sources, 'globals.guest.js'), 'utf8')).replace(

@@ -41,8 +41,12 @@ interface PendingCapability {
   readonly deferred: Deferred.Deferred<CapabilityResult, Error>
 }
 
+type Log = Pick<Extract<SchedulerEvent, { readonly type: 'node.log' }>, 'level' | 'message'>
+
 const encoder = new TextEncoder()
 const executorIsolateBudget = 1_000
+const maxLogBatchBytes = 64 * 1024
+const maxLogBatchEntries = 64
 const cpuWatchdogIntervalMs = 10
 const maxTimerDelayMs = 2_147_483_647
 let completedIsolates = 0
@@ -268,7 +272,7 @@ function installGlobals(
   call: (invocationId: string, capabilities: readonly TaskCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
   capabilities: readonly TaskCapability[],
   nodejs: boolean,
-  log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
+  log?: (logs: readonly Log[]) => Promise<void>,
 ): { readonly close: () => boolean; readonly failure: () => unknown; readonly flush: () => Promise<void> } {
   const primitives = nodejs ? createNodejsPrimitives({ Buffer, createHash, createHmac, zlib }) : undefined
   const timers = new Map<number, { readonly fire: IsolatedVM.Reference<() => void>; readonly timer: ReturnType<typeof setTimeout> }>()
@@ -276,10 +280,24 @@ function installGlobals(
   let active = true
   let capabilityFailure: unknown
   let logQueue = Promise.resolve()
+  let logs: Log[] = []
+  let logBytes = 0
+  let logTimer: ReturnType<typeof setTimeout> | undefined
+  const flushLogs = (): void => {
+    clearTimeout(logTimer)
+    logTimer = undefined
+    if (logs.length == 0) return
+    const batch = logs
+    logs = []
+    logBytes = 0
+    logQueue = logQueue.then(() => log!(batch)).catch(() => {})
+  }
 
   const close = (): boolean => {
     const wasActive = active
     active = false
+    clearTimeout(logTimer)
+    logs = []
     for (const { fire, timer } of timers.values()) {
       clearTimeout(timer)
       fire.release()
@@ -330,7 +348,14 @@ function installGlobals(
   const now = new ivm.Reference((): number => performance.now())
   const writeLog = new ivm.Reference((level: 'debug' | 'error' | 'info' | 'warn', message: string): void => {
     if (!active || log == null) return
-    logQueue = logQueue.then(() => log(level, message)).catch(() => {})
+    const entry = { level, message }
+    const bytes = serializedBytes(entry)
+    // Oversized entries travel alone; storage still owns per-event truncation.
+    if (logBytes + bytes > maxLogBatchBytes) flushLogs()
+    logs.push(entry)
+    logBytes += bytes
+    if (logs.length >= maxLogBatchEntries || logBytes >= maxLogBatchBytes) flushLogs()
+    else logTimer ??= setTimeout(flushLogs, 1)
   })
   const capability = new ivm.Reference((sourceReference: IsolatedVM.Reference<string>, settle: IsolatedVM.Reference<(source: string) => void>): void => {
     const settleResult = (result: CapabilityOutcome): void => {
@@ -407,7 +432,14 @@ function installGlobals(
       '__openFlowPrimitive',
       new ivm.Reference((source: string, buffer?: ArrayBuffer, extra?: ArrayBuffer) => primitives.call(source, buffer, extra)),
     )
-  return { close, failure: () => capabilityFailure, flush: () => logQueue }
+  return {
+    close,
+    failure: () => capabilityFailure,
+    flush: () => {
+      flushLogs()
+      return logQueue
+    },
+  }
 }
 
 async function compileProgram(
@@ -583,7 +615,7 @@ async function execute(
   call: (invocationId: string, capabilities: readonly TaskCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
   capabilities: readonly TaskCapability[] = [],
   preserveCapabilityFailure = false,
-  log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
+  log?: (logs: readonly Log[]) => Promise<void>,
 ): Promise<JsonValue | undefined> {
   if (!('program' in request)) throw new IsolatedVmError('invalid-program', 'Runtime module invocation is incomplete.')
   const { program } = request
@@ -630,6 +662,7 @@ async function execute(
     globals.close()
     return result
   } catch (error) {
+    await globals?.flush()
     if (cpuExceeded) throw new IsolatedVmError('limit-exceeded', 'Runtime invocation exceeded its CPU limit.')
     if (error instanceof IsolatedVmError) throw error
     if (preserveCapabilityFailure && typeof Reflect.get(Object(error), 'schedulerCode') == 'string') throw error
@@ -652,7 +685,7 @@ function executeEffect(
   call: (invocationId: string, capabilities: readonly TaskCapability[], kind: string, payload: JsonValue) => Effect.Effect<BridgeResponse, Error>,
   capabilities: readonly TaskCapability[] = [],
   preserveCapabilityFailure = false,
-  log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Effect.Effect<void, Error>,
+  log?: (logs: readonly Log[]) => Effect.Effect<void, Error>,
 ): Effect.Effect<JsonValue | undefined, Error, Scope.Scope> {
   return Effect.gen(function* () {
     const run = yield* FiberSet.makeRuntimePromise<never, BridgeResponse, Error>()
@@ -665,7 +698,7 @@ function executeEffect(
           (invocationId, allowed, kind, payload) => run(call(invocationId, allowed, kind, payload)),
           capabilities,
           preserveCapabilityFailure,
-          log == null ? undefined : (level, message) => emit(log(level, message)),
+          log == null ? undefined : (logs) => emit(log(logs)),
         ),
       catch: normalizedError,
     })
@@ -686,6 +719,7 @@ function executeFlow(
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
+      | { readonly events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[]; readonly type: 'logs' }
       | { readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
       | { readonly operation: WaitOperation; readonly type: 'wait' },
   ) => Effect.Effect<CapabilityResult, Error>,
@@ -746,18 +780,18 @@ function executeFlow(
               },
               invocation.capabilities,
               true,
-              (level, message) =>
+              (logs) =>
                 remote(
                   call({
-                    event: {
+                    events: logs.map(({ level, message }) => ({
                       jobId: invocation.jobId,
                       level,
                       message,
                       nodeId: invocation.nodeId,
                       runId: invocation.runId,
-                      type: 'node.log',
-                    },
-                    type: 'event',
+                      type: 'node.log' as const,
+                    })),
+                    type: 'logs',
                   }),
                 ).pipe(Effect.asVoid),
             ),
@@ -788,6 +822,7 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
+      | { readonly events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[]; readonly type: 'logs' }
       | { readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
       | { readonly operation: WaitOperation; readonly type: 'wait' },
   ): Effect.Effect<CapabilityResult, Error> =>

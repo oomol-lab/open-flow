@@ -1,4 +1,7 @@
+import type { ExecutorMessage } from '../node/runtime/isolated-vm.ts'
+
 import * as Effect from 'effect/Effect'
+import { ChildProcess } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { Session } from 'node:inspector/promises'
 import { tmpdir } from 'node:os'
@@ -148,9 +151,33 @@ async function benchmark(service: ServerService, profiler: Session) {
       ),
     )
   }
+  scenarios.push(noisy)
+  for (const [name, count, size] of [
+    ['logging-1000', 1000, 0],
+    ['logging-long-16', 16, 16_384],
+  ] as const) {
+    scenarios.push(
+      await create(
+        name,
+        [
+          {
+            op: 'node.add',
+            as: 'code',
+            type: 'code',
+            name: 'Logs',
+            code: `export default () => { const text = 'x'.repeat(${size}); for (let i = 0; i < ${count}; i++) console.log(i, text); return {answer: 42} }`,
+            config: { outputs: { answer: port } },
+          },
+          { op: 'edge.connect', source: '$start', target: '$code' },
+        ],
+        '$code',
+      ),
+    )
+  }
   await service.waitForIdle()
   const counters = {
     sqlPreparations: mock.method(DatabaseSync.prototype, 'prepare'),
+    transactions: mock.method(Database.prototype, 'transaction'),
     eventAppends: mock.method(RunStore.prototype, 'append'),
     revisionReads: mock.method(FlowStore.prototype, 'revision'),
     workflowRequests: mock.method(RunControl.prototype, 'invokeWorkflowTarget'),
@@ -160,6 +187,7 @@ async function benchmark(service: ServerService, profiler: Session) {
     readinessReads: mock.method(RunStore.prototype, 'readyWorkflowRuns'),
     executorLaunches: mock.method(IsolatedVmHost.prototype, 'run'),
   }
+  const messages = mock.method(ChildProcess.prototype, 'emit')
   const rows = []
   await profiler.post('Profiler.enable')
   await profiler.post('Profiler.setSamplingInterval', { interval: 100 })
@@ -170,6 +198,7 @@ async function benchmark(service: ServerService, profiler: Session) {
     for (let sample = 0; sample <= samples; sample++) {
       if (sample == 1) {
         for (const counter of Object.values(counters)) counter.mock.resetCalls()
+        messages.mock.resetCalls()
         notifications = 0
         await profiler.post('Profiler.start')
       }
@@ -223,6 +252,13 @@ async function benchmark(service: ServerService, profiler: Session) {
       ),
       perRun: {
         ...Object.fromEntries(Object.entries(counters).map(([key, counter]) => [key, counter.mock.callCount() / samples])),
+        eventsSubmitted: counters.eventAppends.mock.calls.reduce((count, call) => count + call.arguments.length - 1, 0) / samples,
+        logRequests:
+          messages.mock.calls.filter(({ arguments: [event, value] }) => {
+            if (event != 'message') return false
+            const message = value as ExecutorMessage
+            return message.type == 'logs' || (message.type == 'event' && message.event.type == 'node.log')
+          }).length / samples,
         rootNotifications: notifications / samples,
       },
     })

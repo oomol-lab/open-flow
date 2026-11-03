@@ -137,6 +137,12 @@ export type ExecutorMessage =
       readonly type: 'capability'
     }
   | { readonly event: SchedulerEvent; readonly executionId: number; readonly id: number; readonly type: 'event' }
+  | {
+      readonly events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[]
+      readonly executionId: number
+      readonly id: number
+      readonly type: 'logs'
+    }
   | { readonly executionId: number; readonly id: number; readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
   | { readonly executionId: number; readonly id: number; readonly type: 'call.cancel' }
   | {
@@ -161,6 +167,7 @@ interface PendingInvocation {
   readonly activeCalls: Map<number, Fiber.Fiber<void, never>>
   readonly cancel: () => void
   readonly emit?: (event: SchedulerEvent) => void | Promise<void>
+  readonly emitLogs?: (events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[], signal: AbortSignal) => Promise<void>
   readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
   readonly invokeTask?: (invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal }) => Promise<unknown>
   readonly limits: IsolatedVmLimits
@@ -271,6 +278,7 @@ export class IsolatedVmHost {
     options: RunLaunch & {
       readonly capability: (capabilities: readonly TaskCapability[], call: Parameters<RuntimeInvocation['capability']>[0]) => Promise<RuntimeCapabilityResponse>
       readonly emit?: (event: SchedulerEvent) => void | Promise<void>
+      readonly emitLogs?: (events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[], signal: AbortSignal) => Promise<void>
       readonly flowId: string
       readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
       readonly remainingMs?: number
@@ -280,7 +288,7 @@ export class IsolatedVmHost {
     },
     limits: IsolatedVmLimits = this.limits,
   ): Effect.Effect<FlowRunOutcome, Error> {
-    const { capability, emit, invokeTask, projectFailure, wait, ...flow } = options
+    const { capability, emit, emitLogs, invokeTask, projectFailure, wait, ...flow } = options
     return Effect.suspend(() => {
       if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
       if (serializedBytes(prepared) > limits.maxProgramBytes) {
@@ -299,6 +307,7 @@ export class IsolatedVmHost {
           activeCalls: new Map(),
           cancel: interrupt,
           emit,
+          emitLogs,
           wait,
           invokeTask,
           limits,
@@ -380,6 +389,20 @@ export class IsolatedVmHost {
     if (message.type == 'call.cancel') {
       const fiber = pending.activeCalls.get(message.id)
       if (fiber != null) Effect.runFork(Fiber.interrupt(fiber))
+      return
+    }
+    if (message.type == 'logs') {
+      this.#call(child, message.executionId, message.id, pending, async (signal) => {
+        if (pending.emitLogs != null) return pending.emitLogs(message.events, signal)
+        if (pending.emit == null) throw new IsolatedVmError('executor-crashed', 'Runtime Executor emitted logs outside a Flow Run.')
+        for (const event of message.events) {
+          if (signal.aborted) return
+          // Logs remain best-effort independently, even when their IPC acknowledgement is shared.
+          await Promise.resolve()
+            .then(() => pending.emit!(event))
+            .catch(() => {})
+        }
+      })
       return
     }
     if (message.type == 'event') {

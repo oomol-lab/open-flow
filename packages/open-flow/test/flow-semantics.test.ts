@@ -327,6 +327,49 @@ export default () => value`,
     expect(createRuntimeProgram(result.flow, 'outside-closure', 'sha256:implementation')).toBeUndefined()
   })
 
+  it.each([false, true])('limits RuntimeProgram to transitive entry dependencies (cycle: %s)', async (cycle) => {
+    const source = revision(
+      'import { left } from "./left.mjs"; import { right } from "./right.mjs"; export default () => left() + right()',
+      ['left', 'right'],
+      {
+        left: { name: 'Left', imports: ['shared'], source: 'import { value } from "./shared.mjs"; export const left = () => value' },
+        right: { name: 'Right', imports: ['shared'], source: 'import { value } from "./shared.mjs"; export const right = () => value' },
+        shared: {
+          name: 'Shared',
+          imports: cycle ? ['left'] : [],
+          source: `${cycle ? 'import "./left.mjs";' : ''} export const value = 21`,
+        },
+        other: { name: 'Other', imports: [], source: 'export default () => 7' },
+      },
+    )
+    const prepared = await prepareFlow(
+      {
+        ...source,
+        document: {
+          ...source.document,
+          graph: {
+            ...source.document.graph,
+            nodes: {
+              ...source.document.graph.nodes,
+              other: { inputs: {}, kind: 'task', task: { inputs: [], moduleId: 'other', name: 'Other', outputs: [] } },
+            },
+          },
+        },
+      },
+      currentEngineContract,
+    )
+    if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
+
+    expect(createRuntimeProgram(prepared.flow, 'module-main', 'sha256:implementation')?.modules).toEqual({
+      'module-main': source.modules['module-main'],
+      'left': source.modules.left,
+      'right': source.modules.right,
+      'shared': source.modules.shared,
+    })
+    expect(createRuntimeProgram(prepared.flow, 'other', 'sha256:implementation')?.modules).toEqual({ other: source.modules.other })
+    expect(prepared.flow.modules).toEqual(source.modules)
+  })
+
   it('allows Connector Tasks without a Connection during deterministic validation', async () => {
     const source: RevisionFixture = {
       document: {

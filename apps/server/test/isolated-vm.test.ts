@@ -1,10 +1,11 @@
 import type { RuntimeHarness, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { prepareFlow } from '@oomol-lab/open-flow/flow-semantics'
+import { createRuntimeProgram, prepareFlow } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { nodejsRuntimeConformanceCases, runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
 import { afterAll, describe, expect, it } from 'vitest'
 import { IsolatedVmError, isolatedVmEngineDigest, isolatedVmLimits, IsolatedVmHost } from '../node/runtime/isolated-vm.ts'
 import { childProcessId } from './processTree.ts'
@@ -44,6 +45,46 @@ async function executorPid(): Promise<number> {
 }
 
 describe('isolated-vm runtime conformance', () => {
+  it('executes entry-specific programs with transitive shared dependencies in fresh isolates', async () => {
+    const prepared = await prepareFlow(
+      {
+        modelVersion: currentFlowModelVersion,
+        document: {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: Object.fromEntries(
+              ['first', 'second'].map((id) => [id, { inputs: {}, kind: 'task' as const, task: { moduleId: id, name: id, inputs: [], outputs: [] } }]),
+            ),
+          },
+        },
+        modules: {
+          first: { name: 'First', imports: ['helper'], source: 'import { next } from "./helper.mjs"; export default () => next()' },
+          second: { name: 'Second', imports: ['helper'], source: 'import { next } from "./helper.mjs"; export default () => next() + 1' },
+          helper: { name: 'Helper', imports: ['shared'], source: 'import { next as increment } from "./shared.mjs"; export const next = () => increment()' },
+          shared: { name: 'Shared', imports: [], source: 'let value = 40; export const next = () => ++value' },
+        },
+      },
+      currentEngineContract,
+    )
+    if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
+    for (const [entry, expected] of [
+      ['first', 41],
+      ['second', 42],
+      ['first', 41],
+    ] as const) {
+      const runtimeProgram = createRuntimeProgram(prepared.flow, entry, isolatedVmEngineDigest)!
+      await expect(
+        host.invoke({
+          capability: async () => ({ body: null, status: 403 }),
+          input: null,
+          invocationId: `entry-${entry}`,
+          program: runtimeProgram,
+        }),
+      ).resolves.toBe(expected)
+    }
+  })
+
   it.each(['open-flow-engine/v6', 'open-flow-engine/v6/nodejs-compat-v1', 'open-flow-engine/v7', 'open-flow-engine/v7/nodejs-compat-v1'])(
     'executes the published runtime identity for %s',
     async (engineContract) => {
@@ -281,6 +322,43 @@ describe('isolated-vm runtime conformance', () => {
   return { aborted: controller.signal.aborted, calls, eventType, reason: controller.signal.reason, thrown }
 }`),
     ).resolves.toEqual({ aborted: true, calls: 1, eventType: 'abort', reason: 'stop', thrown: 'stop' })
+  })
+
+  it.each([false, true])('shares abort constructors with stream internals (global fallback: %s)', async (fallback) => {
+    const source = `import { Controller, Signal } from './capture.mjs'
+import { Readable } from 'node:stream'
+globalThis.AbortController = Controller
+globalThis.AbortSignal = Signal
+export default async (_, context) => {
+  const controller = new Controller()
+  let shared = false
+  const stream = Readable.from([1]).map((value, { signal }) => {
+    shared = signal instanceof Signal
+    controller.abort('stop')
+    return value
+  }, { signal: controller.signal })
+  let errorName
+  try { await stream.toArray() } catch (error) { errorName = error.name }
+  return { shared, errorName, contextSignal: context.signal instanceof Signal, sameSignal: context.signal === context.signal }
+}`
+    await expect(
+      host.invoke({
+        capability: async () => ({ body: null, status: 403 }),
+        input: null,
+        invocationId: 'shared-abort',
+        program: {
+          ...program(source),
+          modules: {
+            main: { imports: ['capture'], source },
+            capture: {
+              imports: [],
+              source: `export const Controller = AbortController; export const Signal = AbortSignal;
+${fallback ? 'delete globalThis.AbortController; delete globalThis.AbortSignal;' : ''}`,
+            },
+          },
+        },
+      }),
+    ).resolves.toEqual({ shared: true, errorName: 'AbortError', contextSignal: true, sameSignal: true })
   })
 
   it('provides one context shape without Flow identity for direct programs', async () => {
@@ -789,6 +867,41 @@ it.each(['managed', 'code'] as const)('retries %s Tasks through the real Executo
   expect(events.filter((event) => event == 'node.started')).toHaveLength(1)
   expect(events.filter((event) => event == 'node.failed')).toHaveLength(0)
   expect(events.filter((event) => event == 'node.log')).toHaveLength(1)
+})
+
+it('stops delivering queued logs when a Flow is canceled', async () => {
+  const prepared = await retryFixture('code', 'export default () => { for (let i = 0; i < 137; i++) console.log(i); return { value: 1 } }')
+  const delivered = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const logs: string[] = []
+  const fiber = Effect.runFork(
+    host.run(prepared, {
+      flowId: 'logging',
+      runId: 'logging-canceled',
+      trigger: { nodeId: 'start', outputs: {} },
+      emit: async (event) => {
+        if (event.type != 'node.log') return
+        logs.push(event.message)
+        delivered.resolve()
+        await release.promise
+      },
+      capability: async () => ({ body: null, status: 403 }),
+      invokeTask: async () => {
+        throw new Error('Unexpected managed task')
+      },
+      projectFailure: (error) => ({ code: 'test', message: String(error) }),
+    }),
+  )
+  try {
+    await delivered.promise
+    await Effect.runPromise(Fiber.interrupt(fiber))
+  } finally {
+    release.resolve()
+  }
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  expect(logs).toEqual(['0'])
+  await expect(invoke('export default () => 42')).resolves.toBe(42)
+  expect(logs).toEqual(['0'])
 })
 
 it('bounds Flow Code Tasks by node and Run deadlines rather than the standalone wall-clock limit', async () => {

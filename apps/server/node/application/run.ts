@@ -313,6 +313,20 @@ export class RunExecutor {
         .run(flow, {
           capability: (capabilities, call) => this.#invokeCapability(capabilities, call, this.#connectorContext(run, 'execute'), run, flow, emit),
           emit,
+          emitLogs: async (events, signal) => {
+            const projected = (await Promise.all(events.map((event) => projectEvent(event).catch(() => undefined)))).filter((event) => event != null)
+            if (signal.aborted) return
+            try {
+              this.#store.runs.append(run.runId, ...projected)
+            } catch {
+              // append rolls back the whole batch before independently retrying its best-effort logs.
+              for (const event of projected) {
+                try {
+                  this.#store.runs.append(run.runId, event)
+                } catch {}
+              }
+            }
+          },
           flowId: run.flowId,
           ...launch,
           remainingMs: budgetMs,

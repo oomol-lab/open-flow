@@ -572,6 +572,84 @@ describe('Server application service', () => {
     }
   })
 
+  it.each(['normal', 'count', 'bytes'] as const)('applies the same %s event limits to batched and individual writes', async (limit) => {
+    const file = await databaseFile()
+    const service = await openService(file)
+    const database = Database.open(file)
+    const store = new Store(database, runEnvironment(isolatedVmEngineDigest))
+    const events: ProjectedRunEvent[] = ['first', 'x'.repeat(1_100_000), 'second', 'third'].map((message) => ({ kind: 'node.log', payload: { message } }))
+    const results = []
+    try {
+      for (const batched of [false, true]) {
+        const accepted = await acceptRun(service, {
+          flowId: 'main',
+          revisionId: 'batch-limits',
+          idempotencyKey: String(batched),
+          revision: fullFlow(),
+        })
+        if (accepted.kind != 'accepted') throw new Error('Run was not accepted.')
+        const { runId } = accepted
+        expect(store.runs.claim()?.runId).toBe(runId)
+        store.runs.start(runId, { kind: 'run.started', payload: {} })
+        database.connection
+          .prepare('UPDATE runs SET event_count = ?, event_bytes = ? WHERE run_id = ?')
+          .run(limit == 'count' ? 998 : 0, limit == 'bytes' ? 16 * 1024 * 1024 - 98 : 0, runId)
+        if (batched) store.runs.append(runId, ...events)
+        else for (const event of events) store.runs.append(runId, event)
+        results.push({
+          state: database.connection.prepare('SELECT event_count, event_bytes, events_truncated FROM runs WHERE run_id = ?').get(runId),
+          events: database.connection.prepare("SELECT cursor, payload FROM events WHERE run_id = ? AND kind = 'node.log' ORDER BY cursor").all(runId),
+        })
+      }
+      expect(results[1]).toEqual(results[0])
+      expect(results[1]?.events.length).toBe(limit == 'normal' ? 3 : 2)
+    } finally {
+      database.close()
+    }
+  })
+
+  it('rolls back a failed event batch including counters, response receipts and failure details', async () => {
+    const file = await databaseFile()
+    const service = await openService(file)
+    const database = Database.open(file)
+    const store = new Store(database, runEnvironment(isolatedVmEngineDigest))
+    try {
+      const accepted = await acceptRun(service, {
+        flowId: 'main',
+        revisionId: 'atomic-events',
+        idempotencyKey: 'atomic-events',
+        revision: fullFlow(),
+      })
+      if (accepted.kind != 'accepted') throw new Error('Run was not accepted.')
+      const { runId } = accepted
+      store.runs.claim()
+      store.runs.start(runId, { kind: 'run.started', payload: {} })
+      const before = database.connection.prepare('SELECT event_count, event_bytes, events_truncated, failure_detail FROM runs WHERE run_id = ?').get(runId)
+      const events: ProjectedRunEvent[] = [
+        { kind: 'node.log', payload: { message: 'first' } },
+        { kind: 'node.failed', payload: { terminal: true, nodeId: 'task', error: { message: 'failed' } } },
+        { kind: 'node.completed', payload: { nodeId: 'reply' }, value: {}, response: { body: 'ok', contentType: 'text/plain', status: 200, headers: {} } },
+        { kind: 'node.log', payload: { message: 'bad' } },
+      ]
+      database.connection.exec(`CREATE TEMP TRIGGER reject_event BEFORE INSERT ON events
+        WHEN NEW.kind = 'node.log' AND json_extract(NEW.payload, '$.message') = 'bad'
+        BEGIN SELECT RAISE(ABORT, 'Event write failed.'); END`)
+      expect(() => store.runs.append(runId, ...events)).toThrow('Event write failed.')
+      expect(database.connection.prepare('SELECT event_count, event_bytes, events_truncated, failure_detail FROM runs WHERE run_id = ?').get(runId)).toEqual(
+        before,
+      )
+      expect(store.runViews.webhookResponse(runId, 'reply')).toBeUndefined()
+      expect(service.events(runId).filter((event) => event.kind.startsWith('node.'))).toEqual([])
+      expect(store.runs.append(runId, ...events.slice(0, -1))).toBe(true)
+      expect(service.events(runId).filter((event) => event.kind == 'node.log')).toHaveLength(1)
+      database.connection.prepare("UPDATE runs SET status = 'canceled' WHERE run_id = ?").run(runId)
+      expect(store.runs.append(runId, { kind: 'node.log', payload: { message: 'late' } })).toBe(false)
+      expect(service.events(runId).filter((event) => event.kind == 'node.log')).toHaveLength(1)
+    } finally {
+      database.close()
+    }
+  })
+
   it('checks ordinary notification origin at execution without an admission precheck', async () => {
     const service = await openService(await databaseFile())
     const source = waitFlow()
@@ -1036,19 +1114,74 @@ describe('Server application service', () => {
     await closeService(service)
   })
 
-  it('keeps executing when a Code node log cannot be stored', async () => {
+  it.each([
+    ['success', 137, 0],
+    ['failure', 137, 0],
+    ['unicode', 16, 8192],
+    ['count-limit', 1100, 0],
+    ['oversized', 2, 400_000],
+  ] as const)('preserves ordered console history for %s', async (mode, count, size) => {
     const service = await openService(await databaseFile())
-    const store = (service.control.runs as unknown as { readonly store: { readonly runs: { append(runId: string, event: ProjectedRunEvent): void } } }).store
-      .runs
-    const append = store.append.bind(store)
-    let rejected = false
-    vi.spyOn(store, 'append').mockImplementation((runId, event) => {
-      if (event.kind == 'node.log' && !rejected) {
-        rejected = true
-        throw new Error('Log storage failed.')
-      }
-      append(runId, event)
+    await startService(service)
+    const flow = fullFlow()
+    const accepted = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: `console-${mode}`,
+      revision: {
+        ...flow,
+        modules: {
+          ...flow.modules,
+          increment: {
+            imports: [],
+            name: 'Increment',
+            source: `export default ({ value }) => {
+  console.info('before')
+  const text = '中'.repeat(${size})
+  const levels = ['debug', 'info', 'warn', 'error']
+  for (let i = 0; i < ${count}; i++) console[levels[i % 4]](i + ':' + text)
+  console.info('after')
+  ${mode == 'failure' ? "throw new Error('Logged failure')" : 'return { value: value + 1 }'}
+}`,
+          },
+        },
+      },
+      revisionId: `revision-console-${mode}`,
     })
+    if (accepted.kind != 'accepted') throw new Error('Console Run was not accepted.')
+    await service.waitForIdle()
+    expect(service.run(accepted.runId)?.status).toBe(mode == 'failure' ? 'failed' : 'completed')
+    const events = service.events(accepted.runId)
+    const logs = events.filter((event) => event.kind == 'node.log')
+    const expected = [
+      { level: 'info', message: 'before' },
+      ...(mode == 'oversized'
+        ? []
+        : Array.from({ length: count }, (_, i) => ({ level: ['debug', 'info', 'warn', 'error'][i % 4], message: `${i}:${'中'.repeat(size)}` }))),
+      { level: 'info', message: 'after' },
+    ]
+    if (mode == 'count-limit') {
+      expect(logs.length).toBeLessThan(expected.length)
+      expect(logs.length).toBeGreaterThan(900)
+    }
+    expect(logs.map(({ payload }) => ({ level: payload.level, message: payload.message }))).toEqual(
+      mode == 'count-limit' ? expected.slice(0, logs.length) : expected,
+    )
+    const history = service.control.runs.getRunEvents('test', accepted.runId, 0, 1000)
+    expect(history.historyComplete).toBe(!['count-limit', 'oversized'].includes(mode))
+    if (mode == 'success' || mode == 'failure') {
+      const terminal = events.findIndex((event) => event.kind == (mode == 'failure' ? 'node.failed' : 'node.completed') && event.payload.nodeId == 'increment')
+      expect(terminal).toBeGreaterThan(events.findLastIndex((event) => event.kind == 'node.log'))
+    }
+  })
+
+  it('keeps earlier and later logs exactly once when a log write fails', async () => {
+    const file = await databaseFile()
+    const service = await openService(file)
+    const database = Database.open(file)
+    database.connection.exec(`CREATE TRIGGER reject_log BEFORE INSERT ON events
+      WHEN NEW.kind = 'node.log' AND json_extract(NEW.payload, '$.message') = 'First'
+      BEGIN SELECT RAISE(ABORT, 'Log storage failed.'); END`)
+    database.close()
     await startService(service)
     const flow = fullFlow()
     const accepted = await acceptRun(service, {
@@ -1062,6 +1195,7 @@ describe('Server application service', () => {
             imports: [],
             name: 'Increment',
             source: `export default ({ value }) => {
+  console.log('Before')
   console.log('First')
   console.log('Second')
   return { value: value + 1 }
@@ -1075,7 +1209,10 @@ describe('Server application service', () => {
     await service.waitForIdle()
 
     expect(service.run(accepted.runId)?.status).toBe('completed')
-    expect(service.events(accepted.runId).filter(({ kind }) => kind == 'node.log')).toMatchObject([{ payload: { message: 'Second' } }])
+    expect(service.events(accepted.runId).filter(({ kind }) => kind == 'node.log')).toMatchObject([
+      { payload: { message: 'Before' } },
+      { payload: { message: 'Second' } },
+    ])
   })
 
   it('reopens queued work after Scope interruption and completes the same Run once', async () => {

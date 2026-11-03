@@ -529,11 +529,15 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
 
 export function createRuntimeProgram(prepared: PreparedFlow, entryModuleId: string, engineDigest: string): RuntimeProgram | undefined {
   if (!Object.hasOwn(prepared.modules, entryModuleId)) return
+  const modules = new Set([entryModuleId])
+  for (const id of modules) {
+    for (const imported of prepared.modules[id]!.imports) modules.add(imported)
+  }
   return {
     engineContract: prepared.engineContract,
     engineDigest,
     entryModuleId,
-    modules: prepared.modules,
+    modules: Object.fromEntries([...modules].map((id) => [id, prepared.modules[id]!])),
   }
 }
 
