@@ -634,7 +634,11 @@ function takeIsolate(ivm: typeof IsolatedVM, memoryMb: number): PreparedIsolate 
   const spare = spareIsolate
   spareIsolate = undefined
   setImmediate(() => {
-    spareIsolate ??= prepareIsolate(ivm, memoryMb)
+    try {
+      spareIsolate ??= prepareIsolate(ivm, memoryMb)
+    } catch {
+      // The next Task prepares its own isolate and reports any failure through its invocation.
+    }
   })
   if (spare?.memoryMb == memoryMb && !spare.isolate.isDisposed) return spare
   if (spare != null && !spare.isolate.isDisposed) spare.isolate.dispose()
