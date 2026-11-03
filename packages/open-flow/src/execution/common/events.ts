@@ -95,6 +95,7 @@ function nodeContext(
   event: Record<string, unknown>,
   flows: ReadonlyMap<string, string>,
   platformRunId: string,
+  identify: typeof opaqueId,
 ): {
   readonly executionId: Promise<string>
   readonly flowId: string
@@ -105,7 +106,7 @@ function nodeContext(
   const flowId = flows.get(rawRunId)
   if (flowId == null) throw new TypeError('Runtime node event preceded its run.started event.')
   return {
-    executionId: projectExecutionId(platformRunId, rawRunId, string(event.jobId, 'Runtime node event jobId')),
+    executionId: identify('execution', platformRunId, rawRunId, string(event.jobId, 'Runtime node event jobId')),
     flowId,
     nodeId: string(event.nodeId, 'Runtime node event nodeId'),
     rawRunId,
@@ -184,6 +185,17 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
   const jobs = new Map<string, string>()
   const nodeProgressBuckets = new Map<string, number>()
   const runProgressBuckets = new Map<string, number>()
+  // Every event of a scope or execution repeats its identity, so each digest is computed once per projector.
+  const identities = new Map<string, Promise<string>>()
+  const identify: typeof opaqueId = (prefix, ...parts) => {
+    const key = JSON.stringify([prefix, ...parts])
+    let identity = identities.get(key)
+    if (identity == null) {
+      identity = opaqueId(prefix, ...parts)
+      identities.set(key, identity)
+    }
+    return identity
+  }
   return async (value) => {
     const event = object(value, 'Runtime event')
     const type = string(event.type, 'Runtime event type')
@@ -205,8 +217,8 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
         kind: 'run.started',
         payload: {
           flowId,
-          ...(parentRunId === undefined ? {} : { parentScopeId: await opaqueId('scope', platformRunId, parentRunId) }),
-          scopeId: await opaqueId('scope', platformRunId, rawRunId),
+          ...(parentRunId === undefined ? {} : { parentScopeId: await identify('scope', platformRunId, parentRunId) }),
+          scopeId: await identify('scope', platformRunId, rawRunId),
         },
       }
     }
@@ -226,7 +238,7 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
         payload: {
           flowId,
           progress: event.progress,
-          scopeId: await opaqueId('scope', platformRunId, rawRunId),
+          scopeId: await identify('scope', platformRunId, rawRunId),
         },
       }
     }
@@ -235,7 +247,7 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
       const rawRunId = runId(event)
       if (type == 'run.failed' && rawRunId == platformRunId && event.failure != null) {
         const failure = object(event.failure, 'Runtime terminal failure')
-        const context = nodeContext(failure, flows, platformRunId)
+        const context = nodeContext(failure, flows, platformRunId, identify)
         return {
           kind: 'node.failed',
           payload: {
@@ -258,13 +270,13 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
       type == 'node.completed' ||
       type == 'node.failed'
     ) {
-      const context = nodeContext(event, flows, platformRunId)
+      const context = nodeContext(event, flows, platformRunId, identify)
       const executionId = await context.executionId
       const payload = {
         executionId,
         flowId: context.flowId,
         nodeId: context.nodeId,
-        scopeId: await opaqueId('scope', platformRunId, context.rawRunId),
+        scopeId: await identify('scope', platformRunId, context.rawRunId),
         ...(event.systemOutputs === undefined ? {} : { systemOutputs: object(event.systemOutputs, 'Runtime system outputs') }),
         ...(event.handled === true ? { handled: true } : {}),
       }

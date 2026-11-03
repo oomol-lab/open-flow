@@ -2,7 +2,6 @@ import type { JsonValue, RevisionContent, TaskNode, WorkflowCapability } from '@
 import type { WorkflowContract } from '@oomol-lab/open-flow/workflow'
 import type { Store } from '../storage/store.ts'
 
-import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowDependencies } from '@oomol-lab/open-flow/flow-semantics'
 import {
   workflowCompatibility,
@@ -13,6 +12,7 @@ import {
   sameWorkflowInterface,
 } from '@oomol-lab/open-flow/workflow'
 import { ControlError } from '../error.ts'
+import { decodedRevision } from './revision-cache.ts'
 
 /** Resolve availability and the published interface without reading Revision content. */
 function readWorkflowTarget(store: Pick<Store, 'flows' | 'publications'>, ownerId: string, flowId: string) {
@@ -57,7 +57,7 @@ export function workflowAuthoringTarget(store: Pick<Store, 'flows' | 'publicatio
 export function workflowContent(store: Pick<Store, 'flows' | 'publications'>, contract: WorkflowContract): RevisionContent {
   const saved = store.flows.revision(contract.flowId, contract.revisionId)
   if (saved == null) throw new ControlError('flow.invalid', 'Called workflow Revision is unavailable.')
-  return decodeRevision(new TextEncoder().encode(saved.content))
+  return decodedRevision(saved.content)
 }
 
 export function workflowCallCompatibility(store: Pick<Store, 'flows' | 'publications'>, node: TaskNode, contract: WorkflowContract) {

@@ -9,7 +9,7 @@ import type {
   RunInitiator,
   RunResult,
 } from '@oomol-lab/open-flow/control-api'
-import type { JsonValue, RevisionContent, TaskNode, WaitAction, WorkflowCapability } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, TaskNode, WaitAction, WorkflowCapability } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
@@ -22,7 +22,7 @@ import type { ControlAccess } from './control-access.ts'
 
 import { controlErrorCode, decodeRunEvent, readResult } from '@oomol-lab/open-flow/control-api'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { agentActions, codeActions, normalizeRunTrigger, prepareFlow, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions, codeActions, normalizeRunTrigger, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { projectExecutionId } from '@oomol-lab/open-flow/run-events'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { captureConnectorAccess } from '../deployment/connector-access.ts'
@@ -30,6 +30,7 @@ import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
+import { decodedRevision, preparedRevision } from './revision-cache.ts'
 import { requireWorkflowCalls, workflowCallCompatibility, workflowTarget, workflowToolCompatibility, workflowRunOutcome } from './workflow.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
@@ -106,11 +107,11 @@ export class RunControl {
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     const stored = readRevisionOrRepair(() => this.store.flows.revision(flowId, revisionId))
     if (stored == null) notFound()
-    const content = revisionContent(stored)
+    const content = revisionContent(stored, decodedRevision)
     const seed = normalizeRunTrigger(content, trigger)
     if (seed == null) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and outputs.')
     requireWorkflowCalls(this.store, flowId, content, trigger.nodeId)
-    const fixed = await this.prepareRun(content, engineContract, trigger.nodeId)
+    const fixed = await this.prepareRun(stored.content, engineContract, trigger.nodeId)
     const providerAccess = await captureConnectorAccess(this.connectorAccess, flowId, { ...content.document, ...fixed.flow }, sharedAccess)
     await this.checkRunActions(fixed.flow, flowId, providerAccess, 'draft')
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
@@ -167,13 +168,13 @@ export class RunControl {
     const existing = this.replayRun(idempotencyKey, requestDigest, 'live')
     if (existing != null) return existing
 
-    const { publication: livePublication, content } = resolved ?? this.liveRevision(publicationId)
+    const { publication: livePublication, content, source } = resolved ?? this.liveRevision(publicationId)
     const { flowId } = livePublication
     if (content.document.graph.nodes[trigger.nodeId]?.kind != 'start') {
       throw new ControlError(controlErrorCode.runInvalid, 'Live Runs can only be started through a Start node.')
     }
     requireWorkflowCalls(this.store, flowId, content, trigger.nodeId)
-    const fixed = await this.prepareRun(content, livePublication.engineContract)
+    const fixed = await this.prepareRun(source, livePublication.engineContract)
     const seed = normalizeRunTrigger(content, trigger)
     if (seed == null) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and outputs.')
     const inputsValid = validateFlowInputs(content, inputs) == 'valid'
@@ -219,7 +220,7 @@ export class RunControl {
     if (stored == null || stored.digest != publication.revisionDigest) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
     }
-    return { publication, content: revisionContent(stored) }
+    return { publication, content: revisionContent(stored, decodedRevision), source: stored.content }
   }
 
   async invokeWorkflow(parent: StoredRun, nodeId: string, jobId: string, input: Readonly<Record<string, JsonValue>>, node: TaskNode, expectedChild?: string) {
@@ -470,8 +471,8 @@ export class RunControl {
     return { created: false, runId: existing.runId }
   }
 
-  private async prepareRun(content: RevisionContent, engineContract: string, triggerId?: string) {
-    const fixed = await prepareFlow(content, engineContract, triggerId)
+  private async prepareRun(content: string, engineContract: string, triggerId?: string) {
+    const fixed = await preparedRevision(content, engineContract, triggerId)
     switch (fixed.kind) {
       case 'engine-unsupported':
         throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')

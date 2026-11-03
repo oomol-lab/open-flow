@@ -13,8 +13,8 @@ import type { RunControl } from './run-control.ts'
 
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { agentActions, codeActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { digestBytes } from '@oomol-lab/open-flow/flow-encoding'
+import { agentActions, codeActions, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { hashIdentities, skipDuplicatesIdentities, StateError } from '@oomol-lab/open-flow/flow-state'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { findEngineContract, resolveAction } from '@oomol-lab/open-flow/runtime-contract'
@@ -30,6 +30,7 @@ import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { errorKind } from '../logger.ts'
 import { supportsIsolatedVmEngine, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
+import { decodedRevision, preparedRevision } from './revision-cache.ts'
 import { ArtifactHostError, RunArtifacts } from './run-artifacts.ts'
 import { RunState } from './run-state.ts'
 import { workflowRunOutcome } from './workflow.ts'
@@ -171,9 +172,9 @@ export class RunExecutor {
       if (revisionDigest != run.revisionDigest) {
         return yield* Effect.fail(new Error('Fixed Flow Revision digest does not match stored content.'))
       }
-      const revision = decodeRevision(new TextEncoder().encode(run.content))
+      const revision = decodedRevision(run.content)
       const prepared = yield* Effect.tryPromise({
-        try: () => prepareFlow(revision, run.engineContract, run.source == 'draft' ? run.trigger?.nodeId : undefined),
+        try: () => preparedRevision(run.content, run.engineContract, run.source == 'draft' ? run.trigger?.nodeId : undefined),
         catch: (error) => error,
       })
       if (prepared.kind != 'prepared') {
