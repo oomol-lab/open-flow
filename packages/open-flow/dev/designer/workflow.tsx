@@ -501,7 +501,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'selected-layout',
     title: 'Selected node layout',
     description:
-      'Rearrange the selected nodes with their floating toolbar or the lower view controls. Unselected nodes and comments keep their positions. Clear the selection to rearrange the whole workflow. Compare both themes and read-only mode.',
+      'The floating toolbar rearranges selected nodes without moving the viewport. The lower view controls also fit the selection. Unselected nodes and comments keep their positions. Clear the selection to rearrange the whole workflow. Compare both themes and read-only mode.',
     standalone: true,
     render: (log, dark, language) => (
       <WorkflowStory dark={dark} language={language} log={log} model={workflow} initialSelectedNodeIds={['task', 'condition']} />

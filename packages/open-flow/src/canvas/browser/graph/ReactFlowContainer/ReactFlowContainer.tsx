@@ -475,6 +475,9 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const onBeforeFitView = useCallback(() => setFittingView(true), [])
   const relayout = useCallback(() => {
     props.onRelayout?.(getLayoutWidth(flowState.getState()))
+  }, [flowState, props.onRelayout])
+  const relayoutAndFitView = useCallback(() => {
+    relayout()
     onBeforeFitView()
     // Wait for node measurements before fitting the rearranged nodes.
     setTimeout(
@@ -487,7 +490,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
         }),
       100,
     )
-  }, [flowState, onBeforeFitView, props.onRelayout, props.layoutMotion, rf, selectedNodes])
+  }, [relayout, onBeforeFitView, props.layoutMotion, rf, selectedNodes])
 
   useLayoutEffect(() => {
     setLayoutReady(props.layoutMotion !== false || props.onLayoutMeasured == null)
@@ -789,7 +792,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             onChangeDirection={props.onChangeDirection}
             layoutMotion={props.layoutMotion}
             onBeforeFitView={onBeforeFitView}
-            onRelayout={props.onRelayout ? relayout : undefined}
+            onRelayout={props.onRelayout ? relayoutAndFitView : undefined}
             onFitView={props.onFitView}
             dottedBackground={props.dottedBackground}
           />
