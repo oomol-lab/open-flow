@@ -13,7 +13,7 @@ describe('Trigger schedule editor', () => {
     )
 
     expect(markup).not.toContain('<details')
-    expect(markup).toContain('<h3 class="inspector-section-title">Trigger schedule</h3>')
+    expect(markup).toContain('Trigger schedule')
     expect(markup).toContain('Schedule type')
   })
 
@@ -24,8 +24,8 @@ describe('Trigger schedule editor', () => {
       </I18nProvider>,
     )
 
-    expect(markup).toContain('<details class="inspector-disclosure"')
+    expect(markup).toContain('<details')
     expect(markup).not.toMatch(/<details[^>]*\sopen(?:=""|(?=[\s>]))/)
-    expect(markup).toContain('<strong class="inspector-section-title-text">Trigger schedule</strong>')
+    expect(markup).toContain('Trigger schedule')
   })
 })

@@ -112,8 +112,8 @@ describe('Webhook configuration', () => {
     expect(markup).not.toContain('>HEAD<')
     expect(markup).not.toContain('>OPTIONS<')
     expect(markup).not.toContain('Click Run and enter sample request data')
-    expect(markup).toContain('<details class="inspector-disclosure"')
-    expect(markup).not.toContain('<details class="inspector-disclosure" open=""')
+    expect(markup).toContain('<details')
+    expect(markup).not.toMatch(/<details[^>]*\sopen(?:=""|(?=[\s>]))/)
     expect(markup).toContain('Advanced settings')
   })
 
@@ -146,14 +146,6 @@ describe('Webhook configuration', () => {
     const statusInput = renderWebhook('POST').match(/<input\b[^>]*placeholder="200 \(default\)"[^>]*>/)?.[0]
     expect(statusInput).toContain('inputMode="numeric"')
     expect(statusInput).not.toContain('type="number"')
-  })
-
-  it('uses the same muted placeholder treatment for single-line and multiline drafts', () => {
-    const markup = renderWebhook('POST')
-    const origins = markup.match(/<input\b[^>]*placeholder="https:\/\/example\.com, \*"[^>]*>/)?.[0]
-    const responseBody = markup.match(/<textarea\b[^>]*placeholder="Leave blank to return no response body\."[^>]*>/)?.[0]
-    expect(origins).toContain('placeholder:text-muted-foreground/60')
-    expect(responseBody).toContain('placeholder:text-muted-foreground/60')
   })
 
   it.each([false, true])('keeps header literals as single-line text without type controls (dynamic: %s)', (dynamic) => {

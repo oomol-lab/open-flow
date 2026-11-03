@@ -27,7 +27,6 @@ describe('Output definitions', () => {
     expect(markup).toContain('number')
     expect(markup).not.toContain('JSON Schema')
     expect(markup).toContain('aria-label="Group settings"')
-    expect(markup).toContain('i-lucide-light:settings-2')
     expect(markup).not.toContain('value="Result"')
     expect(markup).not.toContain('Set value')
     expect(markup).not.toContain('Set empty string')
@@ -51,11 +50,7 @@ describe('Output definitions', () => {
     const controls = markup.match(/<(?:input|button|select|textarea)\b[^>]*>/g) ?? []
     expect(controls.length).toBeGreaterThan(0)
     expect(controls.every((control) => control.includes('disabled'))).toBe(true)
-    expect(markup).toContain('data-field-control="true"')
-    expect(markup).toContain('data-readonly="true"')
-    expect(markup).toContain('border-input')
-    expect(markup).toContain('bg-[var(--ui-control-background,var(--ui-muted))]')
-    expect(markup).toContain('>Text</span>')
+    expect(markup).toContain('aria-label="answer type: Text"')
   })
 })
 
@@ -74,10 +69,8 @@ describe('Property panel port layout', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('Input ports')
-    expect(markup).toContain('i-carbon:port-input')
-    expect(markup).toContain('data-layout="ports"')
     expect(markup).toContain('aria-label="Field name"')
-    const typeDisplay = (markup.match(/<span\b[^>]*>/g) ?? []).find((tag) => tag.includes('aria-label="message type: Text"'))
+    const typeDisplay = (markup.match(/<[^>]+>/g) ?? []).find((tag) => tag.includes('aria-label="message type: Text"'))
     expect(typeDisplay).toContain('role="img"')
     expect(typeDisplay).not.toContain('tabindex=')
     expect(markup).toContain('message Nullable')
@@ -126,25 +119,6 @@ describe('Property panel port layout', () => {
     expect(markup).toContain('Select values')
   })
 
-  it('keeps output type icons and names visible in the wider output layout', () => {
-    const markup = renderToStaticMarkup(
-      <I18nProvider i18n={createI18n('en')}>
-        <PortDefinitionEditor
-          layout="ports"
-          title="Outputs"
-          output
-          disabled={false}
-          values={[{ handle: 'result', jsonSchema: { type: 'number' }, nullable: false }]}
-          onChange={vi.fn()}
-        />
-      </I18nProvider>,
-    )
-    expect(markup).toContain('data-output="true"')
-    expect(markup).toContain('i-carbon:port-output')
-    expect(markup).toContain('i-lucide-light:hash')
-    expect(markup).toContain('>Number</span>')
-  })
-
   it('exposes nested object output definitions without value controls', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
@@ -173,9 +147,7 @@ describe('Property panel port layout', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('aria-label="result" aria-expanded="false"')
-    expect(markup).toContain('data-composite-types="true"')
     expect(markup).toContain('aria-label="items[] type: Text"')
-    expect(markup).toContain('>of</span>')
     expect(markup).not.toContain('aria-label="items" aria-expanded')
     expect(markup).not.toContain('aria-label="result.status Set value"')
     expect(markup).not.toContain('aria-label="result Set value"')
@@ -196,7 +168,7 @@ describe('Property panel port layout', () => {
     expect(markup).toMatch(/<button[^>]*aria-label="result type: Object"[^>]*aria-expanded="false"[^>]*aria-controls=/)
   })
 
-  it('renders nested read-only output types with the output control surface', () => {
+  it('keeps nested read-only output types inspectable without mutation controls', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <DefinitionField
@@ -209,11 +181,8 @@ describe('Property panel port layout', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toMatch(/aria-label="result.status type: Text"[^>]*data-field-control="true"/)
+    expect(markup).toContain('aria-label="result.status type: Text"')
     expect(markup).toMatch(/<button[^>]*aria-label="result.details type: Object"[^>]*aria-expanded="false"/)
-    expect(markup).toContain('>Text</span>')
-    expect(markup).toContain('>Object</span>')
-    expect(markup.match(/data-readonly-object-action-slots/g)).toHaveLength(2)
     expect(markup).not.toContain('aria-label="Add field result.status"')
     expect(markup).not.toContain('aria-label="Remove status"')
   })

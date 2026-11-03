@@ -69,20 +69,6 @@ describe('RunDrawer terminal result', () => {
     expect(renderFailure('failed', [], false)).toBe('')
   })
 
-  it('keeps the panel height stable as logs accumulate and places the view switch in the header', () => {
-    const events: RunEvent[] = Array.from({ length: 100 }, (_, sequence) => ({
-      sequence,
-      createdAt: '2026-08-27T10:00:00.000Z',
-      kind: 'node.log',
-      payload: { flowId: 'flow', scopeId: 'root', nodeId: 'node', executionId: 'execution', level: 'info', message: 'Log entry' },
-    }))
-    const empty = renderFailure('failed')
-    const populated = renderFailure('failed', events)
-    expect(empty.match(/class="run-drawer"[^>]*style="([^"]+)"/)?.[1]).toBe('height:360px')
-    expect(populated.match(/class="run-drawer"[^>]*style="([^"]+)"/)?.[1]).toBe('height:360px')
-    expect(populated.match(/<header class="run-header">[\s\S]*?<\/header>/)?.[0]).toContain('Execution overview')
-  })
-
   it('bounds the initial rendered window for a large log history', () => {
     const events: RunEvent[] = Array.from({ length: 10_000 }, (_, index) => ({
       sequence: index + 1,

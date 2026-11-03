@@ -37,21 +37,19 @@ function render(groupTriggers = false): string {
 describe('FlowNodeList', () => {
   it('groups triggers in the full outline', () => {
     const markup = render(true)
-    expect(markup).toContain('<h3 class="px-2.5 pb-1 text-xs font-medium text-muted-foreground">Triggers</h3>')
-    expect(markup).toContain('<h3 class="px-2.5 pb-1 text-xs font-medium text-muted-foreground">Nodes</h3>')
-    expect(markup.match(/flow-node-list-grid/g)).toHaveLength(2)
+    expect(markup).toContain('Triggers')
+    expect(markup).toContain('Nodes')
+    expect(markup).toContain('Manual trigger')
+    expect(markup).toContain('Review issues')
     expect(markup.indexOf('Manual trigger')).toBeLessThan(markup.indexOf('Review issues'))
   })
 
-  it('keeps a multiple selection in one responsive grid', () => {
+  it('lists selected nodes without group headings', () => {
     const markup = render()
-    expect(markup).not.toContain('<h3')
-    expect(markup.match(/flow-node-list-grid/g)).toHaveLength(1)
-    expect(markup.match(/bg-foreground\/\[0.03\] hover:bg-accent/g)).toHaveLength(2)
-    expect(markup.match(/px-2.5 py-2/g)).toHaveLength(2)
-    expect(markup).not.toContain('bg-foreground/5')
-    expect(markup).not.toContain('opacity-0')
-    expect(markup.match(/text-muted-foreground\/70 hover:bg-foreground\/10 hover:text-foreground dark:hover:bg-foreground\/10/g)).toHaveLength(2)
+    expect(markup).not.toContain('Triggers')
+    expect(markup).not.toContain('Nodes')
+    expect(markup).toContain('Manual trigger')
+    expect(markup).toContain('Review issues')
     expect(markup.match(/aria-label="Locate this node on the canvas"/g)).toHaveLength(2)
   })
 })

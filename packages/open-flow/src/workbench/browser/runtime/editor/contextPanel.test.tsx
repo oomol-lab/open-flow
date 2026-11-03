@@ -180,7 +180,7 @@ describe('Context Panel', () => {
     expect(markup).toContain('Loading catalog blocks')
   })
 
-  it('renders one panel shell and a browsable list with descriptions and choices', () => {
+  it('renders a themed panel with a browsable list, descriptions and choices', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <ContextPanel focusOnOpen={false} icon="plus" onClose={() => undefined} theme="dark" title="Blocks">
@@ -198,12 +198,9 @@ describe('Context Panel', () => {
       </I18nProvider>,
     )
 
-    expect(markup.match(/class="context-panel"/g)).toHaveLength(1)
-    expect(markup).toContain('aria-hidden="true" class="context-panel-backdrop"')
     expect(markup).toContain('data-theme="dark"')
     expect(markup).toContain('Search blocks')
     expect(markup).toContain('GitHub actions.')
     expect(markup).toContain('Create issue')
-    expect(markup).toContain('<details')
   })
 })

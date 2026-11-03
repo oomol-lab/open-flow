@@ -6,6 +6,7 @@ import { act } from 'react'
 import { expect, it, vi } from 'vitest'
 import { click, render } from '../../../../test/support/render.tsx'
 import { currentFlowModelVersion } from '../../../flow/common/change.ts'
+import { currentEngineContract } from '../../../runtime/common/engineContract.ts'
 import { OpenFlowWorkbench } from './openFlowWorkbench.tsx'
 
 vi.mock('./flowWorkspace.tsx', () => ({
@@ -56,6 +57,18 @@ it('keeps the list and editor aligned with the host route throughout asynchronou
   const request = vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input)
     if (path == `/v1/flows/${flow.flowId}/editor`) return loading.promise
+    if (path == `/v1/flows/${flow.flowId}/revisions/${editor.draft.revisionId}/check`)
+      return Response.json({
+        closureDigest: 'closure-1',
+        diagnostics: [],
+        engineContract: currentEngineContract,
+        flowId: flow.flowId,
+        modelVersion: editor.draft.modelVersion,
+        revisionDigest: editor.draft.digest,
+        revisionId: editor.draft.revisionId,
+        valid: true,
+        version: 1,
+      })
     if (path == `/v1/flows/${flow.flowId}/connector-access`)
       return Response.json({ accessRevision: 0, bindings: [], mode: 'implicit', sharedAccessDigest: 'digest', version: 1 })
     if (path.startsWith('/v1/flows?')) return Response.json({ flows: [flow], total: 1, version: 1 })
