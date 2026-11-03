@@ -35,9 +35,55 @@ function xCoordinates(path: string): number[] {
 }
 
 describe('connection routing', () => {
-  it('preserves forward Bézier geometry', () => {
+  it('preserves forward horizontal Bézier curves in both drag directions', () => {
     const params = { ...backward, sourceX: 320, targetX: 550 }
-    expect(getConnectionPath(params)).toEqual(getBezierPath(params).slice(0, 3))
+    for (const p of [params, reversed(params)]) {
+      expect(getConnectionPath(p)).toEqual(getBezierPath(p).slice(0, 3))
+    }
+  })
+
+  it.each([
+    { gap: 4, offset: 520 },
+    { gap: 32, offset: 520 },
+    { gap: 80, offset: 520 },
+    { gap: 230, offset: 80 },
+    { gap: 230, offset: 0 },
+  ])('aligns forward approaches with their ports across a $gap px gap and $offset px offset in either layout and drag direction', ({ gap, offset }) => {
+    const params = { ...backward, sourceX: 320, sourceY: 0, targetX: 320 + gap, targetY: offset }
+    for (const p of [params, reversed(params), transpose(params), transpose(reversed(params))]) {
+      const [path, x, y] = getConnectionPath(p)
+      const points = pairs(path)
+      const start = points[0]!
+      const departure = points[1]!
+      const arrival = points.at(-2)!
+      const end = points.at(-1)!
+      expect(start).toEqual([p.sourceX, p.sourceY])
+      expect(end).toEqual([p.targetX, p.targetY])
+      const vertical = p.sourcePosition === Position.Bottom || p.sourcePosition === Position.Top
+      const primary = vertical ? 1 : 0
+      const cross = vertical ? 0 : 1
+      expect(departure[cross]).toBe(start[cross])
+      expect(arrival[cross]).toBe(end[cross])
+      expect((end[primary]! - arrival[primary]!) * (end[primary]! - start[primary]!)).toBeGreaterThan(0)
+      expect(Math.abs(end[primary]! - arrival[primary]!)).toBeGreaterThanOrEqual(Math.min(12, gap / 4))
+      for (const point of points) {
+        expect(point[0]).toBeGreaterThanOrEqual(Math.min(p.sourceX, p.targetX))
+        expect(point[0]).toBeLessThanOrEqual(Math.max(p.sourceX, p.targetX))
+        expect(point[1]).toBeGreaterThanOrEqual(Math.min(p.sourceY, p.targetY))
+        expect(point[1]).toBeLessThanOrEqual(Math.max(p.sourceY, p.targetY))
+      }
+      expect([x, y]).toEqual(getBezierPath(p).slice(1, 3))
+      expect(path).not.toMatch(/NaN|Infinity/)
+    }
+  })
+
+  it('shares the final approach for opposite-side sources at one vertical input', () => {
+    const connections = [
+      { ...backward, sourceX: 0, sourceY: 0, targetX: 800, targetY: 350 },
+      { ...backward, sourceX: 500, sourceY: 700, targetX: 800, targetY: 350 },
+    ]
+    const approaches = connections.map((params) => pairs(getConnectionPath(transpose(params))[0]).slice(-2))
+    expect(approaches[0]).toEqual(approaches[1])
   })
 
   const layouts = [
@@ -309,7 +355,7 @@ it.each([backward, reversed(backward), { ...backward, sourceBounds: { ...backwar
   },
 )
 
-it('preserves forward vertical Bézier geometry', () => {
-  const params = transpose({ ...backward, sourceX: 320, targetX: 550 })
+it('preserves Bézier routing between perpendicular ports', () => {
+  const params = { ...backward, sourcePosition: Position.Bottom, targetPosition: Position.Left }
   expect(getConnectionPath(params)).toEqual(getBezierPath(params).slice(0, 3))
 })

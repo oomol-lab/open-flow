@@ -1,6 +1,6 @@
 import type { GetBezierPathParams, InternalNode, Rect } from '@xyflow/react'
 
-import { getBezierPath, Position } from '@xyflow/react'
+import { getBezierPath, getSmoothStepPath, Position } from '@xyflow/react'
 
 export type ConnectionPathParams = GetBezierPathParams & { sourceBounds?: Rect; targetBounds?: Rect }
 
@@ -9,7 +9,7 @@ export function connectionNodeBounds(node: InternalNode | undefined | null): Rec
   return { ...node.internals.positionAbsolute, width: node.measured.width, height: node.measured.height }
 }
 
-/** Route backward connections outside both cards in their primary and cross axes. */
+/** Align arrows with their ports and route returns outside both cards. */
 export function getConnectionPath({ sourceBounds, targetBounds, ...params }: ConnectionPathParams): [string, number, number] {
   const { sourcePosition = Position.Bottom, targetPosition = Position.Top } = params
   const vertical =
@@ -26,8 +26,13 @@ export function getConnectionPath({ sourceBounds, targetBounds, ...params }: Con
   const targetY = cross(params.targetX, params.targetY)
   const outputX = reverse ? targetX : sourceX
   const inputX = reverse ? sourceX : targetX
-  if ((!horizontal && !vertical) || outputX < inputX) {
+  if (!horizontal && !vertical) {
     const [path, x, y] = getBezierPath(params)
+    return [path, x, y]
+  }
+  if (outputX < inputX) {
+    // Vertical turns finish before the arrow; horizontal connections retain their Bézier curves.
+    const [path, x, y] = vertical ? getSmoothStepPath({ ...params, borderRadius: 16, offset: Math.min(16, (inputX - outputX) / 4) }) : getBezierPath(params)
     return [path, x, y]
   }
 

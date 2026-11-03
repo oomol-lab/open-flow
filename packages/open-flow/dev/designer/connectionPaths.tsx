@@ -13,7 +13,7 @@ export const connectionPathsStory: FrontendStory = {
   id: 'connection-paths',
   title: 'Connection paths',
   description:
-    'Each connection uses only its own endpoints. Drag an upper or lower source: only its line changes. Return turns mirror within a fixed band above the destination when space allows.',
+    'Vertical connections use rounded turns; horizontal connections keep Bézier curves. Compare shared inputs, wide offsets and tight gaps. Select a source or edge and drag either endpoint to inspect the arrows.',
   standalone: true,
   render: (log, dark, language) => (
     <>
@@ -59,6 +59,29 @@ export const connectionPathsStory: FrontendStory = {
       </div>
     </>
   ),
+}
+
+const forwardModel: FlowCanvasViewModel = {
+  direction: 'vertical',
+  viewport: { x: 45, y: 45, zoom: 1 },
+  nodes: [
+    { id: 'wide-source', title: 'Wide offset', position: { x: 520, y: 0 } },
+    { id: 'wide-target', title: 'Destination', position: { x: 0, y: 160 } },
+    { id: 'tight-source', title: 'Short approach', position: { x: 520, y: 340 } },
+    { id: 'tight-target', title: 'Destination · tight gap', position: { x: 0, y: 440 } },
+  ].map((node) => Object.assign(node, { kind: 'task' as const, reference: 'lab/task', inputs: [], outputs: [] })),
+  edges: ['wide', 'tight'].map((id) => ({ id, source: `${id}-source`, sourceHandle: '$out', target: `${id}-target`, targetHandle: '$in' })),
+}
+
+const sharedInputModel: FlowCanvasViewModel = {
+  direction: 'vertical',
+  viewport: { x: 45, y: 45, zoom: 1 },
+  nodes: [
+    { id: 'left-source', title: 'Left source', position: { x: 0, y: 0 } },
+    { id: 'right-source', title: 'Right source', position: { x: 520, y: 0 } },
+    { id: 'shared-target', title: 'Shared input', position: { x: 260, y: 250 } },
+  ].map((node) => Object.assign(node, { kind: 'task' as const, reference: 'lab/task', inputs: [], outputs: [] })),
+  edges: ['left', 'right'].map((id) => ({ id, source: `${id}-source`, sourceHandle: '$out', target: 'shared-target', targetHandle: '$in' })),
 }
 
 const alignedModel: FlowCanvasViewModel = {
@@ -200,6 +223,8 @@ const backwardModel: FlowCanvasViewModel = {
 }
 
 const connectionSamples = [
+  { label: 'Shared input', model: sharedInputModel },
+  { label: 'Forward connections', model: forwardModel },
   { label: 'Aligned returns', model: alignedModel },
   { label: 'Mixed rows', model: mixedRowsModel },
   { label: 'Same row', model: sameRowModel },
@@ -208,7 +233,7 @@ const connectionSamples = [
 ]
 
 function ConnectionSamples({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
-  const [model, setModel] = useState(alignedModel)
+  const [model, setModel] = useState(sharedInputModel)
   const [selected, setSelected] = useState<readonly string[]>([])
   useStoryActions(
     connectionSamples.map(({ label, model: sample }) => ({
@@ -236,6 +261,14 @@ function ConnectionSamples({ dark, language, log }: { dark: boolean; language: U
           setModel((current) => ({ ...current, nodes: current.nodes.map((node) => ({ ...node, position: positions[node.id] ?? node.position })) }))
         }
         onMoveViewport={(viewport) => setModel((current) => ({ ...current, viewport }))}
+        onChangeDirection={(direction, positions) => {
+          setModel((current) => ({
+            ...current,
+            direction,
+            nodes: current.nodes.map((node) => ({ ...node, position: positions[node.id] ?? node.position })),
+          }))
+          return true
+        }}
         onChangeNodeContentHidden={(id, contentHidden) =>
           setModel((current) => ({ ...current, nodes: current.nodes.map((node) => (node.id === id ? { ...node, contentHidden } : node)) }))
         }
