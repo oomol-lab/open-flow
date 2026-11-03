@@ -238,11 +238,10 @@ type FlowControlsProps = Pick<
   | 'direction'
   | 'changingDirection'
   | 'onChangeDirection'
-  | 'onRelayout'
   | 'onFitView'
   | 'dottedBackground'
   | 'layoutMotion'
-> & { onBeforeFitView?: () => void }
+> & { onBeforeFitView?: () => void; onRelayout?: () => void }
 
 const selector = (s: ReactFlowState) => ({
   minZoomReached: s.transform[2] <= s.minZoom,
@@ -252,7 +251,6 @@ const selector = (s: ReactFlowState) => ({
 
 const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
   const rf = useReactFlow()
-  const flowState = useStoreApi()
   const { minZoomReached, maxZoomReached, zoom } = useStore(selector, shallowPlainObjectEqual)
   const nodes = useNodes()
 
@@ -265,16 +263,6 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
     duration: props.layoutMotion === false ? 0 : 150,
     maxZoom: 1,
   }
-  const relayout =
-    props.onRelayout == null
-      ? undefined
-      : () => {
-          props.onRelayout?.(getLayoutWidth(flowState.getState()))
-          props.onBeforeFitView?.()
-          // Wait for the node description height before fitting the view to avoid overlap.
-          setTimeout(() => rf.fitView(fitViewOptions), 100)
-        }
-
   return (
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} size={2} variant={BackgroundVariant.Dots} />}
@@ -299,7 +287,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
             props.onFitView?.()
           }, 100)
         }}
-        onRelayout={relayout}
+        onRelayout={props.onRelayout}
         onZoomIn={() => rf.zoomIn({ duration: getViewportTransitionDuration() })}
         onZoomOut={() => rf.zoomOut({ duration: getViewportTransitionDuration() })}
         onZoomReset={() => rf.zoomTo(1, { duration: getViewportTransitionDuration() })}
@@ -485,6 +473,21 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const [fittingView, setFittingView] = useState(false)
   const [layoutReady, setLayoutReady] = useState(props.layoutMotion !== false || props.onLayoutMeasured == null)
   const onBeforeFitView = useCallback(() => setFittingView(true), [])
+  const relayout = useCallback(() => {
+    props.onRelayout?.(getLayoutWidth(flowState.getState()))
+    onBeforeFitView()
+    // Wait for node measurements before fitting the rearranged nodes.
+    setTimeout(
+      () =>
+        rf.fitView({
+          padding: 0.15,
+          duration: props.layoutMotion === false ? 0 : 150,
+          maxZoom: 1,
+          nodes: selectedNodes.length > 1 ? selectedNodes : undefined,
+        }),
+      100,
+    )
+  }, [flowState, onBeforeFitView, props.onRelayout, props.layoutMotion, rf, selectedNodes])
 
   useLayoutEffect(() => {
     setLayoutReady(props.layoutMotion !== false || props.onLayoutMeasured == null)
@@ -763,7 +766,14 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
         >
           <SelectionAnnotation nodes={selectedNodes} />
           {(props.canDeleteNodes ?? true) && !selectionInProgress && (
-            <SelectionFloatBar editable={!!editable} nodes={selectedNodes} onDelete={deleteSelectedNodes} duplicateNodes={props.duplicateNodes} />
+            <SelectionFloatBar
+              editable={!!editable}
+              nodes={selectedNodes}
+              onDelete={deleteSelectedNodes}
+              duplicateNodes={props.duplicateNodes}
+              onRelayout={props.onRelayout ? relayout : undefined}
+              changingDirection={props.changingDirection}
+            />
           )}
           <FlowControls
             editable={props.editable}
@@ -779,7 +789,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             onChangeDirection={props.onChangeDirection}
             layoutMotion={props.layoutMotion}
             onBeforeFitView={onBeforeFitView}
-            onRelayout={props.onRelayout}
+            onRelayout={props.onRelayout ? relayout : undefined}
             onFitView={props.onFitView}
             dottedBackground={props.dottedBackground}
           />
@@ -969,7 +979,12 @@ function SelectionContextMenu(props: SelectionContextMenuProps) {
   return <ContextMenu items={items} onClose={props.onClose} position={props.position} />
 }
 
-function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onDelete' | 'duplicateNodes'> & { readonly editable: boolean }) {
+type SelectionActionsProps = Pick<SelectionContextMenuProps, 'nodes' | 'onDelete' | 'duplicateNodes'> & {
+  readonly onRelayout?: () => void
+  readonly changingDirection?: boolean
+}
+
+function SelectionFloatBar(props: SelectionActionsProps & { readonly editable: boolean }) {
   const items = useSelectionItems(props)
   const { zoom } = useViewport()
 
@@ -997,7 +1012,7 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
   )
 }
 
-function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onDelete' | 'duplicateNodes'>): ContextMenuItem[] {
+function useSelectionItems(props: SelectionActionsProps): ContextMenuItem[] {
   const t = useTranslate()
   const nodes = useMemo(() => props.nodes.filter((node) => node.data.store), [props.nodes])
   const hasDuplicate = nodes.some((node) => node.data.store?.duplicateNode)
@@ -1029,6 +1044,13 @@ function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
       key: '$duplicate',
       icon: <i className="i-codicon:copy" />,
       onClick: duplicateNodes,
+    },
+    props.onRelayout && {
+      label: t('optimize'),
+      key: '$relayout',
+      icon: <i aria-hidden="true" className="i-lucide-light:layout-template" />,
+      onClick: props.onRelayout,
+      disabled: props.changingDirection,
     },
     toTrue(hasSkip) && {
       label: skip ? t('nodeActions.skipDisableAll') : t('nodeActions.skipEnableAll'),

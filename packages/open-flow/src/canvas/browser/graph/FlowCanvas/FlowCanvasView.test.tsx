@@ -763,6 +763,75 @@ describe('FlowCanvasView model synchronization', () => {
     store.dispose()
   })
 
+  it.each([
+    ['horizontal', 1000],
+    ['horizontal', 200],
+    ['vertical', 200],
+  ] as const)('rearranges and persists only selected nodes in a %s layout with width %s', (direction, availableWidth) => {
+    const before = { ...source, id: 'before', position: { x: 100, y: 200 } }
+    const after = { ...source, id: 'after', position: { x: 1800, y: 1500 } }
+    const note = commentNode('Keep this note')
+    const value: FlowCanvasViewModel = {
+      ...model([before, { ...source, position: { x: 500, y: 1200 } }, { ...task([]), position: { x: 700, y: 900 } }, after, note]),
+      direction,
+      edges: [
+        { id: 'incoming', source: 'before', target: 'source', sourceHandle: '$out', targetHandle: '$in' },
+        { id: 'selected', source: 'source', target: 'target', sourceHandle: '$out', targetHandle: '$in' },
+        { id: 'outgoing', source: 'target', target: 'after', sourceHandle: '$out', targetHandle: '$in' },
+      ],
+    }
+    const onMoveNodes = vi.fn()
+    const view = renderView(props(value, { onMoveNodes, selectedNodeIds: ['source', 'target', 'comment'] }))
+    const store = view.props.flowCanvasStore
+    for (const node of store.$.nodes.values()) node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 200, height: 80 } })
+
+    store.onRelayout(availableWidth)
+
+    expect(onMoveNodes).toHaveBeenCalledOnce()
+    const positions = onMoveNodes.mock.calls[0]![0]
+    expect(Object.keys(positions).toSorted()).toEqual(['source', 'target'])
+    expect(positions.source).toEqual({ x: 500, y: 900 })
+    if (direction === 'horizontal' && availableWidth === 1000) {
+      expect(positions.target.x).toBeGreaterThan(positions.source.x + 200)
+      expect(positions.target.y).toBe(positions.source.y)
+    } else {
+      expect(positions.target.x).toBe(positions.source.x)
+      expect(positions.target.y).toBeGreaterThan(positions.source.y + 80)
+    }
+    for (const node of [before, after, note]) {
+      expect(store.$.rfNodes.value.find((item) => item.data.store.nodeId === node.id)?.position).toEqual(node.position)
+    }
+    store.onRelayout(availableWidth)
+    expect(onMoveNodes).toHaveBeenLastCalledWith(positions)
+    expect(store.$.selectedNodes.value.map((node) => node.nodeId)).toEqual(['source', 'target', 'comment'])
+    store.dispose()
+  })
+
+  it('keeps whole-graph layout available with only one selected node', () => {
+    const onMoveNodes = vi.fn()
+    const view = renderView(props(model([source, task([])]), { onMoveNodes, selectedNodeIds: ['target'] }))
+    const store = view.props.flowCanvasStore
+    for (const node of store.$.nodes.values()) node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 200, height: 80 } })
+
+    store.onRelayout()
+
+    expect(Object.keys(onMoveNodes.mock.calls[0]![0]).toSorted()).toEqual(['source', 'target'])
+    store.dispose()
+  })
+
+  it('does not rearrange the graph when a selection contains only comments', () => {
+    const value = model([source, task([]), commentNode('Note'), { ...commentNode('Second note'), id: 'second-comment' }])
+    const onMoveNodes = vi.fn()
+    const view = renderView(props(value, { onMoveNodes, selectedNodeIds: ['comment', 'second-comment'] }))
+    const store = view.props.flowCanvasStore
+
+    store.onRelayout()
+
+    expect(onMoveNodes).not.toHaveBeenCalled()
+    for (const node of value.nodes) expect(store.$.rfNodes.value.find((item) => item.data.store.nodeId === node.id)?.position).toEqual(node.position)
+    store.dispose()
+  })
+
   it('restores the viewport without replacing node positions', () => {
     const value: FlowCanvasViewModel = {
       edges: [],

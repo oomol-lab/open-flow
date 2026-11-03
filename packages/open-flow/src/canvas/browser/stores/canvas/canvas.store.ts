@@ -233,7 +233,7 @@ export class CanvasStore {
         return true
       }
     }
-    const positions = this.layoutPositions(availableWidth)
+    const positions = this.layoutPositions(nodes, availableWidth)
     this.applyPositions(positions)
     this.layoutMeasurementAttempts = 0
     this.layoutComplete = true
@@ -354,7 +354,15 @@ export class CanvasStore {
 
   // https://reactflow.dev/learn/layouting/layouting#dagre
   private doRelayout(availableWidth?: number) {
-    const positions = this.layoutPositions(availableWidth)
+    const selected = this.$.selectedNodes.value.length > 1 ? this.$.selectedNodes.value : []
+    const nodes = selected.length > 0 ? selected.filter(NodeStore.is) : this.allLayoutNodes()
+    if (nodes.length === 0) return
+    let positions = this.layoutPositions(nodes, availableWidth)
+    if (selected.length > 0) {
+      const offsetX = Math.min(...nodes.map((node) => node.$.position.value.x)) - Math.min(...Object.values(positions).map((position) => position.x))
+      const offsetY = Math.min(...nodes.map((node) => node.$.position.value.y)) - Math.min(...Object.values(positions).map((position) => position.y))
+      positions = Object.fromEntries(Object.entries(positions).map(([id, position]) => [id, { x: position.x + offsetX, y: position.y + offsetY }]))
+    }
     this.applyPositions(positions)
     this.#callbacks.onMoveNodes(positions)
   }
@@ -366,8 +374,7 @@ export class CanvasStore {
     }
   }
 
-  private layoutPositions(availableWidth?: number): Readonly<Record<string, FlowCanvasViewPosition>> {
-    const nodes = this.allLayoutNodes()
+  private layoutPositions(nodes: readonly NodeStore[], availableWidth?: number): Readonly<Record<string, FlowCanvasViewPosition>> {
     const g = new graphlib.Graph().setDefaultEdgeLabel(() => ({}))
     // Leave enough room for both ends of a smooth-step edge and a short middle segment.
     g.setGraph({ rankdir: this.$.direction.value === 'vertical' ? 'TB' : 'LR', ranksep: 80 })
@@ -383,6 +390,7 @@ export class CanvasStore {
     }
 
     for (const rfEdge of this.$.rfEdges.value) {
+      if (!g.hasNode(rfEdge.source) || !g.hasNode(rfEdge.target)) continue
       singles.delete(rfEdge.source)
       singles.delete(rfEdge.target)
       g.setEdge(rfEdge.source, rfEdge.target)
@@ -412,7 +420,7 @@ export class CanvasStore {
                   .filter((edge) => edge.source === node.nodeId && edge.sourceHandle === `$branch:${port.handle}`)
                   .flatMap((edge) => {
                     const target = this.$.nodes.get(edge.target as NodeId)
-                    return target ? [target.rfNodeId] : []
+                    return target && g.hasNode(target.rfNodeId) ? [target.rfNodeId] : []
                   })
               : [],
           ),

@@ -113,7 +113,7 @@ describe('canvas direction', () => {
     expect(onChangeDirection).not.toHaveBeenCalled()
   })
 
-  it.each(['horizontal', 'vertical'] as const)('keeps %s branch lanes in output order', async (direction) => {
+  it.each(['horizontal', 'vertical'] as const)('keeps %s branch lanes in output order for full and selected layouts', async (direction) => {
     const model: FlowCanvasViewModel = {
       direction,
       viewport: { x: 0, y: 0, zoom: 1 },
@@ -149,5 +149,14 @@ describe('canvas direction', () => {
     const cross = direction === 'vertical' ? 'x' : 'y'
     expect(positions.first[cross]).toBeLessThan(positions.second[cross])
     expect(positions.second[cross]).toBeLessThan(positions.otherwise[cross])
+
+    await store.handleNodesChange(
+      store.$.rfNodes.value.map((node) => ({ type: 'select', id: node.id, selected: ['condition', 'first', 'otherwise'].includes(node.data.store.nodeId) })),
+    )
+    store.onRelayout(5000)
+    const selectedPositions = onMoveNodes.mock.calls[1]![0]
+    expect(Object.keys(selectedPositions).toSorted()).toEqual(['condition', 'first', 'otherwise'])
+    expect(selectedPositions.first[cross]).toBeLessThan(selectedPositions.otherwise[cross])
+    for (const id of ['second', 'join']) expect(store.$.rfNodes.value.find((node) => node.data.store.nodeId === id)?.position).toEqual(positions[id])
   })
 })

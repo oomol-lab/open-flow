@@ -289,7 +289,7 @@ function WorkflowStory({
   language,
   log,
   model,
-  initialSelectedNodeId = 'task',
+  initialSelectedNodeIds = ['task'],
   picker = false,
   remoteCommands = false,
   completedModel,
@@ -298,7 +298,7 @@ function WorkflowStory({
   readonly language: UiLanguage
   readonly log: LogAction
   readonly model: FlowCanvasViewModel
-  readonly initialSelectedNodeId?: string
+  readonly initialSelectedNodeIds?: readonly string[]
   readonly remoteCommands?: boolean
   readonly completedModel?: FlowCanvasViewModel
   readonly picker?: boolean
@@ -329,7 +329,7 @@ function WorkflowStory({
     picker ? { position: { x: 140, y: 80 }, onComplete: () => setAddNodeRequest(undefined) } : undefined,
   )
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(String(version))
-  const [selected, setSelected] = useState<readonly string[]>([initialSelectedNodeId])
+  const [selected, setSelected] = useState<readonly string[]>(initialSelectedNodeIds)
   useStoryActions([
     ...(completedModel ? [{ label: runCompleted ? 'Restart running nodes' : 'Finish running nodes', onClick: () => setRunCompleted((value) => !value) }] : []),
     ...(remoteCommands
@@ -351,7 +351,7 @@ function WorkflowStory({
     {
       label: 'Reset samples',
       onClick: () => {
-        setSelected([initialSelectedNodeId])
+        setSelected(initialSelectedNodeIds)
         setEditable(true)
         setRunCompleted(false)
         setVersion((value) => value + 1)
@@ -484,7 +484,7 @@ export const workflowStories: readonly FrontendStory[] = [
       'Commands use the production canvas and affect only its viewport. Fit includes every node even with a selection. Remote commands should not log viewport saves; manual pan and zoom still do. Consecutive pans must accumulate. Reset samples remounts without replaying commands.',
     standalone: true,
     render: (log, dark, language) => (
-      <WorkflowStory dark={dark} language={language} log={log} model={longChainModel} initialSelectedNodeId="step-1" remoteCommands />
+      <WorkflowStory dark={dark} language={language} log={log} model={longChainModel} initialSelectedNodeIds={['step-1']} remoteCommands />
     ),
   },
   {
@@ -492,9 +492,20 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'wrapped-layout',
     title: 'Long workflow layout',
     description:
-      'Default placement wraps after six dependency columns. Re-layout uses the current canvas width, zoom and measured node sizes. Compare at 50% and 100%, or resize the window before re-layout. Parallel steps stay together; zooming alone preserves positions. Reset samples restores default placement.',
+      'Default placement wraps after six dependency columns. Re-layout uses the current canvas width, zoom and measured sizes. Multi-selection limits re-layout to that group. Parallel steps stay together; zooming alone preserves positions. Reset samples restores default placement.',
     standalone: true,
-    render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={longChainModel} initialSelectedNodeId="step-1" />,
+    render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={longChainModel} initialSelectedNodeIds={['step-1']} />,
+  },
+  {
+    group: 'Workbench',
+    id: 'selected-layout',
+    title: 'Selected node layout',
+    description:
+      'Rearrange the selected nodes with their floating toolbar or the lower view controls. Unselected nodes and comments keep their positions. Clear the selection to rearrange the whole workflow. Compare both themes and read-only mode.',
+    standalone: true,
+    render: (log, dark, language) => (
+      <WorkflowStory dark={dark} language={language} log={log} model={workflow} initialSelectedNodeIds={['task', 'condition']} />
+    ),
   },
   {
     group: 'Workbench',
@@ -511,7 +522,9 @@ export const workflowStories: readonly FrontendStory[] = [
     title: 'Edge colors',
     description: 'Port colors blend along straight, curved and reverse connections. Select nodes or edges and switch themes to compare states.',
     standalone: true,
-    render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={edgeColors} initialSelectedNodeId="selected-source" />,
+    render: (log, dark, language) => (
+      <WorkflowStory dark={dark} language={language} log={log} model={edgeColors} initialSelectedNodeIds={['selected-source']} />
+    ),
   },
   {
     group: 'Theme Preview',
@@ -530,7 +543,7 @@ export const workflowStories: readonly FrontendStory[] = [
       'Compare compact and content-filled running nodes with the other execution states, provider stacks and account warnings. Finish and restart both running nodes to check the beam lifecycle. Compare corners, selection, themes, zoom and reduced motion.',
     standalone: true,
     render: (log, dark, language) => (
-      <WorkflowStory dark={dark} language={language} log={log} model={states} completedModel={completedStates} initialSelectedNodeId="selected" />
+      <WorkflowStory dark={dark} language={language} log={log} model={states} completedModel={completedStates} initialSelectedNodeIds={['selected']} />
     ),
   },
   {
