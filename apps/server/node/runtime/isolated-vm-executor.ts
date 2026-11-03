@@ -609,6 +609,38 @@ function readResult(
   return returnedVoid ? undefined : (result.value as JsonValue)
 }
 
+interface PreparedIsolate {
+  readonly context: Promise<IsolatedVM.Context>
+  readonly isolate: IsolatedVM.Isolate
+  readonly memoryMb: number
+}
+
+// One untouched isolate is prepared while the Executor waits, so a Task does not pay for isolate and context startup.
+let spareIsolate: PreparedIsolate | undefined
+
+function prepareIsolate(ivm: typeof IsolatedVM, memoryMb: number): PreparedIsolate {
+  const isolate = new ivm.Isolate({
+    memoryLimit: memoryMb,
+    onCatastrophicError() {
+      process.abort()
+    },
+  })
+  const context = isolate.createContext()
+  context.catch(() => {})
+  return { context, isolate, memoryMb }
+}
+
+function takeIsolate(ivm: typeof IsolatedVM, memoryMb: number): PreparedIsolate {
+  const spare = spareIsolate
+  spareIsolate = undefined
+  setImmediate(() => {
+    spareIsolate ??= prepareIsolate(ivm, memoryMb)
+  })
+  if (spare?.memoryMb == memoryMb && !spare.isolate.isDisposed) return spare
+  if (spare != null && !spare.isolate.isDisposed) spare.isolate.dispose()
+  return prepareIsolate(ivm, memoryMb)
+}
+
 async function execute(
   request: InvokeRequest,
   canceled: AbortSignal,
@@ -637,21 +669,17 @@ async function execute(
     if (isolate != null && !isolate.isDisposed) isolate.dispose()
   }
   try {
-    const running = new ivm.Isolate({
-      memoryLimit: request.limits.memoryMb,
-      onCatastrophicError() {
-        process.abort()
-      },
-    })
+    const prepared = takeIsolate(ivm, request.limits.memoryMb)
+    const running = prepared.isolate
     isolate = running
     // CPU time accumulates across every entry into the isolate, including timer and Capability callbacks.
-    const cpuBudget = BigInt(request.limits.cpuMs) * 1_000_000n
+    const cpuBudget = BigInt(request.limits.cpuMs) * 1_000_000n + running.cpuTime
     watchdog = setInterval(() => {
       if (running.isDisposed || running.cpuTime <= cpuBudget) return
       cpuExceeded = true
       terminate()
     }, cpuWatchdogIntervalMs)
-    const context = await running.createContext()
+    const context = await prepared.context
     globals = installGlobals(ivm, context, request, call, capabilities, contract.builtinModules != null, log)
     canceled.addEventListener('abort', terminate, { once: true })
     if (canceled.aborted) terminate()
