@@ -6,8 +6,10 @@ import { val } from 'value-enhancer'
 import { describe, expect, it, vi } from 'vitest'
 import { createInspectorSession } from '../../../../../dev/designer/inspectorSession.ts'
 import { WorkbenchClient } from '../api.ts'
+import { savedDirection, setCanvasLayout } from '../canvasPresentation.ts'
 import { createI18n } from '../i18n.ts'
 import { NavigationStore } from '../navigation.ts'
+import { canvasDirectionPreferenceKey } from './canvasDirection.ts'
 import { canvasInteractiveModePreferenceKey } from './canvasInteractiveMode.ts'
 import { resourceValue } from './resource.ts'
 import { WorkbenchStore } from './workbenchStore.ts'
@@ -1367,5 +1369,105 @@ it('retains a deferred Provider account across catalog refresh, reconnection and
     expect(session.store.$.draft.value?.content.document.graph.nodes.send).toMatchObject({ task: { executor: { connectionId: '' } } })
   } finally {
     session.dispose()
+  }
+})
+
+describe('new Flow direction preference', () => {
+  it('uses vertical for new Flows, remembers successful explicit switches, and preserves the preference on undo', async () => {
+    const saved = new Map<string, string>()
+    const preferences = {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        saved.set(key, value)
+      },
+    }
+    const store = new WorkbenchStore(new WorkbenchClient(vi.fn()), preferences)
+    const create = vi.spyOn(store.workspace, 'createFlow').mockResolvedValue(undefined)
+    const change = vi.spyOn(store.workspace, 'changeDirection').mockResolvedValue(true)
+    const undo = vi.spyOn(store.workspace, 'undo').mockResolvedValue()
+    try {
+      await store.createFlow('New')
+      expect(savedDirection(create.mock.calls[0]![3]!)).toBe('vertical')
+      expect(saved.size).toBe(0)
+      expect(await store.changeDirection('horizontal', {})).toBe(true)
+      expect(change).toHaveBeenCalledWith('horizontal', {})
+      expect(saved.get(canvasDirectionPreferenceKey)).toBe('horizontal')
+      await store.workspace.undo()
+      expect(undo).toHaveBeenCalledOnce()
+      expect(saved.get(canvasDirectionPreferenceKey)).toBe('horizontal')
+      await store.createFlow('Next')
+      expect(savedDirection(create.mock.calls[1]![3]!)).toBe('horizontal')
+    } finally {
+      store.dispose()
+    }
+    const reopened = new WorkbenchStore(new WorkbenchClient(vi.fn()), preferences)
+    const nextCreate = vi.spyOn(reopened.workspace, 'createFlow').mockResolvedValue(undefined)
+    try {
+      await reopened.createFlow('Reopened')
+      expect(savedDirection(nextCreate.mock.calls[0]![3]!)).toBe('horizontal')
+    } finally {
+      reopened.dispose()
+    }
+  })
+
+  it('keeps the previous new-Flow default when a direction save fails', async () => {
+    const write = vi.fn()
+    const store = new WorkbenchStore(new WorkbenchClient(vi.fn()), { getItem: () => null, setItem: write })
+    vi.spyOn(store.workspace, 'changeDirection').mockResolvedValue(false)
+    const create = vi.spyOn(store.workspace, 'createFlow').mockResolvedValue(undefined)
+    try {
+      expect(await store.changeDirection('horizontal', {})).toBe(false)
+      expect(write).not.toHaveBeenCalled()
+      await store.createFlow('New')
+      expect(savedDirection(create.mock.calls[0]![3]!)).toBe('vertical')
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('keeps the session default usable when preference storage is unavailable', async () => {
+    const store = new WorkbenchStore(new WorkbenchClient(vi.fn()), {
+      getItem: () => {
+        throw new Error('Unavailable')
+      },
+      setItem: () => {
+        throw new Error('Unavailable')
+      },
+    })
+    const create = vi.spyOn(store.workspace, 'createFlow').mockResolvedValue(undefined)
+    vi.spyOn(store.workspace, 'changeDirection').mockResolvedValue(true)
+    try {
+      await store.createFlow('First')
+      expect(savedDirection(create.mock.calls[0]![3]!)).toBe('vertical')
+      await expect(store.changeDirection('horizontal', {})).resolves.toBe(true)
+      await store.createFlow('Next')
+      expect(savedDirection(create.mock.calls[1]![3]!)).toBe('horizontal')
+    } finally {
+      store.dispose()
+    }
+  })
+})
+
+it('opens each Flow using its own direction without saving or applying the new-Flow default', async () => {
+  const { client, store } = catalogSession()
+  const baseline = await client.getEditor('base')
+  vi.mocked(client.getEditor).mockImplementation(async (flowId) => ({
+    ...baseline,
+    flow: { ...baseline.flow, flowId },
+    draft: { ...baseline.draft, flowId },
+    live: { ...baseline.live, flowId },
+    presentation: { ...baseline.presentation, value: flowId === 'vertical' ? setCanvasLayout({}, 'vertical') : baseline.presentation.value },
+  }))
+  const update = vi.spyOn(client, 'updatePresentation')
+  try {
+    await store.workspace.selectFlow('vertical')
+    expect(store.$.designer.value.direction).toBe('vertical')
+    await store.workspace.selectFlow('legacy')
+    expect(store.$.designer.value.direction).toBe('horizontal')
+    await store.workspace.selectFlow('vertical')
+    expect(store.$.designer.value.direction).toBe('vertical')
+    expect(update).not.toHaveBeenCalled()
+  } finally {
+    store.dispose()
   }
 })

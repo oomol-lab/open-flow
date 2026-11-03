@@ -69,6 +69,9 @@ export function NodeHeadContextMenu({ canvasStore, children }: NodeHeadContextMe
   const editable = useVal(canvasStore.$.editable)
 
   const onDelete = toTrue(editable && canvasStore.canDeleteNodes) && (() => canvasStore.deleteNodes([nodeStore]))
+  const content = useVal(NodeStore.to(nodeStore)?.content$)
+  const direction = useVal(canvasStore.$.direction)
+  const resetWidth = editable && direction === 'vertical' && canvasStore.canChangeNodeWidth && content?.kind === 'condition' && content.verticalWidth != null
   const items = useNodeMenuItems({
     t,
     nodeStore,
@@ -89,6 +92,9 @@ export function NodeHeadContextMenu({ canvasStore, children }: NodeHeadContextMe
                   {item.label}
                 </ContextMenuItem>
               ),
+          )}
+          {resetWidth && (
+            <ContextMenuItem onClick={() => void canvasStore.changeNodeWidth(nodeStore.nodeId, undefined)}>{t('nodeWidth.reset')}</ContextMenuItem>
           )}
         </ContextMenuGroup>
       </ContextMenuContent>

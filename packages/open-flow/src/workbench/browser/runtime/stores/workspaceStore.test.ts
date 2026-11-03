@@ -1442,3 +1442,30 @@ it('lists other workflow targets across pages using only list metadata', async (
     store.dispose()
   }
 })
+
+it('passes the initial Presentation to the host creation callback before reading the created Flow', async () => {
+  const createdFlow = {
+    flowId: 'created',
+    name: 'Created',
+    status: 'active',
+    createdAt: '2026-11-03T00:00:00.000Z',
+    updatedAt: '2026-11-03T00:00:00.000Z',
+    draftRevisionId: 'revision',
+    version: 1,
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
+  } as const
+  const client = new WorkbenchClient(vi.fn())
+  vi.spyOn(client, 'getFlow').mockResolvedValue(createdFlow)
+  const create = vi.fn(async () => createdFlow.flowId)
+  const store = new WorkspaceStore(client, vi.fn())
+  const presentation = { designer: { version: 1, flow: { direction: 'vertical' } } }
+  try {
+    await store.createFlow(createdFlow.name, create, ['tag'], presentation)
+    expect(create).toHaveBeenCalledExactlyOnceWith(createdFlow.name, { tagIds: ['tag'], presentation })
+  } finally {
+    store.dispose()
+  }
+})

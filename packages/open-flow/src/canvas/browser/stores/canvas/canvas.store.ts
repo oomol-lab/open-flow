@@ -4,6 +4,7 @@ import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { ReactiveMap, ReadonlyReactiveMap } from 'value-enhancer/collections'
 import type { NodeId } from '../../../../schema/index.ts'
+import type { CanvasDirection } from '../../../common/direction.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFEdge, RFNode } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
@@ -18,6 +19,7 @@ import { dispose, disposableStore } from '@wopjs/disposable'
 import { cluster } from 'radash'
 import { compute, derive, val } from 'value-enhancer'
 import { reactiveMap } from 'value-enhancer/collections'
+import { canvasDirection } from '../../../common/direction.ts'
 import { isSameViewport } from '../../base/compare.ts'
 import { isInside, isMac } from '../../base/dom.ts'
 import { applyEdgeChanges, applyNodeChanges, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
@@ -48,6 +50,8 @@ export interface CanvasStore$$ {
   readonly viewport: Val<Viewport | undefined>
   readonly miniMapExpanded: Val<boolean | undefined>
   readonly interactiveMode: Val<InteractiveMode>
+  readonly direction: Val<CanvasDirection>
+  readonly changingDirection: Val<boolean>
 
   /** Semantic nodes in the current product model. */
   readonly nodes: ReactiveMap<NodeId, NodeStore>
@@ -84,8 +88,36 @@ export class CanvasStore {
     if (this.$.editable.value) this.#callbacks.onIgnoreNodes?.(nodeIds, ignored)
   }
 
+  public get canChangeDirection(): boolean {
+    return this.#callbacks.onChangeDirection != null
+  }
+
+  public readonly changeDirection = (direction: CanvasDirection): void => {
+    if (!this.$.editable.value || !this.canChangeDirection || this.$.changingDirection.value || this.$.direction.value === direction) return
+    this.layoutComplete = false
+    this.layoutMeasurementAttempts = 0
+    this.$$.changingDirection.set(true)
+    this.$$.direction.set(direction)
+  }
+
   public get canChangeNodeContentHidden(): boolean {
     return this.#callbacks.onChangeNodeContentHidden != null
+  }
+
+  public get canChangeNodeWidth(): boolean {
+    return this.#callbacks.onChangeNodeWidth != null
+  }
+
+  public readonly changeNodeWidth = async (nodeId: string, width: number | undefined, position?: FlowCanvasViewPosition): Promise<boolean> => {
+    const node = this.$.nodes.get(nodeId as NodeId)
+    if (!this.$.editable.value || this.$.changingDirection.value || this.$.direction.value !== 'vertical' || node?.content$.value.kind !== 'condition')
+      return false
+    try {
+      return (await this.#callbacks.onChangeNodeWidth?.(nodeId, width, position)) ?? false
+    } catch (error) {
+      console.error('Failed to save node width.', error)
+      return false
+    }
   }
 
   public readonly changeNodeContentHidden = (nodeId: string, hidden: boolean): void => {
@@ -100,6 +132,7 @@ export class CanvasStore {
   private disposed = false
   private layoutMeasurementAttempts = 0
   private layoutComplete: boolean
+  #modelDirection: CanvasDirection = 'horizontal'
   private deletionTimer: ReturnType<typeof setTimeout> | undefined
   private readonly pendingNodeDeletes = new Set<NodeStore | CommentNodeStore>()
   private readonly pendingDisconnects = new Map<string, FlowCanvasViewEdge>()
@@ -145,6 +178,8 @@ export class CanvasStore {
       miniMapExpanded: this.dispose.add(val<boolean | undefined>()),
       viewport: viewport,
       interactiveMode: interactiveMode$ ?? this.dispose.add(val<InteractiveMode>('touchpad')),
+      direction: this.dispose.add(val(canvasDirection(model.direction))),
+      changingDirection: this.dispose.add(val(false)),
       nodes,
       commentNodes,
     }
@@ -185,22 +220,45 @@ export class CanvasStore {
 
   /** Initializes the shared layout after React Flow has measured the nodes. */
   public completeLayout = (availableWidth?: number): boolean | 'relayout' => {
-    if (this.layoutComplete) return true
+    if (this.disposed || this.layoutComplete) return true
     const nodes = this.allLayoutNodes()
-    if (nodes.length === 0) return true
+    if (nodes.length === 0 && !this.$.changingDirection.value) return true
     for (const node of nodes) {
       const measured = node.$.measured.value
       if (!measured?.width || !measured.height) {
         if (this.layoutMeasurementAttempts++ < 5) return false
         this.layoutMeasurementAttempts = 0
         this.layoutComplete = true
+        this.#restoreDirection()
         return true
       }
     }
-    this.doRelayout(availableWidth)
+    const positions = this.layoutPositions(availableWidth)
+    this.applyPositions(positions)
     this.layoutMeasurementAttempts = 0
     this.layoutComplete = true
+    if (this.$.changingDirection.value) void this.#saveDirection(positions)
+    else this.#callbacks.onMoveNodes(positions)
     return 'relayout'
+  }
+
+  async #saveDirection(positions: Readonly<Record<string, FlowCanvasViewPosition>>): Promise<void> {
+    try {
+      const saved = await this.#callbacks.onChangeDirection?.(this.$.direction.value, positions)
+      if (!saved && !this.disposed) this.#restoreDirection()
+    } catch (error) {
+      if (!this.disposed) this.#restoreDirection()
+      console.error('Failed to save canvas direction.', error)
+    } finally {
+      if (!this.disposed) this.$$.changingDirection.set(false)
+    }
+  }
+
+  #restoreDirection(): void {
+    if (!this.$.changingDirection.value) return
+    this.$$.direction.set(this.#modelDirection)
+    this.applyPositions(Object.fromEntries(this.#modelPositions))
+    this.$$.changingDirection.set(false)
   }
 
   private allLayoutNodes(): NodeStore[] {
@@ -286,6 +344,7 @@ export class CanvasStore {
   }
 
   public onRelayout = (availableWidth?: number): void => {
+    if (this.$.changingDirection.value) return
     try {
       this.doRelayout(availableWidth)
     } catch (e) {
@@ -295,10 +354,23 @@ export class CanvasStore {
 
   // https://reactflow.dev/learn/layouting/layouting#dagre
   private doRelayout(availableWidth?: number) {
+    const positions = this.layoutPositions(availableWidth)
+    this.applyPositions(positions)
+    this.#callbacks.onMoveNodes(positions)
+  }
+
+  private applyPositions(positions: Readonly<Record<string, FlowCanvasViewPosition>>) {
+    for (const node of this.allLayoutNodes()) {
+      const position = positions[node.nodeId]
+      if (position) node.$$.position.set(position)
+    }
+  }
+
+  private layoutPositions(availableWidth?: number): Readonly<Record<string, FlowCanvasViewPosition>> {
     const nodes = this.allLayoutNodes()
     const g = new graphlib.Graph().setDefaultEdgeLabel(() => ({}))
     // Leave enough room for both ends of a smooth-step edge and a short middle segment.
-    g.setGraph({ rankdir: 'LR', ranksep: 80 })
+    g.setGraph({ rankdir: this.$.direction.value === 'vertical' ? 'TB' : 'LR', ranksep: 80 })
 
     const singles = new Set<string>()
     for (const node of nodes) {
@@ -325,24 +397,51 @@ export class CanvasStore {
       }
     }
 
-    layout(g)
+    // Branch order is part of the card layout, so keep the downstream lanes in
+    // that same order instead of letting equal-crossing Dagre solutions flip them.
+    const constraints: { left: string; right: string }[] = []
+    const ordering = new graphlib.Graph()
+    for (const node of nodes) {
+      const content = node.content$.value
+      if (content.kind !== 'condition' && content.kind !== 'approval' && content.kind !== 'wait') continue
+      const targets = [
+        ...new Set(
+          content.outputs.flatMap((port) =>
+            'handle' in port
+              ? this.#connections.value
+                  .filter((edge) => edge.source === node.nodeId && edge.sourceHandle === `$branch:${port.handle}`)
+                  .flatMap((edge) => {
+                    const target = this.$.nodes.get(edge.target as NodeId)
+                    return target ? [target.rfNodeId] : []
+                  })
+              : [],
+          ),
+        ),
+      ]
+      for (let index = 1; index < targets.length; index++) {
+        const left = targets[index - 1]!
+        const right = targets[index]!
+        ordering.setEdge(left, right)
+        if (graphlib.alg.isAcyclic(ordering)) constraints.push({ left, right })
+        else ordering.removeEdge(left, right)
+      }
+    }
+    layout(g, { constraints })
 
-    const positions = wrapLayout(
-      nodes.map((node) => {
-        const { x, y, width, height, rank } = g.node(node.rfNodeId)
-        return {
-          id: node.nodeId,
-          column: rank,
-          x: x - width / 2,
-          y: y - height / 2,
-          width,
-          height,
-        }
-      }),
-      availableWidth,
-    )
-    for (const node of nodes) node.$$.position.set(positions[node.nodeId]!)
-    this.#callbacks.onMoveNodes(positions)
+    const layoutNodes = nodes.map((node) => {
+      const { x, y, width, height, rank } = g.node(node.rfNodeId)
+      return {
+        id: node.nodeId,
+        column: rank,
+        x: x - width / 2,
+        y: y - height / 2,
+        width,
+        height,
+      }
+    })
+    return this.$.direction.value === 'horizontal'
+      ? wrapLayout(layoutNodes, availableWidth)
+      : Object.fromEntries(layoutNodes.map(({ id, x, y }) => [id, { x, y }]))
   }
 
   public duplicateNodes = async (nodeIds?: NodeId[], offset?: XYPosition): Promise<void> => {
@@ -490,6 +589,8 @@ export class CanvasStore {
   }
 
   #syncModel(model: FlowCanvasViewModel): void {
+    this.#modelDirection = canvasDirection(model.direction)
+    if (!this.$.changingDirection.value) this.$$.direction.set(this.#modelDirection)
     const runStatus = model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle
     if (this.#runStatus.value != runStatus) this.#runStatus.set(runStatus)
     if (

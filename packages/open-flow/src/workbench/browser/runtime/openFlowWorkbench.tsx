@@ -1,3 +1,4 @@
+import type { FlowCreationOptions } from '../../../control/common/api.ts'
 import type { WorkflowFile } from '../../../flow/common/workflowFile.ts'
 
 import { IconThemeContext } from '../../../ui/browser/icons/iconTheme.ts'
@@ -233,7 +234,7 @@ export interface OpenFlowWorkbenchProps {
   readonly importFlow?:
     | ((file: WorkflowFile, name: string, idempotencyKey: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>)
     | undefined
-  readonly createFlow?: ((name: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>) | undefined
+  readonly createFlow?: ((name: string, options?: FlowCreationOptions) => Promise<string>) | undefined
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?:
     | {

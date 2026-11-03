@@ -29,6 +29,7 @@ import type {
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { NodeId } from '../../../../schema/index.ts'
+import type { CanvasDirection } from '../../../common/direction.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleImpl } from '../../components/handle.tsx'
@@ -65,6 +66,7 @@ import { IconThemeContext } from '../../../../ui/browser/icons/iconTheme.ts'
 import { TooltipProvider } from '../../../../ui/browser/tooltip.tsx'
 import { canvasMinZoom, canvasMaxZoom } from '../../../common/commands.ts'
 import { CANVAS_CLASSNAME } from '../../base/canvas.ts'
+import { CANVAS_CARD_WIDTH, CANVAS_NODE_PADDING, CANVAS_HEADER_HANDLE_Y, DEFAULT_CANVAS_NODE_HEIGHT } from '../../base/canvas.ts'
 import { getScriptletType, getSharedBlockPath, getTriggerType, isWithCommentType, isWithConditionType, isWithValueType } from '../../base/dragNDrop.ts'
 import { toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
 import { coalesce, toTrue } from '../../base/trivial.ts'
@@ -133,6 +135,9 @@ export interface ReactFlowContainerProps {
   i18n: I18n
   miniMapExpanded$?: Val<boolean | undefined>
   interactiveMode$: Val<InteractiveMode>
+  direction?: CanvasDirection
+  changingDirection?: boolean
+  onChangeDirection?: (direction: CanvasDirection) => void
   editable: boolean
   nodesDraggable?: boolean
   nodeTypes?: NodeTypes
@@ -230,6 +235,9 @@ type FlowControlsProps = Pick<
   | 'toolbar'
   | 'miniMapExpanded$'
   | 'interactiveMode$'
+  | 'direction'
+  | 'changingDirection'
+  | 'onChangeDirection'
   | 'onRelayout'
   | 'onFitView'
   | 'dottedBackground'
@@ -273,6 +281,9 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
       <CanvasViewControls
         readOnly={!props.editable}
         interactiveMode$={props.interactiveMode$}
+        direction={props.direction}
+        changingDirection={props.changingDirection}
+        onChangeDirection={props.onChangeDirection}
         miniMapExpanded$={props.miniMapExpanded$}
         maxZoomReached={maxZoomReached}
         minZoomReached={minZoomReached}
@@ -424,22 +435,32 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       if (tooShort(state.from, position)) return
       const nodeId = toManifestNodeId(state.fromNode.id as RFNodeId)
       const handle = toManifestHandleName(state.fromHandle.id as RFHandleName)
-      const connectionSide = state.fromHandle.type == 'target' ? 'left' : 'right'
+      const upstream = state.fromHandle.type === 'target'
+      const connectionDirection = upstream ? 'upstream' : 'downstream'
+      const vertical = props.direction === 'vertical'
+      const nodePosition = vertical
+        ? {
+            x: position.x - CANVAS_CARD_WIDTH / 2 - CANVAS_NODE_PADDING,
+            y: position.y - (upstream ? DEFAULT_CANVAS_NODE_HEIGHT - CANVAS_NODE_PADDING : CANVAS_NODE_PADDING),
+          }
+        : {
+            x: position.x - (upstream ? CANVAS_CARD_WIDTH + CANVAS_NODE_PADDING : CANVAS_NODE_PADDING),
+            y: position.y - CANVAS_HEADER_HANDLE_Y - CANVAS_NODE_PADDING,
+          }
       cancelAnimationFrame(pickerFrame.current)
       // Open after the release event so it cannot dismiss the new popover.
       pickerFrame.current = requestAnimationFrame(() =>
         props.onRequestAddNode?.({
-          position: connectionSide == 'left' ? { x: position.x - 250, y: position.y } : position,
+          position: nodePosition,
           screenPosition,
-          connectionSide,
-          connection:
-            connectionSide == 'left'
-              ? (source) => ({ source, sourceHandle: '$out', target: nodeId, targetHandle: handle })
-              : (target) => ({ source: nodeId, sourceHandle: handle, target, targetHandle: '$in' }),
+          connectionDirection,
+          connection: upstream
+            ? (source) => ({ source, sourceHandle: '$out', target: nodeId, targetHandle: handle })
+            : (target) => ({ source: nodeId, sourceHandle: handle, target, targetHandle: '$in' }),
         }),
       )
     },
-    [rf, props.editable, props.onRequestAddNode],
+    [rf, props.editable, props.onRequestAddNode, props.direction],
   )
 
   const editable = toTrue(props.editable)
@@ -514,7 +535,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       if (fitTimer) clearTimeout(fitTimer)
       if (transitionTimer) clearTimeout(transitionTimer)
     }
-  }, [flowState, onBeforeFitView, props.layoutMotion, props.onLayoutMeasured, rf, updateNodeInternals])
+  }, [flowState, onBeforeFitView, props.layoutMotion, props.onLayoutMeasured, props.direction, rf, updateNodeInternals])
 
   const viewport = useVal(props.viewport$)
   const nonEmptyViewport = useRef(viewport)
@@ -690,7 +711,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           onViewportChange={onViewportChange}
           maxZoom={canvasMaxZoom}
           minZoom={canvasMinZoom}
-          nodesDraggable={props.nodesDraggable ?? props.editable}
+          nodesDraggable={!props.changingDirection && (props.nodesDraggable ?? props.editable)}
           nodesConnectable={editable && props.onConnect != null}
           onEdgeContextMenu={(event, edge) => (event.preventDefault(), setEdgeContextMenu({ edge, event }))}
           onSelectionContextMenu={(event, selectionNodes) => (event.preventDefault(), setSelectionContextMenu({ nodes: selectionNodes, event }))}
@@ -753,6 +774,9 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             toolbar={props.toolbar}
             miniMapExpanded$={props.miniMapExpanded$}
             interactiveMode$={props.interactiveMode$}
+            direction={props.direction}
+            changingDirection={props.changingDirection}
+            onChangeDirection={props.onChangeDirection}
             layoutMotion={props.layoutMotion}
             onBeforeFitView={onBeforeFitView}
             onRelayout={props.onRelayout}

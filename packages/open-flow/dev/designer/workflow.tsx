@@ -258,7 +258,7 @@ const states: FlowCanvasViewModel = {
                 label: id,
               })),
             },
-      diagnostics: node.id == 'error' || node.id == 'account' ? 1 : undefined,
+      diagnostics: node.id == 'account' ? 1 : undefined,
       connectionRequired: node.id == 'account',
       connectionDeferred: node.id == 'deferred',
       kind: 'task' as const,

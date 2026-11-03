@@ -1,7 +1,11 @@
 import styles from './ReactFlowContainer.module.scss'
+import type { ReactNode } from 'react'
 import type { Val } from 'value-enhancer'
+import type { CanvasDirection } from '../../../common/direction.ts'
 import type { InteractiveMode } from '../../stores/canvas/canvas.store.ts'
 
+import { Radio } from '@base-ui/react/radio'
+import { RadioGroup } from '@base-ui/react/radio-group'
 import { Panel } from '@xyflow/react'
 import { useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -24,6 +28,72 @@ import { CanvasTooltip } from '../../components/tooltip.tsx'
 import { CanvasMiniMap, CanvasMiniMapMenuItem, CanvasMiniMapButton } from './CanvasMiniMap.tsx'
 import { useGetStaticPopupContainer } from './useGetPopupContainer.ts'
 
+function CanvasOptionPicker<Value extends string>({
+  label,
+  value,
+  options,
+  onValueChange,
+  disabled = false,
+  defaultOpen = false,
+}: {
+  readonly label: string
+  readonly value: Value
+  readonly options: readonly { readonly value: Value; readonly icon: ReactNode; readonly label: string; readonly description: string }[]
+  readonly onValueChange: (value: Value) => void
+  readonly disabled?: boolean
+  readonly defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  const getPopupContainer = useGetStaticPopupContainer()
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <CanvasTooltip placement="top" title={label}>
+        <PopoverTrigger
+          render={
+            <Button aria-label={label} className={styles.viewChoiceTrigger} disabled={disabled} size="icon" type="button" variant="ghost">
+              {options.find((option) => option.value === value)?.icon}
+            </Button>
+          }
+        />
+      </CanvasTooltip>
+      <PopoverContent
+        align="start"
+        aria-label={label}
+        className={styles.viewChoicePanel}
+        data-canvas-control-scope
+        container={typeof document == 'undefined' ? undefined : getPopupContainer()}
+        side="top"
+        sideOffset={14}
+      >
+        <RadioGroup
+          aria-label={label}
+          className={styles.viewChoices}
+          disabled={disabled}
+          onValueChange={(next) => {
+            onValueChange(next)
+            setOpen(false)
+          }}
+          value={value}
+        >
+          {options.map((option) => (
+            <Radio.Root
+              key={option.value}
+              nativeButton
+              value={option.value}
+              render={<Button className={styles.viewChoice} onClick={() => setOpen(false)} type="button" variant="outline" />}
+            >
+              {option.icon}
+              <strong>{option.label}</strong>
+              <span>{option.description}</span>
+            </Radio.Root>
+          ))}
+        </RadioGroup>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 export function CanvasInteractiveMode({
   interactiveMode$,
   defaultOpen = false,
@@ -33,62 +103,27 @@ export function CanvasInteractiveMode({
 }) {
   const t = useTranslate()
   const mode = useVal(interactiveMode$)
-  const [open, setOpen] = useState(defaultOpen)
-  const getPopupContainer = useGetStaticPopupContainer()
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <CanvasTooltip placement="top" title={t('interactiveMode.title')}>
-        <PopoverTrigger
-          render={
-            <Button aria-label={t('interactiveMode.title')} className={styles.interactiveModeTrigger} size="icon" type="button" variant="ghost">
-              <i className={mode == 'mouse' ? 'i-lucide-light:mouse' : 'i-lucide-light:touchpad'} data-mode-icon />
-            </Button>
-          }
-        />
-      </CanvasTooltip>
-      <PopoverContent
-        align="start"
-        className={styles.interactiveModePanel}
-        data-canvas-control-scope
-        container={typeof document == 'undefined' ? undefined : getPopupContainer()}
-        side="top"
-        sideOffset={14}
-      >
-        <div aria-label={t('interactiveMode.title')} className={styles.interactiveModeChoices} role="radiogroup">
-          <Button
-            aria-checked={mode == 'mouse'}
-            className={styles.interactiveModeChoice}
-            onClick={() => {
-              interactiveMode$.set('mouse')
-              setOpen(false)
-            }}
-            role="radio"
-            type="button"
-            variant="outline"
-          >
-            <i aria-hidden="true" className="i-lucide-light:mouse" />
-            <strong>{t('interactiveMode.mouse')}</strong>
-            <span>{t('interactiveMode.mouseDescription')}</span>
-          </Button>
-          <Button
-            aria-checked={mode == 'touchpad'}
-            className={styles.interactiveModeChoice}
-            onClick={() => {
-              interactiveMode$.set('touchpad')
-              setOpen(false)
-            }}
-            role="radio"
-            type="button"
-            variant="outline"
-          >
-            <i aria-hidden="true" className="i-lucide-light:touchpad" />
-            <strong>{t('interactiveMode.touchpad')}</strong>
-            <span>{t('interactiveMode.touchpadDescription')}</span>
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+    <CanvasOptionPicker
+      defaultOpen={defaultOpen}
+      label={t('interactiveMode.title')}
+      onValueChange={(next) => interactiveMode$.set(next)}
+      options={[
+        {
+          value: 'mouse',
+          icon: <i aria-hidden="true" className="i-lucide-light:mouse" />,
+          label: t('interactiveMode.mouse'),
+          description: t('interactiveMode.mouseDescription'),
+        },
+        {
+          value: 'touchpad',
+          icon: <i aria-hidden="true" className="i-lucide-light:touchpad" />,
+          label: t('interactiveMode.touchpad'),
+          description: t('interactiveMode.touchpadDescription'),
+        },
+      ]}
+      value={mode}
+    />
   )
 }
 
@@ -115,11 +150,50 @@ function CanvasInteractiveModeMenu({ interactiveMode$ }: { readonly interactiveM
   )
 }
 
+interface DirectionControlProps {
+  readonly direction?: CanvasDirection
+  readonly changingDirection?: boolean
+  readonly onChangeDirection?: (direction: CanvasDirection) => void
+}
+
+function CanvasDirectionIcon({ direction }: { readonly direction: CanvasDirection }) {
+  return <i aria-hidden="true" className={direction === 'vertical' ? 'i-tabler-light:arrow-autofit-down' : 'i-tabler-light:arrow-autofit-right'} />
+}
+
+function CanvasDirectionButton({ direction = 'horizontal', changingDirection, onChangeDirection }: DirectionControlProps) {
+  const t = useTranslate()
+  return (
+    <CanvasOptionPicker
+      disabled={changingDirection}
+      label={t('layoutDirection.title')}
+      onValueChange={(next) => onChangeDirection?.(next)}
+      options={[
+        {
+          value: 'vertical',
+          icon: <CanvasDirectionIcon direction="vertical" />,
+          label: t('layoutDirection.vertical'),
+          description: t('layoutDirection.verticalDescription'),
+        },
+        {
+          value: 'horizontal',
+          icon: <CanvasDirectionIcon direction="horizontal" />,
+          label: t('layoutDirection.horizontal'),
+          description: t('layoutDirection.horizontalDescription'),
+        },
+      ]}
+      value={direction}
+    />
+  )
+}
+
 function CanvasOptionsMenu({
   onRelayout,
   miniMapExpanded$,
   interactiveMode$,
-}: {
+  direction = 'horizontal',
+  changingDirection,
+  onChangeDirection,
+}: DirectionControlProps & {
   readonly onRelayout?: () => void
   readonly miniMapExpanded$?: Val<boolean | undefined>
   readonly interactiveMode$?: Val<InteractiveMode>
@@ -128,10 +202,25 @@ function CanvasOptionsMenu({
   return (
     <>
       {onRelayout != null && (
-        <DropdownMenuItem onClick={onRelayout}>
+        <DropdownMenuItem disabled={changingDirection} onClick={onRelayout}>
           <i aria-hidden="true" className="i-carbon:template" />
           {t('optimize')}
         </DropdownMenuItem>
+      )}
+      {onChangeDirection && (
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t('layoutDirection.title')}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={direction} onValueChange={(value) => onChangeDirection(value as CanvasDirection)}>
+            <DropdownMenuRadioItem disabled={changingDirection} value="vertical">
+              <CanvasDirectionIcon direction="vertical" />
+              {t('layoutDirection.vertical')}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem disabled={changingDirection} value="horizontal">
+              <CanvasDirectionIcon direction="horizontal" />
+              {t('layoutDirection.horizontal')}
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
       )}
       {miniMapExpanded$ != null && <CanvasMiniMapMenuItem miniMapExpanded$={miniMapExpanded$} />}
       {interactiveMode$ != null && <CanvasInteractiveModeMenu interactiveMode$={interactiveMode$} />}
@@ -141,6 +230,9 @@ function CanvasOptionsMenu({
 
 export function CanvasViewControls({
   readOnly = false,
+  direction,
+  changingDirection,
+  onChangeDirection,
   interactiveMode$,
   miniMapExpanded$,
   maxZoomReached,
@@ -151,7 +243,7 @@ export function CanvasViewControls({
   onZoomOut,
   onZoomReset,
   zoom,
-}: {
+}: DirectionControlProps & {
   readonly interactiveMode$?: Val<InteractiveMode>
   readonly miniMapExpanded$?: Val<boolean | undefined>
   readonly readOnly?: boolean
@@ -207,7 +299,14 @@ export function CanvasViewControls({
               {t('fitView')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <CanvasOptionsMenu onRelayout={onRelayout} miniMapExpanded$={miniMapExpanded$} interactiveMode$={interactiveMode$} />
+            <CanvasOptionsMenu
+              direction={direction}
+              changingDirection={changingDirection}
+              onChangeDirection={onChangeDirection}
+              onRelayout={onRelayout}
+              miniMapExpanded$={miniMapExpanded$}
+              interactiveMode$={interactiveMode$}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -232,7 +331,7 @@ export function CanvasViewControls({
             <i className="i-lucide-light:scan" />
           </Button>
         </CanvasTooltip>
-        {(onRelayout != null || miniMapExpanded$ != null || interactiveMode$ != null) && (
+        {(onChangeDirection != null || onRelayout != null || miniMapExpanded$ != null || interactiveMode$ != null) && (
           <>
             <div className={styles.viewOptions} data-expanded={optionsExpanded} aria-hidden={!optionsExpanded}>
               <div className={styles.viewOptionsClip}>
@@ -240,10 +339,13 @@ export function CanvasViewControls({
                   <span aria-hidden="true" className={styles.viewSeparator} />
                   {onRelayout != null && (
                     <CanvasTooltip placement="top" title={t('optimize')}>
-                      <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" type="button" variant="ghost">
+                      <Button aria-label={t('optimize')} disabled={changingDirection} onClick={onRelayout} size="icon" type="button" variant="ghost">
                         <i aria-hidden="true" className="i-carbon:template" />
                       </Button>
                     </CanvasTooltip>
+                  )}
+                  {onChangeDirection != null && (
+                    <CanvasDirectionButton direction={direction} changingDirection={changingDirection} onChangeDirection={onChangeDirection} />
                   )}
                   {miniMapExpanded$ != null && <CanvasMiniMapButton miniMapExpanded$={miniMapExpanded$} />}
                   {interactiveMode$ != null && <CanvasInteractiveMode interactiveMode$={interactiveMode$} />}

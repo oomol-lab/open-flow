@@ -122,6 +122,14 @@ there is no Draft/Live distinction for tag membership.
 The SDK exposes tag directory/mutation methods, `updateFlow`, `setFlowTags`, optional creation/import tag IDs,
 and these filters on `listFlows`. Workbench host creation and import callbacks receive the optional
 tag selection as their last options argument and must forward it in the creation request.
+Creation callbacks also receive optional `presentation` and must forward it unchanged.
+
+### Initial canvas presentation
+
+`POST /v1/flows` accepts optional `presentation: Record<string, JsonValue>` alongside
+`name`, `teamId`, `tagIds` and `version: 1`. It is saved with the initial Flow and Revision
+in the same transaction and participates in creation idempotency. Omission retains the
+existing empty Presentation. The SDK exposes it as the final optional `createFlow` argument.
 
 ### Shareable workflow files
 
@@ -395,6 +403,24 @@ interface Presentation {
 ```
 
 Update bodies use `{ expectedRevision, value, version: 1 }`. Stale CAS returns `flow.presentation-conflict`.
+
+Workbench stores layout direction at `value.designer.flow.direction` under
+`designer.version: 1`. Values are `horizontal` and `vertical`; an absent or null field means
+horizontal. Positions, viewport, comments and hidden content retain their existing meanings.
+Workflow files and Publication snapshots preserve direction with the rest of Presentation.
+This field does not change the execution model or Engine contract.
+
+Optional `value.designer.flow.verticalNodeWidths` maps Condition node IDs to positive pixel
+widths for vertical layouts. Horizontal layouts ignore these preferences. An absent entry
+uses the automatic width derived from branch count; rendering never shrinks below that
+automatic minimum. Resizing saves the width and any changed position as one undoable
+Presentation edit. Workflow files and Publication snapshots preserve these preferences.
+
+Workbench's local `open-flow:canvas-direction` preference defaults to vertical and only
+initializes newly created Flows. Existing and imported Flows use their saved direction.
+An explicit direction switch relayouts nodes and saves direction plus positions as one
+undoable Presentation edit, then remembers the selected direction for new Flows. Undo/redo
+restores the Flow layout without changing that local default.
 
 `GET /v1/flows/{flowId}/editor` combines data for initial editor loading:
 

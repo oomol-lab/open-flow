@@ -2,7 +2,6 @@ import styles from './CommentNodeContent.module.scss'
 import type { Components } from 'react-markdown'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
-import { useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -11,7 +10,9 @@ import { Checkbox } from '../../../../../ui/browser/checkbox.tsx'
 import { Textarea } from '../../../../../ui/browser/textarea.tsx'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { MarkdownPreview } from '../../../preview/markdownPreview.tsx'
+import { COMMENT_MINIMUM_SIZE } from '../../../stores/node/commentNode.store.ts'
 import { CanvasDarkContext, useCanvasStore } from '../../CanvasStoreContext.tsx'
+import { NodeResizeHandle } from './NodeResizeHandle.tsx'
 
 const markdownComponents: Components = {
   input: ({ type, checked }) => (type === 'checkbox' ? <Checkbox className={styles.taskCheckbox} checked={checked ?? false} readOnly tabIndex={-1} /> : null),
@@ -85,41 +86,17 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
 
 function CommentResizeButton({ store }: { readonly store: CommentNodeStore }) {
   const t = useTranslate()
-  const reactFlow = useStoreApi()
-  const drag = useRef<{ x: number; y: number; width: number; height: number; zoom: number } | null>(null)
+  const size = useVal(store.$.size)
   return (
-    <button
-      type="button"
-      className={`${styles.resizeButton} nodrag nopan`}
-      aria-label={t('comment.resize')}
-      title={t('comment.resize')}
-      onDoubleClick={(event) => event.stopPropagation()}
-      onPointerDown={(event) => {
-        if (!event.isPrimary || event.button !== 0) return
-        event.stopPropagation()
-        event.currentTarget.setPointerCapture(event.pointerId)
-        drag.current = { x: event.clientX, y: event.clientY, ...store.$.size.value, zoom: reactFlow.getState().transform[2] }
-      }}
-      onPointerMove={(event) => {
-        const start = drag.current
-        if (!start || !event.currentTarget.hasPointerCapture(event.pointerId)) return
-        store.resize({ width: start.width + (event.clientX - start.x) / start.zoom, height: start.height + (event.clientY - start.y) / start.zoom })
-      }}
-      // Pointer capture ends on release or cancellation, including outside the button.
-      onLostPointerCapture={() => {
-        drag.current = null
-      }}
-      onKeyDown={(event) => {
-        const step = event.shiftKey ? 40 : 10
-        const delta = ({ ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] } as const)[event.key]
-        if (!delta) return
-        event.preventDefault()
-        event.stopPropagation()
-        const size = store.$.size.value
-        store.resize({ width: size.width + delta[0], height: size.height + delta[1] })
-      }}
+    <NodeResizeHandle
+      className={styles.resizeButton}
+      label={t('comment.resize')}
+      position="bottom-right"
+      minimum={COMMENT_MINIMUM_SIZE}
+      size={size}
+      onResize={store.resize}
     >
       <i aria-hidden="true" className="i-mdi:resize-bottom-right" />
-    </button>
+    </NodeResizeHandle>
   )
 }

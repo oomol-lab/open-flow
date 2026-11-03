@@ -73,6 +73,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onDropAddItem,
 }) => {
   const editable = useVal(flowCanvasStore.$.editable)
+  const direction = useVal(flowCanvasStore.$.direction)
+  const changingDirection = useVal(flowCanvasStore.$.changingDirection)
   const nodeMiniMapPhase = useVal(flowCanvasStore.$.nodeMiniMapPhase)
 
   useEffect(flowCanvasStore.setupForceDelete, [])
@@ -89,6 +91,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
               bottomRightTools={bottomRightTools}
               toolbar={toolbar}
               editable={editable}
+              direction={direction}
+              changingDirection={changingDirection}
+              onChangeDirection={editable && flowCanvasStore.canChangeDirection ? flowCanvasStore.changeDirection : undefined}
               nodesDraggable={nodesDraggable ?? editable}
               className={className}
               i18n={flowCanvasStore.i18n}

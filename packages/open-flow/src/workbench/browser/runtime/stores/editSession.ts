@@ -242,7 +242,8 @@ export class EditSession {
     if (draft == null || presentation == null) return false
     const next = update?.(presentation.value) ?? presentation.value
     const presentationChange = canvasPresentationChange(presentation.value, next)
-    if (dequal(applyFlowChanges(draft, changes).content, draft.content) && presentationChange.nodeIds.length == 0) return true
+    if (dequal(applyFlowChanges(draft, changes).content, draft.content) && presentationChange.nodeIds.length == 0 && !presentationChange.directionChanged)
+      return true
     const generation = this.#history.generation
     const inverse = inverseFlowChanges(draft.content, changes)
     this.#history.beginChange()

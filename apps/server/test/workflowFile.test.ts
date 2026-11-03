@@ -26,6 +26,22 @@ const file: WorkflowFile = {
   presentation: { viewport: { x: 30, y: 20, zoom: 1 }, comments: [] },
 }
 
+it('creates a Flow with its initial layout atomically and includes it in idempotency and export', async () => {
+  const service = await openService(':memory:')
+  const app = createServerApp(service, { resolveControlActor: () => 'alice' })
+  const client = new ControlClient(async (path, init) => app.request(`http://test${path}`, init))
+  const layout = { designer: { version: 1, flow: { direction: 'vertical', nodes: {} } } }
+  const created = await client.createFlow('Vertical', 'create-vertical', undefined, undefined, layout)
+  expect((await client.getEditor(created.flowId)).presentation.value).toEqual(layout)
+  expect(await client.createFlow('Vertical', 'create-vertical', undefined, undefined, layout)).toEqual(created)
+  await expect(client.createFlow('Vertical', 'create-vertical', undefined, undefined, {})).rejects.toMatchObject({ code: 'flow.conflict' })
+  expect((await client.exportFlow(created.flowId)).presentation).toEqual(layout)
+  const imported = await client.importFlow(await client.exportFlow(created.flowId))
+  expect((await client.getEditor(imported.flowId)).presentation.value).toEqual(layout)
+  const legacy = await client.createFlow('Legacy', 'legacy')
+  expect((await client.getEditor(legacy.flowId)).presentation.value).toEqual({})
+})
+
 it('imports once, keeps layout and node identities, and isolates actor scopes on HTTP', async () => {
   const service = await openService(':memory:')
   let actor = 'alice'

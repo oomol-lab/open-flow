@@ -22,13 +22,19 @@ production branch as `main`, the root directory as `/`, the build command as
 non-production branches. Set the build variable `BUN_VERSION` to the version in the root
 `packageManager` field.
 
-The default **Cards · Content & records** gallery uses the production card, execution status and record controls. It compares compact identity-only cards, plain text summaries and framed report previews, alongside schedule, condition, approval, running and failed examples. Empty content creates no placeholder. Execution status appears once in the footer; lightweight record actions open sample results and logs. Preview surfaces are distinct from the card shell in both themes.
+The default **Cards · Content & records** gallery uses the production card, execution status and record controls. It compares compact identity-only cards, plain text summaries and framed report previews, alongside schedule, condition, approval, running and failed examples. Empty content creates no placeholder. Execution status and icon-only record actions appear in the header and open sample results and logs. Preview surfaces are distinct from the card shell in both themes.
 
 **Workflow components** shows the single execution canvas with a bottom command dock. It does not add an inspector or reserve a sidebar column. It includes Task, Trigger, Condition, Value and Comment nodes, grouped inputs and connected ports. **Reset samples** restores the sample layout and selection.
 
 **Comment / Properties** (`?story=comment-properties`) displays the production `EditorContextPanel` heading and `CommentInspector` Source/Markdown tabs, with editable, empty-content and read-only samples side by side. Each editable sample keeps its saved title and Markdown in local state. Trigger-specific property panels live under Triggers / [type] / Properties.
 
 The **Nodes** section collects production canvas nodes under boundary inputs. Its **Condition / Node States** story covers empty, single and multiple cases, plus long rule labels, long output labels and both sides overflowing together.
+
+**Condition / Layout directions** (`?story=condition-vertical-layout`) renders production Condition nodes with idle, running, failed and long-title examples. Use the lower-left direction control to compare horizontal rows and vertical columns, including selected ports and record popovers.
+
+**Canvas / Vertical workflow** (`?story=vertical-workflow`) uses the production canvas for an English application-processing example. Switch direction in the lower-left controls to relayout the real nodes, ports and edges. Story actions cover Provider disconnection with previous records, a failed retry retaining results and logs, configuration errors, deferred accounts, manual approval and compact status icons. The sample saves changes only in page state. **Undo & Redo / Canvas history** (`?story=canvas-history`) additionally exercises direction and layout persistence through the production EditSession, undo/redo, save failure and reload.
+
+**Canvas / Cards · Identity indicators** (`?story=canvas-card-indicators`) compares node diagnostics and execution outcomes at normal and compact zoom, including failed runs with and without data records.
 
 **Value / Node States** (`?story=node-value`) displays hidden, empty, primitive, structured, nullable, long-content and invalid values using the production canvas. The node toolbar places the content visibility toggle immediately before Delete, only when the node has collapsible content. The story toolbar provides read-only and reset actions; canvas actions are logged.
 

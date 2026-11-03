@@ -149,6 +149,11 @@ export interface PublicationPresentation {
   readonly presentation: Presentation | null
 }
 
+export interface FlowCreationOptions {
+  readonly tagIds?: readonly string[]
+  readonly presentation?: Readonly<Record<string, JsonValue>>
+}
+
 export interface Presentation {
   readonly revision: number
   readonly updatedAt: string
@@ -941,10 +946,22 @@ export class ControlClient {
     )
   }
 
-  async createFlow(name: string, idempotencyKey = `flow-${randomId()}`, teamId?: string, tagIds?: readonly string[]): Promise<Flow> {
+  async createFlow(
+    name: string,
+    idempotencyKey = `flow-${randomId()}`,
+    teamId?: string,
+    tagIds?: readonly string[],
+    initialPresentation?: Readonly<Record<string, JsonValue>>,
+  ): Promise<Flow> {
     return flow(
       await this.request('/v1/flows', {
-        body: JSON.stringify({ name, ...(teamId == null ? {} : { teamId }), ...(tagIds == null ? {} : { tagIds }), version: 1 }),
+        body: JSON.stringify({
+          name,
+          ...(teamId == null ? {} : { teamId }),
+          ...(tagIds == null ? {} : { tagIds }),
+          ...(initialPresentation == null ? {} : { presentation: initialPresentation }),
+          version: 1,
+        }),
         headers: { 'idempotency-key': idempotencyKey },
         method: 'POST',
       }),

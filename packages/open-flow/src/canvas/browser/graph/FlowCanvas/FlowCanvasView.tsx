@@ -15,9 +15,11 @@ import { toViewEdge } from './model.ts'
 function callbacksFromProps(props: FlowCanvasViewProps): ViewCallbacks {
   return {
     onIgnoreNodes: props.onIgnoreNodes,
+    onChangeDirection: props.onChangeDirection,
     onAddNode: props.onAddNode,
     onMoveNodes: props.onMoveNodes,
     onChangeNodeContentHidden: props.onChangeNodeContentHidden,
+    onChangeNodeWidth: props.onChangeNodeWidth,
     onChangeComment: props.onChangeComment,
     onConnect: props.onConnect,
     onDeleteNodes: props.onDeleteNodes,

@@ -122,10 +122,12 @@ export function CanvasNodePicker({
       anchor={request.screenPosition}
       centered={centered}
       isOptionDisabled={(option) =>
-        request.connectionSide != null &&
+        request.connectionDirection != null &&
         (option.kind == 'trigger' ||
           option.kind == 'comment' ||
-          (request.connectionSide == 'left' && (option.kind == 'approval' || option.kind == 'condition' || option.kind == 'wait')))
+          (request.connectionDirection == 'downstream' && option.kind == 'value') ||
+          (request.connectionDirection == 'upstream' &&
+            (option.kind == 'approval' || option.kind == 'condition' || option.kind == 'wait' || option.kind == 'outputs')))
       }
     />
   )

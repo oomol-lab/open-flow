@@ -414,13 +414,15 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     expect(
       (await app.request('/v1/flows', { ...publicRequest, body: JSON.stringify({ name: 'Public Team Flow', teamId: 'team-1', version: 1 }) })).status,
     ).toBe(409)
+    const initialPresentation = { designer: { version: 1, flow: { direction: 'vertical' } } }
     const createdResponse = await app.request('/connector/flows', {
-      body: JSON.stringify({ name: 'Team Flow', teamId: 'team-2', version: 1 }),
+      body: JSON.stringify({ name: 'Team Flow', teamId: 'team-2', presentation: initialPresentation, version: 1 }),
       headers: { 'content-type': 'application/json', 'idempotency-key': 'create-team-flow' },
       method: 'POST',
     })
     expect(createdResponse.status).toBe(201)
     flowId = ((await createdResponse.json()) as { readonly flowId: string }).flowId
+    expect(await (await app.request(`/v1/flows/${flowId}/presentation`)).json()).toMatchObject({ value: initialPresentation })
     await service.control.connectors.listConnectorProviders('operator', flowId)
     expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
     const other = await service.control.flows.createFlow('operator', 'Default Team Flow', 'create-default-team-flow')

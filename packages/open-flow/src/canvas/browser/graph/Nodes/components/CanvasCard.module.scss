@@ -164,21 +164,7 @@
   overflow: hidden;
 }
 
-.footer {
-  margin: 2px 8px 0;
-  padding: 8px 0 2px;
-  border-top: 1px solid color-mix(in srgb, var(--node-border-color) 60%, transparent);
-}
-
-.afterPreview {
-  margin-top: 4px;
-  border-top: 0;
-}
-
 .branches {
-  grid-template-columns: minmax(0, 1fr) 12px 84px;
-  column-gap: 12px;
-  display: grid;
   margin: 0 -8px;
 }
 

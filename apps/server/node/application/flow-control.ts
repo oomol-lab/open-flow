@@ -118,6 +118,7 @@ export class FlowControl {
     idempotencyKey: string,
     connectorTeamId?: string,
     tagIds?: readonly string[],
+    initialPresentation?: Readonly<Record<string, JsonValue>>,
   ): Promise<{ readonly created: boolean; readonly flow: Flow }> {
     return await this.#createFlow({
       actorId,
@@ -126,7 +127,8 @@ export class FlowControl {
       idempotencyKey,
       connectorTeamId,
       content: emptyRevision(),
-      request: { connectorTeamId: connectorTeamId ?? null, name },
+      presentation: initialPresentation,
+      request: { connectorTeamId: connectorTeamId ?? null, name, ...(initialPresentation == null ? {} : { presentation: initialPresentation }) },
     })
   }
 

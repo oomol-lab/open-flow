@@ -42,7 +42,7 @@ export default defineConfig({
             ...collection,
             prefix: 'tabler-light',
             icons: Object.fromEntries(
-              ['square-rounded-plus', 'square-rounded-minus'].map((name) => {
+              ['square-rounded-plus', 'square-rounded-minus', 'arrow-autofit-down', 'arrow-autofit-right'].map((name) => {
                 const icon = collection.icons[name]!
                 return [name, { ...icon, body: icon.body.replaceAll('stroke-width="2"', 'stroke-width="1.5"') }]
               }),

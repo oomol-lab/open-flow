@@ -15,7 +15,7 @@ import { toRFNodeId } from '../../base/rfHelpers.ts'
 import { NODE_TYPE } from './constants.ts'
 import { createNodeInteraction } from './nodeInteraction.ts'
 
-const minimumSize: Size = { width: 350, height: 160 }
+export const COMMENT_MINIMUM_SIZE: Size = { width: 350, height: 160 }
 const defaultSize: Size = { width: 350, height: 260 }
 
 const dragHandle = `.${NODE_HANDLE_CLASSNAME}`
@@ -99,7 +99,7 @@ export class CommentNodeStore {
   }
 
   public readonly resize = ({ width, height }: Size): void => {
-    this.$$.size.set({ width: Math.max(minimumSize.width, width), height: Math.max(minimumSize.height, height) })
+    this.$$.size.set({ width: Math.max(COMMENT_MINIMUM_SIZE.width, width), height: Math.max(COMMENT_MINIMUM_SIZE.height, height) })
   }
 
   public readonly togglePreview = (): void => {

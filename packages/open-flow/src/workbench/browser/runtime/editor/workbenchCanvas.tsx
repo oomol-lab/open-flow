@@ -38,6 +38,7 @@ interface Props {
   readonly addNodeOptions: readonly AddNodeOption[]
   readonly disabled: boolean
   readonly interactiveMode$?: FlowCanvasViewProps['interactiveMode$']
+  readonly onChangeDirection?: FlowCanvasViewProps['onChangeDirection']
   readonly theme: WorkbenchTheme
   readonly subscribeCanvasCommands?: FlowCanvasViewProps['subscribeCanvasCommands']
   readonly focusNodeRequest?: {
@@ -49,6 +50,7 @@ interface Props {
   readonly onAddNode: (option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>) => Promise<string | undefined>
   readonly onConnect: (edge: Omit<DesignerEdge, 'id'>) => void
   readonly onChangeNodeContentHidden?: (nodeId: string, hidden: boolean) => void
+  readonly onChangeNodeWidth?: FlowCanvasViewProps['onChangeNodeWidth']
   readonly onChangeComment: (nodeId: string, value: { readonly content: string; readonly title: string }) => void
   readonly onCopy: () => void
   readonly onDeleteEdge: (edge: DesignerEdge) => void
@@ -96,12 +98,14 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     onAddNode,
     onConnect,
     onChangeNodeContentHidden,
+    onChangeNodeWidth,
     onChangeComment,
     onCopy,
     onDeleteEdge,
     onDeleteNodes,
     onDuplicate,
     onMoveNodes,
+    onChangeDirection,
     onMoveViewport,
     subscribeCanvasCommands,
     onPaste,
@@ -355,6 +359,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         }}
         onConnect={onConnect}
         onChangeNodeContentHidden={onChangeNodeContentHidden}
+        onChangeNodeWidth={onChangeNodeWidth}
         onChangeComment={onChangeComment}
         onDeleteNodes={(nodeIds) => {
           // Move focus off the toolbar before deleting its node and unmounting the button.
@@ -370,6 +375,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           onDuplicate(positions, offset)
         }}
         onMoveNodes={onMoveNodes}
+        onChangeDirection={onChangeDirection}
         onMoveViewport={onMoveViewport}
         subscribeCanvasCommands={subscribeCanvasCommands}
         onCopy={(nodeIds) => {

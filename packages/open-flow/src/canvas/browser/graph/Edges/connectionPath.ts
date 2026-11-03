@@ -9,21 +9,33 @@ export function connectionNodeBounds(node: InternalNode | undefined | null): Rec
   return { ...node.internals.positionAbsolute, width: node.measured.width, height: node.measured.height }
 }
 
-/** Return connections offset both side turns and horizontal lanes by their endpoint distance. */
+/** Route backward connections outside both cards in their primary and cross axes. */
 export function getConnectionPath({ sourceBounds, targetBounds, ...params }: ConnectionPathParams): [string, number, number] {
-  const { sourceX, sourceY, targetX, targetY, sourcePosition = Position.Bottom, targetPosition = Position.Top } = params
-  const reverse = sourcePosition === Position.Left && targetPosition === Position.Right
-  const horizontal = (sourcePosition === Position.Right && targetPosition === Position.Left) || reverse
+  const { sourcePosition = Position.Bottom, targetPosition = Position.Top } = params
+  const vertical =
+    (sourcePosition === Position.Bottom && targetPosition === Position.Top) || (sourcePosition === Position.Top && targetPosition === Position.Bottom)
+  const reverse =
+    (sourcePosition === Position.Left && targetPosition === Position.Right) || (sourcePosition === Position.Top && targetPosition === Position.Bottom)
+  const horizontal =
+    (sourcePosition === Position.Right && targetPosition === Position.Left) || (sourcePosition === Position.Left && targetPosition === Position.Right)
+  const primary = (x: number, y: number) => (vertical ? y : x)
+  const cross = (x: number, y: number) => (vertical ? x : y)
+  const sourceX = primary(params.sourceX, params.sourceY)
+  const sourceY = cross(params.sourceX, params.sourceY)
+  const targetX = primary(params.targetX, params.targetY)
+  const targetY = cross(params.targetX, params.targetY)
   const outputX = reverse ? targetX : sourceX
   const inputX = reverse ? sourceX : targetX
-  if (!horizontal || outputX < inputX) {
+  if ((!horizontal && !vertical) || outputX < inputX) {
     const [path, x, y] = getBezierPath(params)
     return [path, x, y]
   }
 
-  // Normalize input-origin drags to the output-to-input direction.
-  const outputBounds = reverse ? targetBounds : sourceBounds
-  const inputBounds = reverse ? sourceBounds : targetBounds
+  // Input-origin drags use the same output-to-input geometry as completed edges.
+  const axes = (bounds: Rect | undefined): Rect | undefined =>
+    bounds && (vertical ? { x: bounds.y, y: bounds.x, width: bounds.height, height: bounds.width } : bounds)
+  const outputBounds = axes(reverse ? targetBounds : sourceBounds)
+  const inputBounds = axes(reverse ? sourceBounds : targetBounds)
   const outputY = reverse ? targetY : sourceY
   const inputY = reverse ? sourceY : targetY
   const minimumOffset = 40
@@ -53,7 +65,9 @@ export function getConnectionPath({ sourceBounds, targetBounds, ...params }: Con
     { x: left, y: laneY },
     { x: left, y: inputY },
     { x: inputX, y: inputY },
-  ].filter((point, index, all) => index === 0 || point.x !== all[index - 1]!.x || point.y !== all[index - 1]!.y)
+  ]
+    .filter((point, index, all) => index === 0 || point.x !== all[index - 1]!.x || point.y !== all[index - 1]!.y)
+    .map((point) => (vertical ? { x: point.y, y: point.x } : point))
   if (reverse) points.reverse()
   const radius = 16
   let path = `M ${points[0]!.x} ${points[0]!.y}`
@@ -68,5 +82,6 @@ export function getConnectionPath({ sourceBounds, targetBounds, ...params }: Con
     path += ` Q ${corner.x} ${corner.y} ${corner.x + ((next.x - corner.x) * r) / after} ${corner.y + ((next.y - corner.y) * r) / after}`
   }
   const end = points.at(-1)!
-  return [`${path} L ${end.x} ${end.y}`, (left + right) / 2, laneY]
+  const middle = (left + right) / 2
+  return [`${path} L ${end.x} ${end.y}`, vertical ? laneY : middle, vertical ? middle : laneY]
 }

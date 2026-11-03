@@ -1,5 +1,6 @@
 import styles from './RunChips.module.scss'
 import type { ReactNode } from 'react'
+import type { TFunction } from 'val-i18n'
 import type { FlowCanvasViewNodeRun } from '../../FlowCanvas/model.ts'
 
 import { useState } from 'react'
@@ -18,32 +19,38 @@ function RecordChip({
   children,
   icon,
   status,
+  compact = false,
 }: {
   readonly label: string
   readonly run: FlowCanvasViewNodeRun
   readonly children?: ReactNode
   readonly icon?: string
   readonly status?: string
+  readonly compact?: boolean
 }) {
   const t = useTranslate()
   const getContainer = useGetStaticPopupContainer()
   const popupContainer = getContainer()
   const runId = run.runId
+  const trigger = (
+    <PopoverTrigger
+      render={
+        <button
+          type="button"
+          aria-label={compact ? label : undefined}
+          className={`${styles.chip} ${status ? styles.status : ''} ${compact ? styles.compactChip : ''} nodrag nopan nokey`}
+          data-status={status}
+          onClick={(event) => event.stopPropagation()}
+        />
+      }
+    >
+      {icon && <i className={icon} aria-hidden="true" />}
+      {!compact && <span>{label}</span>}
+    </PopoverTrigger>
+  )
   return (
     <Popover>
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            className={`${styles.chip} ${status ? styles.status : ''} nodrag nopan nokey`}
-            data-status={status}
-            onClick={(event) => event.stopPropagation()}
-          />
-        }
-      >
-        {icon && <i className={icon} aria-hidden="true" />}
-        <span>{label}</span>
-      </PopoverTrigger>
+      {compact ? <CanvasTooltip title={label}>{trigger}</CanvasTooltip> : trigger}
       <PopoverContent
         container={popupContainer}
         side="bottom"
@@ -135,39 +142,62 @@ export function ImagePreview({ images, run, title }: { readonly images: readonly
   )
 }
 
-export function RunChips({ run }: { readonly run: FlowCanvasViewNodeRun }) {
-  const t = useTranslate()
+function runStatusLabel(run: FlowCanvasViewNodeRun, t: TFunction): string {
   const elapsed = run.startedAt != null && run.finishedAt != null ? Date.parse(run.finishedAt) - Date.parse(run.startedAt) : undefined
   const label = t(`canvasCard.status.${run.status}`)
   const progress =
     run.status == 'running' && run.progress != null && Number.isFinite(run.progress) ? ` · ${Math.round(Math.min(100, Math.max(0, run.progress)))}%` : ''
-  const status = `${label}${progress}${elapsed != null && Number.isFinite(elapsed) && elapsed >= 0 ? ` · ${formatDuration(elapsed)}` : ''}`
-  const state = run.status
-  const icon =
-    state == 'handled'
-      ? 'i-lucide-light:triangle-alert'
-      : state == 'running'
-        ? 'i-codicon:loading'
-        : state == 'success'
-          ? 'i-codicon:check'
-          : state == 'error'
-            ? 'i-codicon:error'
-            : state == 'waiting'
-              ? 'i-carbon:time'
-              : 'i-codicon:circle-outline'
+  return `${label}${progress}${elapsed != null && Number.isFinite(elapsed) && elapsed >= 0 ? ` · ${formatDuration(elapsed)}` : ''}`
+}
+
+function runStatusIcon(state: FlowCanvasViewNodeRun['status']): string {
+  return state == 'handled'
+    ? 'i-lucide-light:triangle-alert'
+    : state == 'running'
+      ? 'i-codicon:loading'
+      : state == 'success'
+        ? 'i-codicon:check'
+        : state == 'error'
+          ? 'i-codicon:error'
+          : state == 'waiting'
+            ? 'i-carbon:time'
+            : 'i-codicon:circle-outline'
+}
+
+export function RunStatusIndicator({ run }: { readonly run: FlowCanvasViewNodeRun }) {
+  const t = useTranslate()
+  const label = runStatusLabel(run, t)
+  return (
+    <CanvasTooltip title={label} placement="top">
+      <span className={styles.statusIndicator} data-status={run.status} role="img" aria-label={label} tabIndex={0}>
+        <i className={runStatusIcon(run.status)} aria-hidden="true" />
+      </span>
+    </CanvasTooltip>
+  )
+}
+
+export function hasRunRecords(run: FlowCanvasViewNodeRun | undefined): run is FlowCanvasViewNodeRun {
+  return run != null && (run.status !== 'idle' || run.outputs !== undefined || (run.logs?.length ?? 0) > 0 || (run.artifacts?.length ?? 0) > 0)
+}
+
+export function RunChips({ run }: { readonly run: FlowCanvasViewNodeRun }) {
+  const t = useTranslate()
+  if (!hasRunRecords(run)) return null
   return (
     <div className={styles.row}>
-      <RecordChip label={status} run={run} icon={icon} status={state}>
-        {run.error != null && <JSONViewer data={run.error} shouldExpandNode={collapseAllNested} />}
-      </RecordChip>
+      {run.status !== 'idle' && (
+        <RecordChip label={runStatusLabel(run, t)} run={run} icon={runStatusIcon(run.status)} status={run.status} compact>
+          {run.error != null && <JSONViewer data={run.error} shouldExpandNode={collapseAllNested} />}
+        </RecordChip>
+      )}
       <div className={styles.links}>
         {run.outputs !== undefined && (
-          <RecordChip label={t('canvasCard.result')} run={run} icon="i-codicon:output">
+          <RecordChip label={t('canvasCard.result')} run={run} icon="i-codicon:output" compact>
             <JSONViewer data={run.outputs} shouldExpandNode={collapseAllNested} />
           </RecordChip>
         )}
         {(run.logs?.length ?? 0) > 0 && (
-          <RecordChip label={t('canvasCard.logs', { count: run.logs?.length ?? 0 })} run={run} icon="i-codicon:list-unordered">
+          <RecordChip label={t('canvasCard.logs', { count: run.logs?.length ?? 0 })} run={run} icon="i-codicon:list-unordered" compact>
             {run.logs?.map((log, index) => (
               <div className={styles.log} key={`${log.time}-${index}`}>
                 <small>
@@ -179,7 +209,7 @@ export function RunChips({ run }: { readonly run: FlowCanvasViewNodeRun }) {
           </RecordChip>
         )}
         {(run.artifacts?.length ?? 0) > 0 && (
-          <RecordChip label={t('canvasCard.files', { count: run.artifacts?.length ?? 0 })} run={run} icon="i-codicon:files">
+          <RecordChip label={t('canvasCard.files', { count: run.artifacts?.length ?? 0 })} run={run} icon="i-codicon:files" compact>
             <p>{t('canvasCard.artifactMetadata')}</p>
             <JSONViewer data={run.artifacts} shouldExpandNode={collapseAllNested} />
           </RecordChip>

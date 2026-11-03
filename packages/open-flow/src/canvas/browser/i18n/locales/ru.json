@@ -653,5 +653,17 @@
     "Europe/Moscow": "Москва",
     "Australia/Sydney": "Сидней",
     "Pacific/Auckland": "Окленд"
+  },
+  "layoutDirection": {
+    "title": "Направление схемы",
+    "horizontal": "Горизонтально",
+    "vertical": "Вертикально",
+    "verticalDescription": "Сверху вниз, ветви расположены рядом.",
+    "horizontalDescription": "Слева направо, ветви расположены друг под другом."
+  },
+  "nodeWidth": {
+    "resizeLeft": "Изменить ширину слева",
+    "resizeRight": "Изменить ширину справа",
+    "reset": "Восстановить автоматическую ширину"
   }
 }

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { applyFlowChanges, decodeChangeOperations } from '../../../../flow/common/change.ts'
 import { createCodeTask, createValue } from '../../../../flow/common/nodeChanges.ts'
 import { ApiError, WorkbenchClient } from '../api.ts'
-import { setComment, setNodePositions } from '../canvasPresentation.ts'
+import { savedDirection, savedPositions, savedVerticalNodeWidths, setComment, setNodePositions } from '../canvasPresentation.ts'
 import { designerGraph } from '../workspace.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
@@ -760,6 +760,108 @@ it('adds and selects a response node without an execution edge in one undoable c
     expect(saved().draft.content).toEqual(before)
     await store.redo()
     expect(saved().draft.content).toEqual(after)
+  } finally {
+    store.dispose()
+  }
+})
+
+it('saves direction and measured positions in one history entry and retains earlier history', async () => {
+  const { store, saved, change, update } = await session()
+  try {
+    await store.moveNodes({ code: { x: 700, y: 20 } })
+    const before = saved().presentation.value
+    const content = saved().draft.content
+    update.mockClear()
+    expect(await store.changeDirection('vertical', { code: { x: 80, y: 300 }, value: { x: 80, y: 0 } })).toBe(true)
+    const after = saved().presentation.value
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(savedDirection(after)).toBe('vertical')
+    expect(change).not.toHaveBeenCalled()
+    await store.undo()
+    expect(saved().presentation.value).toEqual(before)
+    expect(store.history$.value.canUndo).toBe(true)
+    await store.redo()
+    expect(saved().presentation.value).toEqual(after)
+    expect(saved().draft.content).toEqual(content)
+    await store.undo()
+    await store.changeDirection('vertical', {})
+    expect(store.history$.value.canRedo).toBe(false)
+    await store.undo()
+    expect(savedDirection(saved().presentation.value)).toBe('horizontal')
+  } finally {
+    store.dispose()
+  }
+})
+
+it('recovers the saved direction after a failed layout save', async () => {
+  const { store, saved, update } = await session()
+  try {
+    update.mockRejectedValueOnce(new Error('Storage unavailable'))
+    expect(await store.changeDirection('vertical', { code: { x: 0, y: 300 } })).toBe(false)
+    await vi.waitFor(() => expect(store.history$.value.failed).toBe(false))
+    expect(savedDirection(store.$.presentation.value!.value)).toBe('horizontal')
+    expect(savedDirection(saved().presentation.value)).toBe('horizontal')
+    expect(store.history$.value.canUndo).toBe(false)
+  } finally {
+    store.dispose()
+  }
+})
+
+it('saves a Condition width and left-edge position together, restores them and ignores the width in horizontal layouts', async () => {
+  const { store, saved, change, update } = await session()
+  try {
+    const option = store.$.addNodeOptions.value.find((candidate) => candidate.kind === 'condition')!
+    const nodeId = (await store.addNode(option, { x: 500, y: 50 }))!
+    await store.changeDirection('vertical', {})
+    const content = saved().draft.content
+    change.mockClear()
+    update.mockClear()
+    expect(await store.saveNodeWidth(nodeId, 700, { x: 120, y: 50 })).toBe(true)
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(change).not.toHaveBeenCalled()
+    expect(savedVerticalNodeWidths(saved().presentation.value)[nodeId]).toBe(700)
+    expect(savedPositions(saved().presentation.value)[nodeId]).toEqual({ x: 120, y: 50 })
+    await store.undo()
+    expect(savedVerticalNodeWidths(saved().presentation.value)[nodeId]).toBeUndefined()
+    expect(savedPositions(saved().presentation.value)[nodeId]).toEqual({ x: 500, y: 50 })
+    await store.redo()
+    expect(savedVerticalNodeWidths(saved().presentation.value)[nodeId]).toBe(700)
+    await store.changeDirection('horizontal', {})
+    await store.changeDirection('vertical', {})
+    const graph = designerGraph(saved().draft, saved().presentation.value)
+    expect(graph.nodes.find((node) => node.id === nodeId)).toMatchObject({ verticalWidth: 700 })
+    await store.saveNodeWidth(nodeId, undefined)
+    expect(savedVerticalNodeWidths(saved().presentation.value)[nodeId]).toBeUndefined()
+    await store.undo()
+    expect(savedVerticalNodeWidths(saved().presentation.value)[nodeId]).toBe(700)
+    store.selectNodes([nodeId])
+    await store.duplicateSelectedNodes()
+    const duplicate = store.$.selectedNodeIds.value[0]!
+    expect(savedVerticalNodeWidths(saved().presentation.value)[duplicate]).toBe(700)
+    await store.undo()
+    store.selectNodes([nodeId])
+    await store.deleteSelectedNodes()
+    expect(savedVerticalNodeWidths(saved().presentation.value)[nodeId]).toBeUndefined()
+    await store.undo()
+    expect(savedVerticalNodeWidths(saved().presentation.value)[nodeId]).toBe(700)
+    expect(saved().draft.content).toEqual(content)
+  } finally {
+    store.dispose()
+  }
+})
+
+it('recovers saved Condition width and position after a resize save fails', async () => {
+  const { store, saved, update } = await session()
+  try {
+    const option = store.$.addNodeOptions.value.find((candidate) => candidate.kind === 'condition')!
+    const nodeId = (await store.addNode(option, { x: 500, y: 50 }))!
+    await store.saveNodeWidth(nodeId, 600)
+    update.mockRejectedValueOnce(new Error('Storage unavailable'))
+    expect(await store.saveNodeWidth(nodeId, 800, { x: 300, y: 50 })).toBe(false)
+    await vi.waitFor(() => expect(store.history$.value.failed).toBe(false))
+    expect(savedVerticalNodeWidths(store.$.presentation.value!.value)[nodeId]).toBe(600)
+    expect(savedVerticalNodeWidths(saved().presentation.value)[nodeId]).toBe(600)
+    expect(savedPositions(store.$.presentation.value!.value)[nodeId]).toEqual({ x: 500, y: 50 })
   } finally {
     store.dispose()
   }

@@ -277,7 +277,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     if (input === false) throw new ControlError(serverErrorCode.requestInvalid, 'Connector Flow request is invalid.')
     const key = context.req.header('idempotency-key')
     if (key == null || key.length == 0 || key.length > 256) throw new ControlError(serverErrorCode.requestInvalid, 'Idempotency-Key is invalid.')
-    const created = await service.control.flows.createFlow(actorId, input.name, key, input.teamId, input.tagIds)
+    const created = await service.control.flows.createFlow(actorId, input.name, key, input.teamId, input.tagIds, input.presentation)
     return json(created.created ? 201 : 200, created.flow)
   })
 
@@ -660,7 +660,9 @@ async function readWebhookBody(request: Request): Promise<JsonValue> {
 
 async function connectorFlowRequest(
   request: Request,
-): Promise<{ readonly name: string; readonly teamId: string; readonly tagIds?: readonly string[] } | false> {
+): Promise<
+  { readonly name: string; readonly teamId: string; readonly tagIds?: readonly string[]; readonly presentation?: Readonly<Record<string, JsonValue>> } | false
+> {
   try {
     const value: unknown = JSON.parse(new TextDecoder().decode(await readBody(request, maximumHostRequestBytes, () => new Error('Host request is too large.'))))
     const body = controlRequests.createFlow(value)
