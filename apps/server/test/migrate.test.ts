@@ -852,6 +852,35 @@ it('preserves the effective hosted LLM when upgrading an environment-managed Con
   }
 })
 
+it.each(['oomol', null] as const)('preserves the effective custom LLM when upgrading an environment-managed Connector over saved %s mode', async (mode) => {
+  const file = await databaseFile()
+  const old = legacyDatabase(file, 60)
+  old.prepare('INSERT INTO deployment_settings (id, revision, service_mode, updated_at) VALUES (1, 4, ?, 123)').run(mode)
+  old.exec(`UPDATE service_profiles SET connector_origin = 'https://connector.oomol.dev', connector_token = 'hosted-key' WHERE mode = 'oomol';
+    UPDATE service_profiles SET connector_origin = 'https://connector.example.com', connector_token = 'connector-key',
+    llm_origin = 'https://models.example.com', llm_token = 'model-key' WHERE mode = 'custom'`)
+  old.close()
+  const database = Database.open(file)
+  const environment = { connectorOrigin: 'https://environment-connector.example.com', connectorToken: 'environment-key' }
+  try {
+    const configured = new Settings(new SettingsStore(database), environment)
+    expect(configured.status()).toMatchObject({ revision: 4, services: { mode: 'custom' }, llm: { mode: 'custom', source: 'settings' } })
+    expect(configured.llm()?.config).toEqual({ origin: 'https://models.example.com', token: 'model-key' })
+    expect(configured.selectLlm(4, 'oomol')).toBe('saved')
+    expect(configured.llm()?.config).toEqual({ origin: 'https://new-llm.oomol.dev', token: 'hosted-key' })
+  } finally {
+    database.close()
+  }
+  const reopened = Database.open(file)
+  try {
+    const configured = new Settings(new SettingsStore(reopened), environment)
+    expect(configured.status().llm.mode).toBe('oomol')
+    expect(configured.llm()?.config?.token).toBe('hosted-key')
+  } finally {
+    reopened.close()
+  }
+})
+
 it('preserves legacy team bindings and remembers names across database reopen', async () => {
   const file = await databaseFile()
   const old = legacyDatabase(file, 44)

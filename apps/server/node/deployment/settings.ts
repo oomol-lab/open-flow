@@ -46,7 +46,7 @@ export class Settings {
     if (environment.llmOrigin != null && environment.llmToken != null) {
       this.#environmentLlm = createLlm(environment.llmOrigin, environment.llmToken)
     }
-    this.#store.initializeLlmMode(this.oomolManaged() ? 'oomol' : (this.#store.state().serviceMode ?? 'none'))
+    this.#store.initializeLlmMode(this.#environmentConnector != null ? (this.oomolManaged() ? 'oomol' : 'custom') : (this.#store.state().serviceMode ?? 'none'))
   }
 
   connector(): ConnectorClient | undefined {
