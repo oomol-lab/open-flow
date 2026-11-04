@@ -39,7 +39,7 @@
     "auto": "Système"
   },
   "settings": {
-    "servicesDescription": "Configurez les connexions utilisées par les workflows pour appeler des services externes et exécuter les nœuds LLM et Agent.",
+    "servicesDescription": "Configurez le Connector utilisé par les workflows pour appeler des services externes.",
     "unsavedTitle": "Enregistrer les modifications ?",
     "unsavedDescription": "Vous avez des modifications non enregistrées.",
     "discardChanges": "Ignorer les modifications",
@@ -95,8 +95,8 @@
     "services": "Connexion aux services",
     "connectorAddress": "URL du Connector",
     "connectorToken": "Jeton du Connector (facultatif)",
-    "llmAddress": "URL du LLM (facultative)",
-    "llmToken": "Jeton du LLM",
+    "llmAddress": "URL du LLM",
+    "llmToken": "API Key",
     "saveServices": "Enregistrer et appliquer",
     "connected": "Connecté",
     "validation": {
@@ -108,8 +108,8 @@
     },
     "serviceSelectionRequired": "Sélectionnez une connexion de service",
     "serviceIncomplete": "Modifiez le service sélectionné pour compléter sa configuration",
-    "hostedIncludes": "Utilisez les services Connector et LLM hébergés officiellement, sans les déployer vous-même.",
-    "selfHostedDescription": "Connectez vos propres services Connector, console d’autorisation et LLM.",
+    "hostedIncludes": "Utilisez le Connector hébergé par OOMOL sans le déployer vous-même.",
+    "selfHostedDescription": "Connectez votre propre Connector et votre console d’autorisation.",
     "connectorAddressHelp": "Adresse utilisée par les workflows pour découvrir et exécuter les fonctions des services externes via Connector.",
     "connectorTokenHelp": "Identifiant d’accès aux requêtes Connector. Laissez vide si l’authentification est désactivée.",
     "consoleAddressHelp": "Adresse pour autoriser les comptes externes et gérer les connexions.",
@@ -127,7 +127,16 @@
     "oomolSavingHint": "Autorisation terminée. Enregistrement de la configuration des services hébergés.",
     "oomolSaveFailed": "Autorisation réussie, mais échec de l’enregistrement",
     "oomolSaveFailedHint": "Votre autorisation est conservée. Réessayez l’enregistrement.",
-    "oomolRetrySave": "Réessayer l’enregistrement"
+    "oomolRetrySave": "Réessayer l’enregistrement",
+    "llm": "LLM",
+    "llmSource": "Source du service",
+    "llmOomol": "Service OOMOL",
+    "llmCustom": "Service personnalisé",
+    "llmOomolHint": "Utilisez la connexion OOMOL existante, sans saisir d’adresse ni de clé.",
+    "llmOomolUnavailable": "Connectez votre compte OOMOL pour utiliser son service de modèles.",
+    "oomolConnect": "Connecter OOMOL",
+    "llmDescription": "Choisissez le service de modèles utilisé par les workflows.",
+    "llmCustomHint": "Connectez un service de modèles compatible OpenAI avec votre URL et votre clé API."
   },
   "team": {
     "createFailed": "Impossible de créer le Flow pour cette équipe du Connector.",

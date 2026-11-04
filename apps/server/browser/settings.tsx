@@ -6,7 +6,7 @@ import { Button, Input, Dialog, DialogContent, DialogHeader, DialogTitle, Dialog
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Trans, useTranslate } from 'val-i18n-react'
-import { validateServiceProfile } from '../common/service-profile.ts'
+import { validateLlmConfiguration, validateServiceProfile } from '../common/service-profile.ts'
 import { HostPage, HostField } from './host-ui.tsx'
 import { posthog } from './posthog.ts'
 import { useUnsavedChanges } from './unsaved-changes.tsx'
@@ -35,20 +35,11 @@ function setting(value: unknown, originKey: string, token: boolean) {
 function serviceProfile(value: unknown) {
   if (value == null || typeof value != 'object') return
   const p = value as Record<string, unknown>
-  if (
-    typeof p.connectorOrigin != 'string' ||
-    typeof p.consoleOrigin != 'string' ||
-    typeof p.llmOrigin != 'string' ||
-    typeof p.connectorTokenConfigured != 'boolean' ||
-    typeof p.llmTokenConfigured != 'boolean'
-  )
-    return
+  if (typeof p.connectorOrigin != 'string' || typeof p.consoleOrigin != 'string' || typeof p.connectorTokenConfigured != 'boolean') return
   return {
     connectorOrigin: p.connectorOrigin,
     consoleOrigin: p.consoleOrigin,
-    llmOrigin: p.llmOrigin,
     connectorTokenConfigured: p.connectorTokenConfigured,
-    llmTokenConfigured: p.llmTokenConfigured,
   }
 }
 function config(value: unknown) {
@@ -64,6 +55,17 @@ function config(value: unknown) {
   const integration = setting(body.integration, 'publicOrigin', false)
   const llm = setting(body.llm, 'origin', true)
   if (runtime == null || console == null || integration == null || llm == null) return
+  const llmBody = body.llm as Record<string, unknown>
+  const customLlm = llmBody.custom as Record<string, unknown> | undefined
+  if (
+    (llmBody.mode !== null && llmBody.mode != 'oomol' && llmBody.mode != 'custom') ||
+    typeof llmBody.managed != 'boolean' ||
+    typeof llmBody.oomolAvailable != 'boolean' ||
+    typeof llmBody.oomolManaged != 'boolean' ||
+    typeof customLlm?.origin != 'string' ||
+    typeof customLlm.tokenConfigured != 'boolean'
+  )
+    return
   const profiles = services.profiles as Record<string, unknown> | undefined
   const oomol = serviceProfile(profiles?.oomol)
   const custom = serviceProfile(profiles?.custom)
@@ -71,7 +73,14 @@ function config(value: unknown) {
   return {
     connector: { console, runtime },
     integration,
-    llm,
+    llm: {
+      ...llm,
+      mode: llmBody.mode == 'oomol' ? ('oomol' as const) : llmBody.mode == 'custom' ? ('custom' as const) : null,
+      managed: llmBody.managed,
+      oomolAvailable: llmBody.oomolAvailable,
+      oomolManaged: llmBody.oomolManaged,
+      custom: { origin: customLlm.origin, tokenConfigured: customLlm.tokenConfigured },
+    },
     revision: Number(body.revision),
     services: { mode: services.mode, managed: services.managed, profiles: { oomol, custom } },
   }
@@ -602,8 +611,6 @@ function ServiceEditor({
     connectorOrigin: profile.connectorOrigin || (mode == 'oomol' ? 'https://connector.oomol.com' : ''),
     connectorToken: '',
     consoleOrigin: profile.consoleOrigin,
-    llmOrigin: profile.llmOrigin,
-    llmToken: '',
   })
   const initial = useRef(draft)
   const [pending, setPending] = useState(false)
@@ -616,7 +623,6 @@ function ServiceEditor({
   const errors = validateServiceProfile(mode, {
     ...draft,
     connectorToken: draft.connectorToken || (profile.connectorTokenConfigured && !keyCleared ? 'stored' : ''),
-    llmToken: draft.llmToken || (profile.llmTokenConfigured ? 'stored' : ''),
   })
   const dirty =
     authorizedDraft != null || keyCleared || Object.keys(draft).some((key) => draft[key as keyof typeof draft] != initial.current[key as keyof typeof draft])
@@ -637,7 +643,6 @@ function ServiceEditor({
         body: JSON.stringify({
           ...nextDraft,
           connectorToken: nextDraft.connectorToken == '' && profile.connectorTokenConfigured && !keyCleared ? null : nextDraft.connectorToken,
-          llmToken: nextDraft.llmToken == '' && profile.llmTokenConfigured ? null : nextDraft.llmToken,
           expectedRevision: current.revision,
           version: 1,
         }),
@@ -681,8 +686,6 @@ function ServiceEditor({
           ['connectorOrigin', t('settings.connectorAddress'), t('settings.connectorAddressHelp'), 'url', 'https://connector.example.com'],
           ['connectorToken', t('settings.connectorToken'), t('settings.connectorTokenHelp'), 'password', ''],
           ['consoleOrigin', t('settings.console'), t('settings.consoleAddressHelp'), 'url', 'https://console.example.com'],
-          ['llmOrigin', t('settings.llmAddress'), t('settings.llmAddressHelp'), 'url', 'https://llm.example.com'],
-          ['llmToken', t('settings.llmToken'), t('settings.llmTokenHelp'), 'password', ''],
         ] as const)
   return (
     <>
@@ -736,7 +739,7 @@ function ServiceEditor({
             >
               <div className={`grid gap-4 ${mode == 'oomol' ? 'py-2' : ''}`}>
                 {fields.map(([key, label, description, type, placeholder]) => {
-                  const stored = key == 'connectorToken' ? profile.connectorTokenConfigured && !keyCleared : key == 'llmToken' && profile.llmTokenConfigured
+                  const stored = key == 'connectorToken' && profile.connectorTokenConfigured && !keyCleared
                   const input = (
                     <div className="host-field-control group/api-key flex-1 min-w-0">
                       <Input
@@ -751,11 +754,7 @@ function ServiceEditor({
                         autoComplete={type == 'password' ? 'off' : 'url'}
                         disabled={pending || authorizing}
                         className={mode == 'oomol' ? 'pr-9' : undefined}
-                        required={
-                          key == 'connectorOrigin' ||
-                          (key == 'connectorToken' && mode == 'oomol' && !stored) ||
-                          (key == 'llmToken' && draft.llmOrigin != '' && !stored)
-                        }
+                        required={key == 'connectorOrigin' || (key == 'connectorToken' && mode == 'oomol' && !stored)}
                         onChange={(event) => setDraft({ ...draft, [key]: event.currentTarget.value })}
                       />
                       {mode == 'oomol' && (draft.connectorToken != '' || stored) && (
@@ -866,10 +865,10 @@ function ConnectorSettings({
     }
   }
   return (
-    <section ref={container} className="host-card" aria-label={t('settings.services')}>
+    <section ref={container} className="host-card" aria-label={t('settings.connector')}>
       <div className="host-card-heading">
         <div className="host-card-heading-copy">
-          <h2>{t('settings.services')}</h2>
+          <h2>{t('settings.connector')}</h2>
           <p>{t('settings.servicesDescription')}</p>
         </div>
         {missing && (
@@ -917,6 +916,282 @@ function ConnectorSettings({
         />
       )}
     </section>
+  )
+}
+
+function LlmSettings({
+  current,
+  onSaved,
+  onConflict,
+  onUnauthorized,
+  onConnectorChange,
+}: {
+  readonly current: Configuration
+  readonly onSaved: (value: Configuration) => void
+  readonly onConflict: () => Promise<void>
+  readonly onUnauthorized: () => void
+  readonly onConnectorChange: () => void
+}): ReactElement {
+  const t = useTranslate()
+  const container = useRef<HTMLElement>(null)
+  const [editing, setEditing] = useState<ServiceMode>()
+  const [pending, setPending] = useState(false)
+  async function select(mode: ServiceMode): Promise<void> {
+    if (pending || mode == current.llm.mode) return
+    setPending(true)
+    try {
+      const response = await fetch('/config/llm/mode', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mode, version: 1, expectedRevision: current.revision }),
+      })
+      if (response.status == 401) {
+        onUnauthorized()
+        return
+      }
+      if (response.status == 409) {
+        toast.error(t('settings.changed'))
+        await onConflict()
+        return
+      }
+      const value = config(await response.json())
+      if (!response.ok || value == null) throw new Error('Invalid configuration response.')
+      onSaved(value)
+    } catch {
+      toast.error(t('settings.saveFailed'))
+    } finally {
+      setPending(false)
+    }
+  }
+  return (
+    <section ref={container} className="host-card" aria-label={t('settings.llm')}>
+      <div className="host-card-heading">
+        <div className="host-card-heading-copy">
+          <h2>{t('settings.llm')}</h2>
+          <p>{t('settings.llmDescription')}</p>
+        </div>
+      </div>
+      <div className="host-card-body">
+        <fieldset className="settings-service-options" disabled={pending || current.llm.managed}>
+          <legend className="sr-only">{t('settings.llmSource')}</legend>
+          {(['oomol', 'custom'] as const).map((mode) => (
+            <div className="settings-service-option" key={mode} data-selected={current.llm.mode == mode || undefined}>
+              <label>
+                <strong>{t(mode == 'oomol' ? 'settings.llmOomol' : 'settings.llmCustom')}</strong>
+                <input
+                  type="radio"
+                  name="llm-mode"
+                  value={mode}
+                  checked={current.llm.mode == mode}
+                  aria-describedby={`llm-${mode}-description`}
+                  aria-invalid={current.llm.mode == mode && !current.llm.configured}
+                  onChange={() => void select(mode)}
+                />
+              </label>
+              <p id={`llm-${mode}-description`}>
+                {t(mode == 'custom' ? 'settings.llmCustomHint' : current.llm.oomolAvailable ? 'settings.llmOomolHint' : 'settings.llmOomolUnavailable')}
+              </p>
+              <Button
+                type="button"
+                variant={current.llm.mode == mode && !current.llm.configured ? 'destructive' : 'outline'}
+                size="sm"
+                disabled={mode == 'oomol' && current.llm.oomolManaged}
+                onClick={() => setEditing(mode)}
+              >
+                {t(
+                  mode == 'oomol'
+                    ? current.llm.oomolAvailable
+                      ? 'settings.edit'
+                      : 'settings.oomolConnect'
+                    : current.llm.custom.tokenConfigured
+                      ? 'settings.edit'
+                      : 'settings.configure',
+                )}
+              </Button>
+            </div>
+          ))}
+        </fieldset>
+      </div>
+      {current.llm.managed && <p className="settings-service-note">{t('settings.environmentHint')}</p>}
+      {editing == 'custom' && (
+        <LlmEditor
+          current={current}
+          onSaved={onSaved}
+          onConflict={onConflict}
+          onUnauthorized={onUnauthorized}
+          container={container.current}
+          onClose={() => setEditing(undefined)}
+        />
+      )}
+      {editing == 'oomol' && (
+        <ServiceEditor
+          mode="oomol"
+          current={current}
+          container={container.current}
+          onConflict={onConflict}
+          onUnauthorized={onUnauthorized}
+          onClose={() => setEditing(undefined)}
+          onSaved={(value) => {
+            onSaved(value)
+            onConnectorChange()
+          }}
+        />
+      )}
+    </section>
+  )
+}
+
+function LlmEditor({
+  current,
+  onSaved,
+  onConflict,
+  onUnauthorized,
+  container,
+  onClose,
+}: {
+  readonly current: Configuration
+  readonly onSaved: (value: Configuration) => void
+  readonly onConflict: () => Promise<void>
+  readonly onUnauthorized: () => void
+  readonly container: HTMLElement | null
+  readonly onClose: () => void
+}): ReactElement {
+  const t = useTranslate()
+  const originInput = useRef<HTMLInputElement>(null)
+  const tokenInput = useRef<HTMLInputElement>(null)
+  const [origin, setOrigin] = useState(current.llm.custom.origin)
+  const [token, setToken] = useState('')
+  const [pending, setPending] = useState(false)
+  const dirty = origin != current.llm.custom.origin || token != ''
+  const tokenUpdate = token == '' && current.llm.custom.tokenConfigured ? null : token
+  const errors = validateLlmConfiguration(origin, tokenUpdate)
+  const { guard, confirmation } = useUnsavedChanges({ dirty, pending, save, container })
+  async function save(): Promise<boolean> {
+    if (pending || current.llm.managed) return false
+    if (errors.origin || errors.token) {
+      const input = errors.origin ? originInput : tokenInput
+      input.current?.focus()
+      return false
+    }
+    setPending(true)
+    try {
+      const response = await fetch('/config/llm/custom', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          version: 1,
+          expectedRevision: current.revision,
+          origin,
+          token: tokenUpdate,
+        }),
+      })
+      if (response.status == 401) {
+        onUnauthorized()
+        return false
+      }
+      if (response.status == 409) {
+        toast.error(t('settings.changed'))
+        await onConflict()
+        return false
+      }
+      const value = config(await response.json())
+      if (!response.ok || value == null) throw new Error('Invalid configuration response.')
+      onSaved(value)
+      onClose()
+      posthog?.capture('configuration_saved', { configuration_type: 'llm' })
+      return true
+    } catch {
+      toast.error(t('settings.saveFailed'))
+      return false
+    } finally {
+      setPending(false)
+    }
+  }
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !pending) guard(onClose)
+      }}
+    >
+      <DialogContent
+        container={container}
+        closeLabel={t('settings.cancel')}
+        showCloseButton={!pending}
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl"
+      >
+        <DialogHeader>
+          <DialogTitle>{t('settings.llmCustom')}</DialogTitle>
+        </DialogHeader>
+        <form
+          className="grid gap-4 host-field-feedback-scope"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault()
+            void save()
+          }}
+        >
+          <HostField id="llm-origin" label={t('settings.llmAddress')}>
+            <div className="host-field-control">
+              <Input
+                ref={originInput}
+                id="llm-origin"
+                type="url"
+                autoComplete="url"
+                autoFocus
+                spellCheck={false}
+                placeholder="https://llm.example.com"
+                required
+                disabled={pending}
+                value={origin}
+                aria-invalid={errors.origin != null}
+                aria-describedby={errors.origin ? 'llm-origin-error' : undefined}
+                onChange={(event) => setOrigin(event.target.value)}
+              />
+              {errors.origin && (
+                <p id="llm-origin-error" className="host-field-error" role="alert">
+                  {t(`settings.validation.${errors.origin}`)}
+                </p>
+              )}
+            </div>
+          </HostField>
+          <HostField id="llm-token" label={t('settings.llmToken')}>
+            <div className="host-field-control">
+              <Input
+                ref={tokenInput}
+                id="llm-token"
+                type="password"
+                autoComplete="new-password"
+                spellCheck={false}
+                required={!current.llm.custom.tokenConfigured}
+                disabled={pending}
+                value={token}
+                placeholder={current.llm.custom.tokenConfigured ? '••••••••' : ''}
+                aria-invalid={errors.token != null}
+                aria-describedby={errors.token ? 'llm-token-error' : undefined}
+                onChange={(event) => setToken(event.target.value)}
+              />
+              {errors.token && (
+                <p id="llm-token-error" className="host-field-error" role="alert">
+                  {t(`settings.validation.${errors.token}`)}
+                </p>
+              )}
+            </div>
+          </HostField>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={pending} onClick={() => guard(onClose)}>
+              {t('settings.cancel')}
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {t('settings.save')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+      {confirmation}
+    </Dialog>
   )
 }
 
@@ -980,9 +1255,7 @@ export function useConfiguration(onUnauthorized: () => void, enabled = true) {
 export function serviceConfigurationMissing(current: Configuration | undefined): boolean {
   return (
     current != null &&
-    (current.services.mode == null ||
-      !current.connector.runtime.configured ||
-      ((current.services.mode == 'oomol' || current.services.profiles.custom.llmOrigin != '') && !current.llm.configured))
+    (current.services.mode == null || !current.connector.runtime.configured || (current.services.mode == 'oomol' && !current.connector.runtime.tokenConfigured))
   )
 }
 
@@ -1028,6 +1301,7 @@ export function SettingsPage({
       ) : (
         <>
           <ConnectorSettings current={current} onConflict={load} onConnectorChange={onConnectorChange} onSaved={saved} onUnauthorized={onUnauthorized} />
+          <LlmSettings current={current} onConflict={load} onConnectorChange={onConnectorChange} onSaved={saved} onUnauthorized={onUnauthorized} />
           <section className="host-card">
             <SettingItem
               analyticsType="integration"

@@ -22,8 +22,8 @@ export class OomolLogin {
   }
 
   async start(actorId: string, revision: number, signal: AbortSignal) {
+    if (this.#settings.oomolManaged()) throw new ControlError(serverErrorCode.configurationEnvironmentManaged, 'Configuration is managed by the environment.')
     const current = this.#settings.status()
-    if (current.services.managed) throw new ControlError(serverErrorCode.configurationEnvironmentManaged, 'Configuration is managed by the environment.')
     if (current.revision != revision) throw new ControlError(serverErrorCode.configurationConflict, 'Configuration changed.')
     this.#login?.controller.abort()
     const login: Login = {

@@ -5,6 +5,7 @@ import { Database } from '../node/storage/database.ts'
 import { migrate } from '../node/storage/migrate.ts'
 import { StateStore, stateLimits } from '../node/storage/state-store.ts'
 import { Store } from '../node/storage/store.ts'
+import { restoreGroupedServiceSettings } from './support/legacySettings.ts'
 
 const databases: Database[] = []
 afterEach(() => databases.splice(0).forEach((database) => database.close()))
@@ -124,6 +125,7 @@ it('migrates byte-accounted data without losing values or history', async () => 
   const store = new StateStore(database.connection, (operation) => database.transaction(operation))
   store.set('f', 'draft', 'r', 'key', '你好')
   store.insert('f', 'draft', 'flow', await hashIdentities(['a']))
+  restoreGroupedServiceSettings(database.connection)
   database.connection.exec(
     "CREATE TABLE flow_state_usage (flow_id TEXT, scope TEXT, bytes INTEGER); ALTER TABLE flow_dedupe_spaces ADD COLUMN mode TEXT NOT NULL DEFAULT 'new'; ALTER TABLE flow_dedupe_spaces ADD COLUMN watermark_json TEXT; DROP TABLE flow_dedupe_pending; UPDATE flow_state_values SET size = 999; PRAGMA user_version = 58",
   )

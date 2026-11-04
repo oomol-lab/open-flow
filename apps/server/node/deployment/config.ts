@@ -52,15 +52,13 @@ export function createConfigApp(settings: Settings, authenticate: (request: Requ
     if (
       (mode != 'oomol' && mode != 'custom') ||
       body == null ||
-      Object.keys(body).length != 7 ||
+      Object.keys(body).length != 5 ||
       body.version !== 1 ||
       !Number.isSafeInteger(body.expectedRevision) ||
       Number(body.expectedRevision) <= 0 ||
       typeof body.connectorOrigin != 'string' ||
       (body.connectorToken !== null && typeof body.connectorToken != 'string') ||
-      typeof body.consoleOrigin != 'string' ||
-      typeof body.llmOrigin != 'string' ||
-      (body.llmToken !== null && typeof body.llmToken != 'string')
+      typeof body.consoleOrigin != 'string'
     )
       return invalid()
     try {
@@ -69,8 +67,6 @@ export function createConfigApp(settings: Settings, authenticate: (request: Requ
           connectorOrigin: body.connectorOrigin,
           connectorToken: body.connectorToken,
           consoleOrigin: body.consoleOrigin,
-          llmOrigin: body.llmOrigin,
-          llmToken: body.llmToken,
         }),
         settings,
         changed,
@@ -182,17 +178,41 @@ export function createConfigApp(settings: Settings, authenticate: (request: Requ
     if (!deleteRequest(body)) return invalid()
     return updated(settings.deleteIntegration(Number(body.expectedRevision)), settings, changed)
   })
-  app.put('/llm', async (context) => {
+  app.put('/llm/mode', async (context) => {
     const body = await objectRequest(context.req.raw)
-    if (!runtimeRequest(body)) return invalid()
+    if (
+      body == null ||
+      Object.keys(body).length != 3 ||
+      body.version !== 1 ||
+      !Number.isSafeInteger(body.expectedRevision) ||
+      Number(body.expectedRevision) <= 0 ||
+      (body.mode != 'oomol' && body.mode != 'custom')
+    )
+      return invalid()
+    return updated(settings.selectLlm(Number(body.expectedRevision), body.mode == 'oomol' ? 'oomol' : 'custom'), settings, changed)
+  })
+  app.put('/llm', (context) => saveLlm(context.req.raw, true))
+  app.put('/llm/custom', (context) => saveLlm(context.req.raw, false))
+  async function saveLlm(request: Request, activate: boolean): Promise<Response> {
+    const body = await objectRequest(request)
+    if (
+      body == null ||
+      Object.keys(body).length != 4 ||
+      body.version !== 1 ||
+      !Number.isSafeInteger(body.expectedRevision) ||
+      Number(body.expectedRevision) <= 0 ||
+      typeof body.origin != 'string' ||
+      (body.token !== null && typeof body.token != 'string')
+    )
+      return invalid()
     let result
     try {
-      result = settings.putLlm(Number(body.expectedRevision), body.origin, body.token)
+      result = settings.putLlm(Number(body.expectedRevision), body.origin, body.token, activate)
     } catch {
       return invalid()
     }
     return updated(result, settings, changed)
-  })
+  }
   app.delete('/llm', async (context) => {
     const body = await objectRequest(context.req.raw)
     if (!deleteRequest(body)) return invalid()

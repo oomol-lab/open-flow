@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createLlm, oomolLlm } from '../node/deployment/llm.ts'
+import { createLlm, oomolLlmConfig } from '../node/deployment/llm.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -39,7 +39,8 @@ describe('OOMOL LLM host', () => {
         return Response.json({ choices: [{ message: { content: 'Hello back' } }] })
       }),
     )
-    const llm = oomolLlm('https://connector.oomol.com', 'runtime-token')!
+    const config = oomolLlmConfig('https://connector.oomol.com', 'runtime-token')!
+    const llm = createLlm(config.origin, config.token)
 
     await expect(
       llm({
@@ -83,7 +84,8 @@ describe('OOMOL LLM host', () => {
         return Response.json({ choices: [{ message: { content: '{"answer":42}' } }] })
       }),
     )
-    const llm = oomolLlm('https://connector.oomol.dev', 'runtime-token')!
+    const config = oomolLlmConfig('https://connector.oomol.dev', 'runtime-token')!
+    const llm = createLlm(config.origin, config.token)
 
     await expect(
       llm({
@@ -128,7 +130,8 @@ describe('OOMOL LLM host', () => {
       'fetch',
       vi.fn(async () => Response.json({ choices: [{ message: { content: 'not json' } }] })),
     )
-    const llm = oomolLlm('https://connector.oomol.com', 'runtime-token')!
+    const config = oomolLlmConfig('https://connector.oomol.com', 'runtime-token')!
+    const llm = createLlm(config.origin, config.token)
 
     await expect(
       llm({
@@ -143,7 +146,8 @@ describe('OOMOL LLM host', () => {
 
   it('reports the validation reason for invalid Task input', async () => {
     vi.stubGlobal('fetch', vi.fn())
-    const llm = oomolLlm('https://connector.oomol.com', 'runtime-token')!
+    const config = oomolLlmConfig('https://connector.oomol.com', 'runtime-token')!
+    const llm = createLlm(config.origin, config.token)
 
     await expect(
       llm({
@@ -167,15 +171,17 @@ describe('OOMOL LLM host', () => {
   })
 
   it('does not infer an LLM host for a custom Connector or an empty token', () => {
-    expect(oomolLlm('https://connector.example.com', 'runtime-token')).toBeUndefined()
-    expect(oomolLlm('https://connector.oomol.com', '')).toBeUndefined()
-    expect(oomolLlm(undefined, 'runtime-token')).toBeUndefined()
+    expect(oomolLlmConfig('https://connector.example.com', 'runtime-token')).toBeUndefined()
+    expect(oomolLlmConfig('https://connector.oomol.com', '')).toBeUndefined()
+    expect(oomolLlmConfig('https://connector.oomol.com', '   ')).toBeUndefined()
+    expect(oomolLlmConfig(undefined, 'runtime-token')).toBeUndefined()
   })
 
   it('rejects unsafe or ambiguous explicit LLM settings', () => {
     expect(() => createLlm('http://models.example.com', 'model-token')).toThrow('OPEN_FLOW_LLM_ORIGIN')
     expect(() => createLlm('https://models.example.com/v1', 'model-token')).toThrow('OPEN_FLOW_LLM_ORIGIN')
     expect(() => createLlm('https://models.example.com', '')).toThrow('OPEN_FLOW_LLM_TOKEN')
+    expect(() => createLlm('https://models.example.com', '   ')).toThrow('OPEN_FLOW_LLM_TOKEN')
   })
 })
 

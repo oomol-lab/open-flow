@@ -2,8 +2,6 @@ export interface ServiceProfileDraft {
   readonly connectorOrigin: string
   readonly connectorToken: string
   readonly consoleOrigin: string
-  readonly llmOrigin: string
-  readonly llmToken: string
 }
 
 export type ServiceProfileIssue = 'required' | 'connectorUrl' | 'origin' | 'hosted'
@@ -27,17 +25,26 @@ export function validateServiceProfile(mode: 'oomol' | 'custom', draft: ServiceP
     if (!draft.connectorToken.trim()) errors.connectorToken = 'required'
     return errors
   }
-  for (const key of ['consoleOrigin', 'llmOrigin'] as const) {
-    if (!draft[key]) continue
-    try {
-      const url = new URL(draft[key])
-      const loopback = ['127.0.0.1', '::1', '[::1]', 'localhost'].includes(url.hostname)
-      if ((url.protocol != 'https:' && !(url.protocol == 'http:' && loopback)) || url.username || url.password || url.pathname != '/' || url.search || url.hash)
-        errors[key] = 'origin'
-    } catch {
-      errors[key] = 'origin'
-    }
-  }
-  if (draft.llmOrigin && !draft.llmToken.trim()) errors.llmToken = 'required'
+  if (draft.consoleOrigin && !validServiceOrigin(draft.consoleOrigin)) errors.consoleOrigin = 'origin'
   return errors
+}
+
+/** A null token retains an existing key; a supplied key must contain non-whitespace characters. */
+export function validateLlmConfiguration(origin: string, token: string | null): { readonly origin?: 'origin' | 'required'; readonly token?: 'required' } {
+  let issue: 'origin' | 'required' | undefined
+  if (origin.trim() == '') issue = 'required'
+  else if (!validServiceOrigin(origin)) issue = 'origin'
+  return { ...(issue == null ? {} : { origin: issue }), ...(token !== null && token.trim() == '' ? { token: 'required' as const } : {}) }
+}
+
+function validServiceOrigin(value: string): boolean {
+  try {
+    const url = new URL(value)
+    const loopback = ['127.0.0.1', '::1', '[::1]', 'localhost'].includes(url.hostname)
+    return (
+      (url.protocol == 'https:' || (url.protocol == 'http:' && loopback)) && !url.username && !url.password && url.pathname == '/' && !url.search && !url.hash
+    )
+  } catch {
+    return false
+  }
 }
