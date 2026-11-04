@@ -121,6 +121,7 @@ export interface TaskContext<
   readonly blockId: string
   readonly state: {
     get(key: string): Promise<JsonValue | null>
+    get(keys: readonly string[]): Promise<(JsonValue | null)[]>
     set(key: string, value: JsonValue): Promise<void>
     insert(key: string, value: Exclude<JsonValue, null>): Promise<boolean>
     delete(key: string): Promise<void>

@@ -13,6 +13,22 @@ export interface StateConformanceHarness {
 
 export const stateConformanceCases: readonly { name: string; verify(harness: StateConformanceHarness): Promise<void> }[] = [
   {
+    name: 'reads selected State keys in input order with missing, falsy and independent values',
+    async verify(harness) {
+      const result = await harness.run(`export default async (_, context) => {
+        await context.state.set('object', { nested: [1] });
+        await context.state.set('zero', 0);
+        await context.state.set('false', false);
+        await context.state.set('empty', '');
+        const values = await context.state.get(['false', 'missing', 'object', 'zero', 'empty']);
+        values[2].nested.push(2);
+        return {result: {values, retained: await context.state.get('object'), zero: await context.state.get('zero')}};
+      }`)
+      if (!dequal(result, { values: [false, null, { nested: [1, 2] }, 0, ''], retained: { nested: [1] }, zero: 0 }))
+        throw new Error('State batch reads must preserve order, missing keys and independent JSON values.')
+    },
+  },
+  {
     name: 'skips composite identities across successful Runs without depending on field order',
     async verify(harness) {
       const items = [

@@ -2,7 +2,7 @@ import type { RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-la
 import type { StoredRun } from '../storage/run-store.ts'
 import type { StateStore } from '../storage/state-store.ts'
 
-import { dedupeIdentities, hashIdentities, stateKey, StateError } from '@oomol-lab/open-flow/flow-state'
+import { dedupeIdentities, hashIdentities, stateKey, stateReadSchema, StateError } from '@oomol-lab/open-flow/flow-state'
 import { snapshotRuntimeResult } from '@oomol-lab/open-flow/runtime-contract'
 
 export class RunState {
@@ -30,8 +30,14 @@ export class RunState {
     const fields = payload as Record<string, unknown>
     const write = () => this.store.reserveWrite(run.flowId, scope, run.runId)
     switch (call.kind) {
-      case 'state.get':
+      case 'state.get': {
+        if (Array.isArray(fields.key)) {
+          const keys = stateReadSchema.shape.keys.safeParse(fields.key)
+          if (!keys.success) throw new StateError('capability.invalid', 'State reads require 1–16 distinct valid keys.')
+          return { status: 200, body: { values: this.store.readValues(run.flowId, scope, keys.data).map((item) => item.value) } }
+        }
         return { status: 200, body: { value: this.store.get(run.flowId, scope, stateKey(fields.key)) } }
+      }
       case 'state.list':
         return { status: 200, body: { keys: this.store.list(run.flowId, scope) } }
       case 'state.delete': {

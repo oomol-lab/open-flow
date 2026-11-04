@@ -133,9 +133,13 @@ before Host dispatch.
 
 ## Flow State (Engine v10)
 
-Code receives `context.state.get(key)`, `set(key, value)`, `insert(key, value)`, `delete(key)` and
+Code receives `context.state.get(keyOrKeys)`, `set(key, value)`, `insert(key, value)`, `delete(key)` and
 `list()`. Keys contain 1 to 256 UTF-8 bytes. Values are strictly JSON, checked before serialization.
-Get returns an independent value or null; list returns sorted keys. Set with null deletes. Insert
+Get with a string returns an independent value or null. Get with an array accepts 1–16 distinct keys
+and returns independent values in the same order, using null for missing keys. A batch uses one Host
+call and at most 1 MiB of stored JSON value bytes; an oversized request fails entirely with
+`limit-exceeded`. Empty arrays, duplicate or invalid keys, null and omitted arguments fail with
+`capability.invalid`. There is no whole-scope value read. List returns sorted keys. Set with null deletes. Insert
 rejects null and returns false without replacing an existing key. Writes persist immediately,
 even if the Task subsequently fails or the Run is canceled. State is not a credential store.
 
@@ -163,9 +167,10 @@ Handled downstream failure followed by successful Run completion commits the nod
 Different overlapping Runs may process the same items before either completes. Downstream effects
 are not rolled back, and unknown execution outcomes are never automatically replayed.
 
-Capability kinds and payloads: `state.get`/`state.delete` use `{ key }`, `state.set`/`state.insert`
+Capability kinds and payloads: `state.get` uses `{ key: string | string[] }` and returns `{ value }`
+for a string or `{ values }` for an array. `state.delete` uses `{ key }`, `state.set`/`state.insert`
 use `{ key, value }`, `state.list` uses `{}`, and `dedupe.insert`/`dedupe.has` use `{ ids }`.
-Responses respectively contain `{ value }`, null, null, `{ inserted }`, `{ keys }`,
+The remaining responses respectively contain null, null, `{ inserted }`, `{ keys }`,
 `{ inserted }` and `{ present }`. Invalid parameters fail with `capability.invalid`.
 Exhausted identity or space slots fail with catchable `dedupe.full`; exhausted saved-key slots, oversized values or the write budget fail with
 non-catchable `limit-exceeded`. Capacity failure writes nothing, while all-duplicate batches still

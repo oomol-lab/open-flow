@@ -1,5 +1,27 @@
 # Public contracts and version evolution
 
+## Unreleased bounded Flow State management reads
+
+The publication baseline is npm `next` beta.78, gitHead
+`ca752e96035984c401244bc0a310e331e679ae27`. Its client sends `values=false` even for
+metadata-only State reads. Overviews retain that input for existing clients but reject
+`values=true` with `400 flow.invalid`; scope-wide value retrieval is intentionally retired.
+New clients omit `values` and use `POST /v1/flows/:flowId/state/read` for explicit, bounded keys.
+This is a coordinated management API change: upgrade Server and Cloud before enabling the matching
+Workbench or CLI. Older clients can still inspect metadata, but their full-value operation fails
+explicitly. Flow model, Engine, checkpoint identifiers and persisted State bytes do not change.
+The request/response envelope version remains 1: metadata responses retain their existing shape,
+and the new body-reading operation has a separate route and schema. No existing request is silently
+reinterpreted as a partial value read.
+
+`context.state.get` additionally accepts 1–16 distinct keys and returns aligned values in one Host
+call, with the same 1 MiB saved-JSON budget. Its existing string input and value-or-null result are
+unchanged. This additive extension retains Engine v10; it does not require a separate capability
+flag or rejection boundary. The Server runtime digest adds `state-batch-read/1` to identify the
+updated guest and Host implementation. The published v10 digest remains accepted for existing
+Publications and Runs. Deployments must implement the batch payload before advertising the new
+digest; old hosts reject an unknown runtime digest through their existing identity checks.
+
 ## Skip Duplicates: Flow model v13 and Engine v10
 
 On 2026-11-02 npm `next` beta.77, gitHead `e25a738d170322734572a0b8a1323cb00b9d355a`,

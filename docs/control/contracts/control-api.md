@@ -1759,13 +1759,14 @@ Model v13 / Engine v10 adds explicit persistent Flow State. State belongs to a F
 Run source (`draft` or `live`); neither publication nor rollback copies or resets it. These
 management operations require the same Flow access as editing. They do not change a Revision.
 
-| Method | Path                       | Query                                                                       | Success                             |
-| ------ | -------------------------- | --------------------------------------------------------------------------- | ----------------------------------- |
-| GET    | `/v1/flows/:flowId/state`  | Required `scope=draft\|live`; optional `values=true\|false` (default false) | `200 FlowStateView`                 |
-| DELETE | `/v1/flows/:flowId/state`  | Required `scope`; optional `key`                                            | `200 { version: 1, cleared: true }` |
-| DELETE | `/v1/flows/:flowId/dedupe` | Required `scope` and `space=flow\|node:<nodeId>`                            | `200 { version: 1, cleared: true }` |
+| Method | Path                           | Query                                                           | Success                             |
+| ------ | ------------------------------ | --------------------------------------------------------------- | ----------------------------------- |
+| GET    | `/v1/flows/:flowId/state`      | Required `scope=draft\|live`; legacy `values=false` is accepted | `200 FlowStateView`                 |
+| POST   | `/v1/flows/:flowId/state/read` | JSON `{version:1, scope, keys}`                                 | `200 FlowStateValues`               |
+| DELETE | `/v1/flows/:flowId/state`      | Required `scope`; optional `key`                                | `200 { version: 1, cleared: true }` |
+| DELETE | `/v1/flows/:flowId/dedupe`     | Required `scope` and `space=flow\|node:<nodeId>`                | `200 { version: 1, cleared: true }` |
 
-Unknown query fields, omitted/invalid scope, invalid boolean values, empty/oversized keys and
+Unknown query fields, omitted/invalid scope, `values=true`, invalid boolean values, empty/oversized keys and
 invalid space names are rejected with `400 flow.invalid`. DELETE is idempotent; an absent key
 or space is already clear. Clearing business values does not clear dedupe history, and clearing
 a dedupe space does not touch business values or other spaces. A space with pending Run records returns
@@ -1773,8 +1774,8 @@ a dedupe space does not touch business values or other spaces. A space with pend
 
 `FlowStateView` and its schema are exported from `@oomol-lab/open-flow/flow-state`. Its root has
 `version: 1`, `scope`, deployment `limits`, `values`, and `spaces`. Value entries
-contain `key`, JSON UTF-8 byte `size`, and epoch-millisecond `updatedAt`; `value` is included only when
-requested. Space entries contain `space`, committed `count`, distinct provisional `pendingCount`,
+contain only `key`, JSON UTF-8 byte `size`, and epoch-millisecond `updatedAt`; overviews never include
+`value`. Space entries contain `space`, committed `count`, distinct provisional `pendingCount`,
 `reservedCount` (the union of committed and provisional identities), and epoch-millisecond
 `updatedAt`. Pending identities can overlap committed history when another Run finishes first;
 they still prevent reset, while capacity counts each identity once. Hashes and original identity lists are never returned. Deleted-node spaces remain
@@ -1785,19 +1786,33 @@ Each Flow/source has independent limits.
 Identity and space limits include pending reservations. A reserved identity is counted once across overlapping Runs.
 There is no total byte quota. Updates to existing keys and duplicate-only batches remain allowed at capacity.
 
-The public client exposes `getFlowState(flowId, scope, values?)`,
+`POST /v1/flows/:flowId/state/read` requires an explicit `scope` and 1–16 distinct keys, each 1–256
+UTF-8 bytes. It does not require an idempotency key. `FlowStateValues` has `{version:1, scope, values}`;
+`values` contains exactly one `{key, value}` for every requested key, in request order. Missing keys
+return `value: null`, matching runtime State semantics. Present values share a 1 MiB stored JSON UTF-8
+byte budget; missing keys consume zero value bytes. An over-budget read fails entirely with
+`400 flow.invalid`, without partial data or truncation. Invalid keys, duplicates, missing/empty keys,
+unknown body fields and unsupported body versions also return `400 flow.invalid`.
+Both State read endpoints return `Cache-Control: no-store` and enforce the same Flow access.
+`stateReadSchema`, `stateReadLimits`, `FlowStateValues`, and its response schema are exported from
+`@oomol-lab/open-flow/flow-state`. Deployment adapters validate incoming queries with the shared
+schema before passing typed values to application/storage code.
+
+The public client exposes `getFlowState(flowId, scope)`, `getFlowStateValues(flowId, scope, keys, signal?)`,
 `clearFlowState(flowId, scope, key?)`, and `clearFlowDedupe(flowId, scope, space)`. CLI and MCP
 use this same deployment service:
 
 ```bash
 oo flow state show FLOW --scope draft
-oo flow state show FLOW --scope live --full
+oo flow state show FLOW --scope live --key cursor
 oo flow state clear FLOW --scope draft --key cursor --yes
 oo flow dedupe clear FLOW --scope live --space node:filter --yes
 ```
 
-CLI clearing requires `--yes`. MCP tools are `flow_state`, `flow_state_clear`, and
-`flow_dedupe_clear`; each requires an explicit `scope`. Workbench defaults to Draft and asks
+CLI clearing requires `--yes`; `state show --full` is rejected. MCP tools are `flow_state`,
+`flow_state_read`, `flow_state_clear`, and `flow_dedupe_clear`; each requires an explicit `scope`.
+`flow_state_read` requires the same bounded keys and shares the HTTP read budget.
+Workbench defaults to Draft, loads individual value bodies when their keys are expanded, and asks
 for separate confirmation before clearing Live. Live clearing immediately affects future
 membership checks and may cause items to be processed again.
 

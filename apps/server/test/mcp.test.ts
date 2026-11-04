@@ -1017,12 +1017,19 @@ async function seedDraft(control: ControlClient, args: { flowId: unknown; expect
 }
 
 it('uses the same scoped State service through MCP and rejects omitted scope', async () => {
-  const { call, client, control } = await fixture()
+  const { call, client, control, service } = await fixture()
   const flow = await control.createFlow('State')
+  service.control.state.store.set(flow.flowId, 'draft', 'seed', 'counter', 0)
   expect(await call('flow_state', { flowId: flow.flowId, scope: 'draft' })).toEqual(await control.getFlowState(flow.flowId, 'draft'))
-  for (const name of ['flow_state', 'flow_state_clear', 'flow_dedupe_clear']) {
+  expect(await call('flow_state_read', { flowId: flow.flowId, scope: 'draft', keys: ['missing', 'counter'] })).toEqual(
+    await control.getFlowStateValues(flow.flowId, 'draft', ['missing', 'counter']),
+  )
+  for (const name of ['flow_state', 'flow_state_read', 'flow_state_clear', 'flow_dedupe_clear']) {
     expect((await client.callTool({ name, arguments: { flowId: flow.flowId, space: 'flow' } })).isError).toBe(true)
   }
+  for (const keys of [[], ['counter', 'counter'], Array.from({ length: 17 }, (_, index) => String(index))])
+    expect((await client.callTool({ name: 'flow_state_read', arguments: { flowId: flow.flowId, scope: 'draft', keys } })).isError).toBe(true)
+  expect((await client.callTool({ name: 'flow_state', arguments: { flowId: flow.flowId, scope: 'draft', values: true } })).isError).toBe(true)
   expect(await call('flow_state_clear', { flowId: flow.flowId, scope: 'live' })).toEqual({ version: 1, cleared: true })
   expect(await call('flow_dedupe_clear', { flowId: flow.flowId, scope: 'draft', space: 'node:removed' })).toEqual({ version: 1, cleared: true })
 })

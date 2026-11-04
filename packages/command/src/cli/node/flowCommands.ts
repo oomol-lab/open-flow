@@ -24,7 +24,8 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       if (action === 'clear' && !args.yes) throw new CliError('cli.invalid-arguments', 'Clearing State requires --yes.')
       const flow = await referencedFlow(client, target!)
       if (action === 'show') {
-        const result = await client.getFlowState(flow.flowId, args.scope, args.full)
+        const result =
+          args.key == null ? await client.getFlowState(flow.flowId, args.scope) : await client.getFlowStateValues(flow.flowId, args.scope, [args.key])
         write(runtime, args.json, { kind: 'flow.state', ...result }, JSON.stringify(result, null, 2))
       } else {
         if (operation === 'state') await client.clearFlowState(flow.flowId, args.scope, args.key)

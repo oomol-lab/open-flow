@@ -46,6 +46,55 @@ function codeFlow(source: string, onError?: 'error'): RevisionContent {
   }
 }
 
+it('bounds named management reads, preserves request order and enforces Flow access', async () => {
+  const host = await createService({ maxValueBytes: 1024 * 1024 })
+  const app = createServerApp(host, { resolveControlActor: () => 'test' })
+  const client = new ControlClient(async (url, init) => app.request(url, init))
+  const flow = await client.createFlow('Named State reads')
+  const store = host.control.state.store
+  store.set(flow.flowId, 'draft', 'seed', 'zero', 0)
+  store.set(flow.flowId, 'draft', 'seed', 'false', false)
+  store.set(flow.flowId, 'live', 'seed', 'zero', 42)
+  expect(await client.getFlowStateValues(flow.flowId, 'draft', ['false', 'missing', 'zero'])).toEqual({
+    version: 1,
+    scope: 'draft',
+    values: [
+      { key: 'false', value: false },
+      { key: 'missing', value: null },
+      { key: 'zero', value: 0 },
+    ],
+  })
+  expect((await client.getFlowStateValues(flow.flowId, 'live', ['zero'])).values).toEqual([{ key: 'zero', value: 42 }])
+  const read = (body: unknown) =>
+    app.request(`/v1/flows/${flow.flowId}/state/read`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const response = await read({ version: 1, scope: 'draft', keys: ['zero'] })
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  for (const body of [
+    { version: 1, scope: 'draft' },
+    { version: 1, keys: ['zero'] },
+    { scope: 'draft', keys: ['zero'] },
+    { version: 1, scope: 'draft', keys: [] },
+    { version: 1, scope: 'draft', keys: ['zero', 'zero'] },
+    { version: 1, scope: 'draft', keys: Array.from({ length: 17 }, (_, index) => String(index)) },
+    { version: 1, scope: 'draft', keys: ['zero'], values: true },
+  ])
+    expect((await read(body)).status).toBe(400)
+  store.set(flow.flowId, 'draft', 'seed', 'large-a', '汉'.repeat(200000))
+  store.set(flow.flowId, 'draft', 'seed', 'large-b', '汉'.repeat(200000))
+  await expect(client.getFlowStateValues(flow.flowId, 'draft', ['zero', 'large-a', 'large-b'])).rejects.toMatchObject({ code: 'flow.invalid' })
+  const denied = createServerApp(host, { resolveControlActor: () => 'another' })
+  expect(
+    (
+      await denied.request(`/v1/flows/${flow.flowId}/state/read`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: 1, scope: 'draft', keys: ['zero'] }),
+      })
+    ).status,
+  ).toBe(404)
+})
+
 it('persists Code state across Runs, returns independent reads, and isolates Live', async () => {
   const host = await createService()
   const revision = codeFlow(`export default async (_, context) => {
@@ -74,10 +123,47 @@ it('persists Code state across Runs, returns independent reads, and isolates Liv
     })
   }
   expect(host.control.state.read('test', stored.flowId, { scope: 'live' }).values).toEqual([])
-  expect(host.control.state.read('test', stored.flowId, { scope: 'draft', values: true }).values[0]?.value).toEqual({ value: 2 })
+  expect(host.control.state.readValues('test', stored.flowId, { scope: 'draft', keys: ['counter'] }).values[0]?.value).toEqual({ value: 2 })
   expect(() => host.control.state.read('another', stored.flowId, { scope: 'draft' })).toThrow()
   host.control.state.clear('test', stored.flowId, { scope: 'draft' })
   expect(host.control.state.read('test', stored.flowId, { scope: 'draft' }).values).toEqual([])
+})
+
+it('reads 16 values at the byte limit without consuming the Run write allowance', async () => {
+  const host = await createService({ maxRunWrites: 1 })
+  const revision = codeFlow(`export default async (_, context) => {
+    const values = await context.state.get(Array.from({length: 16}, (_, index) => String(index)));
+    await context.state.set('proof', true);
+    return {result: {lengths: values.map(value => value.length), proof: await context.state.get('proof')}};
+  }`)
+  const stored = await storeRevision(host, revision, 'batch-limit')
+  for (const index of Array.from({ length: 16 }, (_, value) => value))
+    host.control.state.store.set(stored.flowId, 'draft', 'seed', String(index), 'x'.repeat(64 * 1024 - 2))
+  const accepted = await acceptRun(host, { flowId: stored.flowId, revision, revisionId: 'batch-limit', idempotencyKey: 'batch-limit' })
+  if (accepted.kind !== 'accepted') throw new Error('Run not accepted')
+  await host.waitForIdle()
+  expect(host.run(accepted.runId)?.status, JSON.stringify(host.events(accepted.runId))).toBe('completed')
+  expect(host.events(accepted.runId).find((event) => event.kind === 'node.completed' && event.payload.nodeId === 'code')?.value).toEqual({
+    result: { lengths: Array.from({ length: 16 }, () => 64 * 1024 - 2), proof: true },
+  })
+})
+
+it('preserves non-catchable limit failures for oversized State batch reads', async () => {
+  const host = await createService({ maxValueBytes: 1024 * 1024 })
+  const revision = codeFlow(
+    `export default async (_, context) => {
+    try { await context.state.get(['large-a', 'large-b']); } catch {}
+    return {result: 'caught'};
+  }`,
+    'error',
+  )
+  const stored = await storeRevision(host, revision, 'batch-oversize')
+  for (const key of ['large-a', 'large-b']) host.control.state.store.set(stored.flowId, 'draft', 'seed', key, '汉'.repeat(200000))
+  const accepted = await acceptRun(host, { flowId: stored.flowId, revision, revisionId: 'batch-oversize', idempotencyKey: 'batch-oversize' })
+  if (accepted.kind !== 'accepted') throw new Error('Run not accepted')
+  await host.waitForIdle()
+  expect(host.run(accepted.runId)?.status, JSON.stringify(host.events(accepted.runId))).toBe('failed')
+  expect(host.events(accepted.runId).find((event) => event.kind === 'node.failed')?.payload).toMatchObject({ error: { code: 'limit-exceeded' } })
 })
 
 it('records node history across Runs and separates node and shared Flow spaces', async () => {
@@ -126,9 +212,8 @@ it('rejects non-JSON guest values and keeps writes made before a Task failure', 
   const accepted = await acceptRun(host, { flowId: stored.flowId, revision, revisionId: 'failed-state', idempotencyKey: 'failed' })
   if (accepted.kind !== 'accepted') throw new Error('Run not accepted')
   await host.waitForIdle()
-  expect(host.control.state.read('test', stored.flowId, { scope: 'draft', values: true }).values.map(({ key, value }) => ({ key, value }))).toEqual([
-    { key: 'retained', value: 42 },
-  ])
+  expect(host.control.state.read('test', stored.flowId, { scope: 'draft' }).values.map((item) => item.key)).toEqual(['retained'])
+  expect(host.control.state.readValues('test', stored.flowId, { scope: 'draft', keys: ['retained'] }).values).toEqual([{ key: 'retained', value: 42 }])
 })
 
 for (const scenario of stateConformanceCases)
@@ -236,15 +321,13 @@ it('isolates actual Live Runs and requires explicit scope at the management boun
   }
   await client.createLiveRun(publicationId, { trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'live' })
   await host.waitForIdle()
-  expect((await client.getFlowState(stored.flowId, 'draft', true)).values[0]?.value).toBe(2)
-  expect((await client.getFlowState(stored.flowId, 'live', true)).values[0]?.value).toBe(1)
+  expect((await client.getFlowStateValues(stored.flowId, 'draft', ['count'])).values[0]?.value).toBe(2)
+  expect((await client.getFlowStateValues(stored.flowId, 'live', ['count'])).values[0]?.value).toBe(1)
   expect((await client.getFlowState(stored.flowId, 'live')).values[0]).not.toHaveProperty('value')
-  for (const values of ['true', 'false']) {
-    const response = await app.request(`/v1/flows/${stored.flowId}/state?scope=draft&values=${values}`)
-    expect(response.status).toBe(200)
-    expect(response.headers.get('Cache-Control')).toBe('no-store')
-  }
-  for (const route of ['state', 'dedupe?space=flow', 'state?scope=invalid', 'state?scope=draft&values=invalid']) {
+  const metadata = await app.request(`/v1/flows/${stored.flowId}/state?scope=draft&values=false`)
+  expect(metadata.status).toBe(200)
+  expect(metadata.headers.get('Cache-Control')).toBe('no-store')
+  for (const route of ['state', 'dedupe?space=flow', 'state?scope=invalid', 'state?scope=draft&values=invalid', 'state?scope=draft&values=true']) {
     expect((await app.request(`/v1/flows/${stored.flowId}/${route}`, { method: route.startsWith('dedupe') ? 'DELETE' : 'GET' })).status).toBe(400)
   }
   expect((await app.request(`/v1/flows/${stored.flowId}/state`, { method: 'DELETE' })).status).toBe(400)
@@ -252,7 +335,7 @@ it('isolates actual Live Runs and requires explicit scope at the management boun
   await client.clearFlowDedupe(stored.flowId, 'draft', 'flow')
   expect((await client.getFlowState(stored.flowId, 'draft')).values).toEqual([])
   expect((await client.getFlowState(stored.flowId, 'draft')).spaces).toEqual([])
-  expect((await client.getFlowState(stored.flowId, 'live', true)).values[0]?.value).toBe(1)
+  expect((await client.getFlowStateValues(stored.flowId, 'live', ['count'])).values[0]?.value).toBe(1)
 })
 
 it.each([undefined, 1])('shares state and the durable write budget across Tasks (budget %s)', async (maxRunWrites) => {
@@ -277,7 +360,7 @@ it.each([undefined, 1])('shares state and the durable write budget across Tasks 
   if (accepted.kind !== 'accepted') throw new Error('Run not accepted')
   await host.waitForIdle()
   expect(host.run(accepted.runId)?.status).toBe(maxRunWrites == null ? 'completed' : 'failed')
-  expect(host.control.state.read('test', stored.flowId, { scope: 'draft', values: true }).values[0]?.value).toBe(maxRunWrites == null ? 2 : 1)
+  expect(host.control.state.readValues('test', stored.flowId, { scope: 'draft', keys: ['count'] }).values[0]?.value).toBe(maxRunWrites == null ? 2 : 1)
 })
 
 it.each([1, 2])('handles managed-node capacity failures and reports usage without identities (limit %s)', async (maxIdentities) => {
@@ -356,9 +439,9 @@ it.each([false, true])('commits Skip Duplicates only after Run success while Cod
     expect(host.run(accepted.runId)?.status).toBe(handled ? 'completed' : 'failed')
     const output = host.events(accepted.runId).find((event) => event.kind === 'node.completed' && event.payload.nodeId === 'filter')?.value
     expect(output).toMatchObject({ items: handled && index === 2 ? [] : [{ id: 1 }, { id: 2 }] })
-    const state = host.control.state.read('test', stored.flowId, { scope: 'draft', values: true })
+    const state = host.control.state.read('test', stored.flowId, { scope: 'draft' })
     expect(state.spaces).toEqual(handled ? [expect.objectContaining({ count: 2, pendingCount: 0 })] : [])
-    expect(state.values[0]?.value).toBe(index)
+    expect(host.control.state.readValues('test', stored.flowId, { scope: 'draft', keys: ['attempts'] }).values[0]?.value).toBe(index)
   }
 })
 

@@ -114,7 +114,7 @@ export class WorkbenchStore {
     return updated
   }
 
-  readonly state: Pick<WorkbenchClient, 'getFlowState' | 'clearFlowState' | 'clearFlowDedupe'>
+  readonly state: Pick<WorkbenchClient, 'getFlowState' | 'getFlowStateValues' | 'clearFlowState' | 'clearFlowDedupe'>
   readonly results: Pick<WorkbenchClient, 'listRunResults' | 'readRunResult' | 'downloadRunResult'>
   readonly #client: WorkbenchClient
   readonly #externalRuns = new Latest()

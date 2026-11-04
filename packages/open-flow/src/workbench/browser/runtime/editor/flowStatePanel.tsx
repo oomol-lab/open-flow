@@ -1,19 +1,89 @@
 import type { ControlClient } from '../../../../control/common/api.ts'
-import type { FlowStateView, StateScope } from '../../../../state/common/state.ts'
+import type { FlowStateValues, FlowStateView, StateScope } from '../../../../state/common/state.ts'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
-import { Label } from '../../../../ui/browser/label.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 
-export type FlowStateClient = Pick<ControlClient, 'getFlowState' | 'clearFlowState' | 'clearFlowDedupe'>
+export type FlowStateClient = Pick<ControlClient, 'getFlowState' | 'getFlowStateValues' | 'clearFlowState' | 'clearFlowDedupe'>
+
+function StateValueRow({
+  item,
+  client,
+  flowId,
+  scope,
+  busy,
+  onClear,
+}: {
+  item: FlowStateView['values'][number]
+  client: FlowStateClient
+  flowId: string
+  scope: StateScope
+  busy: boolean
+  onClear: (key: string, trigger: HTMLElement) => void
+}) {
+  const t = useTranslate()
+  const [open, setOpen] = useState(false)
+  const [result, setResult] = useState<FlowStateValues['values'][number]>()
+  const [error, setError] = useState<string>()
+  useEffect(() => {
+    if (!open) return
+    const controller = new AbortController()
+    setResult(undefined)
+    setError(undefined)
+    void client.getFlowStateValues(flowId, scope, [item.key], controller.signal).then(
+      (response) => {
+        if (!controller.signal.aborted) setResult(response.values[0])
+      },
+      (reason: unknown) => {
+        if (!controller.signal.aborted) setError(String(reason))
+      },
+    )
+    return () => controller.abort()
+  }, [client, flowId, scope, item.key, item.updatedAt, open])
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-border/60 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="m-0 break-all font-medium">{item.key}</p>
+        {open &&
+          (result != null ? (
+            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(result.value, null, 2)}</pre>
+          ) : error != null ? (
+            <p role="alert" className="text-destructive text-sm">
+              {error}
+            </p>
+          ) : (
+            <p role="status" className="text-muted-foreground text-sm">
+              {t('flowState.loading')}
+            </p>
+          ))}
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          aria-expanded={open}
+          aria-label={`${t(open ? 'flowState.hideValue' : 'flowState.showValue')}: ${item.key}`}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {t(open ? 'flowState.hideValue' : 'flowState.showValue')}
+        </Button>
+        <Button variant="outline" size="sm" disabled={busy} onClick={(event) => onClear(item.key, event.currentTarget)}>
+          {t('flowState.delete')}
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export function FlowStatePanel({
   value,
+  client,
+  flowId,
   nodeIds,
   busy,
   onClearValues,
@@ -21,6 +91,8 @@ export function FlowStatePanel({
   space,
 }: {
   value: FlowStateView
+  client: FlowStateClient
+  flowId: string
   nodeIds: readonly string[]
   busy: boolean
   space?: string
@@ -47,17 +119,7 @@ export function FlowStatePanel({
           </div>
           {!value.values.length && <p className="m-0 text-sm text-muted-foreground">{t('flowState.emptyValues')}</p>}
           {value.values.map((item) => (
-            <div key={item.key} className="flex items-start justify-between gap-3 border-b border-border/60 py-2">
-              <div className="min-w-0">
-                <p className="m-0 break-all font-medium">{item.key}</p>
-                {item.value !== undefined && (
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(item.value, null, 2)}</pre>
-                )}
-              </div>
-              <Button variant="outline" size="sm" disabled={busy} onClick={(event) => onClearValues(item.key, event.currentTarget)}>
-                {t('flowState.delete')}
-              </Button>
-            </div>
+            <StateValueRow key={item.key} item={item} client={client} flowId={flowId} scope={value.scope} busy={busy} onClear={onClearValues} />
           ))}
         </section>
       )}
@@ -119,7 +181,6 @@ export function FlowStateButton({
   const [open, setOpen] = useState(onClose != null)
   const [scope, setScope] = useState<StateScope>('draft')
   const space = history == null ? undefined : `node:${history.nodeId}`
-  const [values, setValues] = useState(false)
   const [data, setData] = useState<FlowStateView>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
@@ -139,7 +200,7 @@ export function FlowStateButton({
     let active = true
     setData(undefined)
     setError(undefined)
-    void client.getFlowState(flowId, scope, values).then(
+    void client.getFlowState(flowId, scope).then(
       (result) => {
         if (active) setData(result)
       },
@@ -150,7 +211,7 @@ export function FlowStateButton({
     return () => {
       active = false
     }
-  }, [client, flowId, scope, values, refresh, open, space])
+  }, [client, flowId, scope, refresh, open, space])
   const clear = async (target: { key?: string; space?: string }) => {
     setBusy(true)
     setError(undefined)
@@ -179,7 +240,6 @@ export function FlowStateButton({
             setOpen(next)
             if (next) {
               setScope('draft')
-              setValues(false)
             }
             if (!next) onClose?.()
             setConfirm(undefined)
@@ -207,12 +267,6 @@ export function FlowStateButton({
               <NativeSelectOption value="draft">{t('flowState.draft')}</NativeSelectOption>
               <NativeSelectOption value="live">{t('flowState.live')}</NativeSelectOption>
             </NativeSelect>
-            {space == null && (values || (data?.values.length ?? 0) > 0) && (
-              <Label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={values} onCheckedChange={setValues} />
-                {t('flowState.showValues')}
-              </Label>
-            )}
             <Button variant="outline" size="sm" disabled={busy} onClick={() => setRefresh((value) => value + 1)}>
               {t('flowState.refresh')}
             </Button>
@@ -255,7 +309,10 @@ export function FlowStateButton({
             <p role="status">{error == null ? t('flowState.loading') : ''}</p>
           ) : (
             <FlowStatePanel
+              key={JSON.stringify([flowId, scope, refresh])}
               value={data}
+              client={client}
+              flowId={flowId}
               space={space}
               nodeIds={nodeIds}
               busy={busy}

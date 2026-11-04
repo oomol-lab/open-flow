@@ -180,6 +180,9 @@ history: its invocation-owned provisional identities persist across Wait, but be
 only in the authoritative Run success transaction. Failed invocations and non-success terminals
 release their provisional identities and capacity. Other Runs cannot use provisional history to
 suppress items. State is not a secret store.
+Management overviews expose key metadata and deduplication statistics without value bodies. Reading
+business values requires an explicit, bounded set of keys; deployments enforce the shared read
+budget before returning values. Clients load bodies on demand rather than retrieving an entire scope.
 
 ### Workflow calls
 

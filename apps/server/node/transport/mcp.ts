@@ -114,6 +114,7 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
   }
 
   register('flow_state', mcpTools.flow_state, ({ flowId, ...query }) => control.state.read(actorId, flowId, query))
+  register('flow_state_read', mcpTools.flow_state_read, ({ flowId, ...input }) => control.state.readValues(actorId, flowId, input))
   register('flow_state_clear', mcpTools.flow_state_clear, ({ flowId, ...query }) => control.state.clear(actorId, flowId, query))
   register('flow_dedupe_clear', mcpTools.flow_dedupe_clear, ({ flowId, ...query }) => control.state.clearDedupe(actorId, flowId, query))
   register('flow_live', mcpTools.flow_live, ({ flowId }) => control.publications.getLiveDetails(actorId, flowId, endpointOrigin))

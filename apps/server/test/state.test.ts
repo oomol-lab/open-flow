@@ -1,4 +1,4 @@
-import { hashIdentities } from '@oomol-lab/open-flow/flow-state'
+import { hashIdentities, stateReadLimits } from '@oomol-lab/open-flow/flow-state'
 import { afterEach, describe, expect, it } from 'vitest'
 import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
@@ -21,6 +21,31 @@ function setup(limits = stateLimits) {
 }
 
 describe('Flow State storage', () => {
+  it('reads named values in request order without exposing unrequested data or crossing scopes', () => {
+    const store = setup()
+    store.set('a', 'draft', 'run', 'zero', 0)
+    store.set('a', 'draft', 'run', 'false', false)
+    store.set('a', 'draft', 'run', 'empty', '')
+    store.set('a', 'draft', 'run', 'unrequested', { secret: 'body' })
+    store.set('a', 'live', 'run', 'zero', 42)
+    store.set('b', 'draft', 'run', 'zero', 99)
+    expect(store.readValues('a', 'draft', ['empty', 'zero', 'missing', 'false'])).toEqual([
+      { key: 'empty', value: '' },
+      { key: 'zero', value: 0 },
+      { key: 'missing', value: null },
+      { key: 'false', value: false },
+    ])
+    expect(store.view('a', 'draft').values.every((item) => !('value' in item))).toBe(true)
+  })
+  it('admits exactly 1 MiB of stored JSON and rejects an entire read one byte over budget', () => {
+    const store = setup({ ...stateLimits, maxValueBytes: 65537 })
+    const keys = Array.from({ length: stateReadLimits.maxKeys }, (_, index) => String(index))
+    keys.forEach((key) => store.set('a', 'draft', 'run', key, 'x'.repeat(65534)))
+    expect(store.readValues('a', 'draft', keys)).toHaveLength(16)
+    store.set('a', 'draft', 'run', keys[0]!, 'x'.repeat(65535))
+    expect(() => store.readValues('a', 'draft', keys)).toThrow('1 MiB read limit')
+    expect(store.readValues('a', 'draft', keys.slice(1))).toHaveLength(15)
+  })
   it('persists independent values, conditionally inserts and isolates Flow and source', () => {
     const store = setup()
     store.set('a', 'draft', 'run1', 'key', { nested: [1] })
@@ -130,7 +155,8 @@ it('migrates byte-accounted data without losing values or history', async () => 
     "CREATE TABLE flow_state_usage (flow_id TEXT, scope TEXT, bytes INTEGER); ALTER TABLE flow_dedupe_spaces ADD COLUMN mode TEXT NOT NULL DEFAULT 'new'; ALTER TABLE flow_dedupe_spaces ADD COLUMN watermark_json TEXT; DROP TABLE flow_dedupe_pending; UPDATE flow_state_values SET size = 999; PRAGMA user_version = 58",
   )
   migrate(database)
-  expect(store.view('f', 'draft', true)).toMatchObject({ values: [{ key: 'key', value: '你好', size: 8 }], spaces: [{ count: 1 }] })
+  expect(store.view('f', 'draft')).toMatchObject({ values: [{ key: 'key', size: 8 }], spaces: [{ count: 1 }] })
+  expect(store.readValues('f', 'draft', ['key'])).toEqual([{ key: 'key', value: '你好' }])
   expect(database.connection.prepare("SELECT name FROM sqlite_master WHERE name = 'flow_state_usage'").get()).toBeUndefined()
 })
 

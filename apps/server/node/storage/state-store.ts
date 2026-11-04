@@ -2,7 +2,7 @@ import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { FlowStateView, StateScope } from '@oomol-lab/open-flow/flow-state'
 import type { DatabaseSync } from 'node:sqlite'
 
-import { StateError } from '@oomol-lab/open-flow/flow-state'
+import { StateError, stateReadLimits } from '@oomol-lab/open-flow/flow-state'
 
 export const stateLimits = { maxValueBytes: 64 * 1024, maxValues: 1_000, maxSpaces: 100, maxIdentities: 10_000, maxRunWrites: 1_000 }
 type SpaceRow = { space: string; count: number; updated_at: number }
@@ -43,6 +43,16 @@ export class StateStore {
     return (
       this.database.prepare('SELECT key FROM flow_state_values WHERE flow_id = ? AND scope = ? ORDER BY key').all(flowId, scope) as { key: string }[]
     ).map((row) => row.key)
+  }
+
+  readValues(flowId: string, scope: StateScope, keys: readonly string[]) {
+    const rows = this.database
+      .prepare('SELECT key, size, value_json FROM flow_state_values WHERE flow_id = ? AND scope = ? AND key IN (SELECT value FROM json_each(?))')
+      .all(flowId, scope, JSON.stringify(keys)) as { key: string; size: number; value_json: string }[]
+    if (rows.reduce((total, row) => total + row.size, 0) > stateReadLimits.maxBytes)
+      throw new StateError('limit-exceeded', 'Requested State values exceed the 1 MiB read limit. Read fewer keys.')
+    const values = new Map(rows.map((row) => [row.key, JSON.parse(row.value_json) as JsonValue]))
+    return keys.map((key) => ({ key, value: values.get(key) ?? null }))
   }
 
   set(flowId: string, scope: StateScope, runId: string, key: string, value: JsonValue, insert = false): boolean {
@@ -207,10 +217,10 @@ export class StateStore {
     })
   }
 
-  view(flowId: string, scope: StateScope, includeValues = false): FlowStateView {
+  view(flowId: string, scope: StateScope): FlowStateView {
     const values = this.database
-      .prepare(`SELECT key, size, updated_at${includeValues ? ', value_json' : ''} FROM flow_state_values WHERE flow_id = ? AND scope = ? ORDER BY key`)
-      .all(flowId, scope) as { key: string; size: number; updated_at: number; value_json?: string }[]
+      .prepare('SELECT key, size, updated_at FROM flow_state_values WHERE flow_id = ? AND scope = ? ORDER BY key')
+      .all(flowId, scope) as { key: string; size: number; updated_at: number }[]
     const spaces = this.database
       .prepare(`SELECT space, MAX(count) AS count, MAX(updated_at) AS updated_at FROM (
       SELECT space, count, updated_at FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ?
@@ -221,12 +231,7 @@ export class StateStore {
       version: 1,
       scope,
       limits: this.limits,
-      values: values.map((row) =>
-        Object.assign(
-          { key: row.key, size: row.size, updatedAt: row.updated_at },
-          row.value_json == null ? {} : { value: JSON.parse(row.value_json) as JsonValue },
-        ),
-      ),
+      values: values.map((row) => ({ key: row.key, size: row.size, updatedAt: row.updated_at })),
       spaces: spaces.map((row) => {
         const pending = this.database
           .prepare(`SELECT COUNT(DISTINCT identity) AS count, COUNT(DISTINCT CASE WHEN NOT EXISTS (

@@ -45,6 +45,26 @@ async function executorPid(): Promise<number> {
 }
 
 describe('isolated-vm runtime conformance', () => {
+  it('executes single-key State reads with the published v10 runtime digest', async () => {
+    const calls: unknown[] = []
+    await expect(
+      host.invoke({
+        capability: async ({ kind, payload }) => {
+          calls.push({ kind, payload })
+          return { status: 200, body: { value: 0 } }
+        },
+        input: null,
+        invocationId: 'published-state-digest',
+        program: {
+          ...program("export default async (_, context) => context.state.get('zero')"),
+          engineContract: 'open-flow-engine/v10',
+          engineDigest: 'sha256:4d71f86d4af71e10e77dcc86a953991d1a12667a3e92c0dc88ff75da49840f5f',
+        },
+      }),
+    ).resolves.toBe(0)
+    expect(calls).toEqual([{ kind: 'state.get', payload: { key: 'zero' } }])
+  })
+
   it('executes entry-specific programs with transitive shared dependencies in fresh isolates', async () => {
     const prepared = await prepareFlow(
       {

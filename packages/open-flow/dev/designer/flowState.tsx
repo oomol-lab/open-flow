@@ -22,7 +22,7 @@ const sample: FlowStateView = {
   version: 1,
   scope: 'draft',
   limits: { maxValueBytes: 65536, maxValues: 1000, maxSpaces: 100, maxIdentities: 10000, maxRunWrites: 1000 },
-  values: [{ key: 'cursor', size: 80, updatedAt: 1793322000000, value: { page: 3 } }],
+  values: [{ key: 'cursor', size: 80, updatedAt: 1793322000000 }],
   spaces: [
     { space: 'flow', count: 500, pendingCount: 0, reservedCount: 500, updatedAt: 1793322000000 },
     { space: 'node:filter', count: 9000, pendingCount: 0, reservedCount: 9000, updatedAt: 1793322000000 },
@@ -167,9 +167,15 @@ function StateStory({ language, dark, log }: { language: UiLanguage; dark: boole
   ])
   const client = useMemo<FlowStateClient>(
     () => ({
-      async getFlowState(_flowId, scope, includeValues = false) {
-        const value = current.current[scope]
-        return { ...value, values: value.values.map(({ value: stored, ...item }) => (includeValues ? Object.assign(item, { value: stored }) : item)) }
+      async getFlowState(_flowId, scope) {
+        return current.current[scope]
+      },
+      async getFlowStateValues(_flowId, scope, keys) {
+        return {
+          version: 1,
+          scope,
+          values: keys.map((key) => ({ key, value: current.current[scope].values.some((item) => item.key === key) ? { page: 3 } : null })),
+        }
       },
       async clearFlowState(_flowId, scope, key) {
         setScopes((value) => ({ ...value, [scope]: { ...value[scope], values: key == null ? [] : value[scope].values.filter((item) => item.key !== key) } }))
@@ -222,6 +228,8 @@ function StateStory({ language, dark, log }: { language: UiLanguage; dark: boole
             {stateOpen && <FlowStateButton client={client} flowId="sample" nodeIds={['filter', 'pending']} onClose={() => setStateOpen(false)} />}
             <FlowStatePanel
               value={scopes.draft}
+              client={client}
+              flowId="sample"
               nodeIds={['filter', 'pending']}
               busy={false}
               onClearValues={(key) => void client.clearFlowState('sample', 'draft', key)}

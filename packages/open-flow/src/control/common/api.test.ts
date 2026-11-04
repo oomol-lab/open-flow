@@ -22,6 +22,63 @@ const flow = {
 } as const
 
 describe('ControlClient Flow API', () => {
+  it('keeps State overview metadata separate from named value reads', async () => {
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/state/read')) {
+        expect(init?.method).toBe('POST')
+        expect(JSON.parse(String(init?.body))).toEqual({ version: 1, scope: 'live', keys: ['cursor', 'missing'] })
+        return Response.json({
+          version: 1,
+          scope: 'live',
+          values: [
+            { key: 'cursor', value: 0 },
+            { key: 'missing', value: null },
+          ],
+        })
+      }
+      expect(path).toBe('/v1/flows/flow%2F1/state?scope=live')
+      return Response.json({
+        version: 1,
+        scope: 'live',
+        limits: { maxValues: 1000, maxSpaces: 100, maxValueBytes: 65536, maxIdentities: 10000, maxRunWrites: 1000 },
+        values: [{ key: 'cursor', size: 1, updatedAt: 1 }],
+        spaces: [],
+      })
+    })
+    const client = new ControlClient(request)
+    expect((await client.getFlowState('flow/1', 'live')).values).toEqual([{ key: 'cursor', size: 1, updatedAt: 1 }])
+    expect((await client.getFlowStateValues('flow/1', 'live', ['cursor', 'missing'])).values).toEqual([
+      { key: 'cursor', value: 0 },
+      { key: 'missing', value: null },
+    ])
+  })
+  it.each([
+    {
+      scope: 'draft',
+      values: [
+        { key: 'a', value: 1 },
+        { key: 'b', value: 2 },
+      ],
+    },
+    { scope: 'live', values: [{ key: 'a', value: 1 }] },
+    {
+      scope: 'live',
+      values: [
+        { key: 'b', value: 2 },
+        { key: 'a', value: 1 },
+      ],
+    },
+    {
+      scope: 'live',
+      values: [
+        { key: 'a', value: 'x'.repeat(1024 * 1024) },
+        { key: 'b', value: 2 },
+      ],
+    },
+  ])('rejects State read responses that violate identity, completeness or byte limits', async (response) => {
+    const client = new ControlClient(async () => Response.json({ version: 1, ...response }))
+    await expect(client.getFlowStateValues('flow', 'live', ['a', 'b'])).rejects.toMatchObject({ code: 'response.invalid' })
+  })
   it.each([
     {
       draft: { variableNames: ['TOKEN'], connections: [], errorSourceFlowIds: [] },

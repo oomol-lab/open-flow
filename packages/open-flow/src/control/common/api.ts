@@ -1,8 +1,8 @@
 import type { CanvasCommand } from '../../canvas/common/commands.ts'
-import type { FlowStateView, StateScope } from '../../state/common/state.ts'
+import type { FlowStateValues, FlowStateView, StateScope } from '../../state/common/state.ts'
 
 import { currentEngineContract } from '../../runtime/common/engineContract.ts'
-import { flowStateViewSchema } from '../../state/common/state.ts'
+import { flowStateValuesSchema, flowStateViewSchema } from '../../state/common/state.ts'
 import { workflowContractSchema, workflowReferencesSchema } from '../../workflow/common/workflow.ts'
 export type { CanvasCommand, CanvasCommandSubscriber } from '../../canvas/common/commands.ts'
 import type { LiveDetails } from './liveDetails.ts'
@@ -1017,9 +1017,21 @@ export class ControlClient {
     return flow(await this.request(`/v1/flows/${segment(flowId)}`, { method: 'PATCH', body: JSON.stringify({ ...changes, version: 1 }) }))
   }
 
-  async getFlowState(flowId: string, scope: StateScope, values = false): Promise<FlowStateView> {
-    const result = flowStateViewSchema.safeParse(await this.request(`/v1/flows/${segment(flowId)}/state?scope=${scope}&values=${values}`))
+  async getFlowState(flowId: string, scope: StateScope): Promise<FlowStateView> {
+    const result = flowStateViewSchema.safeParse(await this.request(`/v1/flows/${segment(flowId)}/state?scope=${scope}`))
     return result.success && result.data.scope === scope ? result.data : invalidResponse()
+  }
+
+  async getFlowStateValues(flowId: string, scope: StateScope, keys: readonly string[], signal?: AbortSignal): Promise<FlowStateValues> {
+    const result = flowStateValuesSchema.safeParse(
+      await this.request(`/v1/flows/${segment(flowId)}/state/read`, { method: 'POST', body: JSON.stringify({ version: 1, scope, keys }), signal }),
+    )
+    return result.success &&
+      result.data.scope === scope &&
+      result.data.values.length === keys.length &&
+      result.data.values.every((item, index) => item.key === keys[index])
+      ? result.data
+      : invalidResponse()
   }
 
   async clearFlowState(flowId: string, scope: StateScope, key?: string): Promise<void> {
