@@ -1,6 +1,6 @@
 # Public contracts and version evolution
 
-## Unreleased bounded Flow State management reads
+## Bounded Flow State reads (beta.79)
 
 The publication baseline is npm `next` beta.78, gitHead
 `ca752e96035984c401244bc0a310e331e679ae27`. Its client sends `values=false` even for
