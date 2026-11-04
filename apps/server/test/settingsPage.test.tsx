@@ -19,7 +19,7 @@ function unload() {
 }
 
 function profile() {
-  return { connectorOrigin: '', connectorTokenConfigured: false, consoleOrigin: '', llmOrigin: '', llmTokenConfigured: false }
+  return { connectorOrigin: '', connectorTokenConfigured: false, consoleOrigin: '' }
 }
 function config(revision: number) {
   return {
@@ -30,7 +30,17 @@ function config(revision: number) {
       runtime: { configured: false, source: 'none' as const, tokenConfigured: false, origin: '' },
       console: { configured: false, source: 'none' as const, origin: '' },
     },
-    llm: { configured: false, source: 'none' as const, tokenConfigured: false, origin: '' },
+    llm: {
+      configured: false,
+      source: 'none' as 'none' | 'settings' | 'derived' | 'environment',
+      tokenConfigured: false,
+      origin: '',
+      mode: null as 'oomol' | 'custom' | null,
+      managed: false,
+      custom: { origin: '', tokenConfigured: false },
+      oomolAvailable: false,
+      oomolManaged: false,
+    },
     integration: { configured: false, source: 'none' as const, origin: '' },
   }
 }
@@ -74,6 +84,149 @@ function dialog() {
 }
 const session = { code: 'ABC123', id: 'login-id', url: 'https://console.oomol.com/login/device?user_code=ABC123', version: 1 }
 const authorized = { connectorOrigin: 'https://connector.oomol.com', apiKey: 'authorized-key', status: 'authorized', version: 1 }
+
+function llmSection(view: Awaited<ReturnType<typeof page>>) {
+  return view.container.querySelector<HTMLElement>(`section[aria-label="${view.i18n.t('settings.llm')}"]`)!
+}
+
+async function llm(current = config(1)) {
+  const view = await page(current)
+  const radio = llmSection(view).querySelector<HTMLInputElement>('input[value=custom]')!
+  await click(radio.closest('label')!.parentElement!.querySelector('button')!)
+  return view
+}
+
+function integrationSection(view: Awaited<ReturnType<typeof page>>) {
+  return [...view.container.querySelectorAll<HTMLElement>('section')].find(
+    (section) => section.querySelector('h2')?.textContent == view.i18n.t('settings.integration'),
+  )!
+}
+
+it('presents hosted and custom LLM choices and saves their configuration without changing the selected source', async () => {
+  const current = config(1)
+  current.services.mode = 'custom'
+  Object.assign(current.llm, {
+    configured: true,
+    source: 'settings',
+    mode: 'custom',
+    origin: 'https://models.example.com',
+    tokenConfigured: true,
+    oomolAvailable: true,
+    custom: { origin: 'https://models.example.com', tokenConfigured: true },
+  })
+  const view = await page(current)
+  const section = llmSection(view)
+  expect(section.textContent).toContain(view.i18n.t('settings.llmOomol'))
+  expect(section.textContent).toContain(view.i18n.t('settings.llmOomolHint'))
+  expect(section.textContent).toContain(view.i18n.t('settings.llmCustom'))
+  expect(section.textContent).toContain(view.i18n.t('settings.llmCustomHint'))
+  expect(section.querySelector('form')).toBeNull()
+  const hosted = structuredClone(current)
+  hosted.revision = 2
+  Object.assign(hosted.llm, { mode: 'oomol', source: 'derived', origin: 'https://new-llm.oomol.com' })
+  view.fetcher.mockResolvedValueOnce(Response.json(hosted))
+  await click(section.querySelector<HTMLInputElement>('input[value=oomol]')!)
+  expect(view.fetcher.mock.calls[0]![0]).toBe('/config/llm/mode')
+  expect(JSON.parse(view.fetcher.mock.calls[0]![1].body)).toEqual({ version: 1, expectedRevision: 1, mode: 'oomol' })
+  expect(view.changed).not.toHaveBeenCalled()
+  expect(section.querySelector('input[value=oomol]:checked')).not.toBeNull()
+  const custom = section.querySelector<HTMLInputElement>('input[value=custom]')!
+  await click(custom.closest('label')!.parentElement!.querySelector('button')!)
+  expect(field('llm-origin').value).toBe('https://models.example.com')
+  expect(field('llm-token').placeholder).toBe('••••••••')
+  view.fetcher.mockResolvedValueOnce(Response.json({ ...hosted, revision: 3 }))
+  await submit(dialog().querySelector('form')!)
+  expect(view.fetcher.mock.calls[1]![0]).toBe('/config/llm/custom')
+  expect(JSON.parse(view.fetcher.mock.calls[1]![1].body)).toEqual({ version: 1, expectedRevision: 2, origin: 'https://models.example.com', token: null })
+  expect(view.configuration().current?.llm.mode).toBe('oomol')
+  expect(view.configuration().current?.services.mode).toBe('custom')
+  expect(view.changed).not.toHaveBeenCalled()
+  expect(document.querySelector('[role=dialog]')).toBeNull()
+  const selected = { ...current, revision: 4 }
+  view.fetcher.mockResolvedValueOnce(Response.json(selected))
+  await click(custom)
+  expect(view.fetcher.mock.calls[2]![0]).toBe('/config/llm/mode')
+  expect(view.configuration().current?.llm.mode).toBe('custom')
+})
+
+it('connects OOMOL from its LLM choice without changing Connector selection or automatically selecting LLM', async () => {
+  const current = config(1)
+  current.services.mode = 'custom'
+  const view = await page(current)
+  const section = llmSection(view)
+  await click(button(view.i18n.t('settings.oomolConnect'), section))
+  const connected = structuredClone(current)
+  connected.revision = 2
+  connected.llm.oomolAvailable = true
+  connected.services.profiles.oomol.connectorTokenConfigured = true
+  view.fetcher.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(Response.json(authorized)).mockResolvedValueOnce(Response.json(connected))
+  await click(button(view.i18n.t('settings.oomolAutoAuthorize')))
+  expect(view.fetcher.mock.calls[2]![0]).toBe('/config/services/oomol')
+  expect(JSON.parse(view.fetcher.mock.calls[2]![1].body)).toEqual({
+    connectorOrigin: authorized.connectorOrigin,
+    connectorToken: authorized.apiKey,
+    consoleOrigin: '',
+    expectedRevision: 1,
+    version: 1,
+  })
+  expect(view.configuration().current?.services.mode).toBe('custom')
+  expect(view.configuration().current?.llm.mode).toBeNull()
+  expect(view.changed).toHaveBeenCalledOnce()
+  expect(document.querySelector('[role=dialog]')).toBeNull()
+  const selected = structuredClone(connected)
+  selected.revision = 3
+  Object.assign(selected.llm, { mode: 'oomol', configured: true, source: 'derived', origin: 'https://new-llm.oomol.com' })
+  view.fetcher.mockResolvedValueOnce(Response.json(selected))
+  await click(section.querySelector<HTMLInputElement>('input[value=oomol]')!)
+  expect(view.fetcher.mock.calls[3]![0]).toBe('/config/llm/mode')
+  expect(JSON.parse(view.fetcher.mock.calls[3]![1].body)).toMatchObject({ expectedRevision: 2, mode: 'oomol' })
+  expect(section.querySelector('form')).toBeNull()
+})
+
+it.each([401, 409, 500])('preserves an LLM draft after save status %s', async (status) => {
+  const view = await llm()
+  await input(field('llm-origin'), 'https://models.example.com')
+  await input(field('llm-token'), 'model-key')
+  view.fetcher.mockResolvedValueOnce(new Response(null, { status }))
+  await submit(dialog().querySelector('form')!)
+  expect(field('llm-origin').value).toBe('https://models.example.com')
+  expect(field('llm-token').value).toBe('model-key')
+  expect(view.unauthorized).toHaveBeenCalledTimes(status == 401 ? 1 : 0)
+  expect(view.changed).not.toHaveBeenCalled()
+  if (status == 409) expect(view.fetcher.mock.calls[1]![0]).toBe('/config')
+  if (status == 500) expect(toast.error).toHaveBeenCalledWith(view.i18n.t('settings.saveFailed'))
+})
+
+it('validates custom LLM fields and preserves its draft when unrelated settings refresh', async () => {
+  const current = config(1)
+  current.llm.oomolAvailable = true
+  const view = await llm(current)
+  await submit(dialog().querySelector('form')!)
+  expect(document.activeElement).toBe(field('llm-origin'))
+  await input(field('llm-origin'), 'https://models.example.com')
+  await submit(dialog().querySelector('form')!)
+  expect(document.activeElement).toBe(field('llm-token'))
+  await input(field('llm-token'), 'draft-key')
+  act(() => view.configuration().saved({ ...current, revision: 2 }))
+  expect(field('llm-origin').value).toBe('https://models.example.com')
+  expect(field('llm-token').value).toBe('draft-key')
+  expect(unload()).toBe(true)
+  expect(view.fetcher).not.toHaveBeenCalled()
+})
+
+it('limits environment locking to LLM and keeps the original Connector choices editable', async () => {
+  const current = config(1)
+  Object.assign(current.connector.runtime, { configured: true, tokenConfigured: true })
+  expect(serviceConfigurationMissing(current)).toBe(false)
+  Object.assign(current.llm, { managed: true, configured: true, mode: 'custom', source: 'environment', origin: 'https://environment.example.com' })
+  const view = await page(current)
+  const section = llmSection(view)
+  expect(section.textContent).toContain(view.i18n.t('settings.environmentHint'))
+  expect(field('llm-token')).toBeNull()
+  expect(section.querySelector('fieldset')!.disabled).toBe(true)
+  const connector = view.container.querySelector<HTMLElement>(`section[aria-label="${view.i18n.t('settings.connector')}"]`)!
+  expect(connector.querySelector<HTMLInputElement>('input[name=connector-mode]')!.closest('fieldset')!.disabled).toBe(false)
+})
 
 it('ignores an older refresh that finishes after the latest refresh', async () => {
   const view = await page()
@@ -140,8 +293,6 @@ it.each([200, 401, 409, 500])('saves the custom service form once and handles st
     connectorOrigin: 'https://connector.example.com',
     connectorToken: 'connector-secret',
     consoleOrigin: 'https://console.example.com',
-    llmOrigin: 'https://models.example.com',
-    llmToken: 'llm-secret',
   }
   for (const [key, value] of Object.entries(draft)) await input(field(`service-${key}`), value)
   view.fetcher.mockImplementation(async () => Response.json(config(2))).mockImplementationOnce(async () => Response.json(config(2), { status }))
@@ -157,7 +308,7 @@ it.each([200, 401, 409, 500])('saves the custom service form once and handles st
 
 it('focuses missing public address and callback key fields without saving', async () => {
   const view = await page()
-  await click(button(view.i18n.t('settings.configure')))
+  await click(button(view.i18n.t('settings.configure'), integrationSection(view)))
   await submit(dialog().querySelector('form')!)
   expect(document.activeElement).toBe(field('/config/integration-origin'))
   await input(field('/config/integration-origin'), 'https://flows.example.com')
@@ -175,7 +326,7 @@ it.each([
   { secret: '中'.repeat(11), accepted: true },
 ])('validates callback keys in UTF-8 bytes: %j', async ({ secret, accepted }) => {
   const view = await page()
-  await click(button(view.i18n.t('settings.configure')))
+  await click(button(view.i18n.t('settings.configure'), integrationSection(view)))
   await input(field('/config/integration-origin'), 'https://flows.example.com')
   await input(field('/config/integration-secret'), secret)
   expect(field('/config/integration-secret').getAttribute('aria-invalid')).toBe(String(!accepted))
@@ -208,11 +359,11 @@ it.each([false, true])('preserves or explicitly clears a stored key on save (cle
 
 it('preserves manual drafts across authorization mode changes and confirms unsaved edits once', async () => {
   const view = await service('oomol', config(1), true)
-  expect(dialog().querySelector('input')).toBeNull()
+  expect(dialog().querySelector('input[type=password]')).toBeNull()
   await click(button(view.i18n.t('settings.oomolManualKey')))
   await input(field('service-connectorToken'), 'manual-draft')
   await click(button(view.i18n.t('settings.oomolBackToAuthorization')))
-  expect(dialog().querySelector('input')).toBeNull()
+  expect(dialog().querySelector('input[type=password]')).toBeNull()
   await click(button(view.i18n.t('settings.oomolManualKey')))
   expect(field('service-connectorToken').value).toBe('manual-draft')
   await click(button(view.i18n.t('settings.cancel'), dialog()))

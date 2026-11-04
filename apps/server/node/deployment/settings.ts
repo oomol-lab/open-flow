@@ -1,12 +1,12 @@
 import type { Logger } from 'pino'
 import type { ServiceMode, ServiceProfile } from '../storage/settings-store.ts'
-import type { LlmHost } from './llm.ts'
+import type { LlmConfig, LlmHost } from './llm.ts'
 
 import { validateServiceProfile } from '../../common/service-profile.ts'
 import { silentLogger } from '../logger.ts'
 import { SettingsStore } from '../storage/settings-store.ts'
 import { ConnectorClient } from './connector.ts'
-import { createLlm, oomolLlm } from './llm.ts'
+import { createLlm, oomolLlmConfig } from './llm.ts'
 
 export class Settings {
   readonly #connectorConsoleOrigin?: string
@@ -14,11 +14,10 @@ export class Settings {
   readonly #connectorToken?: string
   readonly #environmentConnector?: ConnectorClient
   readonly #environmentIntegration?: { readonly callbackKey: string; readonly publicOrigin: string }
-  readonly #environmentLlm?: LlmHost
-  readonly #environmentOrigin?: string
+  readonly #environmentLlm?: ReturnType<typeof createLlm>
   readonly #logger: Logger
   readonly #store: SettingsStore
-  #connectorCache?: { readonly client: ConnectorClient; readonly origin: string; readonly revision: number; readonly token: string }
+  #connectorCache?: { readonly client: ConnectorClient; readonly origin: string; readonly token: string }
 
   constructor(
     store: SettingsStore,
@@ -46,8 +45,8 @@ export class Settings {
     }
     if (environment.llmOrigin != null && environment.llmToken != null) {
       this.#environmentLlm = createLlm(environment.llmOrigin, environment.llmToken)
-      this.#environmentOrigin = new URL(environment.llmOrigin).origin
     }
+    this.#store.initializeLlmMode(this.oomolManaged() ? 'oomol' : (this.#store.state().serviceMode ?? 'none'))
   }
 
   connector(): ConnectorClient | undefined {
@@ -55,11 +54,11 @@ export class Settings {
     const stored = this.#store.state()
     if (stored.connectorOrigin == null || stored.connectorToken == null) return undefined
     const cache = this.#connectorCache
-    if (cache?.origin === stored.connectorOrigin && cache?.token === stored.connectorToken && cache?.revision === stored.revision) {
+    if (cache?.origin === stored.connectorOrigin && cache?.token === stored.connectorToken) {
       return cache.client
     }
     const client = new ConnectorClient(stored.connectorOrigin, stored.connectorToken, 30_000, this.#logger)
-    this.#connectorCache = { client, origin: stored.connectorOrigin, revision: stored.revision, token: stored.connectorToken }
+    this.#connectorCache = { client, origin: stored.connectorOrigin, token: stored.connectorToken }
     return client
   }
 
@@ -84,12 +83,38 @@ export class Settings {
   }
 
   llm(): LlmHost | undefined {
-    const stored = this.#store.state()
-    const connector = this.#connectorValues(stored)
-    if (this.#hosted(stored)) return oomolLlm(connector.origin, connector.token)
     if (this.#environmentLlm != null) return this.#environmentLlm
-    if (stored.llmOrigin != null && stored.llmToken != null && stored.llmToken.trim() != '') return createLlm(stored.llmOrigin, stored.llmToken)
-    return undefined
+    const { config } = this.#resolveLlm(this.#store.state())
+    return config == null ? undefined : createLlm(config.origin, config.token)
+  }
+
+  oomolManaged(): boolean {
+    return hostedOrigin(this.#connectorOrigin)
+  }
+
+  /** OOMOL authorization is shared, independently of the selected Connector profile. */
+  #oomolConfiguration(): { readonly origin: string; readonly token: string } | undefined {
+    if (this.oomolManaged()) return { origin: this.#connectorOrigin!, token: this.#connectorToken ?? '' }
+    const profile = this.#store.profile('oomol')
+    if (profile.connectorOrigin == null) return
+    return { origin: profile.connectorOrigin, token: profile.connectorToken ?? '' }
+  }
+
+  #llmMode(stored: ReturnType<SettingsStore['state']>): ServiceMode | null {
+    if (this.#environmentLlm != null) return 'custom'
+    return stored.llmMode == 'oomol' || stored.llmMode == 'custom' ? stored.llmMode : this.oomolManaged() ? 'oomol' : null
+  }
+
+  #resolveLlm(stored: ReturnType<SettingsStore['state']>) {
+    const mode = this.#llmMode(stored)
+    const authorization = this.#oomolConfiguration()
+    const oomol = oomolLlmConfig(authorization?.origin, authorization?.token)
+    let config: LlmConfig | undefined
+    if (this.#environmentLlm != null) config = this.#environmentLlm.config
+    else if (mode == 'oomol') config = oomol
+    else if (mode == 'custom' && stored.llmOrigin != null && stored.llmToken != null && stored.llmToken.trim() != '')
+      config = { origin: stored.llmOrigin, token: stored.llmToken }
+    return { mode, config, oomolAvailable: oomol != null }
   }
 
   status() {
@@ -129,31 +154,37 @@ export class Settings {
         connectorOrigin: profile.connectorOrigin ?? '',
         connectorTokenConfigured: !!profile.connectorToken,
         consoleOrigin: profile.consoleOrigin ?? '',
-        llmOrigin: profile.llmOrigin ?? '',
-        llmTokenConfigured: !!profile.llmToken,
       }
     }
-    const managed = this.#environmentConnector != null || this.#environmentLlm != null || this.#connectorConsoleOrigin != null
+    const managed = this.#environmentConnector != null || this.#connectorConsoleOrigin != null
     const services = {
       profiles: { oomol: profileStatus('oomol'), custom: profileStatus('custom') },
       mode: managed ? (this.#hosted(stored) ? ('oomol' as const) : ('custom' as const)) : stored.serviceMode,
       managed,
     }
-    const base = { services, connector: { console, runtime: connector }, integration: integrationStatus, revision: stored.revision, version: 1 as const }
-    if (this.#hosted()) {
-      const active = this.#connectorValues(stored)
-      const origin = derivedOrigin(active.origin, active.token)
-      return origin == null
-        ? { ...base, llm: { configured: false as const, source: 'none' as const, tokenConfigured: false as const } }
-        : { ...base, llm: { configured: true as const, origin, source: 'derived' as const, tokenConfigured: true as const } }
+    const { mode, config: llm, oomolAvailable } = this.#resolveLlm(stored)
+    return {
+      services,
+      connector: { console, runtime: connector },
+      integration: integrationStatus,
+      revision: stored.revision,
+      version: 1 as const,
+      llm: {
+        mode,
+        managed: this.#environmentLlm != null,
+        custom: { origin: stored.llmOrigin ?? '', tokenConfigured: !!stored.llmToken?.trim() },
+        oomolAvailable,
+        oomolManaged: this.oomolManaged(),
+        ...(llm == null
+          ? { configured: false as const, source: 'none' as const, tokenConfigured: false as const }
+          : {
+              configured: true as const,
+              origin: llm.origin,
+              source: this.#environmentLlm != null ? ('environment' as const) : mode == 'oomol' ? ('derived' as const) : ('settings' as const),
+              tokenConfigured: true as const,
+            }),
+      },
     }
-    if (this.#environmentOrigin != null) {
-      return { ...base, llm: { configured: true as const, origin: this.#environmentOrigin, source: 'environment' as const, tokenConfigured: true as const } }
-    }
-    if (stored.llmOrigin != null && stored.llmToken != null && stored.llmToken.trim() != '') {
-      return { ...base, llm: { configured: true as const, origin: stored.llmOrigin, source: 'settings' as const, tokenConfigured: true as const } }
-    }
-    return { ...base, llm: { configured: false as const, source: 'none' as const, tokenConfigured: false as const } }
   }
 
   saveProfile(
@@ -163,30 +194,24 @@ export class Settings {
       readonly connectorOrigin: string
       readonly connectorToken: string | null
       readonly consoleOrigin: string
-      readonly llmOrigin: string
-      readonly llmToken: string | null
     },
   ): 'conflict' | 'environment' | 'saved' {
-    if (this.#environmentConnector != null || this.#environmentLlm != null || this.#connectorConsoleOrigin != null) return 'environment'
+    if (mode == 'oomol' ? this.oomolManaged() : this.#environmentConnector != null || this.#connectorConsoleOrigin != null) return 'environment'
     const previous = this.#store.profile(mode)
     const connectorToken = value.connectorToken ?? previous.connectorToken ?? ''
-    const llmToken = value.llmToken ?? previous.llmToken ?? ''
-    if (Object.values(validateServiceProfile(mode, { ...value, connectorToken, llmToken })).some((issue) => issue != 'required'))
+    if (Object.values(validateServiceProfile(mode, { ...value, connectorToken })).some((issue) => issue != 'required'))
       throw new Error('Invalid service configuration.')
     if (value.connectorOrigin.trim() != '') void new ConnectorClient(value.connectorOrigin, connectorToken, 30_000, this.#logger)
-    if (mode == 'custom' && value.llmOrigin != '' && llmToken.trim() != '') createLlm(value.llmOrigin, llmToken)
     const profile: ServiceProfile = {
       connectorOrigin: value.connectorOrigin.trim() == '' ? null : new URL(value.connectorOrigin).href,
       connectorToken,
       consoleOrigin: mode == 'custom' && value.consoleOrigin != '' ? publicOrigin(value.consoleOrigin) : null,
-      llmOrigin: mode == 'custom' && value.llmOrigin != '' ? new URL(value.llmOrigin).origin : null,
-      llmToken: mode == 'custom' && value.llmOrigin != '' ? llmToken : null,
     }
     return this.#store.putProfile(expectedRevision, mode, profile) ? 'saved' : 'conflict'
   }
 
   selectProfile(expectedRevision: number, mode: ServiceMode): 'conflict' | 'environment' | 'saved' {
-    if (this.#environmentConnector != null || this.#environmentLlm != null || this.#connectorConsoleOrigin != null) return 'environment'
+    if (this.#environmentConnector != null || this.#connectorConsoleOrigin != null) return 'environment'
     return this.#store.selectProfile(expectedRevision, mode) ? 'saved' : 'conflict'
   }
 
@@ -215,13 +240,11 @@ export class Settings {
   }
 
   deleteServices(expectedRevision: number): 'conflict' | 'environment' | 'saved' {
-    if (this.#environmentConnector != null || this.#environmentLlm != null || this.#connectorConsoleOrigin != null) return 'environment'
+    if (this.#environmentConnector != null || this.#connectorConsoleOrigin != null) return 'environment'
     return this.#store.putProfile(expectedRevision, this.#store.state().serviceMode ?? 'custom', {
       connectorOrigin: null,
       connectorToken: null,
       consoleOrigin: null,
-      llmOrigin: null,
-      llmToken: null,
     })
       ? 'saved'
       : 'conflict'
@@ -234,18 +257,6 @@ export class Settings {
   putConnector(expectedRevision: number, origin: string, token: string): 'conflict' | 'environment' | 'saved' {
     if (this.#environmentConnector != null) return 'environment'
     void new ConnectorClient(origin, token, 30_000, this.#logger)
-    if (hostedOrigin(origin)) {
-      if (this.#environmentLlm != null || this.#connectorConsoleOrigin != null) return 'environment'
-      return this.#store.putServices(expectedRevision, {
-        connectorOrigin: new URL(origin).href,
-        connectorToken: token,
-        consoleOrigin: null,
-        llmOrigin: null,
-        llmToken: null,
-      })
-        ? 'saved'
-        : 'conflict'
-    }
     return this.#store.putConnector(expectedRevision, new URL(origin).href, token) ? 'saved' : 'conflict'
   }
 
@@ -277,11 +288,16 @@ export class Settings {
     return this.#store.deleteIntegration(expectedRevision) ? 'saved' : 'conflict'
   }
 
-  putLlm(expectedRevision: number, origin: string, token: string): 'conflict' | 'environment' | 'saved' {
+  putLlm(expectedRevision: number, origin: string, token: string | null, activate = true): 'conflict' | 'environment' | 'saved' {
     if (this.#environmentLlm != null) return 'environment'
-    if (this.#hosted()) throw new Error('OOMOL manages the hosted LLM.')
-    createLlm(origin, token)
-    return this.#store.putLlm(expectedRevision, new URL(origin).origin, token) ? 'saved' : 'conflict'
+    const secret = token ?? this.#store.state().llmToken ?? ''
+    createLlm(origin, secret)
+    return this.#store.putLlm(expectedRevision, new URL(origin).origin, secret, activate) ? 'saved' : 'conflict'
+  }
+
+  selectLlm(expectedRevision: number, mode: ServiceMode): 'conflict' | 'environment' | 'saved' {
+    if (this.#environmentLlm != null) return 'environment'
+    return this.#store.selectLlm(expectedRevision, mode) ? 'saved' : 'conflict'
   }
 
   deleteLlm(expectedRevision: number): 'conflict' | 'environment' | 'saved' {
@@ -294,13 +310,6 @@ export class Settings {
       ? { origin: this.#connectorOrigin, token: this.#connectorToken ?? '' }
       : { origin: stored.connectorOrigin ?? undefined, token: stored.connectorToken ?? undefined }
   }
-}
-
-function derivedOrigin(connectorOrigin: string | undefined, token: string | undefined): string | undefined {
-  if (connectorOrigin == null || token == null || token.length == 0) return
-  const connector = new URL(connectorOrigin)
-  if (connector.hostname != 'connector.oomol.com' && connector.hostname != 'connector.oomol.dev') return
-  return `https://new-llm.${connector.hostname.slice('connector.'.length)}`
 }
 
 function publicOrigin(value: string): string {

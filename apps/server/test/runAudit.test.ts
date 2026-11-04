@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { expect, it, onTestFinished } from 'vitest'
 import { createServerApp } from '../node/transport/http.ts'
 import { closeService, openService } from './serviceFixture.ts'
+import { restoreGroupedServiceSettings } from './support/legacySettings.ts'
 
 async function fixture(file = ':memory:') {
   const service = await openService(file)
@@ -75,6 +76,7 @@ it('retains audit after restart and migrates old Runs without inventing identiti
   expect(reopened.control.runs.getRun('operator', run.runId)).toEqual(run)
   await closeService(reopened)
   const database = new DatabaseSync(file)
+  restoreGroupedServiceSettings(database)
   database.exec('ALTER TABLE runs DROP COLUMN initiator_actor_id')
   database.exec('ALTER TABLE runs DROP COLUMN initiator_channel')
   database.exec(

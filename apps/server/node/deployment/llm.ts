@@ -3,6 +3,7 @@ import type { InvokeDecisionTask, InvokeLlmTask, LlmTaskResult } from '@oomol-la
 
 import { decisionAnswers, decisionRequest } from '@oomol-lab/open-flow/decision'
 import { renderPrompt } from '@oomol-lab/open-flow/flow-semantics'
+import { validateLlmConfiguration } from '../../common/service-profile.ts'
 
 export interface LlmConfig {
   readonly origin: string
@@ -13,31 +14,24 @@ export type LlmHost = InvokeLlmTask & { readonly config?: LlmConfig; readonly de
 
 const defaultModel = 'oomol-chat'
 
-export function createLlm(origin: string, token: string): LlmHost {
-  const url = new URL(origin)
-  const loopback = url.hostname == '127.0.0.1' || url.hostname == '::1' || url.hostname == '[::1]' || url.hostname == 'localhost'
-  if (
-    (url.protocol != 'https:' && !(url.protocol == 'http:' && loopback)) ||
-    url.username != '' ||
-    url.password != '' ||
-    url.pathname != '/' ||
-    url.search != '' ||
-    url.hash != ''
-  ) {
+export function createLlm(origin: string, token: string): LlmHost & { readonly config: LlmConfig } {
+  const errors = validateLlmConfiguration(origin, token)
+  if (errors.origin) {
     throw new Error('OPEN_FLOW_LLM_ORIGIN must be an HTTPS origin without credentials, a path, query, or fragment, except on loopback.')
   }
-  if (token.length == 0) throw new Error('OPEN_FLOW_LLM_TOKEN must not be empty.')
+  if (errors.token) throw new Error('OPEN_FLOW_LLM_TOKEN must not be empty.')
+  const url = new URL(origin)
   return Object.assign(invokeLlm(new URL('v1/', url), token), {
     config: { origin: url.origin, token },
     decision: invokeDecision(new URL('v1/systemone', url), token),
   })
 }
 
-export function oomolLlm(connectorOrigin: string | undefined, token: string | undefined): LlmHost | undefined {
-  if (connectorOrigin == null || token == null || token.length == 0) return
+export function oomolLlmConfig(connectorOrigin: string | undefined, token: string | undefined): LlmConfig | undefined {
+  if (connectorOrigin == null || token == null || token.trim().length == 0) return
   const connector = new URL(connectorOrigin)
   if (connector.hostname != 'connector.oomol.com' && connector.hostname != 'connector.oomol.dev') return
-  return createLlm(`https://new-llm.${connector.hostname.slice('connector.'.length)}`, token)
+  return { origin: `https://new-llm.${connector.hostname.slice('connector.'.length)}`, token }
 }
 
 function invokeLlm(origin: URL, token: string): InvokeLlmTask {

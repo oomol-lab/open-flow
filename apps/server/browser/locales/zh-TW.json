@@ -39,7 +39,7 @@
     "auto": "跟隨系統"
   },
   "settings": {
-    "servicesDescription": "設定工作流程呼叫外部服務，以及執行 LLM 和 Agent 節點所需的連線。",
+    "servicesDescription": "設定工作流程呼叫外部服務時使用的 Connector。",
     "unsavedTitle": "儲存變更？",
     "unsavedDescription": "你有尚未儲存的變更。",
     "discardChanges": "放棄變更",
@@ -95,8 +95,8 @@
     "services": "服務連線",
     "connectorAddress": "Connector 位址",
     "connectorToken": "Connector Token（選填）",
-    "llmAddress": "LLM 位址（選填）",
-    "llmToken": "LLM Token",
+    "llmAddress": "LLM 位址",
+    "llmToken": "API Key",
     "saveServices": "儲存並啟用",
     "connected": "已連線",
     "validation": {
@@ -108,8 +108,8 @@
     },
     "serviceSelectionRequired": "請選擇服務連線",
     "serviceIncomplete": "請編輯目前服務，完成設定",
-    "hostedIncludes": "使用官方託管的 Connector 和 LLM 服務，無需自行部署。",
-    "selfHostedDescription": "連接自部署的 Connector、授權控制台和 LLM 服務。",
+    "hostedIncludes": "使用 OOMOL 託管的 Connector，無需自行部署。",
+    "selfHostedDescription": "連接自部署的 Connector 和授權控制台。",
     "connectorAddressHelp": "工作流透過此位址呼叫 Connector，取得和執行外部服務能力。",
     "connectorTokenHelp": "呼叫 Connector 時使用的存取憑證；未啟用驗證時可留空。",
     "consoleAddressHelp": "用於開啟外部帳號的授權和連線管理頁面。",
@@ -127,7 +127,16 @@
     "oomolSavingHint": "授權已完成，正在儲存託管服務設定。",
     "oomolSaveFailed": "授權成功，但儲存失敗",
     "oomolSaveFailedHint": "授權結果已保留，請重試儲存。",
-    "oomolRetrySave": "重試儲存"
+    "oomolRetrySave": "重試儲存",
+    "llm": "LLM",
+    "llmSource": "服務來源",
+    "llmOomol": "OOMOL 託管",
+    "llmCustom": "自行設定",
+    "llmOomolHint": "已連接 OOMOL，可直接使用，無需填寫位址和金鑰。",
+    "llmOomolUnavailable": "由 OOMOL 提供模型服務，連接後即可使用。",
+    "oomolConnect": "連接 OOMOL",
+    "llmDescription": "選擇工作流程使用的模型服務。",
+    "llmCustomHint": "連接相容 OpenAI API 的模型服務，填寫自己的服務位址和 API Key。"
   },
   "team": {
     "createFailed": "無法在這個 Connector 團隊中建立 Flow。",

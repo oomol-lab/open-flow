@@ -39,7 +39,7 @@
     "auto": "Системная"
   },
   "settings": {
-    "servicesDescription": "Настройте подключения для вызова внешних сервисов и выполнения узлов LLM и Agent в рабочих процессах.",
+    "servicesDescription": "Настройте Connector для вызова внешних сервисов из рабочих процессов.",
     "unsavedTitle": "Сохранить изменения?",
     "unsavedDescription": "У вас есть несохранённые изменения.",
     "discardChanges": "Отменить изменения",
@@ -95,8 +95,8 @@
     "services": "Подключение сервисов",
     "connectorAddress": "Адрес Connector",
     "connectorToken": "Токен Connector (необязательно)",
-    "llmAddress": "Адрес LLM (необязательно)",
-    "llmToken": "Токен LLM",
+    "llmAddress": "Адрес LLM",
+    "llmToken": "API Key",
     "saveServices": "Сохранить и применить",
     "connected": "Подключено",
     "validation": {
@@ -108,8 +108,8 @@
     },
     "serviceSelectionRequired": "Выберите подключение к сервису",
     "serviceIncomplete": "Нажмите «Изменить», чтобы завершить настройку выбранного сервиса",
-    "hostedIncludes": "Используйте официально размещённые сервисы Connector и LLM без самостоятельного развёртывания.",
-    "selfHostedDescription": "Подключите собственные сервисы Connector, консоль авторизации и LLM.",
+    "hostedIncludes": "Используйте Connector от OOMOL без собственного развёртывания.",
+    "selfHostedDescription": "Подключите собственный Connector и консоль авторизации.",
     "connectorAddressHelp": "По этому адресу рабочие процессы получают и вызывают функции внешних сервисов через Connector.",
     "connectorTokenHelp": "Токен для запросов к Connector. Оставьте пустым, если аутентификация отключена.",
     "consoleAddressHelp": "Адрес страницы авторизации внешних аккаунтов и управления подключениями.",
@@ -127,7 +127,16 @@
     "oomolSavingHint": "Авторизация завершена. Сохраняем настройки облачных сервисов.",
     "oomolSaveFailed": "Авторизация успешна, но сохранить настройки не удалось",
     "oomolSaveFailedHint": "Результат авторизации сохранён. Повторите сохранение настроек.",
-    "oomolRetrySave": "Повторить сохранение"
+    "oomolRetrySave": "Повторить сохранение",
+    "llm": "LLM",
+    "llmSource": "Источник сервиса",
+    "llmOomol": "Сервис OOMOL",
+    "llmCustom": "Свой сервис",
+    "llmOomolHint": "Используйте существующее подключение OOMOL без ввода адреса и ключа.",
+    "llmOomolUnavailable": "Подключите аккаунт OOMOL, чтобы использовать его сервис моделей.",
+    "oomolConnect": "Подключить OOMOL",
+    "llmDescription": "Выберите сервис моделей для рабочих процессов.",
+    "llmCustomHint": "Подключите OpenAI-совместимый сервис моделей со своим адресом и ключом API."
   },
   "team": {
     "createFailed": "Не удалось создать Flow для этой команды Connector.",

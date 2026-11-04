@@ -5,8 +5,6 @@ export type ServiceProfile = {
   readonly connectorOrigin: string | null
   readonly connectorToken: string | null
   readonly consoleOrigin: string | null
-  readonly llmOrigin: string | null
-  readonly llmToken: string | null
 }
 
 export class SettingsStore {
@@ -22,26 +20,33 @@ export class SettingsStore {
   profile(mode: ServiceMode): ServiceProfile {
     return this.#database.connection
       .prepare(`SELECT connector_origin AS connectorOrigin, connector_token AS connectorToken,
-      console_origin AS consoleOrigin, llm_origin AS llmOrigin, llm_token AS llmToken FROM service_profiles WHERE mode = ?`)
+      console_origin AS consoleOrigin FROM service_profiles WHERE mode = ?`)
       .get(mode) as ServiceProfile
   }
 
   state() {
     const settings = this.#database.connection
-      .prepare(`SELECT service_mode AS serviceMode, integration_callback_key AS integrationCallbackKey,
+      .prepare(`SELECT service_mode AS serviceMode, llm_mode AS llmMode, llm_origin AS llmOrigin, llm_token AS llmToken,
+      integration_callback_key AS integrationCallbackKey,
       integration_public_origin AS integrationPublicOrigin, revision, updated_at AS updatedAt FROM deployment_settings WHERE id = 1`)
       .get() as {
       readonly serviceMode: ServiceMode | null
+      readonly llmMode: ServiceMode | 'none' | null
+      readonly llmOrigin: string | null
+      readonly llmToken: string | null
       readonly integrationCallbackKey: string | null
       readonly integrationPublicOrigin: string | null
       readonly revision: number
       readonly updatedAt: number
     }
     const { consoleOrigin, ...profile } =
-      settings.serviceMode == null
-        ? { consoleOrigin: null, connectorOrigin: null, connectorToken: null, llmOrigin: null, llmToken: null }
-        : this.profile(settings.serviceMode)
+      settings.serviceMode == null ? { consoleOrigin: null, connectorOrigin: null, connectorToken: null } : this.profile(settings.serviceMode)
     return { ...settings, ...profile, connectorConsoleOrigin: consoleOrigin }
+  }
+
+  /** Complete the migration using the deployment's effective pre-split source, including environment settings. */
+  initializeLlmMode(mode: ServiceMode | 'none'): void {
+    this.#database.connection.prepare('UPDATE deployment_settings SET llm_mode = ? WHERE id = 1 AND llm_mode IS NULL').run(mode)
   }
 
   /** Profile data and selection share one optimistic revision and one transaction. */
@@ -49,9 +54,8 @@ export class SettingsStore {
     return this.#database.transaction(() => {
       if (!this.#revise(expectedRevision)) return false
       this.#database.connection
-        .prepare(`UPDATE service_profiles SET connector_origin = ?, connector_token = ?, console_origin = ?,
-        llm_origin = ?, llm_token = ? WHERE mode = ?`)
-        .run(value.connectorOrigin, value.connectorToken, value.consoleOrigin, value.llmOrigin, value.llmToken, mode)
+        .prepare('UPDATE service_profiles SET connector_origin = ?, connector_token = ?, console_origin = ? WHERE mode = ?')
+        .run(value.connectorOrigin, value.connectorToken, value.consoleOrigin, mode)
       if (activate) this.#database.connection.prepare('UPDATE deployment_settings SET service_mode = ? WHERE id = 1').run(mode)
       return true
     })
@@ -66,10 +70,17 @@ export class SettingsStore {
     )
   }
 
-  putServices(expectedRevision: number, value: ServiceProfile): boolean {
-    const mode =
-      value.connectorOrigin != null && ['connector.oomol.com', 'connector.oomol.dev'].includes(new URL(value.connectorOrigin).hostname) ? 'oomol' : 'custom'
-    return this.putProfile(expectedRevision, mode, value, true)
+  putServices(expectedRevision: number, value: ServiceProfile & { readonly llmOrigin: string | null; readonly llmToken: string | null }): boolean {
+    return this.#database.transaction(() => {
+      if (!this.#revise(expectedRevision)) return false
+      this.#database.connection
+        .prepare("UPDATE service_profiles SET connector_origin = ?, connector_token = ?, console_origin = ? WHERE mode = 'custom'")
+        .run(value.connectorOrigin, value.connectorToken, value.consoleOrigin)
+      this.#database.connection
+        .prepare("UPDATE deployment_settings SET service_mode = 'custom', llm_mode = 'custom', llm_origin = ?, llm_token = ? WHERE id = 1")
+        .run(value.llmOrigin, value.llmToken)
+      return true
+    })
   }
 
   putConnector(expectedRevision: number, origin: string, token: string): boolean {
@@ -109,12 +120,30 @@ export class SettingsStore {
     )
   }
 
-  putLlm(expectedRevision: number, origin: string, token: string): boolean {
-    return this.putProfile(expectedRevision, 'custom', { ...this.profile('custom'), llmOrigin: origin, llmToken: token }, true)
+  putLlm(expectedRevision: number, origin: string, token: string, activate = true): boolean {
+    return (
+      this.#database.connection
+        .prepare(`UPDATE deployment_settings SET llm_mode = CASE WHEN ? = 1 THEN 'custom' ELSE llm_mode END, llm_origin = ?, llm_token = ?,
+        revision = revision + 1, updated_at = ? WHERE id = 1 AND revision = ?`)
+        .run(activate ? 1 : 0, origin, token, this.#clock(), expectedRevision).changes == 1
+    )
+  }
+
+  selectLlm(expectedRevision: number, mode: ServiceMode): boolean {
+    return (
+      this.#database.connection
+        .prepare('UPDATE deployment_settings SET llm_mode = ?, revision = revision + 1, updated_at = ? WHERE id = 1 AND revision = ?')
+        .run(mode, this.#clock(), expectedRevision).changes == 1
+    )
   }
 
   deleteLlm(expectedRevision: number): boolean {
-    return this.putProfile(expectedRevision, 'custom', { ...this.profile('custom'), llmOrigin: null, llmToken: null })
+    return (
+      this.#database.connection
+        .prepare(`UPDATE deployment_settings SET llm_origin = NULL, llm_token = NULL,
+        revision = revision + 1, updated_at = ? WHERE id = 1 AND revision = ?`)
+        .run(this.#clock(), expectedRevision).changes == 1
+    )
   }
 
   #revise(expectedRevision: number): boolean {

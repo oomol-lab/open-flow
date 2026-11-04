@@ -39,7 +39,7 @@
     "auto": "시스템"
   },
   "settings": {
-    "servicesDescription": "워크플로가 외부 서비스를 호출하고 LLM 및 Agent 노드를 실행하는 데 필요한 연결을 설정합니다.",
+    "servicesDescription": "워크플로가 외부 서비스를 호출할 때 사용할 Connector를 설정합니다.",
     "unsavedTitle": "변경 사항을 저장할까요?",
     "unsavedDescription": "저장하지 않은 변경 사항이 있습니다.",
     "discardChanges": "변경 사항 버리기",
@@ -95,8 +95,8 @@
     "services": "서비스 연결",
     "connectorAddress": "Connector URL",
     "connectorToken": "Connector 토큰 (선택)",
-    "llmAddress": "LLM URL (선택)",
-    "llmToken": "LLM 토큰",
+    "llmAddress": "LLM URL",
+    "llmToken": "API Key",
     "saveServices": "저장 및 적용",
     "connected": "연결됨",
     "validation": {
@@ -108,8 +108,8 @@
     },
     "serviceSelectionRequired": "서비스 연결을 선택하세요",
     "serviceIncomplete": "선택한 서비스를 편집하여 설정을 완료하세요",
-    "hostedIncludes": "직접 배포할 필요 없이 공식 호스팅 Connector와 LLM 서비스를 사용합니다.",
-    "selfHostedDescription": "직접 호스팅하는 Connector, 인증 콘솔 및 LLM 서비스를 연결합니다.",
+    "hostedIncludes": "직접 배포할 필요 없이 OOMOL의 Connector를 사용합니다.",
+    "selfHostedDescription": "직접 호스팅하는 Connector와 인증 콘솔에 연결합니다.",
     "connectorAddressHelp": "워크플로가 Connector를 통해 외부 서비스 기능을 조회하고 실행하는 주소입니다.",
     "connectorTokenHelp": "Connector 요청에 사용하는 인증 정보입니다. 인증이 비활성화된 경우 비워 두세요.",
     "consoleAddressHelp": "외부 계정 인증 및 연결 관리 페이지를 여는 주소입니다.",
@@ -127,7 +127,16 @@
     "oomolSavingHint": "인증이 완료되었습니다. 호스팅 서비스 설정을 저장하고 있습니다.",
     "oomolSaveFailed": "인증에 성공했지만 저장에 실패했습니다",
     "oomolSaveFailedHint": "인증 결과가 유지됩니다. 저장을 다시 시도하세요.",
-    "oomolRetrySave": "저장 재시도"
+    "oomolRetrySave": "저장 재시도",
+    "llm": "LLM",
+    "llmSource": "서비스 제공 방식",
+    "llmOomol": "OOMOL 호스팅",
+    "llmCustom": "직접 설정",
+    "llmOomolHint": "기존 OOMOL 연결을 사용합니다. URL이나 키를 입력할 필요가 없습니다.",
+    "llmOomolUnavailable": "OOMOL 계정을 연결하면 모델 서비스를 사용할 수 있습니다.",
+    "oomolConnect": "OOMOL 연결",
+    "llmDescription": "워크플로에서 사용할 모델 서비스를 선택합니다.",
+    "llmCustomHint": "자신의 URL과 API 키로 OpenAI 호환 모델 서비스에 연결합니다."
   },
   "team": {
     "createFailed": "이 Connector 팀에서 Flow를 만들지 못했습니다.",

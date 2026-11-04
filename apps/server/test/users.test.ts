@@ -134,6 +134,8 @@ it('allows only administrators to manage users and deployment services', async (
     ['/config/connector', 'PUT', { expectedRevision: 1, origin: 'https://example.com', token: 'secret' }],
     ['/config/connector/oomol-login', 'POST', { expectedRevision: 1 }],
     ['/config/llm', 'DELETE', { expectedRevision: 1 }],
+    ['/config/llm/mode', 'PUT', { expectedRevision: 1, mode: 'oomol' }],
+    ['/config/llm/custom', 'PUT', { expectedRevision: 1, origin: 'https://example.com', token: 'secret' }],
     ['/v1/event-sources', 'GET', undefined],
     ['/v1/event-sources', 'POST', {}],
     ['/v1/connector/connections/mail/page', 'POST', {}],
