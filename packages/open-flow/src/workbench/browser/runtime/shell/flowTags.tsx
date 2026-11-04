@@ -314,6 +314,7 @@ export function FlowTagChips({
           <DropdownMenuContent container={container} align="start" className="w-64 max-w-[calc(100vw-2rem)]">
             {selected.slice(2).map((tag) => (
               <DropdownMenuItem key={tag.tagId} aria-label={t('tags.filterBy', { name: tag.name })} onClick={() => onFilter(tag.tagId)}>
+                <i aria-hidden="true" className="i-lucide-light:tag size-4 shrink-0" />
                 <span className="min-w-0 break-words">{tag.name}</span>
               </DropdownMenuItem>
             ))}
