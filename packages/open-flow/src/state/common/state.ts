@@ -11,6 +11,7 @@ const keySchema = z
   .min(1)
   .refine((value) => new TextEncoder().encode(value).length <= 256)
 export const stateQuerySchema = z.strictObject({ scope: z.enum(['draft', 'live']), values: z.literal(false).optional() })
+export const stateSummaryQuerySchema = stateQuerySchema.omit({ values: true })
 export const stateReadSchema = z.strictObject({
   scope: z.enum(['draft', 'live']),
   keys: z
@@ -25,6 +26,7 @@ export const stateClearSchema = z.strictObject({
   key: keySchema.optional(),
 })
 export const dedupeClearSchema = z.strictObject({ scope: z.enum(['draft', 'live']), space: z.string().regex(/^(flow|node:.+)$/) })
+export const dedupeClearAllSchema = z.strictObject({ scope: z.enum(['draft', 'live']) })
 export type DedupeIdentity = string | number
 export const skipDuplicatesConfigSchema = z.strictObject({
   fields: z
@@ -148,6 +150,18 @@ export const flowStateViewSchema = z.object({
       updatedAt: z.number(),
     }),
   ),
+})
+
+export interface FlowStateSummary {
+  readonly version: 1
+  readonly scope: StateScope
+  readonly limits: FlowStateView['limits']
+  readonly values: { readonly count: number; readonly updatedAt: number | null }
+  readonly spaces: FlowStateView['spaces']
+}
+
+export const flowStateSummarySchema = flowStateViewSchema.extend({
+  values: z.strictObject({ count: z.number().int().nonnegative(), updatedAt: z.number().nullable() }),
 })
 
 export interface FlowStateValues {

@@ -33,6 +33,7 @@ import { webhookResponseInputs } from '../../../../flow/common/webhookResponse.t
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { nodeIcon, nodeTitle, semanticNodeIcon } from '../workspace.ts'
 import { AgentSettingsProvider, AgentPrompt, AgentAdvancedSettings } from './agentSettings.tsx'
 import {
   presentBuiltInOutputDescription,
@@ -1043,7 +1044,19 @@ export function NodeInspector({
                   key={selection!.id}
                   client={store.state}
                   flowId={store.$.flowId.value}
-                  nodeIds={Object.keys(revision.graph()?.nodes ?? {})}
+                  nodes={
+                    selection?.kind === 'task'
+                      ? [
+                          {
+                            id: selection.id,
+                            title: nodeTitle(selection, t),
+                            icon: sourceNodeIcons?.[selection.id] ?? semanticNodeIcon(selection, {}),
+                            fallbackIcon: nodeIcon(selection),
+                          },
+                        ]
+                      : []
+                  }
+                  notify={store.notify}
                   history={{ nodeId: selection!.id }}
                 />
               ) : undefined

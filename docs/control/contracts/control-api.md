@@ -1759,18 +1759,25 @@ Model v13 / Engine v10 adds explicit persistent Flow State. State belongs to a F
 Run source (`draft` or `live`); neither publication nor rollback copies or resets it. These
 management operations require the same Flow access as editing. They do not change a Revision.
 
-| Method | Path                           | Query                                                           | Success                             |
-| ------ | ------------------------------ | --------------------------------------------------------------- | ----------------------------------- |
-| GET    | `/v1/flows/:flowId/state`      | Required `scope=draft\|live`; legacy `values=false` is accepted | `200 FlowStateView`                 |
-| POST   | `/v1/flows/:flowId/state/read` | JSON `{version:1, scope, keys}`                                 | `200 FlowStateValues`               |
-| DELETE | `/v1/flows/:flowId/state`      | Required `scope`; optional `key`                                | `200 { version: 1, cleared: true }` |
-| DELETE | `/v1/flows/:flowId/dedupe`     | Required `scope` and `space=flow\|node:<nodeId>`                | `200 { version: 1, cleared: true }` |
+| Method | Path                              | Query                                                           | Success                             |
+| ------ | --------------------------------- | --------------------------------------------------------------- | ----------------------------------- |
+| GET    | `/v1/flows/:flowId/state`         | Required `scope=draft\|live`; legacy `values=false` is accepted | `200 FlowStateView`                 |
+| GET    | `/v1/flows/:flowId/state/summary` | Required `scope=draft\|live`                                    | `200 FlowStateSummary`              |
+| POST   | `/v1/flows/:flowId/state/read`    | JSON `{version:1, scope, keys}`                                 | `200 FlowStateValues`               |
+| DELETE | `/v1/flows/:flowId/state`         | Required `scope`; optional `key`                                | `200 { version: 1, cleared: true }` |
+| DELETE | `/v1/flows/:flowId/dedupe`        | Required `scope` and `space=flow\|node:<nodeId>`                | `200 { version: 1, cleared: true }` |
+| DELETE | `/v1/flows/:flowId/dedupe/all`    | Required `scope=draft\|live`                                    | `200 { version: 1, cleared: true }` |
 
 Unknown query fields, omitted/invalid scope, `values=true`, invalid boolean values, empty/oversized keys and
 invalid space names are rejected with `400 flow.invalid`. DELETE is idempotent; an absent key
 or space is already clear. Clearing business values does not clear dedupe history, and clearing
 a dedupe space does not touch business values or other spaces. A space with pending Run records returns
 `409 flow.conflict`; finish or cancel its Runs before clearing it.
+`clearAllFlowDedupe(flowId, scope)` uses `/dedupe/all` to atomically clear sources without pending records.
+Sources with any pending records retain all their committed and pending history. If all existing sources
+are pending, it returns `409 flow.conflict` without changing data; an empty history succeeds idempotently.
+This operation does not touch saved values, other Flows, or the other environment. The original
+`/dedupe` endpoint still requires an explicit `space`.
 
 `FlowStateView` and its schema are exported from `@oomol-lab/open-flow/flow-state`. Its root has
 `version: 1`, `scope`, deployment `limits`, `values`, and `spaces`. Value entries
@@ -1783,6 +1790,13 @@ visible until explicitly cleared. Server defaults are `maxValueBytes` (65,536), 
 `maxSpaces` (100), and `maxRunWrites` (1,000). Deployments can override these through
 `ServerRuntime.stateLimits`; clients must use the returned `limits` for the active deployment.
 Each Flow/source has independent limits.
+`FlowStateSummary` and its response schema are exported from the same entry. It returns
+`version: 1`, `scope`, the same effective `limits`, `values: { count, updatedAt }`, and the same
+`spaces` summaries. `values.count` counts surviving keys; `updatedAt` is their maximum write
+timestamp, or `null` when empty. It is not last access time or a deleted entry's timestamp.
+Summary reads aggregate in storage without loading keys or value bodies. Workbench uses
+`getFlowStateSummary(flowId, scope, signal?)` for its overview and per-source or whole-history clearing.
+The existing metadata and bounded value-read endpoints remain available to CLI/MCP and other clients.
 Identity and space limits include pending reservations. A reserved identity is counted once across overlapping Runs.
 There is no total byte quota. Updates to existing keys and duplicate-only batches remain allowed at capacity.
 
@@ -1793,7 +1807,7 @@ return `value: null`, matching runtime State semantics. Present values share a 1
 byte budget; missing keys consume zero value bytes. An over-budget read fails entirely with
 `400 flow.invalid`, without partial data or truncation. Invalid keys, duplicates, missing/empty keys,
 unknown body fields and unsupported body versions also return `400 flow.invalid`.
-Both State read endpoints return `Cache-Control: no-store` and enforce the same Flow access.
+All State read endpoints return `Cache-Control: no-store` and enforce the same Flow access.
 `stateReadSchema`, `stateReadLimits`, `FlowStateValues`, and its response schema are exported from
 `@oomol-lab/open-flow/flow-state`. Deployment adapters validate incoming queries with the shared
 schema before passing typed values to application/storage code.
@@ -1812,7 +1826,7 @@ oo flow dedupe clear FLOW --scope live --space node:filter --yes
 CLI clearing requires `--yes`; `state show --full` is rejected. MCP tools are `flow_state`,
 `flow_state_read`, `flow_state_clear`, and `flow_dedupe_clear`; each requires an explicit `scope`.
 `flow_state_read` requires the same bounded keys and shares the HTTP read budget.
-Workbench defaults to Draft, loads individual value bodies when their keys are expanded, and asks
+Workbench defaults to Draft, displays aggregate usage and source history, and asks
 for separate confirmation before clearing Live. Live clearing immediately affects future
 membership checks and may cause items to be processed again.
 

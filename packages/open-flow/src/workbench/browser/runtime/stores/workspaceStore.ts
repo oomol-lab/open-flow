@@ -50,7 +50,7 @@ export class WorkspaceStore {
   readonly #edits: EditSession
   public readonly history$: EditSession['history$']
   readonly #canvasCommandListeners = new Set<(command: CanvasCommand) => void>()
-  readonly state: Pick<WorkbenchClient, 'getFlowState' | 'getFlowStateValues' | 'clearFlowState' | 'clearFlowDedupe'>
+  readonly state: Pick<WorkbenchClient, 'getFlowStateSummary' | 'clearFlowState' | 'clearFlowDedupe' | 'clearAllFlowDedupe'>
   readonly #client: WorkbenchClient
   readonly #i18n: I18n
   readonly #identity: () => string

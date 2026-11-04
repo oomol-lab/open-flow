@@ -3,7 +3,14 @@ import type { StateStore } from '../storage/state-store.ts'
 import type { ControlAccess } from './control-access.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { StateError, stateClearSchema, stateQuerySchema, dedupeClearSchema } from '@oomol-lab/open-flow/flow-state'
+import {
+  StateError,
+  stateClearSchema,
+  stateQuerySchema,
+  stateSummaryQuerySchema,
+  dedupeClearSchema,
+  dedupeClearAllSchema,
+} from '@oomol-lab/open-flow/flow-state'
 import { ControlError } from '../error.ts'
 
 export class StateControl {
@@ -31,6 +38,13 @@ export class StateControl {
     }
   }
 
+  summary(actorId: string, flowId: string, query: unknown) {
+    this.access.authorize(actorId, { flowId })
+    const parsed = stateSummaryQuerySchema.safeParse(query)
+    if (!parsed.success) throw new ControlError(controlErrorCode.flowInvalid, parsed.error.message)
+    return this.store.summary(flowId, parsed.data.scope)
+  }
+
   clear(actorId: string, flowId: string, query: unknown) {
     this.access.authorize(actorId, { flowId })
     const parsed = stateClearSchema.safeParse(query)
@@ -45,6 +59,15 @@ export class StateControl {
     if (!parsed.success) throw new ControlError(controlErrorCode.flowInvalid, parsed.error.message)
     if (!this.store.clearSpace(flowId, parsed.data.scope, parsed.data.space))
       throw new ControlError(controlErrorCode.flowConflict, 'This history has pending Run records. Finish or cancel those Runs before clearing it.')
+    return { version: 1 as const, cleared: true as const }
+  }
+
+  clearAllDedupe(actorId: string, flowId: string, query: unknown) {
+    this.access.authorize(actorId, { flowId })
+    const parsed = dedupeClearAllSchema.safeParse(query)
+    if (!parsed.success) throw new ControlError(controlErrorCode.flowInvalid, parsed.error.message)
+    if (!this.store.clearAvailableSpaces(flowId, parsed.data.scope))
+      throw new ControlError(controlErrorCode.flowConflict, 'All history sources have pending Run records. Finish or cancel those Runs before clearing them.')
     return { version: 1 as const, cleared: true as const }
   }
 }

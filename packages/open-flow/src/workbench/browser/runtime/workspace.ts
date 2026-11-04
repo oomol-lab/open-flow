@@ -94,7 +94,7 @@ function sourceNodePresentation(node: ResolvedSelection, context: NodeProjection
   return { icon: triggerNodeIcon(node.trigger, context.providers), title: node.trigger.name }
 }
 
-function nodeTitle(node: ResolvedNode, t?: TFunction): string {
+export function nodeTitle(node: ResolvedNode, t?: TFunction): string {
   if (node.node.name != null) return node.node.name
   switch (node.kind) {
     case 'webhook-response':
@@ -114,7 +114,7 @@ function nodeTitle(node: ResolvedNode, t?: TFunction): string {
   }
 }
 
-function nodeIcon(node: ResolvedNode): string | undefined {
+export function nodeIcon(node: ResolvedNode): string | undefined {
   switch (node.kind) {
     case 'webhook-response':
       return ':lucide-light:reply:'

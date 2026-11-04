@@ -2,7 +2,7 @@ import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { skipDuplicatesTask, stateConformanceCases } from '@oomol-lab/open-flow/flow-state'
+import { hashIdentities, skipDuplicatesTask, stateConformanceCases } from '@oomol-lab/open-flow/flow-state'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -514,4 +514,70 @@ it('keeps node history independent between real Draft and Live Runs', async () =
   })
   expect((await client.getFlowState(stored.flowId, 'draft')).spaces).toMatchObject([{ count: 2, pendingCount: 0 }])
   expect((await client.getFlowState(stored.flowId, 'live')).spaces).toMatchObject([{ count: 2, pendingCount: 0 }])
+})
+
+it('serves authorized summaries without keys or bodies and preserves metadata and bounded value reads', async () => {
+  const host = await createService({ maxValues: 17, maxIdentities: 42 })
+  const app = createServerApp(host, { resolveControlActor: () => 'test' })
+  const client = new ControlClient(async (url, init) => app.request(url, init))
+  const flow = await client.createFlow('State summary')
+  const store = host.control.state.store
+  store.set(flow.flowId, 'draft', 'seed', 'private-key', { secret: 'private-content' })
+  const summary = await client.getFlowStateSummary(flow.flowId, 'draft')
+  expect(summary).toEqual({ version: 1, scope: 'draft', limits: store.limits, values: { count: 1, updatedAt: expect.any(Number) }, spaces: [] })
+  expect(summary.limits).toMatchObject({ maxValues: 17, maxIdentities: 42 })
+  expect(JSON.stringify(summary)).not.toContain('private-key')
+  expect(JSON.stringify(summary)).not.toContain('private-content')
+  expect((await client.getFlowStateSummary(flow.flowId, 'live')).values).toEqual({ count: 0, updatedAt: null })
+  const response = await app.request(`/v1/flows/${flow.flowId}/state/summary?scope=draft`)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  for (const query of ['', '?scope=invalid', '?scope=draft&values=false', '?scope=draft&key=private-key']) {
+    expect((await app.request(`/v1/flows/${flow.flowId}/state/summary${query}`)).status).toBe(400)
+  }
+  const denied = createServerApp(host, { resolveControlActor: () => 'another' })
+  expect((await denied.request(`/v1/flows/${flow.flowId}/state/summary?scope=draft`)).status).toBe(404)
+  expect((await client.getFlowState(flow.flowId, 'draft')).values).toEqual([{ key: 'private-key', size: expect.any(Number), updatedAt: expect.any(Number) }])
+  expect((await client.getFlowStateValues(flow.flowId, 'draft', ['private-key', 'missing'])).values).toEqual([
+    { key: 'private-key', value: { secret: 'private-content' } },
+    { key: 'missing', value: null },
+  ])
+  await expect(client.getFlowStateValues(flow.flowId, 'draft', [])).rejects.toMatchObject({ code: 'flow.invalid' })
+  await client.clearFlowState(flow.flowId, 'draft')
+  expect((await client.getFlowStateSummary(flow.flowId, 'draft')).values).toEqual({ count: 0, updatedAt: null })
+})
+
+it('clears available history through the public API and retains complete pending sources', async () => {
+  const host = await createService()
+  const app = createServerApp(host, { resolveControlActor: () => 'test' })
+  const client = new ControlClient(async (url, init) => app.request(url, init))
+  const flow = await client.createFlow('Clear available history')
+  const store = host.control.state.store
+  const hashes = await hashIdentities(['a', 'b'])
+  store.insert(flow.flowId, 'draft', 'flow', hashes)
+  store.insert(flow.flowId, 'draft', 'node:filter', hashes)
+  store.insert(flow.flowId, 'live', 'flow', hashes)
+  store.set(flow.flowId, 'draft', 'seed', 'saved', 42)
+  store.database
+    .prepare(`INSERT INTO runs (run_id, idempotency_key, request_digest, flow_id, revision_id, revision_digest,
+    closure_digest, model_version, engine_contract, engine_digest, inputs, source, status, created_at)
+    VALUES ('bulk-pending', 'bulk-pending', 'digest', ?, 'revision', 'digest', 'closure', 13, 'engine', 'digest', '{}', 'draft', 'running', 0)`)
+    .run(flow.flowId)
+  expect(store.stage(flow.flowId, 'draft', 'bulk-pending', 'job', 'filter', await hashIdentities(['pending']))).toEqual([true])
+  for (const query of ['', '?scope=invalid', '?scope=draft&space=flow']) {
+    expect((await app.request(`/v1/flows/${flow.flowId}/dedupe/all${query}`, { method: 'DELETE' })).status).toBe(400)
+  }
+  const denied = createServerApp(host, { resolveControlActor: () => 'another' })
+  expect((await denied.request(`/v1/flows/${flow.flowId}/dedupe/all?scope=draft`, { method: 'DELETE' })).status).toBe(404)
+  expect((await app.request(`/v1/flows/${flow.flowId}/dedupe?scope=draft`, { method: 'DELETE' })).status).toBe(400)
+  await client.clearAllFlowDedupe(flow.flowId, 'draft')
+  expect((await client.getFlowStateSummary(flow.flowId, 'draft')).spaces).toMatchObject([{ space: 'node:filter', count: 2, pendingCount: 1 }])
+  expect((await client.getFlowStateSummary(flow.flowId, 'live')).spaces).toMatchObject([{ space: 'flow', count: 2 }])
+  expect(store.get(flow.flowId, 'draft', 'saved')).toBe(42)
+  await expect(client.clearAllFlowDedupe(flow.flowId, 'draft')).rejects.toMatchObject({ code: 'flow.conflict' })
+  await expect(client.clearFlowDedupe(flow.flowId, 'draft', 'node:filter')).rejects.toMatchObject({ code: 'flow.conflict' })
+  store.transaction(() => store.finishRun('bulk-pending', false))
+  await client.clearAllFlowDedupe(flow.flowId, 'draft')
+  expect((await client.getFlowStateSummary(flow.flowId, 'draft')).spaces).toEqual([])
+  await client.clearAllFlowDedupe(flow.flowId, 'draft')
 })

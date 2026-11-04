@@ -1,7 +1,7 @@
 import type { RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { FlowStateView } from '../../src/state/common/state.ts'
-import type { FlowStateClient } from '../../src/workbench/browser/runtime/editor/flowStatePanel.tsx'
+import type { FlowStateSummary } from '../../src/state/common/state.ts'
+import type { FlowStateClient, FlowStateNodes } from '../../src/workbench/browser/runtime/editor/flowStatePanel.tsx'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -18,23 +18,28 @@ import { InspectorSamplePanel } from './inspectorSamplePanel.tsx'
 import { createInspectorSession } from './inspectorSession.ts'
 import { useStoryActions } from './storyActions.tsx'
 
-const sample: FlowStateView = {
+const sampleNodes: FlowStateNodes = [
+  { id: 'filter', title: 'Filter new articles', icon: ':twemoji:package:', fallbackIcon: ':lucide-light:list-filter:' },
+  { id: 'pending', title: 'Filter new orders', icon: ':lucide-light:list-filter:', fallbackIcon: ':lucide-light:list-filter:' },
+]
+
+const sample: FlowStateSummary = {
   version: 1,
   scope: 'draft',
   limits: { maxValueBytes: 65536, maxValues: 1000, maxSpaces: 100, maxIdentities: 10000, maxRunWrites: 1000 },
-  values: [{ key: 'cursor', size: 80, updatedAt: 1793322000000 }],
+  values: { count: 23, updatedAt: 1793322000000 },
   spaces: [
     { space: 'flow', count: 500, pendingCount: 0, reservedCount: 500, updatedAt: 1793322000000 },
-    { space: 'node:filter', count: 9000, pendingCount: 0, reservedCount: 9000, updatedAt: 1793322000000 },
+    { space: 'node:filter', count: 1200, pendingCount: 0, reservedCount: 1200, updatedAt: 1793322000000 },
     { space: 'node:pending', count: 5, pendingCount: 20, reservedCount: 20, updatedAt: 1793322000000 },
     { space: 'node:removed', count: 4, pendingCount: 0, reservedCount: 4, updatedAt: 1793322000000 },
   ],
 }
-function finishPending(state: FlowStateView): FlowStateView {
+function finishPending(state: FlowStateSummary): FlowStateSummary {
   return { ...state, spaces: state.spaces.map((space) => Object.assign({}, space, { count: space.reservedCount, pendingCount: 0 })) }
 }
 const cases = [
-  { title: 'Single field', fields: ['id'], items: [{ id: 1 }, { id: 1 }, { id: 2 }] },
+  { title: 'Single field', icon: ':twemoji:package:', fields: ['id'], items: [{ id: 1 }, { id: 1 }, { id: 2 }] },
   {
     title: 'Composite identity',
     fields: ['company', 'id'],
@@ -79,6 +84,7 @@ function NodeSample({
             filter: {
               kind: 'task',
               name: fixture.title,
+              icon: 'icon' in fixture ? fixture.icon : undefined,
               inputs: { items: { kind: 'value', value: fixture.items } },
               task: skipDuplicatesTask({ fields: [...fixture.fields] }),
             },
@@ -123,7 +129,8 @@ function NodeSample({
 }
 function StateStory({ language, dark, log }: { language: UiLanguage; dark: boolean; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
-  const [scopes, setScopes] = useState<Record<'draft' | 'live', FlowStateView>>({ draft: sample, live: { ...sample, scope: 'live' } })
+  const [scopes, setScopes] = useState<Record<'draft' | 'live', FlowStateSummary>>({ draft: sample, live: { ...sample, scope: 'live' } })
+  const nextRead = useRef<'normal' | 'slow' | 'failure'>('normal')
   const current = useRef(scopes)
   current.current = scopes
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -141,7 +148,56 @@ function StateStory({ language, dark, log }: { language: UiLanguage; dark: boole
     },
     {
       label: 'Empty state',
-      onClick: () => setScopes({ draft: { ...sample, values: [], spaces: [] }, live: { ...sample, scope: 'live', values: [], spaces: [] } }),
+      onClick: () =>
+        setScopes({
+          draft: { ...sample, values: { count: 0, updatedAt: null }, spaces: [] },
+          live: { ...sample, scope: 'live', values: { count: 0, updatedAt: null }, spaces: [] },
+        }),
+    },
+    {
+      label: 'Near capacity',
+      onClick: () =>
+        setScopes((value) => ({
+          ...value,
+          draft: {
+            ...value.draft,
+            values: { ...value.draft.values, count: 900 },
+            spaces: value.draft.spaces.map((space) => (space.space === 'node:filter' ? { ...space, count: 9000, reservedCount: 9000 } : space)),
+          },
+        })),
+    },
+    {
+      label: 'Many sources',
+      onClick: () =>
+        setScopes((value) => ({
+          ...value,
+          draft: {
+            ...value.draft,
+            spaces: Array.from({ length: 50 }, (_, index) => ({
+              space: `node:sample-${index}`,
+              count: index + 1,
+              reservedCount: index + 1,
+              pendingCount: 0,
+              updatedAt: 1793322000000,
+            })),
+          },
+        })),
+    },
+    {
+      label: 'Fail next load',
+      onClick: () => {
+        nextRead.current = 'failure'
+      },
+    },
+    {
+      label: 'Slow next load',
+      onClick: () => {
+        nextRead.current = 'slow'
+      },
+    },
+    {
+      label: 'Empty Live',
+      onClick: () => setScopes((value) => ({ ...value, live: { ...sample, scope: 'live', values: { count: 0, updatedAt: null }, spaces: [] } })),
     },
     {
       label: 'Finish pending Run',
@@ -167,23 +223,23 @@ function StateStory({ language, dark, log }: { language: UiLanguage; dark: boole
   ])
   const client = useMemo<FlowStateClient>(
     () => ({
-      async getFlowState(_flowId, scope) {
+      async getFlowStateSummary(_flowId, scope) {
+        const behavior = await Promise.resolve(nextRead.current)
+        nextRead.current = 'normal'
+        if (behavior === 'slow') await new Promise((resolve) => setTimeout(resolve, 3000))
+        if (behavior === 'failure') throw new Error('State storage is unavailable.')
         return current.current[scope]
       },
-      async getFlowStateValues(_flowId, scope, keys) {
-        return {
-          version: 1,
-          scope,
-          values: keys.map((key) => ({ key, value: current.current[scope].values.some((item) => item.key === key) ? { page: 3 } : null })),
-        }
-      },
-      async clearFlowState(_flowId, scope, key) {
-        setScopes((value) => ({ ...value, [scope]: { ...value[scope], values: key == null ? [] : value[scope].values.filter((item) => item.key !== key) } }))
+      async clearFlowState(_flowId, scope) {
+        setScopes((value) => ({ ...value, [scope]: { ...value[scope], values: { count: 0, updatedAt: null } } }))
       },
       async clearFlowDedupe(_flowId, scope, space) {
         if (current.current[scope].spaces.some((item) => item.space === space && item.pendingCount > 0))
           throw new Error('Finish or cancel the pending Run before clearing history.')
         setScopes((value) => ({ ...value, [scope]: { ...value[scope], spaces: value[scope].spaces.filter((item) => item.space !== space) } }))
+      },
+      async clearAllFlowDedupe(_flowId, scope) {
+        setScopes((value) => ({ ...value, [scope]: { ...value[scope], spaces: value[scope].spaces.filter((item) => item.pendingCount > 0) } }))
       },
     }),
     [],
@@ -208,8 +264,9 @@ function StateStory({ language, dark, log }: { language: UiLanguage; dark: boole
           {historyOpen && (
             <FlowStateButton
               client={client}
+              notify={(notice) => log('notice', notice)}
               flowId="sample"
-              nodeIds={['filter', 'pending']}
+              nodes={sampleNodes}
               history={{ nodeId: 'filter' }}
               onClose={() => setHistoryOpen(false)}
             />
@@ -225,14 +282,21 @@ function StateStory({ language, dark, log }: { language: UiLanguage; dark: boole
                 state="current"
               />
             </div>
-            {stateOpen && <FlowStateButton client={client} flowId="sample" nodeIds={['filter', 'pending']} onClose={() => setStateOpen(false)} />}
+            {stateOpen && (
+              <FlowStateButton
+                client={client}
+                notify={(notice) => log('notice', notice)}
+                flowId="sample"
+                nodes={sampleNodes}
+                onClose={() => setStateOpen(false)}
+              />
+            )}
             <FlowStatePanel
               value={scopes.draft}
-              client={client}
-              flowId="sample"
-              nodeIds={['filter', 'pending']}
+              nodes={sampleNodes}
               busy={false}
-              onClearValues={(key) => void client.clearFlowState('sample', 'draft', key)}
+              onClearValues={() => void client.clearFlowState('sample', 'draft')}
+              onClearHistory={() => void client.clearAllFlowDedupe('sample', 'draft')}
               onClearSpace={(space) => void client.clearFlowDedupe('sample', 'draft', space)}
             />
           </div>
@@ -248,7 +312,7 @@ export const flowStateStories: FrontendStory[] = [
     title: 'Properties and history',
     standalone: true,
     description:
-      'Production properties with single, composite, scalar, read-only and failed-save samples. Use Undo/Redo on the single-field sample, including an unsaved blank row. Check keyboard focus after deletion. History commits after Run success; inspect reserved capacity, empty history and production reset confirmation.',
+      'Production properties with single, composite, scalar, read-only and failed-save samples. Use Undo/Redo on the single-field sample, including an unsaved blank row. Check keyboard focus after deletion. History commits after Run success. Inspect the separate sections for saved data and deduplication history in empty and populated states, custom and default canvas icons, outside-view history, pending protection and near-capacity summaries. Open persistent data from the workflow menu; check the toolbar beside environment tabs, Live confirmation, cancellation focus, narrow layouts and scrolling with Many sources in both themes. Clear history removes available sources and retains pending sources; when every source is pending, group and individual clear actions are disabled. Source rows omit visible column headings, show their last update below the name, and count committed and pending identities without overlap. Pending and outside-view explanations appear only in tooltips; hover or keyboard-focus a disabled clear action to read why it is unavailable. Storage info defines saved data and deduplication history before explaining environment separation and retention. Click it to keep the explanation open; dismiss with Escape or outside interaction, then click to reopen it. Fail next load and Slow next load apply to the next open or refresh; retry failures and switch environments during slow reads. Use Empty Live to check that the dialog height stays fixed across environments, loading, empty and populated states. Both section containers remain visible during initial loads and environment changes, with loading or empty text on the second line of their headings. Refresh retains the current rows while those headings show loading; failures retain the sections and offer retry.',
     render: (log, dark, language) => <StateStory language={language} dark={dark} log={log} />,
   },
 ]

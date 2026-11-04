@@ -7,12 +7,13 @@ import { createTooltipHandle, Tooltip, TooltipContent, TooltipTrigger } from './
 export interface HelpButtonProps {
   label: string
   children: ReactNode
+  container?: HTMLElement | null
   /** Button edge length in pixels; the icon scales at 5/8 of this size. */
   size?: number
 }
 
 /** Supplementary, non-interactive help that can also be opened by click. */
-export function HelpButton({ label, children, size = 24 }: HelpButtonProps) {
+export function HelpButton({ label, children, container, size = 24 }: HelpButtonProps) {
   const id = useId()
   const [tooltip] = useState(() => createTooltipHandle())
   return (
@@ -26,7 +27,7 @@ export function HelpButton({ label, children, size = 24 }: HelpButtonProps) {
       >
         <i aria-hidden="true" className="i-lucide-light:info text-muted-foreground" style={{ fontSize: (size * 5) / 8 }} />
       </TooltipTrigger>
-      <TooltipContent>{children}</TooltipContent>
+      <TooltipContent container={container}>{children}</TooltipContent>
     </Tooltip>
   )
 }
