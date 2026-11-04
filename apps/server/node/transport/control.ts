@@ -347,6 +347,13 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       service.state.clear(context.get('actorId'), context.req.param('flowId'), { scope: context.req.query('scope'), key: context.req.query('key') }),
     )
   })
+  app.post('/flows/:flowId/state/read', async (context) => {
+    query(context.req.raw, [], controlErrorCode.flowInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.readFlowState)
+    const result = response(200, service.state.readValues(context.get('actorId'), context.req.param('flowId'), body))
+    result.headers.set('Cache-Control', 'no-store')
+    return result
+  })
   app.delete('/flows/:flowId/dedupe', (context) => {
     query(context.req.raw, ['scope', 'space'], controlErrorCode.flowInvalid)
     return response(

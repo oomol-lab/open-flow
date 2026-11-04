@@ -1,5 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { dedupeIdentities, hashIdentities, skipDuplicatesConfigSchema, skipDuplicatesIdentities } from './state.ts'
+import {
+  dedupeIdentities,
+  flowStateViewSchema,
+  hashIdentities,
+  skipDuplicatesConfigSchema,
+  skipDuplicatesIdentities,
+  stateQuerySchema,
+  stateReadSchema,
+} from './state.ts'
+
+describe('State management reads', () => {
+  it('requires bounded explicit keys and keeps the legacy metadata-only query', () => {
+    expect(stateQuerySchema.parse({ scope: 'draft', values: false })).toEqual({ scope: 'draft', values: false })
+    expect(stateQuerySchema.safeParse({ scope: 'draft', values: true }).success).toBe(false)
+    expect(stateReadSchema.parse({ scope: 'live', keys: ['cursor', 'last run/时间'] }).keys).toEqual(['cursor', 'last run/时间'])
+    for (const input of [
+      { scope: 'live' },
+      { keys: ['cursor'] },
+      { scope: 'live', keys: [] },
+      { scope: 'live', keys: ['cursor', 'cursor'] },
+      { scope: 'live', keys: [''] },
+      { scope: 'live', keys: ['汉'.repeat(86)] },
+      { scope: 'live', keys: Array.from({ length: 17 }, (_, index) => String(index)) },
+      { scope: 'live', keys: ['cursor'], values: true },
+    ])
+      expect(stateReadSchema.safeParse(input).success).toBe(false)
+  })
+  it('rejects overview responses containing value bodies', () => {
+    expect(flowStateViewSchema.shape.values.safeParse([{ key: 'cursor', size: 1, updatedAt: 1, value: 0 }]).success).toBe(false)
+  })
+})
 
 describe('Flow State identities', () => {
   it('uses deterministic typed hashes and normalizes numeric zero', async () => {

@@ -1,8 +1,9 @@
+import type { StateRead } from '@oomol-lab/open-flow/flow-state'
 import type { StateStore } from '../storage/state-store.ts'
 import type { ControlAccess } from './control-access.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { stateClearSchema, stateQuerySchema, dedupeClearSchema } from '@oomol-lab/open-flow/flow-state'
+import { StateError, stateClearSchema, stateQuerySchema, dedupeClearSchema } from '@oomol-lab/open-flow/flow-state'
 import { ControlError } from '../error.ts'
 
 export class StateControl {
@@ -17,7 +18,17 @@ export class StateControl {
     this.access.authorize(actorId, { flowId })
     const parsed = stateQuerySchema.safeParse(query)
     if (!parsed.success) throw new ControlError(controlErrorCode.flowInvalid, parsed.error.message)
-    return this.store.view(flowId, parsed.data.scope, parsed.data.values)
+    return this.store.view(flowId, parsed.data.scope)
+  }
+
+  readValues(actorId: string, flowId: string, input: StateRead) {
+    this.access.authorize(actorId, { flowId })
+    try {
+      return { version: 1 as const, scope: input.scope, values: this.store.readValues(flowId, input.scope, input.keys) }
+    } catch (error) {
+      if (error instanceof StateError && error.code === 'limit-exceeded') throw new ControlError(controlErrorCode.flowInvalid, error.message)
+      throw error
+    }
   }
 
   clear(actorId: string, flowId: string, query: unknown) {

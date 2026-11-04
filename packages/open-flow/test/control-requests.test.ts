@@ -4,6 +4,7 @@ import { mcpTools } from '../src/control/common/mcp.ts'
 import { controlRequests, controlRequestSchema } from '../src/control/common/requests.ts'
 
 const samples = {
+  readFlowState: { version: 1, scope: 'draft', keys: ['cursor'] },
   canvas: { version: 1, command: { type: 'fit' } },
   authoringCheck: { revisionId: 'revision' },
   authoringRead: {},

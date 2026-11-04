@@ -5,14 +5,24 @@ import { z } from 'zod'
 export { stateConformanceCases, type StateConformanceHarness } from './conformance.ts'
 
 export type StateScope = 'draft' | 'live'
-export const stateQuerySchema = z.strictObject({ scope: z.enum(['draft', 'live']), values: z.boolean().optional() })
+export const stateReadLimits = { maxKeys: 16, maxBytes: 1024 * 1024 }
+const keySchema = z
+  .string()
+  .min(1)
+  .refine((value) => new TextEncoder().encode(value).length <= 256)
+export const stateQuerySchema = z.strictObject({ scope: z.enum(['draft', 'live']), values: z.literal(false).optional() })
+export const stateReadSchema = z.strictObject({
+  scope: z.enum(['draft', 'live']),
+  keys: z
+    .array(keySchema)
+    .min(1)
+    .max(stateReadLimits.maxKeys)
+    .refine((keys) => new Set(keys).size === keys.length, 'State keys must be distinct.'),
+})
+export type StateRead = z.infer<typeof stateReadSchema>
 export const stateClearSchema = z.strictObject({
   scope: z.enum(['draft', 'live']),
-  key: z
-    .string()
-    .min(1)
-    .refine((key) => new TextEncoder().encode(key).length <= 256)
-    .optional(),
+  key: keySchema.optional(),
 })
 export const dedupeClearSchema = z.strictObject({ scope: z.enum(['draft', 'live']), space: z.string().regex(/^(flow|node:.+)$/) })
 export type DedupeIdentity = string | number
@@ -108,7 +118,7 @@ export interface FlowStateView {
     readonly maxIdentities: number
     readonly maxRunWrites: number
   }
-  readonly values: readonly { readonly key: string; readonly size: number; readonly updatedAt: number; readonly value?: JsonValue }[]
+  readonly values: readonly { readonly key: string; readonly size: number; readonly updatedAt: number }[]
   readonly spaces: readonly {
     readonly space: string
     readonly count: number
@@ -128,7 +138,7 @@ export const flowStateViewSchema = z.object({
     maxIdentities: z.number().positive(),
     maxRunWrites: z.number().positive(),
   }),
-  values: z.array(z.object({ key: z.string(), size: z.number().nonnegative(), updatedAt: z.number(), value: z.json().optional() })),
+  values: z.array(z.strictObject({ key: z.string(), size: z.number().nonnegative(), updatedAt: z.number() })),
   spaces: z.array(
     z.object({
       space: z.string(),
@@ -139,3 +149,26 @@ export const flowStateViewSchema = z.object({
     }),
   ),
 })
+
+export interface FlowStateValues {
+  readonly version: 1
+  readonly scope: StateScope
+  readonly values: readonly { readonly key: string; readonly value: JsonValue }[]
+}
+
+export const flowStateValuesSchema = z
+  .object({
+    version: z.literal(1),
+    scope: z.enum(['draft', 'live']),
+    values: z
+      .array(z.strictObject({ key: keySchema, value: z.json() }))
+      .min(1)
+      .max(stateReadLimits.maxKeys),
+  })
+  .refine((response) => {
+    const encoder = new TextEncoder()
+    return (
+      response.values.reduce((bytes, item) => bytes + (item.value === null ? 0 : encoder.encode(JSON.stringify(item.value)).byteLength), 0) <=
+      stateReadLimits.maxBytes
+    )
+  }, 'State values exceed the 1 MiB read limit.')

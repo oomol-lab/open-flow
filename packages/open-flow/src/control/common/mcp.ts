@@ -5,7 +5,7 @@ import { canvasCommandSchema } from '../../canvas/common/commands.ts'
 import { runStatuses } from '../../execution/common/runLifecycle.ts'
 import { waitCommentSchema } from '../../execution/common/wait.ts'
 import { resourceNameIssue } from '../../flow/common/change.ts'
-import { stateQuerySchema, stateClearSchema, dedupeClearSchema } from '../../state/common/state.ts'
+import { stateQuerySchema, stateReadSchema, stateClearSchema, dedupeClearSchema } from '../../state/common/state.ts'
 import { authoringReadSchema, authoringSearchSchema, authoringRequestSchema, authoringSchemaQuery } from './authoringSchema.ts'
 import { resultQuerySchema } from './resultQuery.ts'
 
@@ -52,8 +52,13 @@ function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: bool
 
 export const mcpTools = {
   flow_state: tool(
-    'Inspect Flow state usage, business keys and deduplication spaces. Values are omitted unless requested. Scope is required.',
+    'Inspect Flow state usage, business key metadata and deduplication spaces. Never returns values. Scope is required.',
     stateQuerySchema.extend({ flowId: flow }),
+    true,
+  ),
+  flow_state_read: tool(
+    'Read values for 1–16 distinct named State keys in one explicit scope. Values are returned in request order; missing keys return null. The combined stored JSON limit is 1 MiB; oversized reads fail without partial results.',
+    stateReadSchema.extend({ flowId: flow }),
     true,
   ),
   flow_state_clear: tool(

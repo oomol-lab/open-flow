@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import type { Root } from 'react-dom/client'
-import type { FlowStateView } from '../../../../state/common/state.ts'
+import type { FlowStateValues, FlowStateView } from '../../../../state/common/state.ts'
+import type { FlowStateClient } from './flowStatePanel.tsx'
 
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -21,6 +22,11 @@ let container: HTMLDivElement
 const i18n = createI18n('en')
 const client = {
   getFlowState: vi.fn(async (_flowId: string, scope: 'draft' | 'live') => ({ ...value, scope })),
+  getFlowStateValues: vi.fn<FlowStateClient['getFlowStateValues']>(async (_flowId, scope, keys) => ({
+    version: 1,
+    scope,
+    values: keys.map((key) => ({ key, value: 0 })),
+  })),
   clearFlowState: vi.fn(async () => {}),
   clearFlowDedupe: vi.fn(async () => {}),
 }
@@ -50,8 +56,43 @@ async function click(label: string, scope: ParentNode = document) {
   expect(button, label).toBeDefined()
   await act(async () => button!.click())
 }
+it('loads a value only after its key is expanded and preserves falsy values', async () => {
+  client.getFlowState.mockResolvedValueOnce({ ...value, values: [{ key: 'counter', size: 1, updatedAt: 1 }] })
+  await click(i18n.t('flowState.refresh'))
+  expect(client.getFlowStateValues).not.toHaveBeenCalled()
+  expect(document.querySelector('[role="checkbox"]')).toBeNull()
+  await click(i18n.t('flowState.showValue'))
+  expect(client.getFlowStateValues).toHaveBeenCalledWith('flow', 'draft', ['counter'], expect.any(AbortSignal))
+  expect(document.querySelector('pre')?.textContent).toBe('0')
+  await click(i18n.t('flowState.hideValue'))
+  expect(document.querySelector('pre')).toBeNull()
+})
+it('cancels a pending value read when switching scope and ignores its late response', async () => {
+  client.getFlowState.mockImplementation(async (_flowId, scope) => ({ ...value, scope, values: [{ key: 'counter', size: 1, updatedAt: 1 }] }))
+  let resolve!: (value: FlowStateValues) => void
+  client.getFlowStateValues.mockImplementationOnce(
+    () =>
+      new Promise<FlowStateValues>((done) => {
+        resolve = done
+      }),
+  )
+  await click(i18n.t('flowState.refresh'))
+  await click(i18n.t('flowState.showValue'))
+  const signal = client.getFlowStateValues.mock.calls[0]![3]!
+  const select = document.querySelector<HTMLSelectElement>('select[aria-label="Scope"]')!
+  await act(async () => {
+    select.value = 'live'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  expect(signal.aborted).toBe(true)
+  await act(async () => resolve({ version: 1, scope: 'draft', values: [{ key: 'counter', value: 99 }] }))
+  expect(document.querySelector('pre')).toBeNull()
+  await click(i18n.t('flowState.showValue'))
+  expect(client.getFlowStateValues).toHaveBeenLastCalledWith('flow', 'live', ['counter'], expect.any(AbortSignal))
+  expect(document.querySelector('pre')?.textContent).toBe('0')
+})
 it('defaults to Draft, hides business values and clears only the selected history space', async () => {
-  expect(client.getFlowState).toHaveBeenCalledWith('flow', 'draft', false)
+  expect(client.getFlowState).toHaveBeenCalledWith('flow', 'draft')
   expect(document.body.textContent).toContain(i18n.t('flowState.nearLimit'))
   await click(i18n.t('flowState.clear'))
   expect(client.clearFlowDedupe).toHaveBeenCalledWith('flow', 'draft', 'node:filter')
@@ -63,7 +104,7 @@ it('requires a separate Live confirmation, supports cancellation and surfaces cl
     select.value = 'live'
     select.dispatchEvent(new Event('change', { bubbles: true }))
   })
-  expect(client.getFlowState).toHaveBeenLastCalledWith('flow', 'live', false)
+  expect(client.getFlowState).toHaveBeenLastCalledWith('flow', 'live')
   await click(i18n.t('flowState.clear'))
   expect(client.clearFlowDedupe).not.toHaveBeenCalled()
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('node:filter')
@@ -91,6 +132,8 @@ it('keeps the Flow-wide total visible when inspecting one node history', async (
     root.render(
       <I18nProvider i18n={i18n}>
         <FlowStatePanel
+          client={client}
+          flowId="flow"
           value={{ ...value, spaces: [...value.spaces, { space: 'flow', count: 500, pendingCount: 0, reservedCount: 500, updatedAt: 1 }] }}
           space="node:filter"
           nodeIds={['filter']}

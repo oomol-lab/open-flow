@@ -53,6 +53,33 @@ function runtime(language: UiLanguage = 'en') {
 }
 
 describe('CLI', () => {
+  it.each([undefined, 'cursor'])('reads State metadata or a named value (key: %s)', async (key) => {
+    const output = runtime()
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path === `/v1/flows/${flow.flowId}`) return Response.json(flow)
+      if (key != null) {
+        expect(path).toBe(`/v1/flows/${flow.flowId}/state/read`)
+        expect(JSON.parse(String(init?.body))).toEqual({ version: 1, scope: 'live', keys: [key] })
+        return Response.json({ version: 1, scope: 'live', values: [{ key, value: 0 }] })
+      }
+      expect(path).toBe(`/v1/flows/${flow.flowId}/state?scope=live`)
+      return Response.json({
+        version: 1,
+        scope: 'live',
+        limits: { maxValues: 1000, maxSpaces: 100, maxValueBytes: 65536, maxIdentities: 10000, maxRunWrites: 1000 },
+        values: [],
+        spaces: [],
+      })
+    })
+    expect(await runCli(['state', 'show', flow.flowId, '--scope', 'live', ...(key == null ? [] : ['--key', key]), '--json'], { request }, output.value)).toBe(0)
+    expect(JSON.parse(output.stdout()).values).toEqual(key == null ? [] : [{ key, value: 0 }])
+  })
+  it('rejects the retired full State read before contacting the deployment', async () => {
+    const output = runtime()
+    const request = vi.fn()
+    expect(await runCli(['state', 'show', flow.flowId, '--scope', 'live', '--full'], { request }, output.value)).toBe(1)
+    expect(request).not.toHaveBeenCalled()
+  })
   it.each([{ type: 'focus', nodeId: 'node' }, { type: 'zoom', zoom: 0.8 }, { type: 'pan', dx: -200, dy: 100 }, { type: 'fit' }])(
     'broadcasts canvas commands through the shared API: %j',
     async (command) => {

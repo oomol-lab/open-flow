@@ -27,11 +27,20 @@ export function createState(invoke: (kind: string, payload: JsonValue) => Promis
       throw invalid('Identities must be strings or finite numbers.')
     return ids
   }
+  function get(key: string): Promise<JsonValue>
+  function get(keys: readonly string[]): Promise<JsonValue[]>
+  async function get(key: unknown) {
+    if (Array.isArray(key)) {
+      if (key.length === 0 || key.length > 16) throw invalid('State reads require 1 to 16 keys.')
+      const keys = Array.from(key, keyOf)
+      if (new Set(keys).size !== keys.length) throw invalid('State keys must be distinct.')
+      return ((await invoke('state.get', { key: keys })).body as { values: JsonValue[] }).values
+    }
+    return ((await invoke('state.get', { key: keyOf(key) })).body as { value: JsonValue }).value
+  }
   return {
     state: Object.freeze({
-      async get(key: unknown) {
-        return ((await invoke('state.get', { key: keyOf(key) })).body as { value: JsonValue }).value
-      },
+      get,
       async set(key: unknown, value: unknown) {
         await invoke('state.set', { key: keyOf(key), value: valueOf(value) })
       },
@@ -444,6 +453,23 @@ async function rejects(operation: Promise<unknown>, pattern: RegExp, message: st
 
 export const runtimeConformanceCases: readonly RuntimeConformanceCase[] = [
   {
+    name: 'reads multiple State keys in one Host call while preserving input order',
+    async verify(harness) {
+      const calls: { kind: string; payload: JsonValue }[] = []
+      const result = await harness.invoke({
+        input: null,
+        invocationId: 'state-batch-read',
+        capability: async ({ kind, payload }) => {
+          calls.push({ kind, payload })
+          return { status: 200, body: { values: [0, null, false, ''] } }
+        },
+        program: program(harness, `export default async (_, context) => context.state.get(['zero', 'missing', 'false', 'empty'])`),
+      })
+      equal(result, [0, null, false, ''], 'State batch values')
+      equal(calls, [{ kind: 'state.get', payload: { key: ['zero', 'missing', 'false', 'empty'] } }], 'State batch dispatch')
+    },
+  },
+  {
     name: 'cancels detached State work when its Task finishes',
     async verify(harness) {
       let aborted = false
@@ -492,7 +518,15 @@ export const runtimeConformanceCases: readonly RuntimeConformanceCase[] = [
           const invalid = [undefined, NaN, Infinity, new Date(), { x: undefined }, cyclic, [undefined], { x: () => 1 }];
           const errors = [];
           for (const value of invalid) { try { await context.state.set('key', value); errors.push('accepted'); } catch (e) { errors.push(e.code); } }
-          for (const call of [() => context.state.get(''), () => context.state.get('x'.repeat(257)), () => context.state.insert('x', null), () => context.dedupe.insert([NaN]), () => context.dedupe.has([null]), () => context.dedupe.insert(new Array(1))]) {
+          for (const call of [
+            () => context.state.get(''), () => context.state.get('x'.repeat(257)),
+            () => context.state.get([]), () => context.state.get(['x', 'x']),
+            () => context.state.get(Array.from({length: 17}, (_, index) => String(index))),
+            () => context.state.get(['']), () => context.state.get(['汉'.repeat(86)]),
+            () => context.state.get(new Array(1)), () => context.state.get(null), () => context.state.get(),
+            () => context.state.insert('x', null), () => context.dedupe.insert([NaN]),
+            () => context.dedupe.has([null]), () => context.dedupe.insert(new Array(1))
+          ]) {
             try { await call(); errors.push('accepted'); } catch (e) { errors.push(e.code); }
           }
           return errors;
@@ -501,7 +535,7 @@ export const runtimeConformanceCases: readonly RuntimeConformanceCase[] = [
       })
       equal(
         result,
-        Array.from({ length: 14 }, () => 'capability.invalid'),
+        Array.from({ length: 22 }, () => 'capability.invalid'),
         'State boundary validation',
       )
       equal(calls, 0, 'State invalid dispatch')

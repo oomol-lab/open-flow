@@ -38,7 +38,6 @@ export interface ParsedArguments {
   readonly source: 'draft' | 'live'
   readonly pendingWait?: boolean
   readonly status?: RunStatus
-  readonly full: boolean
   readonly sets: readonly string[]
   readonly comment?: string
   readonly timeoutMs?: number
@@ -86,7 +85,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   let source: ParsedArguments['source'] = 'draft'
   let pendingWait: boolean | undefined
   let status: RunStatus | undefined
-  let full = false
   let comment: string | undefined
   let timeoutMs: number | undefined
   let timezone: string | undefined
@@ -99,7 +97,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     const equals = raw.startsWith('--') ? raw.indexOf('=') : -1
     const argument = equals < 0 ? raw : raw.slice(0, equals)
     const inlineValue = equals < 0 ? undefined : raw.slice(equals + 1)
-    if (inlineValue != null && ['--json', '--follow', '--wait', '--yes', '--full', '--pending-wait'].includes(argument))
+    if (inlineValue != null && ['--json', '--follow', '--wait', '--yes', '--pending-wait'].includes(argument))
       throw new CliError('cli.invalid-arguments', `${argument} does not accept a value.`)
     if (argument.startsWith('--')) {
       const flag = argument.slice(2)
@@ -122,8 +120,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       yes = true
     } else if (argument == '--pending-wait') {
       pendingWait = true
-    } else if (argument == '--full') {
-      full = true
     } else if (
       argument == '--idempotency-key' ||
       argument == '--expected-publication' ||
@@ -254,7 +250,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     source,
     ...(status == null ? {} : { status }),
     ...(pendingWait == null ? {} : { pendingWait }),
-    full,
     ...(timeoutMs == null ? {} : { timeoutMs }),
     ...(timezone == null ? {} : { timezone }),
     unsets,

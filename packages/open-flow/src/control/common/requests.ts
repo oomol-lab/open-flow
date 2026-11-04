@@ -10,6 +10,7 @@ import { decodeDraftOperations, draftOperationsSchema } from './draftOperations.
 export { decodeDraftOperations, draftOperationsSchema, resolveDraftOperations, type DraftOperation } from './draftOperations.ts'
 import { z } from 'zod'
 import { resourceNameIssue } from '../../flow/common/change.ts'
+import { stateReadSchema } from '../../state/common/state.ts'
 import { createEventSourceSchema, updateEventSourceSchema, eventSourceRevisionSchema } from './eventSourceSchemas.ts'
 
 export const waitActionBodySchema: { parse(value: unknown): { comment?: string | null } } = z.strictObject({ comment: waitCommentSchema })
@@ -23,6 +24,7 @@ const tagName = id.transform((name) => name.trim()).refine((name) => resourceNam
 const inputs = z.record(z.string(), z.record(z.string(), json))
 const trigger = z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) })
 const schemas = {
+  readFlowState: stateReadSchema.extend({ version }),
   canvas: z.strictObject({ command: canvasCommandSchema, version }),
   authoringCheck: authoringCheckSchema,
   authoringEdit: authoringRequestSchema,
@@ -78,6 +80,7 @@ function decoder<Value>(schema: z.ZodType<Value>): (value: unknown) => Value {
 }
 
 export const controlRequests = {
+  readFlowState: decoder(schemas.readFlowState),
   canvas: decoder(schemas.canvas),
   authoringCheck: decoder(schemas.authoringCheck),
   authoringEdit: decoder(schemas.authoringEdit),

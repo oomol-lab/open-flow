@@ -206,6 +206,37 @@ function liveRunRequest(harness: ControlApiConformanceHarness, publicationId: st
 
 export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = [
   {
+    name: 'reads State metadata and bounded explicit keys without scope-wide value retrieval',
+    async verify(harness) {
+      const api = new ControlClient((url, init) => harness.request(new Request(new URL(url, harness.origin), init)))
+      const flow = await api.createFlow('State reads')
+      equal((await api.getFlowState(flow.flowId, 'draft')).values, [], 'New Flow State metadata')
+      equal(
+        await api.getFlowStateValues(flow.flowId, 'live', ['second', 'first']),
+        {
+          version: 1,
+          scope: 'live',
+          values: [
+            { key: 'second', value: null },
+            { key: 'first', value: null },
+          ],
+        },
+        'Missing named State keys',
+      )
+      const metadata = await request(harness, `/v1/flows/${flow.flowId}/state?scope=draft&values=false`)
+      await json(metadata, 200, 'Legacy metadata-only query')
+      equal(metadata.headers.get('cache-control'), 'no-store', 'State metadata cache policy')
+      await error(await request(harness, `/v1/flows/${flow.flowId}/state?scope=draft&values=true`), 400, 'flow.invalid', 'Scope-wide State values')
+      for (const input of [{ scope: 'draft', keys: [] }, { keys: ['key'] }, { scope: 'draft', keys: Array.from({ length: 17 }, (_, index) => String(index)) }])
+        await error(
+          await request(harness, `/v1/flows/${flow.flowId}/state/read`, { method: 'POST', body: JSON.stringify({ version: 1, ...input }) }),
+          400,
+          'flow.invalid',
+          'Invalid named State read',
+        )
+    },
+  },
+  {
     name: 'imports workflow files atomically and exports a new unpublished draft with its Presentation',
     async verify(harness) {
       const api = new ControlClient((url, init) => harness.request(new Request(new URL(url, harness.origin), init)))

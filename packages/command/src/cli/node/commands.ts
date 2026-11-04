@@ -6,7 +6,7 @@ import { z } from 'zod'
 const edit = ['expected-revision', 'idempotency-key']
 const page = ['cursor', 'limit']
 const commands = [
-  ['state show', '<flow> --scope <draft|live> [--full]', ['scope', 'full']],
+  ['state show', '<flow> --scope <draft|live> [--key <key>]', ['scope', 'key']],
   ['state clear', '<flow> --scope <draft|live> [--key <key>] --yes', ['scope', 'key', 'yes']],
   ['dedupe clear', '<flow> --scope <draft|live> --space <space> --yes', ['scope', 'space', 'yes']],
   ['canvas', '<flow> (--input JSON|@file|- | --file path|-)', ['input', 'file']],
@@ -64,7 +64,7 @@ const optionDetails: Record<
   { description: string; type?: string; enum?: readonly string[]; default?: string | number; minimum?: number; maximum?: number }
 > = {
   'scope': { description: 'Required State scope; never defaults to live.', type: 'string', enum: ['draft', 'live'] },
-  'key': { description: 'Business state key; omit to clear all business values.', type: 'string' },
+  'key': { description: 'Business state key to read or clear; omit to inspect metadata or clear all business values.', type: 'string' },
   'space': { description: 'Deduplication space: flow or node:<nodeId>.', type: 'string' },
   'revision': { description: 'Exact Revision to read or check; defaults to the current Draft.', type: 'string' },
   'publication': { description: 'Exact Publication ID whose fixed Code connections are read; defaults to the Draft.', type: 'string' },
@@ -113,7 +113,6 @@ const optionDetails: Record<
   'every': { description: 'Interval such as 5m, 1h, or 1d. Mutually exclusive with --cron.', type: 'string' },
   'wait': { description: 'Wait until terminal, waiting for an action, or the wait budget expires.' },
   'follow': { description: 'Stream event pages as NDJSON with --json; stop on terminal, Wait, or timeout.' },
-  'full': { description: 'Include complete Revision content, schemas, source code and revision metadata.' },
   'yes': { description: 'Confirm the requested deletion.' },
   'json': { description: 'Machine-readable JSON results and errors; NDJSON for followed events.' },
   'help': { description: 'Show this command contract without contacting the host.' },
@@ -130,7 +129,7 @@ export function commandHelp(path: readonly string[], prefix = 'oo flow') {
         Object.assign(
           {
             name: `--${flag}`,
-            value: !['json', 'help', 'wait', 'follow', 'full', 'yes', 'pending-wait'].includes(flag),
+            value: !['json', 'help', 'wait', 'follow', 'yes', 'pending-wait'].includes(flag),
             repeatable: flag == 'set' || flag == 'unset',
           },
           optionDetails[flag],

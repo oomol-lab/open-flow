@@ -43,12 +43,15 @@ const v8EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated
 
 const v9EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1').digest('hex')}`
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1 skip-duplicates/1').digest('hex')}`
+const v10EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1 skip-duplicates/1').digest('hex')}`
+
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1 skip-duplicates/1 state-batch-read/1').digest('hex')}`
 
 const v6EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1').digest('hex')}`
 
 /**
- * v10 adds persistent Flow State to the v9 Node compatibility and fetch contract. Published v9 and v8 Runs keep their original digests
+ * 批量 State 读取沿用 v10 合同，已发布的 v10 Run 保留原摘要与单 key 语义。
+ * Published v9 and v8 Runs keep their original digests
  * and execute with the current implementation: their Artifact calls were always denied and builtin imports failed to
  * resolve, so working Artifacts and builtins are additive, and v8 retains `context.egress`. Published v7 and v6 retain
  * their execution contracts and digests.
@@ -57,6 +60,7 @@ export function supportsIsolatedVmEngine(engineContract: string, engineDigest: s
   return (
     findEngineContract(engineContract) != null &&
     (engineDigest === isolatedVmEngineDigest ||
+      (engineContract === 'open-flow-engine/v10' && engineDigest === v10EngineDigest) ||
       (engineContract === 'open-flow-engine/v9' && engineDigest === v9EngineDigest) ||
       ((engineContract === 'open-flow-engine/v8' || engineContract === 'open-flow-engine/v8/nodejs-compat-v1') && engineDigest === v8EngineDigest) ||
       ((engineContract === 'open-flow-engine/v7' || engineContract === 'open-flow-engine/v7/nodejs-compat-v1') && engineDigest === v7EngineDigest) ||
