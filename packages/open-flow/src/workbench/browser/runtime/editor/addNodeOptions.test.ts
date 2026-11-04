@@ -137,13 +137,18 @@ it.each([
     'Exécuter du code JavaScript dans ce nœud.',
     'Décrivez la tâche à accomplir. L’AI Agent utilisera les entrées du nœud et les outils ajoutés pour la réaliser.',
   ],
-] as const)('puts condition before AI Agent in the %s node library', (language, javascriptLabel, javascriptDescription, agentDescription) => {
+] as const)('orders built-in nodes consistently in the %s node library', (language, javascriptLabel, javascriptDescription, agentDescription) => {
   const options = deriveAddNodeOptions(emptyDraft(), createI18n(language).t).filter((option) => option.kind != 'trigger')
 
-  expect(options.slice(0, 3)).toMatchObject([
+  expect(options.slice(0, 8)).toMatchObject([
     { id: 'javascript', label: javascriptLabel, description: javascriptDescription },
-    { id: 'condition' },
+    { id: 'value' },
     { id: 'agent', label: language === 'zh-CN' ? 'AI 智能体' : language === 'zh-TW' ? 'AI 智能體' : 'AI Agent', description: agentDescription },
+    { id: 'decision' },
+    { id: 'http-request' },
+    { id: 'openapi' },
+    { id: 'condition' },
+    { id: 'skip-duplicates' },
   ])
 })
 
