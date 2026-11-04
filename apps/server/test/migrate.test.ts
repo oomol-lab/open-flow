@@ -852,7 +852,7 @@ it('preserves the effective hosted LLM when upgrading an environment-managed Con
   }
 })
 
-it.each(['oomol', null] as const)('preserves the effective custom LLM when upgrading an environment-managed Connector over saved %s mode', async (mode) => {
+it.each(['oomol', null, 'custom'] as const)('preserves the prior LLM state with a custom environment Connector over saved %s mode', async (mode) => {
   const file = await databaseFile()
   const old = legacyDatabase(file, 60)
   old.prepare('INSERT INTO deployment_settings (id, revision, service_mode, updated_at) VALUES (1, 4, ?, 123)').run(mode)
@@ -862,20 +862,27 @@ it.each(['oomol', null] as const)('preserves the effective custom LLM when upgra
   old.close()
   const database = Database.open(file)
   const environment = { connectorOrigin: 'https://environment-connector.example.com', connectorToken: 'environment-key' }
+  const customLlm = { origin: 'https://models.example.com', token: 'model-key' }
+  const initialLlm = mode == 'custom' ? customLlm : undefined
+  const initialStatus = mode == 'custom' ? { mode: 'custom', configured: true, source: 'settings' } : { mode: null, configured: false, source: 'none' }
   try {
     const configured = new Settings(new SettingsStore(database), environment)
-    expect(configured.status()).toMatchObject({ revision: 4, services: { mode: 'custom' }, llm: { mode: 'custom', source: 'settings' } })
-    expect(configured.llm()?.config).toEqual({ origin: 'https://models.example.com', token: 'model-key' })
-    expect(configured.selectLlm(4, 'oomol')).toBe('saved')
-    expect(configured.llm()?.config).toEqual({ origin: 'https://new-llm.oomol.dev', token: 'hosted-key' })
+    expect(configured.status()).toMatchObject({
+      revision: 4,
+      services: { mode: 'custom' },
+      llm: { ...initialStatus, custom: { origin: customLlm.origin, tokenConfigured: true } },
+    })
+    expect(configured.llm()?.config).toEqual(initialLlm)
   } finally {
     database.close()
   }
   const reopened = Database.open(file)
   try {
     const configured = new Settings(new SettingsStore(reopened), environment)
-    expect(configured.status().llm.mode).toBe('oomol')
-    expect(configured.llm()?.config?.token).toBe('hosted-key')
+    expect(configured.status().llm).toMatchObject(initialStatus)
+    expect(configured.llm()?.config).toEqual(initialLlm)
+    expect(configured.selectLlm(4, 'custom')).toBe('saved')
+    expect(configured.llm()?.config).toEqual(customLlm)
   } finally {
     reopened.close()
   }
