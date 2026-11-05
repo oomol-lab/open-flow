@@ -359,15 +359,21 @@ it.each([
     )
   }
   const view = render(section('first', 'node-a'))
-  const field = view.container.querySelector<HTMLInputElement>('input[id$="-field-0"]')!
+  const fieldSelector = `[role="group"][aria-label="${view.i18n.t('flowState.field')}.0"] input`
+  async function addField() {
+    const label = `${view.i18n.t('valueEditor.addItem')} ${view.i18n.t('flowState.field')}`
+    await click(view.container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!)
+    return view.container.querySelector<HTMLInputElement>(fieldSelector)!
+  }
+  const field = await addField()
   await enterInput(field, 'id')
   await act(async () => field.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
   expect(saveTaskSettings).toHaveBeenCalledTimes(1)
   const nextId = switchBy === 'node' ? 'node-b' : 'node-a'
   view.rerender(section(switchBy === 'flow' ? 'second' : 'first', nextId))
-  expect(view.container.querySelector<HTMLInputElement>('input[id$="-field-0"]')?.value).toBe('')
+  expect(view.container.querySelector(fieldSelector)).toBeNull()
   expect(view.container.textContent).not.toContain(view.i18n.t('flowState.saveFailed'))
-  const nextField = view.container.querySelector<HTMLInputElement>('input[id$="-field-0"]')!
+  const nextField = await addField()
   await enterInput(nextField, 'url')
   await act(async () => {
     nextField.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))

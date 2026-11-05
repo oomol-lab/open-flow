@@ -5,26 +5,28 @@ import { click, input, render } from '../../../../../test/support/render.tsx'
 import { skipDuplicatesTask } from '../../../../state/common/state.ts'
 import { SkipDuplicatesSection } from './skipDuplicatesSection.tsx'
 
-it('adds, saves and removes identity fields without saving blank editor rows', async () => {
+function fieldAction(view: ReturnType<typeof render>, action: 'addItem' | 'remove', index?: number) {
+  const label = `${view.i18n.t(`valueEditor.${action}`)} ${view.i18n.t('flowState.field')}${index == null ? '' : `.${index}`}`
+  const button = view.container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+  expect(button, label).not.toBeNull()
+  return button!
+}
+
+it('inserts after the selected row, saves and removes fields without saving blank editor rows', async () => {
   const save = vi.fn(async () => true)
-  const task = skipDuplicatesTask({ fields: ['company'] })
+  const task = skipDuplicatesTask({ fields: ['company', 'id'] })
   const view = render(<SkipDuplicatesSection task={task} disabled={false} onSave={save} />)
-  const add = [...view.container.querySelectorAll('button')].find((button) => button.textContent === view.i18n.t('flowState.addField'))!
-  await act(async () => view.container.querySelector('input')!.focus())
-  await click(add)
+  await click(fieldAction(view, 'addItem', 0))
   let inputs = view.container.querySelectorAll('input')
-  expect(inputs).toHaveLength(2)
-  expect(document.activeElement).toBe(inputs[1])
-  expect(save.mock.calls.every((call) => !JSON.stringify(call).includes('""'))).toBe(true)
+  expect([...inputs].map((field) => field.value)).toEqual(['company', '', 'id'])
+  expect(save).not.toHaveBeenCalled()
   await input(inputs[1]!, 'record.id')
-  await act(async () => inputs[1]!.blur())
-  expect(save).toHaveBeenLastCalledWith(task, { ...task, executor: { kind: 'skip-duplicates', fields: ['company', 'record.id'] } })
-  const remove = view.container.querySelector<HTMLButtonElement>(`button[aria-label="${view.i18n.t('flowState.removeField', { index: 1 })}"]`)!
-  await click(remove)
+  await act(async () => inputs[1]!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+  expect(save).toHaveBeenLastCalledWith(task, { ...task, executor: { kind: 'skip-duplicates', fields: ['company', 'record.id', 'id'] } })
+  await click(fieldAction(view, 'remove', 0))
   inputs = view.container.querySelectorAll('input')
-  expect(inputs).toHaveLength(1)
-  expect(inputs[0]!.value).toBe('record.id')
-  expect(save).toHaveBeenLastCalledWith(task, { ...task, executor: { kind: 'skip-duplicates', fields: ['record.id'] } })
+  expect([...inputs].map((field) => field.value)).toEqual(['record.id', 'id'])
+  expect(save).toHaveBeenLastCalledWith(task, { ...task, executor: { kind: 'skip-duplicates', fields: ['record.id', 'id'] } })
 })
 
 it('keeps the draft for retry and preserves the latest unrelated task settings', async () => {
@@ -52,16 +54,17 @@ it('rejects duplicate paths and leaves read-only fields immutable', async () => 
   expect(save).not.toHaveBeenCalled()
   expect(view.container.querySelector('[role="alert"]')?.textContent).toContain(view.i18n.t('flowState.invalidFields'))
   expect([...view.container.querySelectorAll('button')].some((button) => button.textContent === view.i18n.t('flowState.retry'))).toBe(false)
-  expect(second.getAttribute('aria-describedby')).toBe(view.container.querySelector('[role="alert"]')?.id)
+  expect(second.closest('[aria-labelledby]')?.getAttribute('aria-describedby')?.split(/\s+/)).toContain(view.container.querySelector('[role="alert"]')?.id)
   view.rerender(<SkipDuplicatesSection task={task} disabled onSave={save} />)
-  expect([...view.container.querySelectorAll('input')].every((field) => field.disabled)).toBe(true)
+  expect([...view.container.querySelectorAll('input')].every((field) => field.readOnly)).toBe(true)
+  expect(view.container.querySelector('button')).toBeNull()
 })
 
 it('reflects undo after adding a blank field row', async () => {
   const save = vi.fn(async () => true)
   const task = skipDuplicatesTask({ fields: ['id', 'version'] })
   const view = render(<SkipDuplicatesSection task={task} disabled={false} onSave={save} />)
-  await click([...view.container.querySelectorAll('button')].find((button) => button.textContent === view.i18n.t('flowState.addField'))!)
+  await click(fieldAction(view, 'addItem', 1))
   await act(async () => view.container.querySelectorAll('input')[2]!.blur())
   expect(save).not.toHaveBeenCalled()
   const undone = skipDuplicatesTask({ fields: ['id'] })
@@ -106,13 +109,16 @@ it('cancels a blurred draft before validation when the user edits it again', asy
   expect(view.container.querySelector('[role="alert"]')).toBeNull()
 })
 
-it('returns keyboard focus to a field after removing the last row', async () => {
+it('saves an empty field list after removing the final row and reuses the empty-list add action', async () => {
   const save = vi.fn(async () => true)
-  const view = render(<SkipDuplicatesSection task={skipDuplicatesTask({ fields: ['id', 'version'] })} disabled={false} onSave={save} />)
-  const remove = view.container.querySelector<HTMLButtonElement>(`button[aria-label="${view.i18n.t('flowState.removeField', { index: 2 })}"]`)!
-  await act(async () => remove.focus())
-  await click(remove)
-  expect(document.activeElement).toBe(view.container.querySelector('input'))
+  const task = skipDuplicatesTask({ fields: ['id'] })
+  const view = render(<SkipDuplicatesSection task={task} disabled={false} onSave={save} />)
+  await click(fieldAction(view, 'remove', 0))
+  expect(view.container.querySelector('input')).toBeNull()
+  expect(save).toHaveBeenLastCalledWith(task, { ...task, executor: { kind: 'skip-duplicates', fields: [] } })
+  await click(fieldAction(view, 'addItem'))
+  expect(view.container.querySelector('input')?.value).toBe('')
+  expect(save).toHaveBeenCalledTimes(1)
 })
 
 it('uses only committed task settings and save callbacks for queued saves', async () => {

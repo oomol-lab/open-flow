@@ -6,6 +6,7 @@ import type { FieldValueEditorProps } from './fieldValueEditor.tsx'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 import { valueForEditor } from '../common/editorComponent.ts'
 import { fieldValueState, setArrayItem } from '../common/fieldValue.ts'
 import { objectFieldNames, renameFieldDefinition, removeFieldDefinition } from '../common/objectFields.ts'
@@ -38,6 +39,7 @@ function childFields(props: FieldValueEditorProps) {
       | 'onDefinitionChange'
       | 'leadingControl'
       | 'disclosureContent'
+      | 'depth'
       | 'typeWidth'
     >,
   ) => {
@@ -237,7 +239,7 @@ export function ObjectValueFields(props: CollectionProps) {
     </div>
   )
 }
-export function ArrayValueFields(props: CollectionProps) {
+export function ArrayValueFields(props: CollectionProps & { showIndices?: boolean }) {
   const { schema, value, onChange, label, disabled, valueEditable = true } = props
   const source = objectValue(schema) ?? {}
   const t = useTranslate()
@@ -263,12 +265,15 @@ export function ArrayValueFields(props: CollectionProps) {
       <ArrayFieldList values={array} onReorder={!disabled && valueEditable ? onChange : undefined} label={label}>
         {(item, index, handle) => {
           const itemSchema = Array.isArray(source.items) ? (source.items[index] ?? source.additionalItems ?? {}) : (source.items ?? {})
+          const addLabel = `${t('valueEditor.addItem')} ${label}.${index}`
+          const removeLabel = `${t('valueEditor.remove')} ${label}.${index}`
           return (
             <div data-array-field-content>
               {child(index, itemSchema, item, (next, deletion) => onChange(setArrayItem(array, index, next), deletion), {
                 arrayChild: true,
                 header: <></>,
-                disclosureContent: <span className={styles.arrayIndex}>{index}.</span>,
+                disclosureContent: props.showIndices !== false ? <span className={styles.arrayIndex}>{index}.</span> : undefined,
+                ...(props.showIndices === false ? { depth: props.depth ?? 0 } : {}),
                 leadingControl: handle || undefined,
                 onDefinitionChange:
                   props.onDefinitionChange && !Array.isArray(source.items)
@@ -282,34 +287,48 @@ export function ArrayValueFields(props: CollectionProps) {
                 hideOptions: true,
                 actions: !props.readOnly && (
                   <>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label={`${t('valueEditor.addItem')} ${label}.${index}`}
-                      disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
-                      onClick={() =>
-                        onChange(
-                          array.toSpliced(
-                            index + 1,
-                            0,
-                            initialValue(Array.isArray(source.items) ? (source.items[index + 1] ?? source.additionalItems ?? {}) : (source.items ?? {})),
-                          ),
-                        )
-                      }
-                    >
-                      <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label={`${t('valueEditor.remove')} ${label}.${index}`}
-                      disabled={disabled || (typeof source.minItems === 'number' && array.length <= source.minItems)}
-                      onClick={() => onChange(array.toSpliced(index, 1), { target: 'arrayItem', name: `${label}.${index}` })}
-                    >
-                      <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={addLabel}
+                            disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
+                            onClick={() =>
+                              onChange(
+                                array.toSpliced(
+                                  index + 1,
+                                  0,
+                                  initialValue(Array.isArray(source.items) ? (source.items[index + 1] ?? source.additionalItems ?? {}) : (source.items ?? {})),
+                                ),
+                              )
+                            }
+                          />
+                        }
+                      >
+                        <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
+                      </TooltipTrigger>
+                      <TooltipContent>{addLabel}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={removeLabel}
+                            disabled={disabled || (typeof source.minItems === 'number' && array.length <= source.minItems)}
+                            onClick={() => onChange(array.toSpliced(index, 1), { target: 'arrayItem', name: `${label}.${index}` })}
+                          />
+                        }
+                      >
+                        <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
+                      </TooltipTrigger>
+                      <TooltipContent>{removeLabel}</TooltipContent>
+                    </Tooltip>
                   </>
                 ),
               })}
