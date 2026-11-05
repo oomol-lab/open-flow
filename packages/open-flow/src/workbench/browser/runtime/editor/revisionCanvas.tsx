@@ -91,35 +91,32 @@ export function RevisionCanvas({
   const model = useMemo(
     () => ({
       ...baseline,
+      direction: session?.direction ?? baseline.direction,
       viewport: session?.viewport ?? baseline.viewport,
       nodes: baseline.nodes.map((node) => ({ ...node, position: session?.positions?.[node.id] ?? node.position })),
     }),
     [baseline, session],
   )
-  const moved = baseline.nodes.some((node) => {
-    const position = session?.positions?.[node.id]
-    return position != null && (position.x !== node.position.x || position.y !== node.position.y)
-  })
+  const layoutChanged =
+    model.direction !== baseline.direction ||
+    baseline.nodes.some((node) => {
+      const position = session?.positions?.[node.id]
+      return position != null && (position.x !== node.position.x || position.y !== node.position.y)
+    })
 
   const selection = selected.length === 1 ? revision.node(selected[0]!) : undefined
   const comment = selected.length === 1 ? model.nodes.find((node) => node.id === selected[0] && node.kind === 'comment') : undefined
-  const navigation =
-    presentation == null || moved ? (
-      <>
-        {presentation == null && <span className="revision-viewer-hint">{t('snapshot.missingLayout')}</span>}
-        {moved && (
-          <Button
-            className="ml-auto"
-            size="xs"
-            variant="ghost"
-            onClick={() => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'restore' }))}
-          >
-            <i aria-hidden="true" className="i-lucide-light:rotate-ccw" />
-            {t('snapshot.restore')}
-          </Button>
-        )}
-      </>
-    ) : undefined
+  const restoreLayout = layoutChanged ? (
+    <Button
+      className="ml-auto"
+      size="xs"
+      variant="ghost"
+      onClick={() => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'restore' }))}
+    >
+      <i aria-hidden="true" className="i-lucide-light:rotate-ccw" />
+      {t('snapshot.restore')}
+    </Button>
+  ) : undefined
   return (
     <section ref={root} className={`revision-viewer${inspectorOpen ? ' inspector-open' : ''}`} aria-label={label ?? t('snapshot.title')}>
       {showHeader && (
@@ -128,7 +125,7 @@ export function RevisionCanvas({
             <i aria-hidden="true" className="i-lucide-light:lock-keyhole" />
             {label ?? t('snapshot.title')}
           </span>
-          {navigation}
+          {restoreLayout}
         </header>
       )}
       <div className="revision-viewer-body">
@@ -149,11 +146,15 @@ export function RevisionCanvas({
             ignoredNodeIds={[]}
             focusNodeRequest={focus}
             onMoveNodes={(positions) => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'move', positions }))}
+            onChangeDirection={(direction, positions) => {
+              setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'direction', direction, positions }))
+              return true
+            }}
             onMoveViewport={(viewport) => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'viewport', viewport }))}
             onSelectionChange={setSelected}
             onInspectSelection={() => setInspectorOpen((open) => !open)}
             inspectorOpen={inspectorOpen}
-            toolbar={showHeader ? undefined : navigation}
+            toolbar={showHeader ? undefined : restoreLayout}
             cornerTools={
               <WorkbenchInspectorToggle
                 label={t('designer.toggleInspector')}

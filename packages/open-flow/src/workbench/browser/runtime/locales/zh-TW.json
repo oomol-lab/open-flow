@@ -1519,7 +1519,6 @@
   "snapshot": {
     "title": "快照",
     "restore": "還原佈局",
-    "missingLayout": "此版本未儲存佈局，已自動排列",
     "loading": "正在載入版本…",
     "failed": "無法載入此版本，其內容可能已無法使用。",
     "root": "主流程"

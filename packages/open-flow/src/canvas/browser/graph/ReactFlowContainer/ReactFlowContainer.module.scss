@@ -156,11 +156,11 @@
 }
 
 @container open-flow-canvas-controls (width <= 900px) {
-  .viewDock[data-readonly='false'] .expandedViewControls {
+  .expandedViewControls {
     display: none;
   }
 
-  .viewDock[data-readonly='false'] .compactViewControls {
+  .compactViewControls {
     display: block;
   }
 }

@@ -1519,7 +1519,6 @@
   "snapshot": {
     "title": "快照",
     "restore": "恢复布局",
-    "missingLayout": "此版本未保存布局，已自动排列",
     "loading": "正在加载版本…",
     "failed": "无法加载此版本，其内容可能已不可用。",
     "root": "主流程"

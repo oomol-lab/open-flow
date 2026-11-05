@@ -258,7 +258,7 @@ export interface FlowCanvasViewProps {
   readonly onDeleteNodes?: (nodeIds: readonly string[]) => void
   readonly onDisconnect?: (edge: FlowCanvasViewEdge) => void
   readonly onDuplicate?: (nodeIds: readonly string[], offset?: FlowCanvasViewPosition, positions?: Readonly<Record<string, FlowCanvasViewPosition>>) => void
-  /** Save direction and its measured layout as one edit. */
+  /** Apply direction and its measured layout together. Also enables session-local layout in read-only views. */
   readonly onChangeDirection?: (direction: CanvasDirection, positions: Readonly<Record<string, FlowCanvasViewPosition>>) => Promise<boolean> | boolean
   readonly onMoveNodes: (positions: Readonly<Record<string, FlowCanvasViewPosition>>) => void
   readonly onMoveViewport: (viewport: FlowCanvasViewViewport) => void

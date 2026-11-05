@@ -157,8 +157,8 @@ within their related controls; failed saves preserve the form for retry.
 ## Offline workflow preview
 
 `@oomol-lab/open-flow/preview` exports the same read-only viewer used in Publications,
-without its striped canvas background. It includes temporary node movement, layout restoration,
-properties. It does not fetch a publication, save changes, or execute a flow.
+without its striped canvas background. It includes temporary node movement, layout direction switching,
+layout restoration and properties. It does not fetch a publication, save changes, or execute a flow.
 
 ```tsx
 import { OpenFlowPreview, type Draft, type Presentation } from '@oomol-lab/open-flow/preview'
@@ -181,7 +181,8 @@ existing missing-layout behavior. These are workflow definitions, not React Flow
 The preview has no title bar. Its optional `label` names the accessible region; layout restoration appears as canvas controls when needed.
 
 The host owns container dimensions, language and light/dark theme. Theme and language can change
-without resetting temporary node positions. Movement never writes back to the supplied objects.
+without resetting temporary node positions or layout direction. Layout changes never write back to the supplied objects.
+Restore layout returns both direction and positions to the supplied presentation while preserving the current viewport.
 Use a new React `key` when switching examples to reset selection and layout.
 
 For Shadow DOM, the host creates the shadow root and mounts the React component inside it.

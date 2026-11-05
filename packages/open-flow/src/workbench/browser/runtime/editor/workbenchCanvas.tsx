@@ -375,7 +375,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           onDuplicate(positions, offset)
         }}
         onMoveNodes={onMoveNodes}
-        onChangeDirection={onChangeDirection}
+        onChangeDirection={disabled ? undefined : onChangeDirection}
         onMoveViewport={onMoveViewport}
         subscribeCanvasCommands={subscribeCanvasCommands}
         onCopy={(nodeIds) => {

@@ -1519,7 +1519,6 @@
   "snapshot": {
     "title": "Snapshot",
     "restore": "Restore layout",
-    "missingLayout": "This version has no saved layout. Nodes are arranged automatically.",
     "loading": "Loading version…",
     "failed": "This version could not be loaded. Its content may no longer be available.",
     "root": "Main flow"

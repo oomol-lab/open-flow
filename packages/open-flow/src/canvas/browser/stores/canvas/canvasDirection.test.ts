@@ -53,8 +53,8 @@ describe('canvas direction', () => {
     expect(onChangeDirection).not.toHaveBeenCalled()
   })
 
-  it('lays out mixed-width vertical chains without wrapping and saves target measurements once', async () => {
-    const { store, onMoveNodes, onChangeDirection } = await setup()
+  it.each([true, false])('lays out mixed-width chains and applies direction once with editable=%s', async (editable) => {
+    const { store, onMoveNodes, onChangeDirection } = await setup(10, 'horizontal', {}, editable)
     store.changeDirection('vertical')
     const first = [...store.$.nodes.values()][0]!
     first.$$.rfNode.set({ ...first.$.rfNode.value, measured: { width: 742, height: 400 } })
@@ -70,6 +70,10 @@ describe('canvas direction', () => {
     }
     expect(onMoveNodes).not.toHaveBeenCalled()
     expect(store.completeLayout(400)).toBe(true)
+    await Promise.resolve()
+    expect(store.$.direction.value).toBe('vertical')
+    expect(store.$.changingDirection.value).toBe(false)
+    expect(store.$.editable.value).toBe(editable)
   })
 
   it('blocks repeated switches until saving completes and restores the model on failure', async () => {
@@ -106,11 +110,12 @@ describe('canvas direction', () => {
     expect(next.onChangeDirection).not.toHaveBeenCalled()
   })
 
-  it('keeps read-only canvas directions immutable', async () => {
-    const { store, onChangeDirection } = await setup(2, 'vertical', {}, false)
+  it('keeps directions immutable without an explicit layout callback', async () => {
+    const { store, onMoveNodes } = await setup(2, 'vertical', { onChangeDirection: undefined }, false)
     store.changeDirection('horizontal')
     expect(store.$.direction.value).toBe('vertical')
-    expect(onChangeDirection).not.toHaveBeenCalled()
+    expect(store.$.changingDirection.value).toBe(false)
+    expect(onMoveNodes).not.toHaveBeenCalled()
   })
 
   it.each(['horizontal', 'vertical'] as const)('keeps %s branch lanes in output order for full and selected layouts', async (direction) => {

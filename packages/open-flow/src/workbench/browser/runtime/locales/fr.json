@@ -1519,7 +1519,6 @@
   "snapshot": {
     "title": "Instantané",
     "restore": "Rétablir la disposition",
-    "missingLayout": "Aucune disposition enregistrée. Les nœuds sont placés automatiquement.",
     "loading": "Chargement de la version…",
     "failed": "Impossible de charger cette version. Son contenu est peut-être indisponible.",
     "root": "Flux principal"

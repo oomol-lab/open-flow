@@ -267,7 +267,6 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} size={2} variant={BackgroundVariant.Dots} />}
       <CanvasViewControls
-        readOnly={!props.editable}
         interactiveMode$={props.interactiveMode$}
         direction={props.direction}
         changingDirection={props.changingDirection}

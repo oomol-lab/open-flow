@@ -93,7 +93,7 @@ export class CanvasStore {
   }
 
   public readonly changeDirection = (direction: CanvasDirection): void => {
-    if (!this.$.editable.value || !this.canChangeDirection || this.$.changingDirection.value || this.$.direction.value === direction) return
+    if (!this.canChangeDirection || this.$.changingDirection.value || this.$.direction.value === direction) return
     this.layoutComplete = false
     this.layoutMeasurementAttempts = 0
     this.$$.changingDirection.set(true)

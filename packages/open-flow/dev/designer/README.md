@@ -149,7 +149,7 @@ Node and Trigger **Properties** galleries include a **Fixed types · editable va
 ## Public preview
 
 `?story=preview` and `?story=preview-shadow` use the public `OpenFlowPreview` entry with the
-Publications fixture. Test temporary movement/restoration, properties, theme/language,
+Publications fixture. Test temporary movement, layout direction switching/restoration, properties, theme/language,
 missing layout, and a narrow host. The Provider example initializes the standard App Catalog
 singleton with deterministic data. Move or select a node before loading metadata to verify that
 Connector icons and Agent tool badges update without resetting the session. The Shadow DOM host is Lab-only and copies the loaded Lab

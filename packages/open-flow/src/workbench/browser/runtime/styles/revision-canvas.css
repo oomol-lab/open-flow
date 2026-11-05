@@ -16,11 +16,6 @@
     font-size: 12px;
     line-height: 24px;
   }
-  .revision-viewer-hint {
-    flex: 1;
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-  }
   .revision-viewer-body {
     position: relative;
     display: grid;
