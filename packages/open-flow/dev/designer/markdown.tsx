@@ -29,6 +29,14 @@ const sample = [
   'graph LR',
   '  Input --> Output',
   '```',
+  '',
+  '### Videos',
+  '',
+  '[![YouTube video](thumbnail.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)',
+  '',
+  '[![Bilibili video](thumbnail.jpg)](https://www.bilibili.com/video/BV1GJ411x7h7)',
+  '',
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
 ].join('\n')
 
 function MarkdownStory({ dark, language }: { dark: boolean; language: UiLanguage }) {
@@ -52,6 +60,7 @@ export const markdownStory: FrontendStory = {
   group: 'Controls',
   id: 'markdown',
   title: 'Markdown',
+  description: 'Image links embed YouTube and Bilibili players. Bare URLs and labeled links stay links; inline code and code blocks stay literal.',
   standalone: true,
   render: (_log, dark, language) => <MarkdownStory dark={dark} language={language} />,
 }

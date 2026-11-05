@@ -194,6 +194,20 @@ const commentModel: FlowCanvasViewModel = {
       content: '',
     },
     {
+      id: 'youtube',
+      kind: 'comment',
+      title: 'YouTube video',
+      position: { x: 400, y: 380 },
+      content: '[![YouTube video](thumbnail.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)',
+    },
+    {
+      id: 'bilibili',
+      kind: 'comment',
+      title: 'Bilibili video',
+      position: { x: 800, y: 380 },
+      content: '[![Bilibili video](thumbnail.jpg)](https://www.bilibili.com/video/BV1GJ411x7h7)',
+    },
+    {
       id: 'formatting',
       kind: 'comment',
       title: 'Markdown formatting',
@@ -745,7 +759,7 @@ export const nodeStories: readonly FrontendStory[] = [
     group: 'Node Comment',
     id: 'node-comment',
     description:
-      'Comment cards · Drag the content’s bottom-right button to resize; arrow keys resize when the button is focused. Long content scrolls within the card. Editing and preview share the same size.',
+      'Comment cards · Drag the content’s bottom-right button to resize; arrow keys resize when the button is focused. Long content scrolls within the card; preview scrollbars hide when the pointer leaves. Paste a YouTube or Bilibili URL into the source to insert an image link. Preview shows rounded players that resize with the card.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <CommentStory dark={dark} language={language} log={log} />,

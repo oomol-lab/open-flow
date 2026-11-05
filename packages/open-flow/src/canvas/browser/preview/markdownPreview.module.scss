@@ -1,5 +1,6 @@
 .container {
   position: relative;
+  height: 100%;
   outline-style: none;
 }
 
@@ -7,7 +8,6 @@
   height: 100%;
   padding: 4px;
   user-select: text;
-  overflow-y: auto;
   box-sizing: border-box;
 
   video {

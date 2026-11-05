@@ -11,6 +11,13 @@ const cases = [
   { label: 'Editable', title: 'Review notes', content: '### Before running\nCheck the inputs and review the output.', disabled: false },
   { label: 'Empty content', title: 'New comment', content: '', disabled: false },
   {
+    label: 'Video links',
+    title: 'Video notes',
+    content:
+      '[![YouTube video](thumbnail.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\n[![Bilibili video](thumbnail.jpg)](https://www.bilibili.com/video/BV1GJ411x7h7)\n\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    disabled: false,
+  },
+  {
     label: 'Long content',
     title: 'Review checklist',
     content: Array.from({ length: 24 }, (_, index) => `### Step ${index + 1}\nCheck the inputs and review the output.`).join('\n\n'),
@@ -75,7 +82,8 @@ export const commentPropertiesStory: FrontendStory = {
   group: 'Node Comment',
   id: 'comment-properties',
   title: 'Properties',
-  description: 'Compare Markdown and Preview tabs, matching panel corners, and short, empty, scrolling and read-only content in both themes.',
+  description:
+    'Compare Markdown and Preview tabs, video embeds, and short, empty, scrolling and read-only content in both themes. Paste a video URL into Markdown to insert an image link; existing bare URLs stay links. Preview scrollbars hide when the pointer leaves.',
   standalone: true,
   render: (log, dark, language) => <CommentProperties dark={dark} language={language} log={log} />,
 }

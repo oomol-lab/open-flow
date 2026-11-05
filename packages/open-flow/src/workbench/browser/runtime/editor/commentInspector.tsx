@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { pasteVideoLink } from '../../../../ui/browser/markdown/videoLink.ts'
+import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 
@@ -44,6 +46,7 @@ export function CommentInspector({
             readOnly={readOnly}
             value={draftContent}
             onChange={(event) => setDraftContent(event.target.value)}
+            onPaste={(event) => pasteVideoLink(event, t)}
             onBlur={save}
           />
         </TabsContent>
@@ -51,13 +54,16 @@ export function CommentInspector({
           value="preview"
           className="flex min-h-0 flex-1 flex-col rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] border border-[var(--_open-flow-comment-border)] bg-[var(--_open-flow-comment-surface)] p-2"
         >
-          <div className="min-h-0 flex-1 overflow-auto rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] border border-[color-mix(in_srgb,var(--_open-flow-comment-border)_45%,transparent)] bg-[var(--_open-flow-comment-content)] p-3">
+          <ScrollArea
+            autoHide="leave"
+            className="min-h-0 flex-1 rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] border border-[color-mix(in_srgb,var(--_open-flow-comment-border)_45%,transparent)] bg-[var(--_open-flow-comment-content)] p-3"
+          >
             <div className="markdown-body min-w-0" onDoubleClick={() => setSource(true)}>
               <Suspense fallback={null}>
                 <MarkdownContent dark={dark} text={draftContent} mermaid />
               </Suspense>
             </div>
-          </div>
+          </ScrollArea>
         </TabsContent>
       </Tabs>
     </section>

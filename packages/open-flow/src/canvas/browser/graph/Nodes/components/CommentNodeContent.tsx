@@ -7,6 +7,7 @@ import { useContext, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Checkbox } from '../../../../../ui/browser/checkbox.tsx'
+import { pasteVideoLink } from '../../../../../ui/browser/markdown/videoLink.ts'
 import { Textarea } from '../../../../../ui/browser/textarea.tsx'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { MarkdownPreview } from '../../../preview/markdownPreview.tsx'
@@ -70,6 +71,7 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
               setComposing(false)
             }}
             onChange={(event) => store.$$.content.set(event.target.value)}
+            onPaste={(event) => pasteVideoLink(event, t)}
             onBlur={(event) => {
               setFocused(false)
               if (editable && !composing) store.saveContent(event.target.value)

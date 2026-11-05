@@ -4,6 +4,7 @@ import type { Components } from 'react-markdown'
 
 import { clsx } from 'clsx'
 import { lazy, memo, Suspense, useState } from 'react'
+import { ScrollArea } from '../../../ui/browser/scroll-area.tsx'
 
 const MarkdownContent = lazy(() => import('../../../ui/browser/markdown/markdownContent.tsx'))
 
@@ -28,11 +29,11 @@ export const MarkdownPreview: FC<MarkdownPreviewProps> = /* @__PURE__ */ memo(
         onBlur={() => setFocus(false)}
         onDoubleClick={onDoubleClick}
       >
-        <div className={`${styles.body} markdown-body`}>
+        <ScrollArea className={`${styles.body} markdown-body`} autoHide="leave">
           <Suspense fallback={<span hidden data-render-pending />}>
             <MarkdownContent components={components} dark={dark} unstyled={unstyled} className={contentClassName} text={content} mermaid />
           </Suspense>
-        </div>
+        </ScrollArea>
       </div>
     )
   },

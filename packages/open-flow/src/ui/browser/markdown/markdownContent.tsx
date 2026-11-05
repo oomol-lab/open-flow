@@ -21,6 +21,7 @@ import remarkFrontmatter from 'remark-frontmatter'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { useTranslate } from 'val-i18n-react'
+import { getVideoLink } from './videoLink.ts'
 
 const remarkPlugins: Options['remarkPlugins'] = [remarkGfm, remarkMath, remarkFrontmatter]
 type RewriteNode = Parameters<RehypeRewriteOptions['rewrite']>[0]
@@ -54,7 +55,7 @@ function createRehypePlugins(t: TFunction): Options['rehypePlugins'] {
         attributes: {
           'video': ['src', 'controls', 'autoplay', 'loop', 'muted'],
           'source': ['src', 'type'],
-          'iframe': ['src', 'allow', 'referrerpolicy', 'allowfullscreen'],
+          'iframe': ['src', 'allow', 'referrerPolicy', 'allowFullScreen'],
           '*': ['className', 'style'],
         },
       }),
@@ -70,57 +71,27 @@ if (typeof window !== 'undefined') {
 }
 
 function rewriteMaybeVideoLinkToIframe(node: RewriteNode, t: TFunction): void {
-  if (!isWebProtocol) {
+  if (!isWebProtocol || node.type !== 'element' || node.tagName !== 'a') {
     return
   }
-  const firstChild = node.type == 'element' ? node.children[0] : undefined
-  if (node.type === 'element' && node.tagName === 'a' && firstChild?.type == 'element' && firstChild.tagName === 'img') {
-    const href = node.properties.href
-    if (isString(href) && isSupportedVideoLink(href)) {
-      inPlaceEditVideoLink(node, href, t)
-    }
+  const href = node.properties.href
+  const firstChild = node.children[0]
+  if (!isString(href) || firstChild?.type !== 'element' || firstChild.tagName !== 'img') {
+    return
+  }
+  const video = getVideoLink(href)
+  if (video) {
+    node.tagName = 'iframe'
+    node.properties = { ...commonIframeProps, src: video.src, title: t(video.titleKey) }
+    node.children = []
   }
 }
-
-const youtubeRegex = /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/
-const bilibiliRegex = /https?:\/\/(?:www\.)?bilibili\.com\/video\/BV([a-zA-Z0-9]+)/
 
 const commonIframeProps = {
-  width: '100%',
-  height: 'auto',
-  frameborder: '0',
+  style: 'display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 0; border-radius: 8px',
   allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-  referrerpolicy: 'strict-origin-when-cross-origin',
-  allowfullscreen: true,
-}
-
-function isSupportedVideoLink(url: string): boolean {
-  return youtubeRegex.test(url) || bilibiliRegex.test(url)
-}
-
-function inPlaceEditVideoLink(node: Extract<RewriteNode, { type: 'element' }>, url: string, t: TFunction): void {
-  let match = url.match(youtubeRegex)
-  if (match) {
-    const videoId = match[1]
-    node.tagName = 'iframe'
-    node.properties = {
-      src: `https://www.youtube.com/embed/${videoId}`,
-      title: t('markdown.videoYouTube'),
-      ...commonIframeProps,
-    }
-    node.children = []
-  }
-  match = url.match(bilibiliRegex)
-  if (match) {
-    const videoId = match[1]
-    node.tagName = 'iframe'
-    node.properties = {
-      src: `https://player.bilibili.com/player.html?bvid=${videoId}`,
-      title: t('markdown.videoBilibili'),
-      ...commonIframeProps,
-    }
-    node.children = []
-  }
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  allowFullScreen: true,
 }
 
 export interface MarkdownContentProps {

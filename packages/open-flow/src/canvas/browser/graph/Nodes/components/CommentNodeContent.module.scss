@@ -7,7 +7,7 @@
 .container {
   height: 100%;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 
