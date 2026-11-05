@@ -7,7 +7,6 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
-import { NodeHistoryContext } from '../../src/canvas/browser/nodeActions.tsx'
 import { currentFlowModelVersion } from '../../src/flow/common/change.ts'
 import { skipDuplicatesTask } from '../../src/state/common/state.ts'
 import { FlowStateButton, FlowStatePanel } from '../../src/workbench/browser/runtime/editor/flowStatePanel.tsx'
@@ -133,7 +132,6 @@ function StateStory({ language, dark, log }: { language: UiLanguage; dark: boole
   const nextRead = useRef<'normal' | 'slow' | 'failure'>('normal')
   const current = useRef(scopes)
   current.current = scopes
-  const [historyOpen, setHistoryOpen] = useState(false)
   const [stateOpen, setStateOpen] = useState(false)
   const [generation, setGeneration] = useState(0)
   const [primary, setPrimary] = useState<Session>()
@@ -246,62 +244,50 @@ function StateStory({ language, dark, log }: { language: UiLanguage; dark: boole
   )
   return (
     <I18nProvider i18n={i18n}>
-      <NodeHistoryContext.Provider value={() => ({ label: i18n.t('flowState.history'), onClick: () => setHistoryOpen(true) })}>
-        <div className="open-flow-workbench open-flow-theme flex flex-col gap-6 p-6" data-theme={dark ? 'dark' : 'light'}>
-          <div className="grid items-start gap-6 lg:grid-cols-2">
-            {cases.map((fixture, index) => (
-              <NodeSample
-                key={`${generation}:${fixture.title}`}
-                fixture={fixture}
-                client={client}
-                language={language}
-                dark={dark}
-                log={log}
-                onReady={index === 0 ? setPrimary : undefined}
-              />
-            ))}
+      <div className="open-flow-workbench open-flow-theme flex flex-col gap-6 p-6" data-theme={dark ? 'dark' : 'light'}>
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          {cases.map((fixture, index) => (
+            <NodeSample
+              key={`${generation}:${fixture.title}`}
+              fixture={fixture}
+              client={client}
+              language={language}
+              dark={dark}
+              log={log}
+              onReady={index === 0 ? setPrimary : undefined}
+            />
+          ))}
+        </div>
+        <div className="flex flex-col gap-4 rounded border border-border p-4">
+          <div className="flex justify-end">
+            <WorkspacePublishIsland
+              hasPublications={false}
+              onOpenPublications={() => {}}
+              onOpenRuns={() => {}}
+              onPublish={() => {}}
+              onOpenState={() => setStateOpen(true)}
+              state="current"
+            />
           </div>
-          {historyOpen && (
+          {stateOpen && (
             <FlowStateButton
               client={client}
               notify={(notice) => log('notice', notice)}
               flowId="sample"
               nodes={sampleNodes}
-              history={{ nodeId: 'filter' }}
-              onClose={() => setHistoryOpen(false)}
+              onClose={() => setStateOpen(false)}
             />
           )}
-          <div className="flex flex-col gap-4 rounded border border-border p-4">
-            <div className="flex justify-end">
-              <WorkspacePublishIsland
-                hasPublications={false}
-                onOpenPublications={() => {}}
-                onOpenRuns={() => {}}
-                onPublish={() => {}}
-                onOpenState={() => setStateOpen(true)}
-                state="current"
-              />
-            </div>
-            {stateOpen && (
-              <FlowStateButton
-                client={client}
-                notify={(notice) => log('notice', notice)}
-                flowId="sample"
-                nodes={sampleNodes}
-                onClose={() => setStateOpen(false)}
-              />
-            )}
-            <FlowStatePanel
-              value={scopes.draft}
-              nodes={sampleNodes}
-              busy={false}
-              onClearValues={() => void client.clearFlowState('sample', 'draft')}
-              onClearHistory={() => void client.clearAllFlowDedupe('sample', 'draft')}
-              onClearSpace={(space) => void client.clearFlowDedupe('sample', 'draft', space)}
-            />
-          </div>
+          <FlowStatePanel
+            value={scopes.draft}
+            nodes={sampleNodes}
+            busy={false}
+            onClearValues={() => void client.clearFlowState('sample', 'draft')}
+            onClearHistory={() => void client.clearAllFlowDedupe('sample', 'draft')}
+            onClearSpace={(space) => void client.clearFlowDedupe('sample', 'draft', space)}
+          />
         </div>
-      </NodeHistoryContext.Provider>
+      </div>
     </I18nProvider>
   )
 }
@@ -309,10 +295,10 @@ export const flowStateStories: FrontendStory[] = [
   {
     id: 'flow-state',
     group: 'Node Skip Duplicates',
-    title: 'Properties and history',
+    title: 'Properties and usage',
     standalone: true,
     description:
-      'Production properties with single, composite, scalar, read-only and failed-save samples. The Identity fields section uses the shared array editor without item numbers or extra indentation: insert after a row, remove the final row and add to an empty list. Check Tab order across inputs and row actions. Blur or Enter saves valid paths; unfinished blank rows are not saved. Use Undo/Redo on the single-field sample, including an unsaved blank row. History commits after Run success. Inspect the separate sections for saved data and deduplication history in empty and populated states, custom and default canvas icons, outside-view history, pending protection and near-capacity summaries. Open persistent data from the workflow menu; check the toolbar beside environment tabs, Live confirmation, cancellation focus, narrow layouts and scrolling with Many sources in both themes. Clear history removes available sources and retains pending sources; when every source is pending, group and individual clear actions are disabled. Source rows omit visible column headings, show their last update below the name, and count committed and pending identities without overlap. Pending and outside-view explanations appear only in tooltips; hover or keyboard-focus a disabled clear action to read why it is unavailable. Storage info defines saved data and deduplication history before explaining environment separation and retention. Click it to keep the explanation open; dismiss with Escape or outside interaction, then click to reopen it. Fail next load and Slow next load apply to the next open or refresh; retry failures and switch environments during slow reads. Use Empty Live to check that the dialog height stays fixed across environments, loading, empty and populated states. Both section containers remain visible during initial loads and environment changes, with loading or empty text on the second line of their headings. Refresh retains the current rows while those headings show loading; failures retain the sections and offer retry.',
+      'Production properties with single, composite, scalar, read-only and failed-save samples. The Identity fields section uses the shared array editor without item numbers or extra indentation: insert after a row, remove the final row and add to an empty list. Check Tab order across inputs and row actions. Blur or Enter saves valid paths; unfinished blank rows are not saved. Use Undo/Redo on the single-field sample, including an unsaved blank row. Open Usage from Identity fields and check the node usage title in each language. History commits after Run success. Inspect the separate sections for saved data and deduplication history in empty and populated states, custom and default canvas icons, outside-view history, pending protection and near-capacity summaries. Open persistent data from the workflow menu; check the toolbar beside environment tabs, Live confirmation, cancellation focus, narrow layouts and scrolling with Many sources in both themes. Clear history removes available sources and retains pending sources; when every source is pending, group and individual clear actions are disabled. Source rows omit visible column headings, show their last update below the name, and count committed and pending identities without overlap. Pending and outside-view explanations appear only in tooltips; hover or keyboard-focus a disabled clear action to read why it is unavailable. Storage info defines saved data and deduplication history before explaining environment separation and retention. Click it to keep the explanation open; dismiss with Escape or outside interaction, then click to reopen it. Fail next load and Slow next load apply to the next open or refresh; retry failures and switch environments during slow reads. Use Empty Live to check that the dialog height stays fixed across environments, loading, empty and populated states. Both section containers remain visible during initial loads and environment changes, with loading or empty text on the second line of their headings. Refresh retains the current rows while those headings show loading; failures retain the sections and offer retry.',
     render: (log, dark, language) => <StateStory language={language} dark={dark} log={log} />,
   },
 ]

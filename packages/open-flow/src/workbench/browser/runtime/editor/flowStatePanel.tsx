@@ -403,7 +403,7 @@ export function FlowStateButton({
         {onClose == null && (
           <DialogTrigger render={<Button variant="ghost" size="sm" />}>
             <i aria-hidden="true" className="i-lucide-light:database" />
-            {t(space == null ? 'flowState.title' : 'flowState.history')}
+            {t(space == null ? 'flowState.title' : 'flowState.usage')}
           </DialogTrigger>
         )}
         <DialogContent
@@ -413,7 +413,7 @@ export function FlowStateButton({
           closeLabel={t('common.close')}
         >
           <DialogTitle className="break-words pr-8">
-            {space == null ? t('flowState.title') : t('flowState.sourceHistory', { name: sourceName(space, nodes, t) })}
+            {space == null ? t('flowState.title') : t('flowState.sourceUsage', { name: sourceName(space, nodes, t) })}
           </DialogTitle>
           <Tabs
             value={scope}

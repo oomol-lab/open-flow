@@ -9,7 +9,6 @@ import type { PublishState } from './shell/workspacePublishIsland.tsx'
 import { memo, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { NodeHistoryContext } from '../../../canvas/browser/nodeActions.tsx'
 import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
 import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { Empty, EmptyHeader, EmptyTitle } from '../../../ui/browser/empty.tsx'
@@ -291,7 +290,7 @@ export function FlowEditor({
   const connections = useVal(store.connectors.$.pickerConnections)
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
-  const [stateTarget, setStateTarget] = useState<{ history?: { nodeId: string } }>()
+  const [stateOpen, setStateOpen] = useState(false)
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   useVal(store.runRequests.$.inputsLoaded)
   const busy = useVal(store.$.busy)
@@ -449,271 +448,262 @@ export function FlowEditor({
   }
 
   return (
-    <NodeHistoryContext.Provider
-      value={(nodeId) => {
-        const node = revision?.graph().nodes[nodeId]
-        if (flowId == null || node?.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'skip-duplicates') return undefined
-        return { label: t('flowState.history'), onClick: () => setStateTarget({ history: { nodeId } }) }
-      }}
+    <CanvasHistoryScope
+      history={historyControls}
+      disabled={authoringDisabled}
+      aria-label={t('workspace.design')}
+      className={`editor-grid ${contextPanelVisible ? '' : 'context-panel-closed'}`}
+      id="workspace-panel-design"
+      role="region"
+      tabIndex={0}
     >
-      <CanvasHistoryScope
-        history={historyControls}
-        disabled={authoringDisabled}
-        aria-label={t('workspace.design')}
-        className={`editor-grid ${contextPanelVisible ? '' : 'context-panel-closed'}`}
-        id="workspace-panel-design"
-        role="region"
-        tabIndex={0}
-      >
-        {flowId != null && stateTarget != null && (
-          <FlowStateButton
-            key={`${flowId}:${stateTarget.history?.nodeId ?? 'all'}`}
-            client={store.state}
-            flowId={flowId}
-            nodes={designer.nodes}
-            notify={store.workspace.notify}
-            history={stateTarget.history}
-            onClose={() => setStateTarget(undefined)}
-          />
-        )}
-        <WorkbenchCanvas
-          interactiveMode$={store.interactiveMode$}
-          connectionControl={
-            <ConnectionUsageButton
-              connectionHref={connectionHref}
-              key={flowId}
-              onManage={onManageConnectorAccess}
-              onSelectReference={setAccountReference}
-              store={store}
-            />
-          }
-          topLeftTools={navigationIsland}
-          bottomRightTools={<RunStatusIslandContainer onToggle={onToggleRuns} open={runDrawerOpen} panelId={RUN_LOG_PANEL_ID} store={store} />}
-          cornerLeading={
-            <div className="workspace-corner-leading">
-              {diagnostics?.valid == false && diagnosticItems.length > 0 && (
-                <WorkspaceDiagnosticsIsland
-                  checking={checkLoading}
-                  items={diagnosticItems}
-                  nodes={designerNodes}
-                  onOpenChange={(open) => {
-                    if (open) store.runRequests.dismissInputs()
-                    setDiagnosticsOpen(open)
-                  }}
-                  onRefresh={() => void store.workspace.check()}
-                  onSelect={(item) => {
-                    if (store.workspace.locateDiagnostic(item)) setDiagnosticsOpen(false)
-                  }}
-                  onSelectNode={(nodeId) => {
-                    if (store.workspace.locateNode(nodeId)) {
-                      openInspector()
-                      setDiagnosticsOpen(false)
-                    }
-                  }}
-                  open={diagnosticsOpen}
-                />
-              )}
-              <WorkspacePublishIsland
-                onExportPng={
-                  connectorAccess.access?.mode != 'selectable' || designer.nodes.length == 0
-                    ? undefined
-                    : (options) => store.exportPng(language, { ...options, ignoredNodeIds })
-                }
-                preferences={store.preferences}
-                onExport={() => {
-                  const id = store.workspace.$.flowId.value
-                  if (id != null) void store.workspace.exportFlow(id)
-                }}
-                hasPublications={live == null ? undefined : live.publication != null}
-                onOpenPublications={onOpenPublications}
-                onOpenRuns={onOpenRuns}
-                onOpenState={flowId == null ? undefined : () => setStateTarget({})}
-                onPublish={() => void store.publications.publish()}
-                state={publishState}
-              />
-            </div>
-          }
-          history={historyControls}
-          ignoredNodeIds={ignoredNodeIds}
-          onIgnoreNodes={onIgnoreNodes}
-          runControl={
-            draft != null && selectedTrigger != null ? (
-              <RunControl
-                disabled={busy != null && busy != 'run' && busy != 'designer'}
-                inputContent={<RunInputPanel onStarted={onRunStarted} store={store.runRequests} theme={theme} />}
-                inputOpen={runInputRequest?.triggerId == selectedTrigger.id}
-                inputStatus={store.runRequests.inputStatus(draft.flowId, draft, selectedTrigger.id)}
-                onInputOpenChange={(open) => {
-                  if (open) void store.editDraftRunInputs(selectedTrigger.id)
-                  else store.runRequests.dismissInputs()
-                }}
-                onRun={() => onRun(selectedTrigger.id)}
-                onSelectTrigger={(triggerId) => {
-                  store.runRequests.dismissInputs()
-                  setStartId(triggerId)
-                }}
-                selectedTriggerId={selectedTrigger.id}
-                starting={busy == 'run'}
-                triggers={triggers}
-              />
-            ) : undefined
-          }
-          addNodeControl={
-            <NodePickerPopover
-              key={flowId ?? ''}
-              options={addNodeOptions}
-              connections={connections}
-              loadConnections={store.connectors.loadConnections}
-              browseOptions={store.browseAddNodeOptions}
-              searchOptions={store.provideAddNodeOptions}
-              provideChoices={store.provideAddNodeOptionChoices}
-              catalogFailed={triggerCatalogState.error != null}
-              refreshCatalog={store.retryCatalog}
-              initialTab={initialAddNodeTab}
-              disabled={authoringDisabled}
-              focusRequest={0}
-              onAdd={addFromPicker}
-              onRegisterDragOption={(option) => designerRef.current?.registerDraggedNode(option)}
-              onDragEnd={() => designerRef.current?.clearDraggedNode()}
-            />
-          }
-          nodePicker={{
-            connections,
-            loadConnections: store.connectors.loadConnections,
-            browseOptions: store.browseAddNodeOptions,
-            provideChoices: store.provideAddNodeOptionChoices,
-            catalogFailed: triggerCatalogState.error != null,
-            refreshCatalog: store.retryCatalog,
-            initialTab: initialAddNodeTab,
-          }}
-          addNodeOptions={addNodeOptions}
-          disabled={authoringDisabled}
-          subscribeCanvasCommands={store.workspace.subscribeCanvasCommands}
-          focusNodeRequest={diagnosticFocus ?? nodeFocus}
-          inspectorOpen={contextPanelVisible}
-          model={designer}
-          annotationContext={canvasAnnotations(flowId, draft, workspaceStatus, moduleEditor?.status, history.failed)}
-          onAddNode={async (option, position, connection) => {
-            const nodeId = await store.addNode(option, position, connection)
-            if (nodeId != null && flowId != null && store.workspace.$.flowId.value == flowId) {
-              setAddedNode({ flowId, nodeId })
-              if (panel.open) panel.activate([nodeId])
-            }
-            return nodeId
-          }}
-          onConnect={(edge) => void store.workspace.connect(edge)}
-          onChangeNodeContentHidden={(nodeId, hidden) => void store.workspace.saveNodeContentHidden(nodeId, hidden)}
-          onChangeNodeWidth={(nodeId, width, position) => store.workspace.saveNodeWidth(nodeId, width, position)}
-          onChangeComment={(nodeId, value) => void store.workspace.saveComment(nodeId, value)}
-          onCopy={() => store.workspace.copySelectedNodes()}
-          onDeleteEdge={(edge) => void store.workspace.disconnect(edge)}
-          onDeleteNodes={() => void store.workspace.deleteSelectedNodes()}
-          onDuplicate={(positions, offset) => void store.workspace.duplicateSelectedNodes(positions, offset)}
-          onMoveNodes={(positions) => void store.workspace.moveNodes(positions)}
-          onChangeDirection={(direction, positions) => store.changeDirection(direction, positions)}
-          onMoveViewport={(viewport) => void store.workspace.moveViewport(viewport)}
-          onPaste={() => void store.workspace.pasteNodes()}
-          provideAddNodeOptions={store.provideAddNodeOptions}
-          onSelectNodes={panel.select}
-          onActivateSelection={panel.activate}
-          onSelectionStart={panel.startSelection}
-          onSelectionEnd={panel.endSelection}
-          onToggleInspector={toggleInspector}
-          ref={designerRef}
-          selectedNodeIds={panel.canvasSelection}
-
-          theme={theme}
+      {flowId != null && stateOpen && (
+        <FlowStateButton
+          key={flowId}
+          client={store.state}
+          flowId={flowId}
+          nodes={designer.nodes}
+          notify={store.workspace.notify}
+          onClose={() => setStateOpen(false)}
         />
-        {contextPanelVisible && (
-          <EditorContextPanel
-            resizable
-            onBack={
-              !flowSelected
-                ? () => {
-                    panel.back()
-                    designerRef.current?.focusCanvas()
+      )}
+      <WorkbenchCanvas
+        interactiveMode$={store.interactiveMode$}
+        connectionControl={
+          <ConnectionUsageButton
+            connectionHref={connectionHref}
+            key={flowId}
+            onManage={onManageConnectorAccess}
+            onSelectReference={setAccountReference}
+            store={store}
+          />
+        }
+        topLeftTools={navigationIsland}
+        bottomRightTools={<RunStatusIslandContainer onToggle={onToggleRuns} open={runDrawerOpen} panelId={RUN_LOG_PANEL_ID} store={store} />}
+        cornerLeading={
+          <div className="workspace-corner-leading">
+            {diagnostics?.valid == false && diagnosticItems.length > 0 && (
+              <WorkspaceDiagnosticsIsland
+                checking={checkLoading}
+                items={diagnosticItems}
+                nodes={designerNodes}
+                onOpenChange={(open) => {
+                  if (open) store.runRequests.dismissInputs()
+                  setDiagnosticsOpen(open)
+                }}
+                onRefresh={() => void store.workspace.check()}
+                onSelect={(item) => {
+                  if (store.workspace.locateDiagnostic(item)) setDiagnosticsOpen(false)
+                }}
+                onSelectNode={(nodeId) => {
+                  if (store.workspace.locateNode(nodeId)) {
+                    openInspector()
+                    setDiagnosticsOpen(false)
+                  }
+                }}
+                open={diagnosticsOpen}
+              />
+            )}
+            <WorkspacePublishIsland
+              onExportPng={
+                connectorAccess.access?.mode != 'selectable' || designer.nodes.length == 0
+                  ? undefined
+                  : (options) => store.exportPng(language, { ...options, ignoredNodeIds })
+              }
+              preferences={store.preferences}
+              onExport={() => {
+                const id = store.workspace.$.flowId.value
+                if (id != null) void store.workspace.exportFlow(id)
+              }}
+              hasPublications={live == null ? undefined : live.publication != null}
+              onOpenPublications={onOpenPublications}
+              onOpenRuns={onOpenRuns}
+              onOpenState={flowId == null ? undefined : () => setStateOpen(true)}
+              onPublish={() => void store.publications.publish()}
+              state={publishState}
+            />
+          </div>
+        }
+        history={historyControls}
+        ignoredNodeIds={ignoredNodeIds}
+        onIgnoreNodes={onIgnoreNodes}
+        runControl={
+          draft != null && selectedTrigger != null ? (
+            <RunControl
+              disabled={busy != null && busy != 'run' && busy != 'designer'}
+              inputContent={<RunInputPanel onStarted={onRunStarted} store={store.runRequests} theme={theme} />}
+              inputOpen={runInputRequest?.triggerId == selectedTrigger.id}
+              inputStatus={store.runRequests.inputStatus(draft.flowId, draft, selectedTrigger.id)}
+              onInputOpenChange={(open) => {
+                if (open) void store.editDraftRunInputs(selectedTrigger.id)
+                else store.runRequests.dismissInputs()
+              }}
+              onRun={() => onRun(selectedTrigger.id)}
+              onSelectTrigger={(triggerId) => {
+                store.runRequests.dismissInputs()
+                setStartId(triggerId)
+              }}
+              selectedTriggerId={selectedTrigger.id}
+              starting={busy == 'run'}
+              triggers={triggers}
+            />
+          ) : undefined
+        }
+        addNodeControl={
+          <NodePickerPopover
+            key={flowId ?? ''}
+            options={addNodeOptions}
+            connections={connections}
+            loadConnections={store.connectors.loadConnections}
+            browseOptions={store.browseAddNodeOptions}
+            searchOptions={store.provideAddNodeOptions}
+            provideChoices={store.provideAddNodeOptionChoices}
+            catalogFailed={triggerCatalogState.error != null}
+            refreshCatalog={store.retryCatalog}
+            initialTab={initialAddNodeTab}
+            disabled={authoringDisabled}
+            focusRequest={0}
+            onAdd={addFromPicker}
+            onRegisterDragOption={(option) => designerRef.current?.registerDraggedNode(option)}
+            onDragEnd={() => designerRef.current?.clearDraggedNode()}
+          />
+        }
+        nodePicker={{
+          connections,
+          loadConnections: store.connectors.loadConnections,
+          browseOptions: store.browseAddNodeOptions,
+          provideChoices: store.provideAddNodeOptionChoices,
+          catalogFailed: triggerCatalogState.error != null,
+          refreshCatalog: store.retryCatalog,
+          initialTab: initialAddNodeTab,
+        }}
+        addNodeOptions={addNodeOptions}
+        disabled={authoringDisabled}
+        subscribeCanvasCommands={store.workspace.subscribeCanvasCommands}
+        focusNodeRequest={diagnosticFocus ?? nodeFocus}
+        inspectorOpen={contextPanelVisible}
+        model={designer}
+        annotationContext={canvasAnnotations(flowId, draft, workspaceStatus, moduleEditor?.status, history.failed)}
+        onAddNode={async (option, position, connection) => {
+          const nodeId = await store.addNode(option, position, connection)
+          if (nodeId != null && flowId != null && store.workspace.$.flowId.value == flowId) {
+            setAddedNode({ flowId, nodeId })
+            if (panel.open) panel.activate([nodeId])
+          }
+          return nodeId
+        }}
+        onConnect={(edge) => void store.workspace.connect(edge)}
+        onChangeNodeContentHidden={(nodeId, hidden) => void store.workspace.saveNodeContentHidden(nodeId, hidden)}
+        onChangeNodeWidth={(nodeId, width, position) => store.workspace.saveNodeWidth(nodeId, width, position)}
+        onChangeComment={(nodeId, value) => void store.workspace.saveComment(nodeId, value)}
+        onCopy={() => store.workspace.copySelectedNodes()}
+        onDeleteEdge={(edge) => void store.workspace.disconnect(edge)}
+        onDeleteNodes={() => void store.workspace.deleteSelectedNodes()}
+        onDuplicate={(positions, offset) => void store.workspace.duplicateSelectedNodes(positions, offset)}
+        onMoveNodes={(positions) => void store.workspace.moveNodes(positions)}
+        onChangeDirection={(direction, positions) => store.changeDirection(direction, positions)}
+        onMoveViewport={(viewport) => void store.workspace.moveViewport(viewport)}
+        onPaste={() => void store.workspace.pasteNodes()}
+        provideAddNodeOptions={store.provideAddNodeOptions}
+        onSelectNodes={panel.select}
+        onActivateSelection={panel.activate}
+        onSelectionStart={panel.startSelection}
+        onSelectionEnd={panel.endSelection}
+        onToggleInspector={toggleInspector}
+        ref={designerRef}
+        selectedNodeIds={panel.canvasSelection}
+
+        theme={theme}
+      />
+      {contextPanelVisible && (
+        <EditorContextPanel
+          resizable
+          onBack={
+            !flowSelected
+              ? () => {
+                  panel.back()
+                  designerRef.current?.focusCanvas()
+                }
+              : undefined
+          }
+          nodeId={singleSelected ? selectedDesignerNode?.id : undefined}
+          nodeHeading={
+            singleSelected && selection != null
+              ? {
+                  titleReadOnly: selection.kind === 'trigger' && (selection.trigger.kind === 'manual' || selection.trigger.kind === 'start'),
+                  title: selection.node.name ?? selectedDesignerNode?.title ?? '',
+                  icon: selectedDesignerNode != null && 'icon' in selectedDesignerNode ? selectedDesignerNode.icon : undefined,
+                  disabled: authoringDisabled,
+                  fallback: <Icon name={inspectorIcon(selection)} />,
+                  onRename: (name) => {
+                    void store.workspace.nodes.saveNodeTitle(selection.id, name)
+                  },
+                  onIconChange: (icon) => {
+                    void store.workspace.nodes.saveNodeIcon(selection.id, icon)
+                  },
+                  validate: (name) => {
+                    if (revision == null) return
+                    const graph = revision.graph()
+                    if (graph == null) return
+                    const issue = nodeNameIssue(graph, selection.id, name)
+                    return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
+                  },
+                }
+              : singleSelected && selectedDesignerNode?.kind === 'comment'
+                ? {
+                    title: selectedDesignerNode.title,
+                    disabled: authoringDisabled,
+                    fallback: <i aria-hidden="true" className="i-codicon:note" />,
+                    validate: () => undefined,
+                    onRename: (title) => {
+                      void store.workspace.saveComment(selectedDesignerNode.id, { title, content: selectedDesignerNode.content ?? '' })
+                    },
                   }
                 : undefined
-            }
-            nodeId={singleSelected ? selectedDesignerNode?.id : undefined}
-            nodeHeading={
-              singleSelected && selection != null
-                ? {
-                    titleReadOnly: selection.kind === 'trigger' && (selection.trigger.kind === 'manual' || selection.trigger.kind === 'start'),
-                    title: selection.node.name ?? selectedDesignerNode?.title ?? '',
-                    icon: selectedDesignerNode != null && 'icon' in selectedDesignerNode ? selectedDesignerNode.icon : undefined,
-                    disabled: authoringDisabled,
-                    fallback: <Icon name={inspectorIcon(selection)} />,
-                    onRename: (name) => {
-                      void store.workspace.nodes.saveNodeTitle(selection.id, name)
-                    },
-                    onIconChange: (icon) => {
-                      void store.workspace.nodes.saveNodeIcon(selection.id, icon)
-                    },
-                    validate: (name) => {
-                      if (revision == null) return
-                      const graph = revision.graph()
-                      if (graph == null) return
-                      const issue = nodeNameIssue(graph, selection.id, name)
-                      return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
-                    },
-                  }
-                : singleSelected && selectedDesignerNode?.kind === 'comment'
-                  ? {
-                      title: selectedDesignerNode.title,
-                      disabled: authoringDisabled,
-                      fallback: <i aria-hidden="true" className="i-codicon:note" />,
-                      validate: () => undefined,
-                      onRename: (title) => {
-                        void store.workspace.saveComment(selectedDesignerNode.id, { title, content: selectedDesignerNode.content ?? '' })
-                      },
-                    }
-                  : undefined
-            }
-            focusOnOpen={focusInspectorOnOpen.current}
-            icon={contextPanelIcon}
-            onClose={() => closeContextPanel(opener.current)}
-            theme={theme}
-            title={contextPanelTitle}
-          >
-            <div hidden={!flowSelected} className={flowSelected ? 'flex h-full min-h-0 flex-col' : 'hidden'}>
-              <div className="min-h-0 flex-1">
-                <FlowNodeList key={flowId ?? ''} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
-              </div>
+          }
+          focusOnOpen={focusInspectorOnOpen.current}
+          icon={contextPanelIcon}
+          onClose={() => closeContextPanel(opener.current)}
+          theme={theme}
+          title={contextPanelTitle}
+        >
+          <div hidden={!flowSelected} className={flowSelected ? 'flex h-full min-h-0 flex-col' : 'hidden'}>
+            <div className="min-h-0 flex-1">
+              <FlowNodeList key={flowId ?? ''} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
             </div>
-            {multipleSelected ? (
-              <FlowNodeList nodes={designer.nodes.filter((node) => selectedNodeIds.includes(node.id))} onSelect={selectOutlineNode} onFocusNode={focusNode} />
-            ) : flowSelected ? null : selectedDesignerNode?.kind == 'comment' ? (
-              <CommentInspector
-                key={selectedDesignerNode.id}
-                title={selectedDesignerNode.title}
-                content={selectedDesignerNode.content ?? ''}
+          </div>
+          {multipleSelected ? (
+            <FlowNodeList nodes={designer.nodes.filter((node) => selectedNodeIds.includes(node.id))} onSelect={selectOutlineNode} onFocusNode={focusNode} />
+          ) : flowSelected ? null : selectedDesignerNode?.kind == 'comment' ? (
+            <CommentInspector
+              key={selectedDesignerNode.id}
+              title={selectedDesignerNode.title}
+              content={selectedDesignerNode.content ?? ''}
+              disabled={authoringDisabled}
+              dark={theme == 'dark'}
+              onSave={(comment) => void store.workspace.saveComment(selectedDesignerNode.id, comment)}
+            />
+          ) : (
+            revision != null && (
+              <NodeInspectorContainer
+                onAddWorkflowOutputs={() => {
+                  const option = store.workspace.$.addNodeOptions.value.find((item) => item.kind === 'outputs')
+                  if (option != null) void addFromPicker(option)
+                }}
+                store={store}
+                focus={diagnosticFocus}
                 disabled={authoringDisabled}
-                dark={theme == 'dark'}
-                onSave={(comment) => void store.workspace.saveComment(selectedDesignerNode.id, comment)}
-              />
-            ) : (
-              revision != null && (
-                <NodeInspectorContainer
-                  onAddWorkflowOutputs={() => {
-                    const option = store.workspace.$.addNodeOptions.value.find((item) => item.kind === 'outputs')
-                    if (option != null) void addFromPicker(option)
-                  }}
-                  store={store}
-                  focus={diagnosticFocus}
-                  disabled={authoringDisabled}
-                  revision={revision}
-                  selection={selection}
+                revision={revision}
+                selection={selection}
 
-                  theme={theme}
-                />
-              )
-            )}
-          </EditorContextPanel>
-        )}
-        <RunDrawerContainer onOpenRuns={onOpenRuns} onClose={onCloseRuns} onConfigureConnector={onConfigureConnector} open={runDrawerOpen} store={store} />
-      </CanvasHistoryScope>
-    </NodeHistoryContext.Provider>
+                theme={theme}
+              />
+            )
+          )}
+        </EditorContextPanel>
+      )}
+      <RunDrawerContainer onOpenRuns={onOpenRuns} onClose={onCloseRuns} onConfigureConnector={onConfigureConnector} open={runDrawerOpen} store={store} />
+    </CanvasHistoryScope>
   )
 }
 

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
 import { currentFlowModelVersion } from '../../src/flow/common/change.ts'
+import { skipDuplicatesTask } from '../../src/state/common/state.ts'
 import { canvasAnnotations } from '../../src/workbench/browser/runtime/editor/canvasAnnotations.ts'
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import { useStoryActions } from './storyActions.tsx'
@@ -628,6 +629,23 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
   )
 }
 
+const skipDuplicatesModel: FlowCanvasViewModel = {
+  ...designerGraph({
+    content: {
+      modelVersion: currentFlowModelVersion,
+      modules: {},
+      document: {
+        bindings: {},
+        graph: {
+          edges: [],
+          nodes: { filter: { kind: 'task', name: 'Skip Duplicates', inputs: {}, task: skipDuplicatesTask() } },
+        },
+      },
+    },
+  }),
+  viewport: { x: 80, y: 120, zoom: 1 },
+}
+
 const responseGraph = designerGraph({
   actorId: 'lab',
   createdAt: '2026-10-21T00:00:00Z',
@@ -668,6 +686,16 @@ const responseModel: FlowCanvasViewModel = {
 }
 
 export const nodeStories: readonly FrontendStory[] = [
+  {
+    group: 'Node Skip Duplicates',
+    id: 'node-skip-duplicates',
+    title: 'Node actions',
+    description: 'Select Skip Duplicates and check that its toolbar and context menu offer no Usage action. Compare both themes and read-only mode.',
+    standalone: true,
+    render: (log, dark, language) => (
+      <NodeContentStory dark={dark} language={language} log={log} initialModel={skipDuplicatesModel} initialSelection="filter" />
+    ),
+  },
   {
     group: 'Node Webhook Response',
     id: 'node-webhook-response-states',
