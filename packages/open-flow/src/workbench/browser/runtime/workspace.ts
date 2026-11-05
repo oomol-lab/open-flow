@@ -10,10 +10,10 @@ import type {
   FlowCanvasViewTriggerNode,
 } from '../../../canvas/browser/graph/FlowCanvas/model.ts'
 import type { ConditionOperand, WorkflowCapability } from '../../../flow/common/change.ts'
-import type { ConnectorProvider, Diagnostic, Draft, GraphNode, Group, JsonValue, Run, RunDetails, RunEvent, TaskDefinition, TriggerNode } from './api.ts'
+import type { ConnectorProvider, Diagnostic, GraphNode, Group, JsonValue, Run, RunDetails, RunEvent, TaskDefinition, TriggerNode } from './api.ts'
 import type { Point, DesignerViewport } from './canvasPresentation.ts'
 import type { ConnectionCatalog, ConnectorActionView } from './connectionCatalog.ts'
-import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
+import type { ResolvedNode, ResolvedSelection, RevisionSource, RevisionView } from './revisionView.ts'
 
 import { wrapLayout } from '../../../canvas/browser/base/wrapLayout.ts'
 import { isTriggerNode } from '../../../flow/common/change.ts'
@@ -72,7 +72,7 @@ interface NodeProjectionContext {
   readonly diagnostics: readonly Diagnostic[]
   readonly nodes: ReadonlyMap<string, ResolvedSelection>
   readonly providers: Readonly<Record<string, ConnectorProvider>>
-  readonly revision: RevisionView
+  readonly revision: RevisionView<RevisionSource>
   readonly runNodes: ReadonlyMap<string, FlowCanvasViewNodeRun>
   readonly t: TFunction | undefined
 }
@@ -146,7 +146,7 @@ function edgeId(source: string, sourceHandle: string, target: string, targetHand
   return JSON.stringify([source, sourceHandle, target, targetHandle])
 }
 
-function nodePorts(node: ResolvedSelection, revision: RevisionView): NodePorts {
+function nodePorts(node: ResolvedSelection, revision: RevisionView<RevisionSource>): NodePorts {
   if (node.kind == 'trigger') {
     return { inputs: new Map(), outputs: new Map(Object.entries(triggerOutputPorts(node.trigger))) }
   }
@@ -271,11 +271,18 @@ function nodeDiagnosticCount(node: ResolvedNode, diagnostics: readonly Diagnosti
 }
 
 function runProjection(
-  revision: RevisionView,
+  revision: RevisionView<RevisionSource>,
   run: Run | RunDetails | undefined,
   events: readonly RunEvent[],
 ): { readonly nodes: ReadonlyMap<string, FlowCanvasViewNodeRun>; readonly status?: 'idle' | 'running' } {
-  if (run?.flowId != revision.revision.flowId || run.revisionId != revision.revision.revisionId) return { nodes: new Map() }
+  if (
+    run == null ||
+    revision.revision.flowId == null ||
+    revision.revision.revisionId == null ||
+    run.flowId != revision.revision.flowId ||
+    run.revisionId != revision.revision.revisionId
+  )
+    return { nodes: new Map() }
   const active = run.status == 'queued' || run.status == 'starting' || run.status == 'running' || run.status == 'waiting'
   const nodes = new Map<string, FlowCanvasViewNodeRun>()
   if ('waits' in run) for (const wait of run.waits) nodes.set(wait.nodeId, { runId: run.runId, status: 'waiting' })
@@ -456,7 +463,7 @@ function layoutNodes(
   return { depth, ordered }
 }
 
-function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts, revision: RevisionView): readonly FlowCanvasViewInput[] {
+function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts, revision: RevisionView<RevisionSource>): readonly FlowCanvasViewInput[] {
   if (isTriggerNode(node)) return []
   const inputs: FlowCanvasViewInput[] = []
   for (const [handle, definition] of ports.inputs) {
@@ -667,7 +674,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
 }
 
 export function designerGraph(
-  draft: Draft | undefined,
+  draft: RevisionSource | undefined,
   presentation: Readonly<Record<string, JsonValue>> = {},
   diagnostics: readonly Diagnostic[] = [],
   connectorActions: Readonly<Record<string, ConnectorActionView>> = {},

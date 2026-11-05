@@ -1,5 +1,7 @@
 import type { TaskNode } from '../../../flow/common/change.ts'
 import type { ManagedTaskDefinition } from '../../../flow/common/change.ts'
+import type { WorkflowFile } from '../../../flow/common/workflowFile.ts'
+import type { Draft } from './api.ts'
 
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -10,10 +12,29 @@ import { createI18n } from './i18n.ts'
 import { providerIcon } from './providerIcon.ts'
 import { designerGraph } from './workspace.ts'
 
+it('projects an exported file without server identity and retains its saved presentation', () => {
+  const file: WorkflowFile = {
+    kind: 'open-flow-workflow' as const,
+    version: 1 as const,
+    name: '文件快照',
+    content: {
+      modelVersion: currentFlowModelVersion,
+      modules: {},
+      document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual' as const, name: '开始' } } } },
+    },
+    presentation: setNodePositions({}, { start: { x: -200, y: 70 } }),
+  }
+  const before = structuredClone(file)
+  const graph = designerGraph(file, file.presentation)
+  expect(graph.nodes).toMatchObject([{ id: 'start', title: '开始', kind: 'trigger', position: { x: -200, y: 70 } }])
+  expect(graph.runStatus).toBeUndefined()
+  expect(file).toEqual(before)
+})
+
 it('wraps CLI-created chains without replacing saved node positions or execution edges', () => {
   const ids = Array.from({ length: 10 }, (_, i) => `step-${i}`)
   const edges = ids.slice(1).map((target, i) => ({ source: ids[i]!, target }))
-  const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+  const draft: Draft = {
     actorId: 'actor',
     createdAt: '2026-10-13T00:00:00Z',
     digest: 'digest',
@@ -67,7 +88,7 @@ describe('Designer port projection', () => {
         ],
       },
     }
-    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    const draft: Draft = {
       actorId: 'actor',
       createdAt: '2026-09-25T00:00:00.000Z',
       digest: 'digest',
@@ -112,7 +133,7 @@ describe('Designer port projection', () => {
   })
 
   it('ignores malformed remote edges instead of throwing', () => {
-    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    const draft: Draft = {
       actorId: 'actor',
       content: {
         document: {
@@ -153,7 +174,7 @@ describe('Designer port projection', () => {
   })
 
   it('preserves revision port order', () => {
-    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    const draft: Draft = {
       actorId: 'actor',
       content: {
         document: {
@@ -202,7 +223,7 @@ describe('Designer port projection', () => {
   })
 
   it('projects environment and node sources for compact Condition summaries', () => {
-    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    const draft: Draft = {
       actorId: 'actor',
       content: {
         document: {
@@ -265,7 +286,7 @@ describe('Designer port projection', () => {
   })
 
   it('only requires a Connection for authenticated Connector Actions', () => {
-    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    const draft: Draft = {
       actorId: 'actor',
       content: {
         document: {
@@ -351,7 +372,7 @@ describe('Designer port projection', () => {
     ['approval', ['approve', 'reject']],
     ['wait', ['continue']],
   ] as const)('projects %s notification first and active waiting state', (kind, actions) => {
-    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    const draft: Draft = {
       actorId: 'actor',
       content: {
         document: {
@@ -411,7 +432,7 @@ describe('Designer port projection', () => {
   })
 
   it('keeps trigger configuration editing outside the canvas projection', () => {
-    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    const draft: Draft = {
       actorId: 'actor',
       content: {
         document: {
@@ -531,7 +552,7 @@ describe('Designer presentation', () => {
   })
 
   it('keeps later nodes above earlier nodes regardless of their IDs', () => {
-    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    const draft: Draft = {
       actorId: 'actor',
       content: {
         document: {
@@ -563,7 +584,7 @@ describe('Designer presentation', () => {
 })
 
 describe('Canvas run records', () => {
-  const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+  const draft: Draft = {
     actorId: 'actor',
     createdAt: '2026-09-05T01:00:00Z',
     digest: 'digest',
@@ -679,7 +700,7 @@ describe('Canvas run records', () => {
 })
 
 it('projects Agent tools through the shared action summary', () => {
-  const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+  const draft: Draft = {
     actorId: 'actor',
     createdAt: '2026-09-09T00:00:00.000Z',
     digest: 'digest',
@@ -776,7 +797,7 @@ it('keeps node content visibility independent and preserves unrelated presentati
 })
 
 it('projects a deferred Provider connection as a reminder without creating an error, even before catalogs load', () => {
-  const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+  const draft: Draft = {
     actorId: 'actor',
     createdAt: '2026-10-16T00:00:00Z',
     digest: 'digest',

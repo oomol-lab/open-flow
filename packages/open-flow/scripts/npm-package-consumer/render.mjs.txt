@@ -1,0 +1,128 @@
+import assert from 'node:assert/strict'
+import { once } from 'node:events'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:http'
+import path from 'node:path'
+import { chromium } from 'playwright-core'
+import { flowToPng } from '@oomol-lab/open-flow/render'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+
+const workflow = {
+  kind: 'open-flow-workflow',
+  version: 1,
+  name: '中文工作流 · Package rendering',
+  content: {
+    modelVersion: currentFlowModelVersion,
+    modules: { code: { name: 'Code', imports: [], source: 'throw new Error("Rendering must not execute workflow code")' } },
+    document: {
+      bindings: {},
+      graph: {
+        nodes: {
+          start: { kind: 'manual', name: '开始 · Trigger' },
+          code: { kind: 'task', name: '中文短标签与很长的工作流节点名称用于检查省略行为', inputs: {}, task: { moduleId: 'code', name: '中文处理', inputs: [], outputs: [] } },
+          value: { kind: 'task', name: '结果', inputs: { text: { kind: 'value', value: '已处理' } }, task: { moduleId: 'code', name: '中文结果', inputs: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false }], outputs: [] } },
+        },
+        edges: [{ source: 'start', target: 'code' }, { source: 'code', target: 'value' }],
+      },
+    },
+  },
+  presentation: {
+    designer: {
+      version: 1,
+      flow: {
+        direction: 'horizontal',
+        nodes: { start: { x: 0, y: 0 }, code: { x: 500, y: 0 }, value: { x: 0, y: 330 }, comment: { x: 500, y: 330 } },
+        comments: { comment: { title: 'Markdown 注释', content: '### 工作流说明\n\n- **中文**、English 与 `code`\n- 回绕连线和首次图标加载' } },
+      },
+    },
+  },
+}
+const original = structuredClone(workflow)
+const browser = await chromium.launch({ executablePath: process.env.OPEN_FLOW_RENDER_BROWSER_PATH })
+const artifacts = process.env.OPEN_FLOW_RENDER_ARTIFACTS
+const results = []
+const requests = []
+const image = '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="green"/></svg>'
+const server = createServer((request, response) => {
+  requests.push(request.url)
+  response.setHeader('Access-Control-Allow-Origin', '*')
+  if (request.url.startsWith('/redirect')) {
+    response.writeHead(302, { Location: request.url.replace('/redirect', '/image') })
+    response.end()
+  } else {
+    response.writeHead(200, { 'Content-Type': 'image/svg+xml' })
+    response.end(image)
+  }
+})
+let callerPage
+async function verify(name, file, options) {
+  const result = await flowToPng(browser, file, options)
+  assert.ok(Buffer.isBuffer(result.buffer))
+  assert.equal(result.buffer.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+  assert.equal(result.buffer.readUInt32BE(16), result.width)
+  assert.equal(result.buffer.readUInt32BE(20), result.height)
+  assert.ok(Math.max(result.width, result.height) <= 16384)
+  assert.ok(result.width * result.height <= 32_000_000)
+  assert.equal(browser.isConnected(), true)
+  assert.equal(browser.contexts().length, 1)
+  assert.equal(await callerPage.title(), 'Caller-owned page')
+  results.push({ name, width: result.width, height: result.height, hasImagePlaceholders: result.hasImagePlaceholders })
+  if (artifacts) await writeFile(path.join(artifacts, `${name}.png`), result.buffer)
+  return result
+}
+try {
+  const callerContext = await browser.newContext()
+  await callerContext.route('**/*', (route) => route.abort())
+  callerPage = await callerContext.newPage()
+  await callerPage.setContent('<title>Caller-owned page</title>')
+  if (artifacts) await mkdir(artifacts, { recursive: true })
+  const light = await verify('light', workflow, { language: 'zh-CN', frame: true })
+  const dark = await verify('dark', workflow, { language: 'zh-CN', dark: true, frame: true })
+  assert.equal(light.hasImagePlaceholders, false)
+  assert.equal(dark.hasImagePlaceholders, false)
+  assert.equal(light.width, dark.width)
+  assert.equal(light.height, dark.height)
+  assert.notDeepEqual(light.buffer, dark.buffer)
+  const plain = await verify('plain', workflow)
+  assert.equal(plain.hasImagePlaceholders, false)
+  const defaults = structuredClone(workflow)
+  delete defaults.presentation
+  await verify('default-layout', defaults, { language: 'zh-CN' })
+  const broken = structuredClone(workflow)
+  broken.presentation.designer.flow.comments.comment.content += '\n\n![坏图](data:image/png;base64,invalid-image)'
+  assert.equal((await verify('placeholder', broken, { frame: true })).hasImagePlaceholders, true)
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address()
+  assert.ok(address && typeof address === 'object')
+  const origin = `http://127.0.0.1:${address.port}`
+  const remote = structuredClone(workflow)
+  remote.presentation.designer.flow.comments.comment.content = `![远程图片](${origin}/image)\n\n![重定向](${origin}/redirect)`
+  assert.equal((await verify('network-blocked', remote, { allowNetwork: false })).hasImagePlaceholders, true)
+  assert.deepEqual(requests, [])
+  assert.equal((await verify('network-bundled', workflow, { allowNetwork: false, frame: true })).hasImagePlaceholders, false)
+  assert.deepEqual(requests, [])
+  for (const allowNetwork of [undefined, true]) {
+    requests.length = 0
+    assert.equal((await verify(allowNetwork ? 'network-allowed' : 'network-default', remote, { allowNetwork })).hasImagePlaceholders, false)
+    assert.ok(requests.includes('/image'))
+    assert.ok(requests.includes('/redirect'))
+  }
+  const large = structuredClone(workflow)
+  large.content.document.graph.nodes = Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`n${index}`, { kind: 'task', name: `节点 ${index + 1}`, inputs: {}, task: { moduleId: 'code', name: 'JavaScript', inputs: [], outputs: [] } }]))
+  large.content.document.graph.edges = Array.from({ length: 49 }, (_, index) => ({ source: `n${index}`, target: `n${index + 1}` }))
+  large.presentation.designer.flow.nodes = Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`n${index}`, { x: index % 10 * 600, y: Math.floor(index / 10) * 450 }]))
+  large.presentation.designer.flow.comments = {}
+  const scaled = await verify('large', large, { frame: true })
+  assert.ok(scaled.width * scaled.height > 30_000_000)
+  await assert.rejects(() => flowToPng(browser, { ...workflow, version: 2 }))
+  assert.equal(browser.isConnected(), true)
+  assert.equal(browser.contexts().length, 1)
+  assert.deepEqual(workflow, original)
+  if (artifacts) await writeFile(path.join(artifacts, 'results.json'), JSON.stringify(results, null, 2) + '\n')
+  console.log('Verified Node PNG rendering in the provided Chromium:', JSON.stringify(results))
+} finally {
+  await browser.close()
+  server.closeAllConnections()
+  await new Promise((resolve) => server.close(resolve))
+}

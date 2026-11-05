@@ -1,3 +1,4 @@
+import type { Draft } from '../src/control/common/api.ts'
 import type { ConditionNode, JsonValue, NodeSource, RevisionContent } from '../src/flow/common/change.ts'
 
 import * as Effect from 'effect/Effect'
@@ -61,7 +62,7 @@ function fixture(value: JsonValue = { name: 'Ada', count: 2 }, schema: JsonValue
   }
 }
 function view(content: RevisionContent) {
-  return revisionView({ content, flowId: 'flow', revision: 'draft' } as unknown as Parameters<typeof revisionView>[0])
+  return revisionView({ content, flowId: 'flow', revision: 'draft' } as unknown as Draft)
 }
 async function prepared(content: RevisionContent) {
   const result = await prepareFlow(content, currentEngineContract)

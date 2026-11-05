@@ -56,6 +56,7 @@
     "./trigger-locales-plugin": "./src/build/node/triggerLocales.ts",
     "./preview": "./src/workbench/browser/runtime/openFlowPreview.tsx",
     "./preview.css": "./src/workbench/browser/runtime/preview.css",
+    "./render": "./src/render/node/index.ts",
     "./decision": "./src/decision/common/decision.ts",
     "./openapi": "./src/openapi/common/openapi.ts",
     "./skills/open-flow/SKILL.md": "./skills/open-flow/SKILL.md",
@@ -85,6 +86,14 @@
     "check:nodejs-builtins": "bun scripts/prepare-nodejs-builtins.ts --check",
     "generate:provider-triggers": "bun scripts/update-trigger-catalog.ts",
     "skill:generate": "bun scripts/generate-skill.ts"
+  },
+  "peerDependencies": {
+    "playwright-core": "^1.64.1"
+  },
+  "peerDependenciesMeta": {
+    "playwright-core": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@babel/parser": "8.0.4",
@@ -161,6 +170,7 @@
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",
     "pathe": "^2.0.3",
+    "playwright-core": "1.64.1",
     "radash": "^12.1.1",
     "react": "^18.3.1",
     "react-colorful": "^5.8.0",

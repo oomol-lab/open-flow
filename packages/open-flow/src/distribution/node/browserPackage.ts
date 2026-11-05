@@ -42,6 +42,8 @@ const uiEntryPath = 'src/distribution/browser/ui.ts'
 const uiDeclarationEntryPath = 'src/ui/browser/public.ts'
 const previewEntryPath = 'src/distribution/browser/preview.ts'
 const previewDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowPreview.tsx'
+const renderBrowserEntryPath = 'src/render/browser/runtime.ts'
+const renderNodeEntryPath = 'src/render/node/index.ts'
 const workbenchEntryPath = 'src/distribution/browser/workbench.ts'
 const workbenchDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowWorkbench.tsx'
 
@@ -114,6 +116,8 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['state/common/state', 'common/flow-state'],
   ['http/common/httpRequest', 'common/http-request'],
   ['localization/common/languages', 'common/localization'],
+  ['render/common/png', 'render/common/png'],
+  ['render/node/index', 'render/node/index'],
   ['openapi/common/openapi', 'common/openapi'],
   ['trigger/common/config', 'common/trigger-config'],
   ['trigger/common/configOptions', 'common/trigger-config-options'],
@@ -180,7 +184,50 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, browserOutputPath, previewEntryPath, 'preview', false)
   await buildRuntime(options, browserOutputPath, workbenchEntryPath, 'workbench', false)
   await copyFile(path.join(options.sourceRoot, 'src/ui/browser/theme.css'), path.join(browserOutputPath, 'theme.css'))
+  await buildRenderRuntime(options)
   await writeDeclarations(options)
+}
+
+async function buildRenderRuntime(options: BuildBrowserPackageOptions): Promise<void> {
+  await build({
+    configFile: false,
+    publicDir: false,
+    root: options.sourceRoot,
+    logLevel: options.quiet ? 'silent' : 'info',
+    css: { modules: { generateScopedName } },
+    define: { 'process.env.NODE_ENV': JSON.stringify('production'), 'process.env': '{}' },
+    plugins: [twemojiCollectionPlugin(), tailwindcss(), UnoCSS(designerUnoConfig)],
+    build: {
+      emptyOutDir: true,
+      outDir: path.join(options.packageRoot, 'dist/render/browser'),
+      lib: {
+        entry: path.join(options.sourceRoot, renderBrowserEntryPath),
+        name: 'OpenFlowRenderer',
+        formats: ['iife'],
+        fileName: () => 'runtime.js',
+        cssFileName: 'runtime',
+      },
+      minify: false,
+      license: { fileName: 'licenses.md' },
+    },
+  })
+  await build({
+    configFile: false,
+    publicDir: false,
+    root: options.sourceRoot,
+    logLevel: options.quiet ? 'silent' : 'info',
+    ssr: { noExternal: true, external: ['playwright-core'] },
+    build: {
+      ssr: path.join(options.sourceRoot, renderNodeEntryPath),
+      target: 'node20',
+      outDir: path.join(options.packageRoot, 'dist/render/node'),
+      emptyOutDir: true,
+      minify: false,
+      rolldownOptions: { output: { entryFileNames: 'index.js' } },
+      license: { fileName: 'licenses.md' },
+    },
+  })
+  await mkdir(path.join(options.packageRoot, 'dist/render/common'), { recursive: true })
 }
 
 async function buildRuntime(
@@ -311,6 +358,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions): Promise<v
         path.join(options.sourceRoot, workbenchDeclarationEntryPath),
         path.join(options.sourceRoot, previewDeclarationEntryPath),
         path.join(options.sourceRoot, uiDeclarationEntryPath),
+        path.join(options.sourceRoot, renderNodeEntryPath),
       ],
       { cwd: options.sourceRoot },
     )
