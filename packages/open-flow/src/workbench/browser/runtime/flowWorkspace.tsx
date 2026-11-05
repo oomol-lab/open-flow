@@ -514,11 +514,12 @@ export function FlowEditor({
                 />
               )}
               <WorkspacePublishIsland
-                onExportSvg={
+                onExportPng={
                   connectorAccess.access?.mode != 'selectable' || designer.nodes.length == 0
                     ? undefined
-                    : () => store.exportSvg(language, { dark: theme == 'dark', ignoredNodeIds })
+                    : (options) => store.exportPng(language, { ...options, ignoredNodeIds })
                 }
+                preferences={store.preferences}
                 onExport={() => {
                   const id = store.workspace.$.flowId.value
                   if (id != null) void store.workspace.exportFlow(id)

@@ -250,7 +250,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
               )}
               style={containerStyle}
             >
-              {modelNode?.kind === 'trigger' && <Zap aria-hidden="true" className={styles.triggerIcon} strokeWidth={1.5} />}
+              {modelNode?.kind === 'trigger' && <Zap aria-hidden="true" className={styles.triggerIcon} data-canvas-bounds strokeWidth={1.5} />}
               <div className={styles.executionHead}>
                 {card ? (
                   <NodeHeadContextMenu canvasStore={canvasStore}>{card}</NodeHeadContextMenu>

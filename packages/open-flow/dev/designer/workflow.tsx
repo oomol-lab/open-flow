@@ -1,3 +1,4 @@
+import type { FlowPngResult } from '../../src/canvas/browser/graph/FlowCanvas/exportPng.ts'
 import type { FlowCanvasViewModel, FlowCanvasViewProps } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../src/canvas/common/commands.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
@@ -13,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
-import { downloadFlowSvg, flowToSvg } from '../../src/canvas/browser/graph/FlowCanvas/exportSvg.ts'
+import { downloadFlowPng, flowToPng } from '../../src/canvas/browser/graph/FlowCanvas/exportPng.ts'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { CanvasViewControls, CanvasTopLeftControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
 import { CornerControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CornerControls.tsx'
@@ -28,6 +29,7 @@ import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 import { FlowSettingsButton } from '../../src/workbench/browser/runtime/shell/flowSettings.tsx'
+import { readPngExportFrame } from '../../src/workbench/browser/runtime/shell/pngExportPreference.ts'
 import { WorkspaceNavigationIsland } from '../../src/workbench/browser/runtime/shell/workspaceNavigationIsland.tsx'
 import { WorkspacePublishIsland } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
 import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
@@ -491,12 +493,12 @@ const edgeColors: FlowCanvasViewModel = {
 export const workflowStories: readonly FrontendStory[] = [
   {
     group: 'Workbench',
-    id: 'workflow-svg',
-    title: 'SVG export',
+    id: 'workflow-png',
+    title: 'PNG export',
     description:
-      'Compare the canvas and exported SVG. Exports use individual Provider images regardless of sprite availability; check Connector icons, JavaScript and AI Agent tool lists, branches, comments and both themes. Simulate a slow export to inspect the waiting dialog.',
+      'Choose Light or Dark from Export PNG image, independently of the canvas theme. Show frame is remembered locally; check the surrounding border and inset canvas corners in both themes. Compare trigger-marker spacing, Chinese labels, tool badges, Markdown and return lanes. Toggle failed images or the large workflow to inspect placeholders and automatic downscaling. Simulate a slow export to inspect the waiting dialog.',
     standalone: true,
-    render: (_log, dark, language) => <SvgExportStory dark={dark} language={language} />,
+    render: (_log, dark, language) => <PngExportStory dark={dark} language={language} />,
   },
   {
     group: 'Workbench',
@@ -579,65 +581,114 @@ export const workflowStories: readonly FrontendStory[] = [
   },
 ]
 
-function SvgExportStory({ dark, language }: { readonly dark: boolean; readonly language: UiLanguage }) {
+function PngExportStory({ dark, language }: { readonly dark: boolean; readonly language: UiLanguage }) {
   const [wrapped, setWrapped] = useState(false)
+  const [large, setLarge] = useState(false)
+  const [brokenImages, setBrokenImages] = useState(false)
+  const [labelKind, setLabelKind] = useState<'normal' | 'short' | 'long'>('normal')
   const [remoteIcons, setRemoteIcons] = useState(false)
   const [taskKind, setTaskKind] = useState<'connector' | 'javascript' | 'agent'>('connector')
   const [slowExport, setSlowExport] = useState(false)
-  const providerArtwork = remoteIcons
-    ? providerIcon(remoteGithubArtwork)
-    : providerIcon({ serviceId: 'google-sheets', serviceName: 'Google Sheets', icon: googleSheetsIcon })
+  const providerArtwork = brokenImages
+    ? providerIcon({ serviceId: 'unavailable', serviceName: 'Unavailable', icon: 'data:image/png;base64,broken-image' })
+    : remoteIcons
+      ? providerIcon(remoteGithubArtwork)
+      : providerIcon({ serviceId: 'google-sheets', serviceName: 'Google Sheets', icon: googleSheetsIcon })
   const i18n = useMemo(() => createI18n(language), [language])
   const model = useMemo(
     () =>
-      wrapped
-        ? longChainModel
-        : {
-            ...workflow,
-            edges: workflow.edges.map((edge) => (edge.id == 'condition-value' ? Object.assign({}, edge, { target: 'task' }) : edge)),
-            nodes: workflow.nodes.map((node) =>
-              Object.assign({}, node, {
-                title: node.kind == 'task' ? '汇总客户反馈并生成每周产品分析报告 & Review' : node.title,
-                icon:
-                  node.kind == 'task'
-                    ? taskKind == 'agent'
-                      ? ':carbon:machine-learning-model:'
-                      : providerArtwork
-                    : node.kind == 'trigger'
-                      ? remoteIcons
-                        ? providerArtwork
-                        : providerIcon({ serviceId: 'sample', serviceName: 'Sample', iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } })
-                      : 'icon' in node
-                        ? node.icon
-                        : undefined,
-                position: { x: node.position.x - 500, y: node.position.y - 180 },
-                ...(node.kind == 'task'
-                  ? {
-                      executorName:
-                        taskKind == 'agent' ? 'AI Agent' : taskKind == 'connector' ? 'Connector · ' + (remoteIcons ? 'GitHub' : 'Google Sheets') : 'JavaScript',
-                      fallbackIcon:
-                        taskKind == 'agent' ? ':carbon:machine-learning-model:' : taskKind == 'connector' ? ':carbon:connection-signal:' : ':carbon:code:',
-                      actionSummary:
-                        taskKind == 'connector'
-                          ? undefined
-                          : { count: 2, providers: [{ id: 'provider', icon: providerArtwork, label: remoteIcons ? 'GitHub' : 'Google Sheets' }] },
-                    }
-                  : {}),
-              }),
-            ),
-          },
-    [wrapped, remoteIcons, taskKind, providerArtwork],
+      large
+        ? {
+            viewport: workflowViewport,
+            nodes: Array.from({ length: 50 }, (_, index) => ({
+              id: `png-step-${index}`,
+              kind: 'task' as const,
+              title: `${index + 1} · Process records 中文`,
+              description: 'A production node in a large workflow.',
+              reference: 'lab/task',
+              executorName: 'JavaScript',
+              icon: ':carbon:code:',
+              position: { x: (index % 10) * 600, y: Math.floor(index / 10) * 280 },
+              inputs: [],
+              outputs: [],
+            })),
+            edges: Array.from({ length: 49 }, (_, index) => ({
+              id: `png-edge-${index}`,
+              source: `png-step-${index}`,
+              sourceHandle: '$out',
+              target: `png-step-${index + 1}`,
+              targetHandle: '$in',
+            })),
+          }
+        : wrapped
+          ? longChainModel
+          : {
+              ...workflow,
+              edges: workflow.edges.map((edge) => (edge.id == 'condition-value' ? Object.assign({}, edge, { target: 'task' }) : edge)),
+              nodes: workflow.nodes.map((node) =>
+                Object.assign({}, node, {
+                  title: node.kind == 'task' ? '汇总客户反馈并生成每周产品分析报告 & Review' : node.title,
+                  icon:
+                    node.kind == 'task'
+                      ? taskKind == 'agent'
+                        ? ':carbon:machine-learning-model:'
+                        : providerArtwork
+                      : node.kind == 'trigger'
+                        ? remoteIcons
+                          ? providerArtwork
+                          : providerIcon({ serviceId: 'sample', serviceName: 'Sample', iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } })
+                        : 'icon' in node
+                          ? node.icon
+                          : undefined,
+                  position: { x: node.position.x - 500, y: node.position.y - 180 },
+                  ...(node.kind == 'comment' && brokenImages
+                    ? { content: `![Unavailable sample](data:image/png;base64,broken-image)\n\n${node.content}` }
+                    : {}),
+                  ...(node.kind == 'task'
+                    ? {
+                        executorName:
+                          labelKind == 'short'
+                            ? '触发器'
+                            : labelKind == 'long'
+                              ? '这是包含工具连接和运行说明的很长的中文副标题，需要在保留工具徽章的同时正确省略'
+                              : taskKind == 'agent'
+                                ? 'AI Agent'
+                                : taskKind == 'connector'
+                                  ? 'Connector · ' + (remoteIcons ? 'GitHub' : 'Google Sheets')
+                                  : 'JavaScript',
+                        fallbackIcon:
+                          taskKind == 'agent' ? ':carbon:machine-learning-model:' : taskKind == 'connector' ? ':carbon:connection-signal:' : ':carbon:code:',
+                        actionSummary:
+                          taskKind == 'connector'
+                            ? undefined
+                            : { count: 2, providers: [{ id: 'provider', icon: providerArtwork, label: remoteIcons ? 'GitHub' : 'Google Sheets' }] },
+                      }
+                    : {}),
+                }),
+              ),
+            },
+    [large, wrapped, brokenImages, labelKind, remoteIcons, taskKind, providerArtwork],
   )
-  const title = wrapped ? 'Weekly records pipeline' : 'Customer insights'
-  const [source, setSource] = useState<string>()
+  const title = large ? 'Large workflow' : wrapped ? 'Weekly records pipeline' : 'Customer insights'
+  const [image, setImage] = useState<FlowPngResult>()
+  const [imageSrc, setImageSrc] = useState<string>()
   const [error, setError] = useState<string>()
   useEffect(() => {
+    const src = image ? URL.createObjectURL(image.blob) : undefined
+    setImageSrc(src)
+    return () => {
+      if (src) URL.revokeObjectURL(src)
+    }
+  }, [image])
+  useEffect(() => {
     let active = true
-    setSource(undefined)
+    setImage(undefined)
     setError(undefined)
-    void flowToSvg(model, title, language, { dark }).then(
+    void flowToPng(model, language, { dark, frame: readPngExportFrame(localStorage), title }).then(
       (value) => {
-        if (active) setSource(value)
+        if (active) {
+          setImage(value)
+        }
       },
       (reason) => {
         if (active) setError(String(reason))
@@ -650,6 +701,12 @@ function SvgExportStory({ dark, language }: { readonly dark: boolean; readonly l
   useStoryActions([
     { label: slowExport ? 'Use normal export speed' : 'Simulate slow export', onClick: () => setSlowExport((value) => !value) },
     { label: wrapped ? 'Show branches & Chinese titles' : 'Show wrapped pipeline', onClick: () => setWrapped((value) => !value) },
+    { label: large ? 'Show normal workflow' : 'Show large workflow', onClick: () => setLarge((value) => !value) },
+    { label: brokenImages ? 'Use working images' : 'Simulate failed images', onClick: () => setBrokenImages((value) => !value) },
+    {
+      label: labelKind == 'normal' ? 'Show short Chinese labels' : labelKind == 'short' ? 'Show long Chinese labels' : 'Show normal labels',
+      onClick: () => setLabelKind((value) => (value == 'normal' ? 'short' : value == 'short' ? 'long' : 'normal')),
+    },
     { label: remoteIcons ? 'Use local provider artwork' : 'Use remote provider artwork', onClick: () => setRemoteIcons((value) => !value) },
     {
       label: taskKind == 'connector' ? 'Show JavaScript' : taskKind == 'javascript' ? 'Show AI Agent' : 'Show Connector',
@@ -661,9 +718,11 @@ function SvgExportStory({ dark, language }: { readonly dark: boolean; readonly l
       <div style={{ display: 'grid', gap: 24, padding: 24, justifyItems: 'start', alignItems: 'start', alignContent: 'start' }}>
         <WorkspacePublishIsland
           hasPublications={false}
-          onExportSvg={async () => {
+          preferences={localStorage}
+          onExportPng={async (options) => {
             if (slowExport) await new Promise((resolve) => setTimeout(resolve, 5000))
-            await downloadFlowSvg(model, title, language, { dark })
+            const result = await downloadFlowPng(model, title, language, options)
+            setImage(result)
           }}
           onOpenPublications={() => {}}
           onOpenRuns={() => {}}
@@ -675,7 +734,7 @@ function SvgExportStory({ dark, language }: { readonly dark: boolean; readonly l
             <p>Canvas</p>
             <div style={{ height: 620 }}>
               <FlowCanvasView
-                identity={`svg-comparison:${wrapped}`}
+                identity={`png-comparison:${wrapped}`}
                 model={model}
                 dark={dark}
                 language={language}
@@ -693,14 +752,8 @@ function SvgExportStory({ dark, language }: { readonly dark: boolean; readonly l
             </div>
           </section>
           <section>
-            <p>Exported SVG</p>
-            {source && (
-              <img
-                alt={title}
-                src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`}
-                style={{ width: '100%', height: 620, objectFit: 'contain' }}
-              />
-            )}
+            <p>Exported PNG{image && ` · ${image.width} × ${image.height}${image.hasImagePlaceholders ? ' · Image placeholders' : ''}`}</p>
+            {imageSrc && <img alt={title} src={imageSrc} style={{ width: '100%', height: 620, objectFit: 'contain' }} />}
             {error && <p role="alert">{error}</p>}
           </section>
         </div>
@@ -833,7 +886,8 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
                   before={
                     <WorkspacePublishIsland
                       onExport={() => log('flow.export')}
-                      onExportSvg={async () => log('flow.exportSvg')}
+                      preferences={localStorage}
+                      onExportPng={async (options) => log('flow.exportPng', options)}
                       hasPublications={hasPublications}
                       onOpenPublications={() => log('publication.history')}
                       onOpenRuns={() => log('run.history')}

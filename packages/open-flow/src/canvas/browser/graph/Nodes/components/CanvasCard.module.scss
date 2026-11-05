@@ -298,6 +298,8 @@
   min-width: 0;
 
   > span:first-child {
+    flex: 1 1 auto;
+    max-width: max-content;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -153,6 +153,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
     connectorAccess: { $: value({}) },
     addNode: vi.fn().mockResolvedValue('new-node'),
     selectNodes: vi.fn(),
+    exportPng: vi.fn().mockResolvedValue(undefined),
     editDraftRunInputs: vi.fn().mockResolvedValue('input'),
     requestDraftRun: vi.fn().mockResolvedValue('started'),
     requestLiveRun: vi.fn().mockResolvedValue('started'),
@@ -353,12 +354,20 @@ it.each([
   expect(view.navigation.open).toHaveBeenCalledWith('publications')
 })
 
-it.each([undefined, 'implicit', 'selectable'])('exports SVG only with selectable connector access (%s)', (mode) => {
+it.each([undefined, 'implicit', 'selectable'])('exports PNG only with selectable connector access (%s)', (mode) => {
   const view = renderWorkspace()
   set(view.store.connectorAccess.$, { access: mode == null ? undefined : { mode } })
-  expect(typeof boundary.publish!.onExportSvg === 'function').toBe(mode === 'selectable')
+  expect(typeof boundary.publish!.onExportPng === 'function').toBe(mode === 'selectable')
   set(view.store.$.designer, { nodes: [], viewport: { x: 0, y: 0, zoom: 1 } })
-  expect(boundary.publish!.onExportSvg).toBeUndefined()
+  expect(boundary.publish!.onExportPng).toBeUndefined()
+})
+
+it.each([false, true])('exports the chosen PNG theme independently of the workspace (dark=%s)', async (dark) => {
+  const view = renderWorkspace()
+  set(view.store.connectorAccess.$, { access: { mode: 'selectable' } })
+  await boundary.publish!.onExportPng!({ dark, frame: true })
+  expect(view.store.exportPng).toHaveBeenCalledWith('en', { dark, frame: true, ignoredNodeIds: [] })
+  expect(boundary.publish!.preferences).toBe(view.store.preferences)
 })
 
 it('updates canvas annotations with draft and unsaved code state', () => {

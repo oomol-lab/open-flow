@@ -7,15 +7,10 @@ export interface OpenFlowLogoProps extends Omit<ComponentPropsWithoutRef<'img'>,
   readonly theme: 'light' | 'dark'
 }
 
+export function openFlowLogoSource(theme: 'light' | 'dark'): string {
+  return theme === 'dark' ? darkLogo : lightLogo
+}
+
 export function OpenFlowLogo({ theme, alt = 'Open Flow', width = 24, height = 24, style, ...props }: OpenFlowLogoProps) {
-  return (
-    <img
-      {...props}
-      src={theme === 'dark' ? darkLogo : lightLogo}
-      alt={alt}
-      width={width}
-      height={height}
-      style={{ flexShrink: 0, objectFit: 'contain', ...style }}
-    />
-  )
+  return <img {...props} src={openFlowLogoSource(theme)} alt={alt} width={width} height={height} style={{ flexShrink: 0, objectFit: 'contain', ...style }} />
 }
