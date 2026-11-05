@@ -326,6 +326,12 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(202, service.flows.retireFlow(context.get('actorId'), context.req.param('flowId')))
   })
 
+  app.get('/flows/:flowId/state/summary', (context) => {
+    query(context.req.raw, ['scope'], controlErrorCode.flowInvalid)
+    const result = response(200, service.state.summary(context.get('actorId'), context.req.param('flowId'), { scope: context.req.query('scope') }))
+    result.headers.set('Cache-Control', 'no-store')
+    return result
+  })
   app.get('/flows/:flowId/state', (context) => {
     query(context.req.raw, ['scope', 'values'], controlErrorCode.flowInvalid)
     const values = context.req.query('values')
@@ -353,6 +359,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const result = response(200, service.state.readValues(context.get('actorId'), context.req.param('flowId'), body))
     result.headers.set('Cache-Control', 'no-store')
     return result
+  })
+  app.delete('/flows/:flowId/dedupe/all', (context) => {
+    query(context.req.raw, ['scope'], controlErrorCode.flowInvalid)
+    return response(200, service.state.clearAllDedupe(context.get('actorId'), context.req.param('flowId'), { scope: context.req.query('scope') }))
   })
   app.delete('/flows/:flowId/dedupe', (context) => {
     query(context.req.raw, ['scope', 'space'], controlErrorCode.flowInvalid)

@@ -1,5 +1,5 @@
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
-import type { FlowStateView, StateScope } from '@oomol-lab/open-flow/flow-state'
+import type { FlowStateSummary, FlowStateView, StateScope } from '@oomol-lab/open-flow/flow-state'
 import type { DatabaseSync } from 'node:sqlite'
 
 import { StateError, stateReadLimits } from '@oomol-lab/open-flow/flow-state'
@@ -217,35 +217,65 @@ export class StateStore {
     })
   }
 
+  clearAvailableSpaces(flowId: string, scope: StateScope): boolean {
+    return this.transaction(() => {
+      const available = `flow_id = ? AND scope = ? AND NOT EXISTS (
+        SELECT 1 FROM flow_dedupe_pending p WHERE p.flow_id = flow_dedupe_spaces.flow_id
+          AND p.scope = flow_dedupe_spaces.scope AND p.space = flow_dedupe_spaces.space
+      )`
+      const hasAvailable = this.database.prepare(`SELECT 1 FROM flow_dedupe_spaces WHERE ${available} LIMIT 1`).get(flowId, scope) != null
+      const hasPending = this.database.prepare('SELECT 1 FROM flow_dedupe_pending WHERE flow_id = ? AND scope = ? LIMIT 1').get(flowId, scope) != null
+      if (!hasAvailable && hasPending) return false
+      this.database
+        .prepare(`DELETE FROM flow_dedupe_identities WHERE flow_id = ? AND scope = ? AND space IN (
+        SELECT space FROM flow_dedupe_spaces WHERE ${available}
+      )`)
+        .run(flowId, scope, flowId, scope)
+      this.database.prepare(`DELETE FROM flow_dedupe_spaces WHERE ${available}`).run(flowId, scope)
+      return true
+    })
+  }
+
   view(flowId: string, scope: StateScope): FlowStateView {
     const values = this.database
       .prepare('SELECT key, size, updated_at FROM flow_state_values WHERE flow_id = ? AND scope = ? ORDER BY key')
       .all(flowId, scope) as { key: string; size: number; updated_at: number }[]
+    return {
+      version: 1,
+      scope,
+      limits: this.limits,
+      values: values.map((row) => ({ key: row.key, size: row.size, updatedAt: row.updated_at })),
+      spaces: this.#spaces(flowId, scope),
+    }
+  }
+
+  summary(flowId: string, scope: StateScope): FlowStateSummary {
+    const values = this.database
+      .prepare('SELECT COUNT(*) AS count, MAX(updated_at) AS updatedAt FROM flow_state_values WHERE flow_id = ? AND scope = ?')
+      .get(flowId, scope) as FlowStateSummary['values']
+    return { version: 1, scope, limits: this.limits, values, spaces: this.#spaces(flowId, scope) }
+  }
+
+  #spaces(flowId: string, scope: StateScope): FlowStateView['spaces'] {
     const spaces = this.database
       .prepare(`SELECT space, MAX(count) AS count, MAX(updated_at) AS updated_at FROM (
       SELECT space, count, updated_at FROM flow_dedupe_spaces WHERE flow_id = ? AND scope = ?
       UNION ALL SELECT space, 0 AS count, recorded_at AS updated_at FROM flow_dedupe_pending WHERE flow_id = ? AND scope = ?
     ) GROUP BY space ORDER BY space`)
       .all(flowId, scope, flowId, scope) as SpaceRow[]
-    return {
-      version: 1,
-      scope,
-      limits: this.limits,
-      values: values.map((row) => ({ key: row.key, size: row.size, updatedAt: row.updated_at })),
-      spaces: spaces.map((row) => {
-        const pending = this.database
-          .prepare(`SELECT COUNT(DISTINCT identity) AS count, COUNT(DISTINCT CASE WHEN NOT EXISTS (
+    return spaces.map((row) => {
+      const pending = this.database
+        .prepare(`SELECT COUNT(DISTINCT identity) AS count, COUNT(DISTINCT CASE WHEN NOT EXISTS (
             SELECT 1 FROM flow_dedupe_identities i WHERE i.flow_id = p.flow_id AND i.scope = p.scope AND i.space = p.space AND i.identity = p.identity
           ) THEN identity END) AS additional FROM flow_dedupe_pending p WHERE flow_id = ? AND scope = ? AND space = ?`)
-          .get(flowId, scope, row.space) as { count: number; additional: number }
-        return {
-          space: row.space,
-          count: row.count,
-          pendingCount: pending.count,
-          reservedCount: row.count + pending.additional,
-          updatedAt: row.updated_at,
-        }
-      }),
-    }
+        .get(flowId, scope, row.space) as { count: number; additional: number }
+      return {
+        space: row.space,
+        count: row.count,
+        pendingCount: pending.count,
+        reservedCount: row.count + pending.additional,
+        updatedAt: row.updated_at,
+      }
+    })
   }
 }

@@ -1,8 +1,8 @@
 import type { CanvasCommand } from '../../canvas/common/commands.ts'
-import type { FlowStateValues, FlowStateView, StateScope } from '../../state/common/state.ts'
+import type { FlowStateSummary, FlowStateValues, FlowStateView, StateScope } from '../../state/common/state.ts'
 
 import { currentEngineContract } from '../../runtime/common/engineContract.ts'
-import { flowStateValuesSchema, flowStateViewSchema } from '../../state/common/state.ts'
+import { flowStateSummarySchema, flowStateValuesSchema, flowStateViewSchema } from '../../state/common/state.ts'
 import { workflowContractSchema, workflowReferencesSchema } from '../../workflow/common/workflow.ts'
 export type { CanvasCommand, CanvasCommandSubscriber } from '../../canvas/common/commands.ts'
 import type { LiveDetails } from './liveDetails.ts'
@@ -1022,6 +1022,11 @@ export class ControlClient {
     return result.success && result.data.scope === scope ? result.data : invalidResponse()
   }
 
+  async getFlowStateSummary(flowId: string, scope: StateScope, signal?: AbortSignal): Promise<FlowStateSummary> {
+    const result = flowStateSummarySchema.safeParse(await this.request(`/v1/flows/${segment(flowId)}/state/summary?scope=${scope}`, { signal }))
+    return result.success && result.data.scope === scope ? result.data : invalidResponse()
+  }
+
   async getFlowStateValues(flowId: string, scope: StateScope, keys: readonly string[], signal?: AbortSignal): Promise<FlowStateValues> {
     const result = flowStateValuesSchema.safeParse(
       await this.request(`/v1/flows/${segment(flowId)}/state/read`, { method: 'POST', body: JSON.stringify({ version: 1, scope, keys }), signal }),
@@ -1043,6 +1048,11 @@ export class ControlClient {
 
   async clearFlowDedupe(flowId: string, scope: StateScope, space: string): Promise<void> {
     const source = record(await this.request(`/v1/flows/${segment(flowId)}/dedupe?scope=${scope}&space=${encodeURIComponent(space)}`, { method: 'DELETE' }))
+    if (source.version !== 1 || source.cleared !== true) invalidResponse()
+  }
+
+  async clearAllFlowDedupe(flowId: string, scope: StateScope): Promise<void> {
+    const source = record(await this.request(`/v1/flows/${segment(flowId)}/dedupe/all?scope=${scope}`, { method: 'DELETE' }))
     if (source.version !== 1 || source.cleared !== true) invalidResponse()
   }
 

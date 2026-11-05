@@ -470,7 +470,8 @@ export function FlowEditor({
             key={`${flowId}:${stateTarget.history?.nodeId ?? 'all'}`}
             client={store.state}
             flowId={flowId}
-            nodeIds={designer.nodes.map((node) => node.id)}
+            nodes={designer.nodes}
+            notify={store.workspace.notify}
             history={stateTarget.history}
             onClose={() => setStateTarget(undefined)}
           />

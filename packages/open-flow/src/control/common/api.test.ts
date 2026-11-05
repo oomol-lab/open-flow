@@ -948,3 +948,46 @@ describe('Flow tags', () => {
     }
   })
 })
+
+describe('ControlClient Flow State summary', () => {
+  const summary = {
+    version: 1,
+    scope: 'draft',
+    limits: { maxValues: 17, maxValueBytes: 65536, maxSpaces: 100, maxIdentities: 42, maxRunWrites: 1000 },
+    values: { count: 0, updatedAt: null },
+    spaces: [],
+  }
+  it('encodes the Flow ID, forwards cancellation and decodes effective aggregate quotas', async () => {
+    const request = vi.fn(async (_url: string, _init?: RequestInit) => Response.json(summary))
+    const controller = new AbortController()
+    await expect(new ControlClient(request).getFlowStateSummary('flow/1', 'draft', controller.signal)).resolves.toEqual(summary)
+    expect(request).toHaveBeenCalledWith('/v1/flows/flow%2F1/state/summary?scope=draft', expect.objectContaining({ signal: controller.signal }))
+  })
+  it.each([
+    { ...summary, scope: 'live' },
+    { ...summary, values: [] },
+    { ...summary, values: { count: -1, updatedAt: null } },
+    { ...summary, values: { count: 0 } },
+    { ...summary, values: { count: 0, updatedAt: null, value: 'private' } },
+  ])('rejects malformed or wrong-scope summary responses', async (response) => {
+    await expect(new ControlClient(async () => Response.json(response)).getFlowStateSummary('flow', 'draft')).rejects.toMatchObject({
+      code: 'response.invalid',
+    })
+  })
+})
+
+describe('ControlClient available history clearing', () => {
+  it('uses an explicit whole-history endpoint without changing per-source clearing', async () => {
+    const request = vi.fn(async (_url: string, _init?: RequestInit) => Response.json({ version: 1, cleared: true }))
+    const client = new ControlClient(request)
+    await client.clearAllFlowDedupe('flow/1', 'live')
+    expect(request).toHaveBeenLastCalledWith('/v1/flows/flow%2F1/dedupe/all?scope=live', expect.objectContaining({ method: 'DELETE' }))
+    await client.clearFlowDedupe('flow/1', 'draft', 'node:filter')
+    expect(request).toHaveBeenLastCalledWith('/v1/flows/flow%2F1/dedupe?scope=draft&space=node%3Afilter', expect.objectContaining({ method: 'DELETE' }))
+  })
+  it('rejects an invalid clear acknowledgement', async () => {
+    await expect(new ControlClient(async () => Response.json({ version: 1, cleared: false })).clearAllFlowDedupe('flow', 'draft')).rejects.toMatchObject({
+      code: 'response.invalid',
+    })
+  })
+})
