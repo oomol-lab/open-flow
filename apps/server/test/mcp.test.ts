@@ -25,6 +25,36 @@ const token = 'mcp-test-operator-token-000000000001'
 const version = '2026-07-28'
 const start = { kind: 'graph.node.create', nodeId: 'start', node: { inputDefs: [], kind: 'start', name: 'Start' } }
 
+it('shares workflow bundles through MCP and applies selected tags to every imported member', async () => {
+  const { call, control, service } = await fixture()
+  const child = await control.createFlow('Child')
+  const root = await control.createFlow('Root')
+  await service.control.drafts.changeDraft('operator', root.flowId, root.draftRevisionId, [
+    {
+      kind: 'graph.node.create',
+      nodeId: 'call',
+      node: {
+        kind: 'task',
+        name: 'Call',
+        inputs: {},
+        task: { name: 'Call', inputs: [], outputs: [], executor: { kind: 'workflow', flowId: child.flowId, revisionId: '' } },
+      },
+    },
+  ])
+  const bundle = await call('flow_export', { flowId: root.flowId, includeDependencies: true })
+  expect(bundle).toMatchObject({ kind: 'open-flow-workflow-bundle', entryFlowId: root.flowId, workflows: expect.any(Array) })
+  const tag = await control.createTag('Imported bundle')
+  const result = (await call('flow_import', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })) as {
+    flows: { flowId: string; tagIds: string[] }[]
+  }
+  expect(result.flows).toHaveLength(2)
+  for (const flow of result.flows) {
+    expect(flow.tagIds).toEqual([tag.tagId])
+    expect([root.flowId, child.flowId]).not.toContain(flow.flowId)
+  }
+  expect(await call('flow_import', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })).toEqual(result)
+})
+
 it('broadcasts REST and MCP canvas commands to every subscriber of only the authorized Flow', async () => {
   const { call, control, service, app, client } = await fixture()
   const flow = await control.createFlow('Canvas')

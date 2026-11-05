@@ -1810,5 +1810,13 @@
     "loadFailed": "Unable to load",
     "valuesHelp": "{{name}}: Content explicitly saved by the workflow, available to later runs.",
     "historyHelp": "{{name}}: Item identifiers used to avoid processing duplicates."
+  },
+  "workflowTransfer": {
+    "includeDependencies": "Include referenced workflows",
+    "workflowCount": "Workflows ({{count}})",
+    "unavailable": "Unavailable workflows: {{count}}.",
+    "export": "Export",
+    "hostUnsupported": "This host does not support workflow bundle imports yet.",
+    "unnamed": "Untitled workflow"
   }
 }

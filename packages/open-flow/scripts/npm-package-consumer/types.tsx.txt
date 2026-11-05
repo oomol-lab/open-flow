@@ -1,3 +1,5 @@
+import type { WorkflowBundle, WorkflowExportPreview } from '@oomol-lab/open-flow/flow-encoding'
+import type { WorkflowBundleImportResult } from '@oomol-lab/open-flow/control-api'
 import type { HttpRequestExecutor } from '@oomol-lab/open-flow/http-request'
 import type { WorkflowContract, WorkflowExecutor } from '@oomol-lab/open-flow/workflow'
 import type { CanvasCommand, CanvasBroadcast } from '@oomol-lab/open-flow/control-api'
@@ -178,6 +180,11 @@ const portable = decodeWorkflowFile({
   content: { modelVersion: 6, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] } } },
 })
 void encodeWorkflowFile(cleanWorkflowFile(portable).file)
+const bundle: WorkflowBundle = { kind: 'open-flow-workflow-bundle', version: 1, entryFlowId: 'root', workflows: [{ flowId: 'root', file: portable }] }
+const bundleClient = new ControlClient(async () => Response.json({}))
+export const bundlePreview: Promise<WorkflowExportPreview> = bundleClient.getFlowExportPreview('root')
+export const bundleImport: Promise<WorkflowBundleImportResult> = bundleClient.importFlowBundle(bundle, { tagIds: ['tag'] })
+
 const argumentsResult = mcpTools.flow_read.inputSchema['~standard'].validate({ flowId: 'test' })
 if ('value' in argumentsResult) {
   const flowId: string = argumentsResult.value.flowId

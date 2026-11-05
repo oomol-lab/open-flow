@@ -93,6 +93,21 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(created.created ? 201 : 200, created.flow)
   })
 
+  app.post('/flows/import-bundle', async (context) => {
+    query(context.req.raw, [], controlErrorCode.flowInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.importFlow)
+    const { created, ...result } = await service.flows.importBundle(
+      context.get('actorId'),
+      body.file,
+      idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
+      body.name,
+      body.teamId,
+      undefined,
+      body.tagIds,
+    )
+    return response(created ? 201 : 200, result)
+  })
+
   // Preserve authorization error precedence before decoding request bodies.
   // Each application operation also enforces access independently of this precheck.
   for (const route of ['/flows/:flowId', '/flows/:flowId/*', '/runs/:runId', '/runs/:runId/*']) {
@@ -297,6 +312,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return new Response(encodeWorkflowFile(service.flows.exportFlow(context.get('actorId'), context.req.param('flowId'))), {
       headers: { 'content-type': 'application/json; charset=utf-8' },
     })
+  })
+  app.get('/flows/:flowId/export-preview', (context) => {
+    query(context.req.raw, [], controlErrorCode.flowInvalid)
+    return response(200, service.flows.getExportPreview(context.get('actorId'), context.req.param('flowId')))
   })
   app.get('/flows/:flowId', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)

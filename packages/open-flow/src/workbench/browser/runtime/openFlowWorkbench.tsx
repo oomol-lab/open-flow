@@ -1,5 +1,6 @@
 import type { FlowCreationOptions } from '../../../control/common/api.ts'
 import type { WorkflowFile } from '../../../flow/common/workflowFile.ts'
+import type { WorkflowBundleImporter } from './contract.ts'
 
 import { IconThemeContext } from '../../../ui/browser/icons/iconTheme.ts'
 export { EventSourcesPage } from './eventSources.tsx'
@@ -135,6 +136,7 @@ function FlowNameBridge({ store, onChange }: { readonly store: WorkbenchStore; r
 interface WorkbenchProps {
   readonly importRef: Ref<OpenFlowWorkbenchHandle> | undefined
   readonly catalogWidth?: OpenFlowWorkbenchProps['catalogWidth']
+  readonly importFlowBundle?: OpenFlowWorkbenchProps['importFlowBundle']
   readonly importFlow?: OpenFlowWorkbenchProps['importFlow']
   readonly createFlow?: OpenFlowWorkbenchProps['createFlow']
   readonly createFlowDisabled?: boolean | undefined
@@ -158,6 +160,7 @@ function Workbench({
   catalogWidth,
   createFlow,
   importFlow,
+  importFlowBundle,
   createFlowDisabled,
   createFlowField,
   connectionHref,
@@ -185,6 +188,11 @@ function Workbench({
           language={language}
           onCreateFlow={(name, tagIds) => navigation.createFlow(name, createFlow, tagIds)}
           onImportFlow={(file, name, key, tagIds) => navigation.importFlow(file, name, key, importFlow, tagIds)}
+          onImportFlowBundle={
+            importFlow != null && importFlowBundle == null
+              ? undefined
+              : (file, name, key, tagIds) => navigation.importFlowBundle(file, name, key, importFlowBundle, tagIds)
+          }
           onLanguageChange={onLanguageChange}
           onSelectFlow={(flow, view) => void navigation.selectFlow(flow, view)}
           store={store}
@@ -233,6 +241,7 @@ export {
 export interface OpenFlowWorkbenchProps {
   /** Embedded catalogs fill a host-owned page without adding width limits or page padding. */
   readonly catalogWidth?: 'default' | 'full' | 'embedded' | undefined
+  readonly importFlowBundle?: WorkflowBundleImporter | undefined
   readonly importFlow?:
     | ((file: WorkflowFile, name: string, idempotencyKey: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>)
     | undefined
@@ -287,6 +296,7 @@ const Session = forwardRef<OpenFlowWorkbenchHandle, SessionProps>(function Sessi
     catalogWidth,
     createFlow,
     importFlow,
+    importFlowBundle,
     createFlowDisabled,
     createFlowField,
     connectionHref,
@@ -370,6 +380,7 @@ const Session = forwardRef<OpenFlowWorkbenchHandle, SessionProps>(function Sessi
               catalogWidth={catalogWidth}
               createFlow={createFlow}
               importFlow={importFlow}
+              importFlowBundle={importFlowBundle}
               createFlowDisabled={createFlowDisabled}
               createFlowField={createFlowField}
               connectionHref={connectionHref}

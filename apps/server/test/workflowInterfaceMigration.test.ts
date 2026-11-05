@@ -83,7 +83,7 @@ async function fixture() {
   function closeLegacy() {
     restoreGroupedServiceSettings(database.connection)
     database.connection.exec(
-      "UPDATE publish_operations SET input_json = json_remove(input_json, '$.interface'); ALTER TABLE publications DROP COLUMN interface_json; ALTER TABLE runs DROP COLUMN initiator_actor_id; ALTER TABLE runs DROP COLUMN initiator_channel; DROP TABLE flow_tags; DROP TABLE tags; DROP INDEX wait_auto_continue_due; ALTER TABLE wait_receipts DROP COLUMN auto_continue_at; ALTER TABLE wait_receipts DROP COLUMN resolution_source; DROP TABLE flow_dedupe_pending; DROP TABLE flow_state_values; DROP TABLE flow_dedupe_identities; DROP TABLE flow_dedupe_spaces; ALTER TABLE runs DROP COLUMN state_writes; DROP TABLE run_artifacts; DROP TABLE webhook_responses; DROP TABLE event_source_apps; DROP TABLE source_event_versions; DROP TABLE event_source_namespace; ALTER TABLE event_sources DROP COLUMN connector_json; ALTER TABLE event_sources DROP COLUMN pending_json; PRAGMA user_version = 48;",
+      "UPDATE publish_operations SET input_json = json_remove(input_json, '$.interface'); ALTER TABLE publications DROP COLUMN interface_json; ALTER TABLE runs DROP COLUMN initiator_actor_id; ALTER TABLE runs DROP COLUMN initiator_channel; DROP TABLE flow_tags; DROP TABLE tags; DROP INDEX wait_auto_continue_due; ALTER TABLE wait_receipts DROP COLUMN auto_continue_at; ALTER TABLE wait_receipts DROP COLUMN resolution_source; DROP TABLE flow_dedupe_pending; DROP TABLE flow_state_values; DROP TABLE flow_dedupe_identities; DROP TABLE flow_dedupe_spaces; ALTER TABLE runs DROP COLUMN state_writes; DROP TABLE run_artifacts; DROP TABLE webhook_responses; DROP TABLE event_source_apps; DROP TABLE source_event_versions; DROP TABLE event_source_namespace; ALTER TABLE event_sources DROP COLUMN connector_json; ALTER TABLE event_sources DROP COLUMN pending_json; DROP TABLE workflow_bundle_imports; PRAGMA user_version = 48;",
     )
     database.close()
   }
@@ -178,7 +178,7 @@ it('upgrades full and delta Revisions, preserves identities and Live history, an
   })
   await closeService(service)
   const reopened = Database.open(file)
-  expect(reopened.connection.prepare('PRAGMA user_version').get()).toEqual({ user_version: 61 })
+  expect(reopened.connection.prepare('PRAGMA user_version').get()).toEqual({ user_version: 62 })
   reopened.close()
 })
 

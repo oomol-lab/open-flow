@@ -10,6 +10,22 @@ import { normalizeFlowQuery } from '@oomol-lab/open-flow/control-api'
 import { revisionResourceReferences } from './flow-resources.ts'
 import { requireErrorSources } from './trigger-store.ts'
 
+export interface FlowCreation {
+  readonly actorId: string
+  readonly tagIds?: readonly string[]
+  readonly connectorTeamId?: string
+  readonly content: string
+  readonly createdAt: number
+  readonly digest: string
+  readonly flowId: string
+  readonly idempotencyKey: string
+  readonly modelVersion: number
+  readonly name: string
+  readonly requestDigest: string
+  readonly presentation?: Readonly<Record<string, JsonValue>>
+  readonly revisionId: string
+}
+
 export interface StoredFlow {
   readonly tagIds: string
   readonly liveEnabled: number | null
@@ -119,59 +135,74 @@ export class FlowStore {
     return { created: false, flow: existing }
   }
 
-  createFlow(input: {
-    readonly actorId: string
-    readonly tagIds?: readonly string[]
-    readonly connectorTeamId?: string
-    readonly content: string
-    readonly createdAt: number
-    readonly digest: string
-    readonly flowId: string
-    readonly idempotencyKey: string
-    readonly modelVersion: number
-    readonly name: string
-    readonly requestDigest: string
-    readonly presentation?: Readonly<Record<string, JsonValue>>
-    readonly revisionId: string
-  }): { readonly created: boolean; readonly flow: StoredFlow } | { readonly kind: 'conflict' } {
+  createFlow(input: FlowCreation): { readonly created: boolean; readonly flow: StoredFlow } | { readonly kind: 'conflict' } {
     return this.#transaction(() => {
-      const idempotencyKey = JSON.stringify([input.actorId, input.idempotencyKey])
       const replay = this.replayCreation(input.actorId, input.idempotencyKey, input.requestDigest)
       if (replay != null) return replay
-
-      const resources = revisionResourceReferences(input.content)
-      this.#revisions.ensure({ content: input.content, revisionDigest: input.digest, revisionId: input.revisionId })
-      this.#database
-        .prepare(
-          'INSERT INTO flow_revisions (revision_id, flow_id, parent_revision_id, actor_id, created_at, digest, model_version) VALUES (?, ?, NULL, ?, ?, ?, ?)',
-        )
-        .run(input.revisionId, input.flowId, input.actorId, input.createdAt, input.digest, input.modelVersion)
-      this.#database
-        .prepare(
-          `INSERT INTO flows (
-             flow_id, name, status, draft_revision_id, create_idempotency_key,
-             create_request_digest, created_at, updated_at, owner_id, draft_resource_references
-           ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          input.flowId,
-          input.name,
-          input.revisionId,
-          idempotencyKey,
-          input.requestDigest,
-          input.createdAt,
-          input.createdAt,
-          input.actorId,
-          resources == null ? null : JSON.stringify(resources),
-        )
-      this.#database
-        .prepare('INSERT INTO flow_presentations (flow_id, revision, value, updated_at) VALUES (?, 1, ?, ?)')
-        .run(input.flowId, JSON.stringify(input.presentation ?? {}), input.createdAt)
-      this.#references.replaceResources(input.actorId, input.flowId, 'draft', resources)
-      this.#database.prepare('INSERT INTO flow_connector_teams (flow_id, team_id) VALUES (?, ?)').run(input.flowId, input.connectorTeamId ?? null)
-      this.#tags.replace(input.actorId, input.flowId, input.tagIds ?? [])
-      return { created: true, flow: this.get(input.flowId)! }
+      return { created: true, flow: this.#insertFlow(input, JSON.stringify([input.actorId, input.idempotencyKey])) }
     })
+  }
+
+  replayBundleImport(actorId: string, idempotencyKey: string, requestDigest: string) {
+    const receipt = this.#database
+      .prepare(
+        'SELECT request_digest AS requestDigest, entry_flow_id AS entryFlowId, flow_ids AS flowIds FROM workflow_bundle_imports WHERE owner_id = ? AND idempotency_key = ?',
+      )
+      .get(actorId, idempotencyKey) as { requestDigest: string; entryFlowId: string; flowIds: string } | undefined
+    if (receipt == null) return
+    if (receipt.requestDigest != requestDigest) return { kind: 'conflict' as const }
+    const ids = JSON.parse(receipt.flowIds) as string[]
+    const flows = ids.map((id) => this.get(id))
+    if (flows.some((item) => item == null || item.ownerId != actorId || item.status != 'active')) return { kind: 'conflict' as const }
+    const stored = flows as StoredFlow[]
+    return { created: false, flow: stored.find((item) => item.flowId == receipt.entryFlowId)!, flows: stored }
+  }
+
+  importBundle(actorId: string, idempotencyKey: string, requestDigest: string, entryFlowId: string, inputs: readonly FlowCreation[]) {
+    return this.#transaction(() => {
+      const replay = this.replayBundleImport(actorId, idempotencyKey, requestDigest)
+      if (replay != null) return replay
+      const flows = inputs.map((input) => this.#insertFlow(input, JSON.stringify([actorId, 'bundle', idempotencyKey, input.flowId])))
+      this.#database
+        .prepare('INSERT INTO workflow_bundle_imports (owner_id, idempotency_key, request_digest, entry_flow_id, flow_ids) VALUES (?, ?, ?, ?, ?)')
+        .run(actorId, idempotencyKey, requestDigest, entryFlowId, JSON.stringify(flows.map((item) => item.flowId)))
+      return { created: true, flow: flows.find((item) => item.flowId == entryFlowId)!, flows }
+    })
+  }
+
+  #insertFlow(input: FlowCreation, idempotencyKey: string): StoredFlow {
+    const resources = revisionResourceReferences(input.content)
+    this.#revisions.ensure({ content: input.content, revisionDigest: input.digest, revisionId: input.revisionId })
+    this.#database
+      .prepare(
+        'INSERT INTO flow_revisions (revision_id, flow_id, parent_revision_id, actor_id, created_at, digest, model_version) VALUES (?, ?, NULL, ?, ?, ?, ?)',
+      )
+      .run(input.revisionId, input.flowId, input.actorId, input.createdAt, input.digest, input.modelVersion)
+    this.#database
+      .prepare(
+        `INSERT INTO flows (
+           flow_id, name, status, draft_revision_id, create_idempotency_key,
+           create_request_digest, created_at, updated_at, owner_id, draft_resource_references
+         ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.flowId,
+        input.name,
+        input.revisionId,
+        idempotencyKey,
+        input.requestDigest,
+        input.createdAt,
+        input.createdAt,
+        input.actorId,
+        resources == null ? null : JSON.stringify(resources),
+      )
+    this.#database
+      .prepare('INSERT INTO flow_presentations (flow_id, revision, value, updated_at) VALUES (?, 1, ?, ?)')
+      .run(input.flowId, JSON.stringify(input.presentation ?? {}), input.createdAt)
+    this.#references.replaceResources(input.actorId, input.flowId, 'draft', resources)
+    this.#database.prepare('INSERT INTO flow_connector_teams (flow_id, team_id) VALUES (?, ?)').run(input.flowId, input.connectorTeamId ?? null)
+    this.#tags.replace(input.actorId, input.flowId, input.tagIds ?? [])
+    return this.get(input.flowId)!
   }
 
   get(flowId: string): StoredFlow | undefined {

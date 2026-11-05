@@ -1810,5 +1810,13 @@
     "loadFailed": "読み込みに失敗しました",
     "valuesHelp": "{{name}}：フローが明示的に保存し、後続の実行で読み取れる内容です。",
     "historyHelp": "{{name}}：同じ項目を繰り返し処理しないための識別情報です。"
+  },
+  "workflowTransfer": {
+    "includeDependencies": "参照先のワークフローを含める",
+    "workflowCount": "ワークフロー（{{count}} 件）",
+    "unavailable": "参照先のワークフロー {{count}} 件を利用できません。",
+    "export": "エクスポート",
+    "hostUnsupported": "このホストはワークフローバンドルのインポートにまだ対応していません。",
+    "unnamed": "無題のワークフロー"
   }
 }

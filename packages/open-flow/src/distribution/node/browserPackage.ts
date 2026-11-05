@@ -109,6 +109,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['flow/common/semantics', 'common/flow-semantics'],
   ['flow/common/webhookMethod', 'common/webhook-method'],
   ['flow/common/webhookResponse', 'common/webhook-response'],
+  ['flow/common/workflowBundle', 'common/flow-workflowBundle'],
   ['flow/common/workflowFile', 'common/flow-workflowFile'],
   ['flow/common/workflowReferences', 'common/flow-workflowReferences'],
   ['http/common/hosts', 'common/http-hosts'],

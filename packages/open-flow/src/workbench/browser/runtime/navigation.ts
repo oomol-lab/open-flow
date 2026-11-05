@@ -1,7 +1,9 @@
 import type { ReadonlyVal } from 'value-enhancer'
+import type { WorkflowBundle } from '../../../flow/common/workflowBundle.ts'
 import type { WorkflowFile } from '../../../flow/common/workflowFile.ts'
 import type { FlowCreationOptions } from './api.ts'
 import type { Flow } from './api.ts'
+import type { WorkflowBundleImporter } from './contract.ts'
 import type { WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchView } from './contract.ts'
 import type { WorkbenchStore } from './stores/workbenchStore.ts'
 
@@ -71,6 +73,16 @@ export class NavigationStore {
     tagIds?: readonly string[],
   ): Promise<boolean> {
     return await this.#openNewFlow(() => this.#store.importFlow(file, name, key, importer, tagIds))
+  }
+
+  public async importFlowBundle(
+    file: WorkflowBundle,
+    name: string,
+    key: string,
+    importer?: WorkflowBundleImporter,
+    tagIds?: readonly string[],
+  ): Promise<boolean> {
+    return await this.#openNewFlow(() => this.#store.importFlowBundle(file, name, key, importer, tagIds))
   }
 
   public async createFlow(

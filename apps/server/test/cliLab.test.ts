@@ -49,6 +49,26 @@ async function cli(lab: LabSession, args: string[], stdin?: string, registered =
   return { record, stdout, stderr }
 }
 describe('CLI Lab', () => {
+  it.each(['workflow-call', 'workflow-tools'])('bundles %s through production CLI and imports every member with one tag', async (id) => {
+    const lab = await fixture(id)
+    await reference(driver(lab, 'cli'), id, lab.manifest.flowId)
+    expect(await lab.verify()).toMatchObject({ passed: true })
+    const exported = await cli(lab, ['export', lab.manifest.flowId, '--include-dependencies'])
+    expect(exported.record.exitCode, exported.stderr).toBe(0)
+    const bundle = JSON.parse(exported.stdout) as { kind: string; workflows: { flowId: string }[] }
+    expect(bundle.kind).toBe('open-flow-workflow-bundle')
+    expect(bundle.workflows.length).toBeGreaterThan(1)
+    const tag = lab.service.control.tags.saveTag('operator', 'Imported workflows')
+    const imported = await cli(lab, ['import', '--file', '-', '--tag', tag.tagId, '--idempotency-key', 'bundle-roundtrip', '--json'], exported.stdout)
+    expect(imported.record.exitCode, imported.stderr).toBe(0)
+    const result = JSON.parse(imported.stdout) as { flows: { flowId: string; tagIds: string[] }[] }
+    expect(result.flows).toHaveLength(bundle.workflows.length)
+    for (const flow of result.flows) {
+      expect(bundle.workflows.some((old) => old.flowId == flow.flowId)).toBe(false)
+      expect(flow.tagIds).toEqual([tag.tagId])
+    }
+  })
+
   it.each([
     { connector: false, model: false },
     { connector: true, model: false },

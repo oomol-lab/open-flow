@@ -55,10 +55,13 @@ export {
   type ResultQuery,
 } from './results.ts'
 import type { RunStatus } from '../../execution/common/runLifecycle.ts'
+import type { WorkflowBundle, WorkflowExportPreview } from '../../flow/common/workflowBundle.ts'
 import type { WorkflowFile } from '../../flow/common/workflowFile.ts'
 
+import { decodeWorkflowExportPreview, workflowBundleFromPreview } from '../../flow/common/workflowBundle.ts'
 import { decodeWorkflowFile } from '../../flow/common/workflowFile.ts'
 export type { WorkflowFile, WorkflowCleanupSummary } from '../../flow/common/workflowFile.ts'
+export type { WorkflowBundle, WorkflowExportPreview } from '../../flow/common/workflowBundle.ts'
 import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 import type { FlowResourceReferences } from '../../flow/common/semantics.ts'
 
@@ -110,6 +113,21 @@ export interface FlowResources {
 export interface FlowUpdate {
   readonly name?: string
   readonly tagIds?: readonly string[]
+}
+
+export interface WorkflowBundleImportResult {
+  readonly version: 1
+  readonly flow: Flow
+  readonly flows: readonly Flow[]
+}
+
+export function decodeWorkflowBundleImportResult(value: unknown): WorkflowBundleImportResult {
+  const source = record(value)
+  if (source.version != 1 || !Array.isArray(source.flows) || source.flows.length == 0) return invalidResponse()
+  const entry = flow(source.flow)
+  const flows = source.flows.map(flow)
+  if (new Set(flows.map((item) => item.flowId)).size != flows.length || !flows.some((item) => item.flowId == entry.flowId)) return invalidResponse()
+  return { version: 1, flow: entry, flows }
 }
 
 export interface FlowQuery {
@@ -931,6 +949,34 @@ export class ControlClient {
     } catch {
       return invalidResponse()
     }
+  }
+
+  async getFlowExportPreview(flowId: string): Promise<WorkflowExportPreview> {
+    const value = await this.request(`/v1/flows/${segment(flowId)}/export-preview`)
+    try {
+      return decodeWorkflowExportPreview(value)
+    } catch {
+      return invalidResponse()
+    }
+  }
+
+  async exportFlowBundle(flowId: string): Promise<WorkflowBundle> {
+    const preview = await this.getFlowExportPreview(flowId)
+    if (preview.unavailableFlowIds.length) throw new ApiError(400, 'flow.invalid', 'Some referenced workflows are unavailable.')
+    return workflowBundleFromPreview(preview)
+  }
+
+  async importFlowBundle(
+    file: WorkflowBundle,
+    options: { readonly name?: string; readonly teamId?: string; readonly idempotencyKey?: string; readonly tagIds?: readonly string[] } = {},
+  ): Promise<WorkflowBundleImportResult> {
+    return decodeWorkflowBundleImportResult(
+      await this.request('/v1/flows/import-bundle', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': options.idempotencyKey ?? `flow-${randomId()}` },
+        body: JSON.stringify({ file, name: options.name, teamId: options.teamId, tagIds: options.tagIds, version: 1 }),
+      }),
+    )
   }
 
   async importFlow(

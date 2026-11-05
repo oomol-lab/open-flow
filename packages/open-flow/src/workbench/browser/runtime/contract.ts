@@ -1,4 +1,6 @@
+import type { WorkflowBundleImportResult } from '../../../control/common/api.ts'
 import type { FlowCatalogEvent, FlowChangeEvent } from '../../../control/common/flowNotifications.ts'
+import type { WorkflowBundle } from '../../../flow/common/workflowBundle.ts'
 import type { UiLanguage } from '../../../localization/common/languages.ts'
 
 export type { FlowCatalogEvent, FlowChangeEvent } from '../../../control/common/flowNotifications.ts'
@@ -71,3 +73,11 @@ export interface OpenFlowWorkbenchHandle {
   /** Opens confirmation on an idle, initialized Flow list. Invalid files notify the host. Does not create a Flow. */
   openImport(input: WorkbenchImportInput): 'opened' | 'unavailable' | 'invalid-file'
 }
+
+/** The host must create every member using the selected destination scope. */
+export type WorkflowBundleImporter = (
+  file: WorkflowBundle,
+  name: string,
+  idempotencyKey: string,
+  options?: { readonly tagIds?: readonly string[] },
+) => Promise<WorkflowBundleImportResult>

@@ -123,6 +123,31 @@ it('opens confirmation once, preserves its snapshot, and retries the same submis
   expect(onImportFlow).toHaveBeenCalledWith(file, 'Example', expect.any(String), [])
 })
 
+it('imports a bundle through its own callback, preserving member names and the shared tag selection', async () => {
+  const onImportFlowBundle = vi.fn(async () => false)
+  const { ref, onImportFlow } = await browser({ onImportFlowBundle })
+  const bundle = {
+    kind: 'open-flow-workflow-bundle',
+    version: 1,
+    entryFlowId: 'root',
+    workflows: [
+      { flowId: 'root', file: { ...file, name: 'Root' } },
+      { flowId: 'child', file: { ...file, name: 'Dependency' } },
+    ],
+  }
+  expect(await open(ref, { text: JSON.stringify(bundle), fileName: 'bundle.openflow.json' })).toBe('opened')
+  const modal = await dialog()
+  expect(modal.querySelector('input')?.value).toBe('Root')
+  expect(modal.querySelector('summary')?.textContent).toContain('2')
+  expect(modal.textContent).toContain('Dependency')
+  expect(modal.textContent).toContain('Tags')
+  for (let attempt = 0; attempt < 2; attempt++)
+    await act(async () => modal.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
+  expect(onImportFlowBundle).toHaveBeenCalledWith(bundle, 'Root', expect.any(String), [])
+  expect(onImportFlowBundle.mock.calls[0]).toEqual(onImportFlowBundle.mock.calls[1])
+  expect(onImportFlow).not.toHaveBeenCalled()
+})
+
 it('rejects unavailable states before parsing and makes retained handles inert after unmount', async () => {
   const { ref, render, store } = await browser({ initializing: true })
   const handle = ref.current!
