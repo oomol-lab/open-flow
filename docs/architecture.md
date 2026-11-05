@@ -165,9 +165,15 @@ Internal Run storage must not become a second data channel through which scripts
 Node execution, events, and capability calls share cancellation and deadlines. Catching an ordinary business error cannot disable resource limits or termination requirements.
 
 The deployment owns the Run's sole execution authority and terminal state. Admission fixes the version, execution scope, and runtime identity.
-Retries must not duplicate accepted execution. If side-effect outcomes cannot be confirmed, execution ends as indeterminate and is not automatically replayed.
+Retries must not duplicate accepted execution. If side-effect outcomes cannot be confirmed, execution ends as indeterminate and is not automatically replayed, except for the subscribed-notification policy below.
 Cancellation and completion races must produce one authoritative terminal state.
 The deployment limits concurrency and execution budgets and owns queuing and recovery. Clients must not take ownership of scheduling facts.
+
+Leina subscription notifications use a success/failure delivery contract as an explicit exception.
+Direct Connector Tasks may retry unknown delivery outcomes with the same event identity within the notification budget, according to Connector retryability.
+A confirmed retry may complete the Run. An unhandled final notification error, including `delivery_unconfirmed`, ends it as `failed`.
+A failed notification Run can include a delivered message. Manual reruns create a new event identity and may deliver it again.
+See the [notification execution contract](control/contracts/control-api.md#connector-passthrough) for identity, retry and deadline rules.
 
 ### Flow State
 

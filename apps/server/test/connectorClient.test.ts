@@ -136,8 +136,8 @@ function captureLogger(): { readonly logger: Logger; readonly output: () => stri
   return { logger: createLogger('trace', destination), output: () => output }
 }
 
-async function run(service: ServerService, revision = connectorFlow()) {
-  const accepted = await acceptRun(service, { flowId: 'main', idempotencyKey: crypto.randomUUID(), revision, revisionId: crypto.randomUUID() })
+async function run(service: ServerService, revision = connectorFlow(), revisionId = crypto.randomUUID()) {
+  const accepted = await acceptRun(service, { flowId: 'main', idempotencyKey: crypto.randomUUID(), revision, revisionId })
   if (accepted.kind != 'accepted') throw new Error('Connector Run acceptance conflicted.')
   await service.waitForIdle()
   return accepted.runId
@@ -161,6 +161,85 @@ async function readBody(request: IncomingMessage): Promise<unknown> {
 const app = { alias: 'work', id: 'connection-work', service: 'example', status: 'active' }
 
 describe('Server Connector client', () => {
+  it.each([
+    { failure: 'network', recover: false },
+    { failure: 'invalid-json', recover: false },
+    { failure: 'invalid-response', recover: false },
+    { failure: 'delivery-unconfirmed', recover: false },
+    { failure: 'network', recover: true },
+  ] as const)('applies subscribed notification terminal semantics after $failure (recover: $recover)', async ({ failure, recover }) => {
+    const keys: (string | undefined)[] = []
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([{ ...app, service: 'leina' }]))
+      keys.push(request.headers['idempotency-key'] as string | undefined)
+      if (recover && keys.length > 1) return send(response, 200, success({ message: 'hello' }))
+      switch (failure) {
+        case 'network':
+          request.socket.destroy()
+          return
+        case 'invalid-json':
+          response.writeHead(502)
+          response.end('invalid JSON')
+          return
+        case 'invalid-response':
+          return send(response, 502, null)
+        case 'delivery-unconfirmed':
+          return send(response, 502, { success: false, errorCode: 'provider_error', data: { error: 'delivery_unconfirmed', retryable: false } })
+      }
+    })
+    const { service } = await startService(origin)
+    const revision = connectorFlow({ action: 'leina.send_notification' })
+    const node = revision.document.graph.nodes.connector
+    if (node?.kind != 'task' || !('executor' in node.task)) throw new Error('Expected managed Task')
+    const source: RevisionContent = {
+      ...revision,
+      document: {
+        ...revision.document,
+        graph: {
+          ...revision.document.graph,
+          nodes: {
+            connector: {
+              ...node,
+              retry: { maxRetries: 1, intervalMs: 1000 },
+              inputs: { ...node.inputs, leinaId: { kind: 'value', value: 'default' }, subscription: { kind: 'value', value: 'sub_test' } },
+              task: {
+                ...node.task,
+                inputs: [
+                  ...node.task.inputs,
+                  { handle: 'leinaId', jsonSchema: { type: 'string' }, nullable: false },
+                  { handle: 'subscription', jsonSchema: { type: 'string' }, nullable: true },
+                ],
+              },
+            },
+          },
+        },
+      },
+    }
+    const revisionId = crypto.randomUUID()
+    const runId = await run(service, source, revisionId)
+    const attempts = failure == 'delivery-unconfirmed' ? 1 : 2
+    expect(keys).toHaveLength(attempts)
+    expect(keys[0]).toEqual(expect.any(String))
+    expect(new Set(keys).size).toBe(1)
+    if (recover) {
+      expect(service.run(runId)).toMatchObject({ status: 'completed' })
+    } else {
+      const code = failure == 'delivery-unconfirmed' ? 'delivery_unconfirmed' : 'notification_unavailable'
+      expect(service.run(runId)).toMatchObject({ status: 'failed', result: { error: { code } } })
+      expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
+        payload: { error: { code } },
+      })
+    }
+    if (failure == 'network' && !recover) {
+      const nextRunId = await run(service, source, revisionId)
+      const first = service.control.runs.getRun('test', runId)
+      expect(service.control.runs.getRun('test', nextRunId)).toMatchObject({ flowId: first.flowId, revisionId: first.revisionId, status: 'failed' })
+      expect(keys).toHaveLength(2 * attempts)
+      expect(new Set(keys.slice(attempts)).size).toBe(1)
+      expect(keys[attempts]).not.toBe(keys[0])
+    }
+  })
+
   it.each([
     { status: 502, data: { error: 'delivery_unconfirmed', retryable: false }, code: 'delivery_unconfirmed', retryable: false },
     { status: 409, data: { error: 'platform_unavailable', retryable: true }, code: 'platform_unavailable', retryable: true },
