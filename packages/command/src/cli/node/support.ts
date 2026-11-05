@@ -11,7 +11,6 @@ import type {
   TriggerKeySnapshot,
   TriggerKeySummary,
 } from '@oomol-lab/open-flow/control-api'
-import type { RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 import type { ParsedArguments } from './arguments.ts'
 
@@ -138,20 +137,6 @@ export async function referencedAction(client: ControlClient, reference: string,
   return exactAction(await client.searchConnectorActions(reference, undefined, flowId), reference)
 }
 
-export function exactTrigger(content: RevisionContent, reference: string): { readonly trigger: TriggerNode; readonly triggerId: string } {
-  const entries = Object.entries(content.document.graph.nodes).filter((entry): entry is [string, TriggerNode] => !('inputs' in entry[1]))
-  const byId = entries?.find(([triggerId]) => triggerId == reference)
-  if (byId != null) return { trigger: byId[1], triggerId: byId[0] }
-  const byName = entries?.filter(([, trigger]) => trigger.name == reference) ?? []
-  if (byName.length == 1) return { trigger: byName[0]![1], triggerId: byName[0]![0] }
-  if (byName.length > 1) {
-    throw new CliError('trigger.ambiguous', `Trigger name ${JSON.stringify(reference)} is ambiguous.`, {
-      candidates: byName.map(([triggerId, trigger]) => ({ name: trigger.name, triggerId })),
-    })
-  }
-  throw new CliError('trigger.not-found', `Trigger ${JSON.stringify(reference)} was not found.`)
-}
-
 export function triggerKeyText(definition: TriggerKeySummary): string {
   return `${definition.displayName}\t${definition.key}\t${definition.provider}\t${definition.type}`
 }
@@ -221,6 +206,19 @@ export async function argumentText(value: string, option: string, errorCode: str
     if (error instanceof CliError) throw error
     throw new CliError(errorCode, error instanceof Error ? error.message : String(error))
   }
+}
+
+export async function requestInput(source: string | undefined, runtime: Runtime): Promise<Readonly<Record<string, unknown>>> {
+  if (source == null) return {}
+  const text = await argumentText(source, 'input', 'flow.authoring-unreadable', runtime)
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    throw new CliError('cli.invalid-arguments', 'Input must be valid JSON.')
+  }
+  if (value == null || typeof value != 'object' || Array.isArray(value)) throw new CliError('cli.invalid-arguments', 'Input must be a JSON object.')
+  return value as Readonly<Record<string, unknown>>
 }
 
 export async function runInputs(args: ParsedArguments, runtime: Runtime): Promise<Readonly<Record<string, Readonly<Record<string, JsonValue>>>>> {

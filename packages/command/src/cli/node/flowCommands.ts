@@ -2,14 +2,13 @@ import type { ParsedArguments } from './arguments.ts'
 import type { CommandHost, Runtime } from './support.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
-import { canvasCommandSchema, controlRequests } from '@oomol-lab/open-flow/control-requests'
 import { encodeWorkflowFile, parseWorkflowFile, workflowNameFromFile } from '@oomol-lab/open-flow/flow-encoding'
 import { importedWorkflowName } from '@oomol-lab/open-flow/localization'
 import { basename } from 'node:path'
 import { connectorCommand, triggerCommand } from './connectorCommands.ts'
 import { liveText } from './live.ts'
 import { createRunCommand, publicationsCommand, publishCommand, rollbackCommand, runsCommand } from './runCommands.ts'
-import { argumentText, checkedResourceName, CliError, flowText, referencedFlow, requireCount, write } from './support.ts'
+import { argumentText, checkedResourceName, CliError, flowText, referencedFlow, requestInput, requireCount, write } from './support.ts'
 
 export async function flowCommand(client: ControlClient, host: CommandHost, args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   const [operation, ...operands] = args.positionals
@@ -43,27 +42,29 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       if (args.file != null && args.input != null) throw new CliError('cli.invalid-arguments', 'Choose --input or --file.')
       const source = args.file == null ? args.input : args.file == '-' ? '-' : `@${args.file}`
       if (source == null) throw new CliError('cli.invalid-arguments', 'Canvas requires --input or --file.')
-      const command = canvasCommandSchema.safeParse(JSON.parse(await argumentText(source, 'input', 'flow.authoring-unreadable', runtime)))
-      if (!command.success) throw new CliError('cli.invalid-arguments', command.error.message)
+      const command = await requestInput(source, runtime)
       const flow = await referencedFlow(client, operands[0]!)
-      const result = await client.broadcastCanvas(flow.flowId, command.data)
-      write(runtime, args.json, { ...result, kind: 'flow.canvas' }, `Broadcast canvas ${command.data.type} for ${flow.flowId}; execution is not confirmed.`)
+      const result = await client.broadcastCanvas(flow.flowId, command)
+      write(runtime, args.json, { ...result, kind: 'flow.canvas' }, `Broadcast canvas ${command.type} for ${flow.flowId}; execution is not confirmed.`)
       return
     }
     case 'read':
     case 'search':
     case 'edit': {
       requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} ${operation} <flow> [--input JSON|@file|-] [--file path|-] --json`)
-      const flow = await referencedFlow(client, operands[0]!)
       if (args.file != null && args.input != null) throw new CliError('cli.invalid-arguments', 'Choose --input or --file.')
       const source = args.file == null ? args.input : args.file == '-' ? '-' : `@${args.file}`
-      const payload: unknown = source == null ? {} : JSON.parse(await argumentText(source, 'input', 'flow.authoring-unreadable', runtime))
+      const payload = await requestInput(source, runtime)
+      const requestId = payload.requestId
+      if (operation == 'edit' && (typeof requestId != 'string' || requestId.length == 0))
+        throw new CliError('cli.invalid-arguments', 'Edit requires a non-empty requestId.')
+      const flow = await referencedFlow(client, operands[0]!)
       const result =
         operation == 'read'
-          ? await client.readAuthoring(flow.flowId, controlRequests.authoringRead(payload))
+          ? await client.readAuthoring(flow.flowId, payload)
           : operation == 'search'
-            ? await client.searchAuthoring(flow.flowId, controlRequests.authoringSearch(payload))
-            : await client.editAuthoring(flow.flowId, controlRequests.authoringEdit(payload))
+            ? await client.searchAuthoring(flow.flowId, payload)
+            : await client.editAuthoring(flow.flowId, payload as typeof payload & { requestId: string })
       runtime.stdout.write(`${JSON.stringify(result)}\n`)
       return
     }

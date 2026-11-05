@@ -15,7 +15,7 @@ import type {
 } from './api.ts'
 
 import { providerIconAppearance } from '../../connector/common/providerIconSprite.ts'
-import { exact, requiredFields, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
+import { requiredFields, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { ApiError } from './errors.ts'
 import { parseProviderAccessSource } from './providerAccess.ts'
 
@@ -33,7 +33,7 @@ export function leinaBots(value: unknown): readonly LeinaBot[] {
 
 function accessPermissions(value: unknown): NonNullable<ProviderAccessBindingCandidate['permissions']> {
   const source = record(value)
-  exact(source, ['actionIds', 'allActions', 'triggerIds', 'allTriggers', 'configured', 'proxy'])
+  requiredFields(source, ['actionIds', 'allActions', 'triggerIds', 'allTriggers', 'configured', 'proxy'])
   if (!Array.isArray(source.actionIds)) return invalidResponse('permissions.actionIds: expected an array.')
   if (!Array.isArray(source.triggerIds)) return invalidResponse('permissions.triggerIds: expected an array.')
   if (typeof source.allActions != 'boolean') return invalidResponse('permissions.allActions: expected a boolean.')
@@ -62,19 +62,15 @@ function accessBinding(value: unknown, candidate: boolean): ProviderAccessBindin
   const legacy = Object.hasOwn(source, 'displayName') && !Object.hasOwn(source, 'connectionDisplayName')
   const permissions = candidate && Object.hasOwn(source, 'permissions') ? accessPermissions(source.permissions) : undefined
   const permissionGroupName = source.permissionGroupName
-  exact(source, [
+  requiredFields(source, [
     'accessBindingId',
     'connectionId',
     'source',
     legacy ? 'displayName' : 'connectionDisplayName',
-    ...(candidate && Object.hasOwn(source, 'isDefault') ? ['isDefault'] : []),
-    ...(candidate && permissions != null ? ['permissions'] : []),
-    ...(Object.hasOwn(source, 'permissionGroupName') ? ['permissionGroupName'] : []),
-    ...(policyRevision == null ? [] : ['policyRevision']),
     'providerId',
     ...(candidate ? [] : ['status']),
   ])
-  if (policyRevision != null && typeof policyRevision != 'string') return invalidResponse('policyRevision: expected a string.')
+  if (policyRevision !== undefined && typeof policyRevision != 'string') return invalidResponse('policyRevision: expected a string.')
   if (candidate && isDefault !== undefined && typeof isDefault != 'boolean') return invalidResponse('isDefault: expected a boolean.')
   if (permissionGroupName !== undefined && permissionGroupName !== null && typeof permissionGroupName != 'string')
     return invalidResponse('permissionGroupName: expected a string or null.')
@@ -106,15 +102,7 @@ function accessMode(value: unknown): ConnectorAccess['mode'] {
 
 export function connectorAccess(value: unknown): ConnectorAccess {
   const source = record(value)
-  exact(source, [
-    'accessRevision',
-    'bindings',
-    'mode',
-    'sharedAccessDigest',
-    ...('providerIds' in source ? ['providerIds'] : []),
-    ...('discardedBindingCount' in source ? ['discardedBindingCount'] : []),
-    'version',
-  ])
+  requiredFields(source, ['accessRevision', 'bindings', 'mode', 'sharedAccessDigest', 'version'])
   const accessRevision = integer(source.accessRevision)
   if (source.version != 1 || accessRevision < 0 || !Array.isArray(source.bindings)) return invalidResponse()
   if ('providerIds' in source && !Array.isArray(source.providerIds)) return invalidResponse()
@@ -170,14 +158,7 @@ function accessGrants(value: unknown): readonly ConnectorAccessGrant[] {
   if (!Array.isArray(value)) return invalidResponse()
   const bindings = value.map((candidate) => {
     const entry = record(candidate)
-    exact(entry, [
-      'accessBindingId',
-      'connectionId',
-      'providerId',
-      'source',
-      'connectionDisplayName',
-      ...('permissionGroupName' in entry ? ['permissionGroupName'] : []),
-    ])
+    requiredFields(entry, ['accessBindingId', 'connectionId', 'providerId', 'source', 'connectionDisplayName'])
     let identity
     try {
       identity = parseProviderAccessSource(entry.source)
@@ -200,7 +181,7 @@ function accessGrants(value: unknown): readonly ConnectorAccessGrant[] {
 
 export function connectorAccessSnapshot(value: unknown): ConnectorAccessSnapshot {
   const source = record(value)
-  exact(source, ['mode', 'sharedAccessDigest', 'sharedBindings', 'selectedBindings', 'version'])
+  requiredFields(source, ['mode', 'sharedAccessDigest', 'sharedBindings', 'selectedBindings', 'version'])
   if (source.version != 2) return invalidResponse()
   const mode = accessMode(source.mode)
   const sharedBindings = accessGrants(source.sharedBindings)
@@ -211,7 +192,7 @@ export function connectorAccessSnapshot(value: unknown): ConnectorAccessSnapshot
 
 export function connectorAccessCandidates(value: unknown, providerId: string): ConnectorAccessCandidates {
   const source = record(value)
-  exact(source, ['candidates', 'mode', 'providerId', 'version'])
+  requiredFields(source, ['candidates', 'mode', 'providerId', 'version'])
   if (source.version != 1) return invalidResponse('version: expected 1.')
   if (string(source.providerId) != providerId) return invalidResponse('providerId: does not match the requested provider.')
   if (!Array.isArray(source.candidates)) return invalidResponse('candidates: expected an array.')
@@ -225,7 +206,7 @@ export function connectorAccessCandidates(value: unknown, providerId: string): C
 
 export function connectorAccessCandidatesBatch(value: unknown, providerIds: readonly string[]): ConnectorAccessCandidatesBatch {
   const source = record(value)
-  exact(source, ['results', 'version'])
+  requiredFields(source, ['results', 'version'])
   if (source.version != 1) return invalidResponse('version: expected 1.')
   if (!Array.isArray(source.results)) return invalidResponse('results: expected an array.')
   const remaining = new Set(providerIds)
@@ -234,9 +215,9 @@ export function connectorAccessCandidatesBatch(value: unknown, providerIds: read
     const providerId = string(item.providerId)
     if (!remaining.delete(providerId)) return invalidResponse('results[].providerId: duplicate or unrequested provider.')
     if (!Object.hasOwn(item, 'error')) return connectorAccessCandidates(item, providerId)
-    exact(item, ['providerId', 'error'])
+    requiredFields(item, ['providerId', 'error'])
     const error = record(item.error)
-    exact(error, ['code', 'message'])
+    requiredFields(error, ['code', 'message'])
     return { providerId, error: { code: string(error.code), message: string(error.message) } }
   })
   if (remaining.size != 0) return invalidResponse('results: missing requested providers.')

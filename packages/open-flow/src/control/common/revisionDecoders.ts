@@ -28,6 +28,20 @@ export function draft(value: unknown): Draft {
   }
 }
 
+export function revisionTriggers(value: unknown) {
+  const source = record(value)
+  const content = record(source.content)
+  const graph = record(record(content.document).graph)
+  const triggers = Object.entries(record(graph.nodes)).flatMap(([triggerId, entry]) => {
+    const node = record(entry)
+    if (node.kind == 'outputs' || Object.hasOwn(node, 'inputs')) return []
+    const kind = string(node.kind)
+    if (node.name !== undefined && typeof node.name != 'string') return invalidResponse()
+    return [{ triggerId: string(triggerId), kind, ...(node.name === undefined ? {} : { name: node.name }) }]
+  })
+  return { ...revisionMetadata(source), triggers }
+}
+
 export function presentation(value: unknown): Presentation {
   const source = record(value)
   if (source.version != 1 || integer(source.revision) < 1) return invalidResponse()

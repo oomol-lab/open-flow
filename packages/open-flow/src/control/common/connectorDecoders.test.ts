@@ -44,12 +44,34 @@ it('accepts administrator candidates with complete action and trigger permission
   expect(connectorAccessCandidatesBatch(value, ['mail'])).toEqual(value)
 })
 
+it('ignores additional candidate, permission and batch response fields', () => {
+  const expected = {
+    results: [response({ ...candidate, permissions }), { providerId: 'calendar', error: { code: 'connector.unavailable', message: 'Unavailable' } }],
+    version: 1,
+  }
+  const value = {
+    ...expected,
+    extra: true,
+    results: [
+      { ...response({ ...candidate, extra: true, permissions: { ...permissions, extra: true } }), extra: true },
+      { providerId: 'calendar', extra: true, error: { code: 'connector.unavailable', message: 'Unavailable', extra: true } },
+    ],
+  }
+  expect(connectorAccessCandidatesBatch(value, ['mail', 'calendar'])).toEqual(expected)
+})
+
+it('ignores additional shared access and execution snapshot fields without changing authority', () => {
+  const binding = { ...candidate, status: 'active' }
+  const access = { version: 1, mode: 'selectable', accessRevision: 7, sharedAccessDigest: 'saved', bindings: [binding] }
+  expect(connectorAccess({ ...access, extra: true, bindings: [{ ...binding, extra: true }] })).toEqual(access)
+  expect(connectorAccessSnapshot({ ...snapshot, extra: true, selectedBindings: [{ ...candidate, status: 'active', extra: true }] })).toEqual(snapshot)
+})
+
 it.each([
   [{ ...permissions, allTriggers: 'true' }, 'permissions.allTriggers: expected a boolean.'],
   [{ ...permissions, allActions: false }, 'permissions.proxy: requires allActions=true, allTriggers=true and configured=false.'],
   [{ ...permissions, triggerIds: ['trigger'] }, 'permissions.triggerIds: must be empty when allTriggers is true.'],
   [{ ...permissions, triggerIds: ['trigger', 'trigger'] }, 'permissions.triggerIds: duplicate IDs.'],
-  [{ ...permissions, extra: 'private value' }, 'Unexpected fields: extra.'],
   [{ actionIds: [], allActions: true, configured: false, proxy: true }, 'Missing fields: triggerIds, allTriggers.'],
 ])('explains invalid permission summaries %#', (summary, detail) => {
   expect(() => connectorAccessCandidates(response({ ...candidate, permissions: summary }), 'mail')).toThrow(expect.objectContaining({ detail }))
@@ -74,7 +96,6 @@ it.each([
   { ...snapshot, sharedBindings: undefined },
   { ...snapshot, selectedBindings: [candidate, candidate] },
   { ...snapshot, selectedBindings: [{ ...candidate, source: null }] },
-  { ...snapshot, selectedBindings: [{ ...candidate, status: 'active' }] },
   { ...snapshot, selectedBindings: [{ ...candidate, connectionId: null }] },
   { ...snapshot, mode: 'implicit' },
 ])('rejects incomplete or invalid execution authority %#', (value) => {
@@ -93,6 +114,7 @@ it.each([
   { ...candidate, source: { kind: 'policy' } },
   { ...candidate, source: { kind: 'admin-delegation', ruleId: 'team-admin' } },
   { ...candidate, connectionId: '' },
+  { ...candidate, policyRevision: null },
 ])('rejects incomplete or ambiguous binding identities', (binding) => {
   expect(() => connectorAccessCandidates(response(binding), 'mail')).toThrow(expect.objectContaining({ code: 'response.invalid' }))
 })

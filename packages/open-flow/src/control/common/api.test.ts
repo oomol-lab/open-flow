@@ -22,6 +22,52 @@ const flow = {
 } as const
 
 describe('ControlClient Flow API', () => {
+  it('reads pinned Trigger identities without decoding newer node configurations or modules', async () => {
+    const metadata = {
+      actorId: 'actor',
+      createdAt: flow.createdAt,
+      digest: 'digest',
+      flowId: flow.flowId,
+      modelVersion: 999,
+      parentRevisionId: null,
+      revisionId: 'revision/1',
+      version: 1,
+    }
+    const value = {
+      ...metadata,
+      content: {
+        modelVersion: 999,
+        modules: { future: { format: 'future-module' } },
+        document: {
+          graph: {
+            nodes: {
+              start: { kind: 'start', name: 'Start', future: true },
+              trigger: { kind: 'future-trigger', name: 'Future', future: true },
+              task: { kind: 'future-node', inputs: {}, config: { future: true } },
+              outputs: { kind: 'outputs', name: 'Outputs', outputDefs: [], outputMappings: {} },
+            },
+          },
+        },
+      },
+    }
+    const request = vi.fn(async (path: string) => {
+      expect(path).toBe('/v1/flows/flow%2F1/revisions/revision%2F1')
+      return Response.json(value)
+    })
+    const client = new ControlClient(request)
+    expect(await client.getRevisionTriggers(flow.flowId, 'revision/1')).toEqual({
+      ...metadata,
+      triggers: [
+        { triggerId: 'start', kind: 'start', name: 'Start' },
+        { triggerId: 'trigger', kind: 'future-trigger', name: 'Future' },
+      ],
+    })
+    request.mockResolvedValueOnce(Response.json({ ...value, revisionId: 'different' }))
+    await expect(client.getRevisionTriggers(flow.flowId, 'revision/1')).rejects.toMatchObject({ code: 'response.invalid' })
+    request.mockResolvedValueOnce(Response.json({ ...value, content: { document: { graph: { nodes: { start: { kind: 'start', name: 1 } } } } } }))
+    await expect(client.getRevisionTriggers(flow.flowId, 'revision/1')).rejects.toMatchObject({ code: 'response.invalid' })
+  })
+
   it('keeps State overview metadata separate from named value reads', async () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path.endsWith('/state/read')) {

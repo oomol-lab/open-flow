@@ -7,7 +7,6 @@ import { liveText } from './live.ts'
 import {
   CliError,
   argumentText,
-  exactTrigger,
   eventText,
   publicationById,
   publicationPageLimit,
@@ -40,16 +39,22 @@ export async function createRunCommand(client: ControlClient, operands: readonly
       : undefined
   if (args.source == 'live' && live?.publication == null) throw new CliError('live.not-found', `Flow ${JSON.stringify(operands[0])} has no Live Publication.`)
   const revisionId = live?.publication?.revisionId ?? args.expectedRevision ?? flow.draftRevisionId
-  const revision = await client.getRevision(flow.flowId, revisionId)
-  const triggers = Object.entries(revision.content.document.graph.nodes).filter(([, node]) => !('inputs' in node))
-  const starts = triggers.filter(([, node]) => node.kind == 'start')
-  const only = starts.length == 1 ? starts[0]![0] : triggers.length == 1 && triggers[0]?.[1].kind == 'manual' ? triggers[0][0] : undefined
+  const { triggers } = await client.getRevisionTriggers(flow.flowId, revisionId)
+  const starts = triggers.filter((node) => node.kind == 'start')
+  const only = starts.length == 1 ? starts[0]!.triggerId : triggers.length == 1 && triggers[0]?.kind == 'manual' ? triggers[0].triggerId : undefined
   const reference = args.trigger ?? only
   if (reference == null)
     throw new CliError('run.trigger-required', 'Choose a start node with --trigger <name|id>.', {
-      candidates: triggers.map(([triggerId, node]) => ({ triggerId, name: node.name })),
+      candidates: triggers.map(({ triggerId, name }) => ({ triggerId, name })),
     })
-  const selected = exactTrigger(revision.content, reference)
+  const byId = triggers.find((node) => node.triggerId == reference)
+  const byName = triggers.filter((node) => node.name == reference)
+  if (byId == null && byName.length > 1)
+    throw new CliError('trigger.ambiguous', `Trigger name ${JSON.stringify(reference)} is ambiguous.`, {
+      candidates: byName.map(({ triggerId, name }) => ({ triggerId, name })),
+    })
+  const selected = byId ?? byName[0]
+  if (selected == null) throw new CliError('trigger.not-found', `Trigger ${JSON.stringify(reference)} was not found.`)
   let outputs: Readonly<Record<string, JsonValue>> = {}
   if (args.outputs != null) {
     const text = await argumentText(args.outputs, '--outputs', 'run.input-unreadable', runtime)
