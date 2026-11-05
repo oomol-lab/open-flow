@@ -10,13 +10,22 @@ import type {
   Presentation,
 } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
-import type { WorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
+import type { WorkflowBundle, WorkflowExportPreview, WorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
 import type { Store } from '../storage/store.ts'
 import type { PublicationControl } from './publication-control.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { resourceNameIssue } from '@oomol-lab/open-flow/flow-change'
-import { canonicalJsonBytes, cleanWorkflowFile, digestBytes, encodeRevision, upgradeRevisionContent } from '@oomol-lab/open-flow/flow-encoding'
+import {
+  canonicalJsonBytes,
+  cleanWorkflowBundle,
+  cleanWorkflowFile,
+  digestBytes,
+  encodeRevision,
+  remapWorkflowBundle,
+  upgradeRevisionContent,
+} from '@oomol-lab/open-flow/flow-encoding'
+import { flowResourceReferences } from '@oomol-lab/open-flow/flow-semantics'
 import { randomUUID } from 'node:crypto'
 import { ControlError } from '../error.ts'
 import { TagAssignmentError } from '../storage/tag-store.ts'
@@ -30,6 +39,12 @@ export interface FlowPosition {
   readonly createdAt: number
   readonly flowId: string
 }
+const unreadableWorkflowCodes: ReadonlySet<string> = new Set([
+  controlErrorCode.flowNotFound,
+  controlErrorCode.flowInvalid,
+  controlErrorCode.flowRepairRequired,
+  controlErrorCode.flowUpgradeRequired,
+])
 export class FlowControl {
   private readonly access: ControlAccess
   private readonly flowChanged: (event: FlowChangeEvent) => void
@@ -79,6 +94,99 @@ export class FlowControl {
       content: currentDraft.content,
       presentation: this.getPresentation(actorId, flowId).value,
     }).file
+  }
+
+  getExportPreview(actorId: string, entryFlowId: string): WorkflowExportPreview {
+    this.access.requireFlow(actorId, entryFlowId)
+    const pending = [entryFlowId]
+    const seen = new Set<string>()
+    const workflows: WorkflowExportPreview['workflows'][number][] = []
+    const unavailableFlowIds: string[] = []
+    for (const flowId of pending) {
+      if (seen.has(flowId)) continue
+      seen.add(flowId)
+      const stored = this.store.flows.get(flowId)
+      if (stored?.ownerId != actorId || stored.status != 'active') {
+        unavailableFlowIds.push(flowId)
+        continue
+      }
+      let file: WorkflowFile
+      try {
+        file = this.exportFlow(actorId, flowId)
+      } catch (error) {
+        if (flowId == entryFlowId || !(error instanceof ControlError) || !unreadableWorkflowCodes.has(error.code)) throw error
+        unavailableFlowIds.push(flowId)
+        continue
+      }
+      workflows.push({ flowId, file })
+      pending.push(...(flowResourceReferences(file.content).calledFlowIds ?? []))
+    }
+    if (!workflows.some((item) => item.flowId == entryFlowId)) throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
+    workflows.sort((left, right) =>
+      left.flowId == right.flowId ? 0 : left.flowId == entryFlowId ? -1 : right.flowId == entryFlowId ? 1 : left.flowId.localeCompare(right.flowId),
+    )
+    return { version: 1, entryFlowId, workflows, unavailableFlowIds: unavailableFlowIds.toSorted() }
+  }
+
+  async importBundle(
+    actorId: string,
+    value: unknown,
+    idempotencyKey: string,
+    name?: string,
+    teamId?: string,
+    defaultName = 'Imported workflow',
+    tagIds: readonly string[] = [],
+  ) {
+    let bundle: WorkflowBundle
+    try {
+      bundle = cleanWorkflowBundle(value)
+      bundle = {
+        ...bundle,
+        workflows: bundle.workflows.map((item) => ({ ...item, file: { ...item.file, content: upgradeRevisionContent(item.file.content) } })),
+      }
+    } catch {
+      throw new ControlError(controlErrorCode.flowInvalid, 'Invalid or unsupported workflow bundle.')
+    }
+    const names = new Map(bundle.workflows.map(({ flowId, file }) => [flowId, (flowId == bundle.entryFlowId ? name : undefined) ?? file.name ?? defaultName]))
+    if ([...names.values()].some((item) => item != item.trim() || resourceNameIssue(item) != null))
+      throw new ControlError(controlErrorCode.flowInvalid, 'Flow name is invalid.')
+    const ids = [...new Set(tagIds)].toSorted()
+    const requestDigest = await digestBytes(canonicalJsonBytes({ file: value as JsonValue, name: name ?? null, teamId: teamId ?? null, tagIds: ids }))
+    const replay = this.store.flows.replayBundleImport(actorId, idempotencyKey, requestDigest)
+    if (replay != null) {
+      if ('kind' in replay) throw new ControlError(controlErrorCode.flowConflict, 'The workflow bundle import conflicts with this request.')
+      return { created: false, version: 1 as const, flow: flow(replay.flow), flows: replay.flows.map(flow) }
+    }
+    const connectorTeamId = await this.resolveConnectorTeam(teamId)
+    if (teamId != null && connectorTeamId == null) throw new ControlError(controlErrorCode.flowInvalid, 'Connector Team is not available for this deployment.')
+    const flowIds = new Map(bundle.workflows.map((item) => [item.flowId, `flow_${randomUUID().replaceAll('-', '')}`]))
+    const mapped = remapWorkflowBundle(bundle, flowIds)
+    const mappedNames = new Map([...names].map(([id, item]) => [flowIds.get(id)!, item]))
+    const createdAt = this.clock()
+    const inputs = await Promise.all(
+      mapped.workflows.map(async ({ flowId, file }) => {
+        const bytes = encodeRevision(file.content)
+        return {
+          actorId,
+          flowId,
+          tagIds: ids,
+          connectorTeamId,
+          createdAt,
+          idempotencyKey,
+          requestDigest,
+          content: new TextDecoder().decode(bytes),
+          digest: await digestBytes(bytes),
+          modelVersion: file.content.modelVersion,
+          name: mappedNames.get(flowId)!,
+          presentation: file.presentation,
+          revisionId: `revision_${randomUUID().replaceAll('-', '')}`,
+        }
+      }),
+    )
+    const stored = this.assignTags(() => this.store.flows.importBundle(actorId, idempotencyKey, requestDigest, mapped.entryFlowId, inputs))
+    if ('kind' in stored) throw new ControlError(controlErrorCode.flowConflict, 'The workflow bundle import conflicts with this request.')
+    if (stored.created) this.flowCatalogChanged(undefined, actorId)
+    return { created: stored.created, version: 1 as const, flow: flow(stored.flow), flows: stored.flows.map(flow) }
   }
 
   async importFlow(

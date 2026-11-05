@@ -1053,6 +1053,65 @@ it('exports only indented workflow JSON and imports files or stdin with stable r
   expect(requests).toHaveLength(before)
 })
 
+it('exports dependency bundles and imports files or stdin with tags applied to every member', async () => {
+  const file = {
+    kind: 'open-flow-workflow',
+    version: 1,
+    name: 'Root',
+    content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] } } },
+  }
+  const workflows = [
+    { flowId: flow.flowId, file },
+    { flowId: 'child', file: { ...file, name: 'Child' } },
+  ]
+  const bundle = { kind: 'open-flow-workflow-bundle', version: 1, entryFlowId: flow.flowId, workflows }
+  const imported = {
+    version: 1,
+    flow: { ...flow, flowId: 'new-root', tagIds: ['tag-a', 'tag-b'] },
+    flows: [
+      { ...flow, flowId: 'new-root', tagIds: ['tag-a', 'tag-b'] },
+      { ...flow, flowId: 'new-child', tagIds: ['tag-a', 'tag-b'] },
+    ],
+  }
+  const requests: { path: string; init?: RequestInit }[] = []
+  const request = async (path: string, init?: RequestInit) => {
+    requests.push({ path, init })
+    if (path.endsWith('/export-preview')) return Response.json({ version: 1, entryFlowId: flow.flowId, workflows, unavailableFlowIds: [] })
+    if (path == '/v1/flows/import-bundle') return Response.json(imported, { status: 201 })
+    return Response.json(flow)
+  }
+  const exported = runtime()
+  expect(await runCli(['export', flow.flowId, '--include-dependencies'], { request }, exported.value)).toBe(0)
+  expect(JSON.parse(exported.stdout())).toEqual(bundle)
+  expect(exported.stderr()).toBe('')
+  for (const fileName of ['bundle.openflow.json', '-']) {
+    const output = runtime()
+    output.value.readFile = output.value.readStdin = async () => JSON.stringify(bundle)
+    expect(
+      await runCli(['import', '--file', fileName, '--tag', 'tag-a', '--tag=tag-b', '--idempotency-key', 'bundle', '--json'], { request }, output.value),
+    ).toBe(0)
+    const sent = requests.at(-1)!
+    expect(sent.path).toBe('/v1/flows/import-bundle')
+    expect(JSON.parse(String(sent.init?.body))).toEqual({ file: bundle, name: 'Root', tagIds: ['tag-a', 'tag-b'], version: 1 })
+    expect(new Headers(sent.init?.headers).get('idempotency-key')).toBe('bundle')
+    expect(JSON.parse(output.stdout())).toMatchObject({ kind: 'flow.import', ...imported })
+  }
+  const unavailable = runtime()
+  expect(
+    await runCli(
+      ['export', flow.flowId, '--include-dependencies'],
+      {
+        request: async (path) =>
+          path.endsWith('/export-preview')
+            ? Response.json({ version: 1, entryFlowId: flow.flowId, workflows: [workflows[0]], unavailableFlowIds: ['child'] })
+            : Response.json(flow),
+      },
+      unavailable.value,
+    ),
+  ).toBe(1)
+  expect(unavailable.stdout()).toBe('')
+})
+
 it.each([
   ['state', 'show', 'flow-1'],
   ['state', 'clear', 'flow-1', '--yes'],

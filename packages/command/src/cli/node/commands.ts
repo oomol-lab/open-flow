@@ -14,8 +14,8 @@ const commands = [
   ['search', '<flow> (--input JSON|@file|- | --file path|-)', ['input', 'file']],
   ['edit', '<flow> (--input JSON|@file|- | --file path|-)', ['input', 'file']],
   ['list', '[--cursor <cursor>] [--limit <count>]', page],
-  ['export', '<flow>', []],
-  ['import', '--file <path|->', ['file', 'name', 'idempotency-key']],
+  ['export', '<flow>', ['include-dependencies']],
+  ['import', '--file <path|->', ['file', 'name', 'idempotency-key', 'tag']],
   ['create', '<name>', ['idempotency-key']],
   ['show', '<flow>', []],
   ['live', '<flow>', []],
@@ -98,6 +98,8 @@ const optionDetails: Record<
     type: 'string',
     enum: ['queued', 'starting', 'running', 'waiting', 'completed', 'failed', 'canceled', 'indeterminate'],
   },
+  'include-dependencies': { description: 'Include all referenced workflow drafts in one JSON bundle.', type: 'boolean' },
+  'tag': { description: 'Tag ID applied to every imported workflow; repeat to select multiple tags.', type: 'string' },
   'file': { description: 'Authoring request or workflow JSON file path, or - for stdin.', type: 'string' },
   'code': { description: 'JavaScript source, @file, or - for stdin.', type: 'string' },
   'input': { description: 'Authoring request JSON; literal JSON, @file, or -. For run, node ID to input values.', type: 'string' },
@@ -129,8 +131,8 @@ export function commandHelp(path: readonly string[], prefix = 'oo flow') {
         Object.assign(
           {
             name: `--${flag}`,
-            value: !['json', 'help', 'wait', 'follow', 'yes', 'pending-wait'].includes(flag),
-            repeatable: flag == 'set' || flag == 'unset',
+            value: !['json', 'help', 'wait', 'follow', 'yes', 'pending-wait', 'include-dependencies'].includes(flag),
+            repeatable: flag == 'set' || flag == 'unset' || flag == 'tag',
           },
           optionDetails[flag],
           key == 'runs results' && flag == 'after'

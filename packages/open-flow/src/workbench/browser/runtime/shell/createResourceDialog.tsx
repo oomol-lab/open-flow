@@ -14,6 +14,7 @@ import { WorkbenchSelect } from './workbenchSelect.tsx'
 export default function CreateResourceDialog({
   disabled,
   tagField,
+  summary,
   field,
   id,
   issue,
@@ -27,6 +28,7 @@ export default function CreateResourceDialog({
   sourceUrl,
   title,
 }: {
+  readonly summary?: ReactNode
   readonly tagField?: ((container: HTMLElement | null) => ReactNode) | undefined
   readonly disabled?: boolean | undefined
   readonly field?:
@@ -132,6 +134,7 @@ export default function CreateResourceDialog({
                 />
                 {showIssue ? <FieldError id={messageId}>{message}</FieldError> : <FieldDescription id={messageId}>{message}</FieldDescription>}
               </Field>
+              {summary}
               {tagField?.(root)}
               {field != null && (
                 <Field>

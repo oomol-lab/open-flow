@@ -21,7 +21,7 @@ import {
 import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { readPngExportFrame, writePngExportFrame } from './pngExportPreference.ts'
-import { WorkflowExportMenuItem } from './workflowExportMenuItem.tsx'
+import { useWorkflowExportAction, WorkflowExportMenuItem } from './workflowExportMenuItem.tsx'
 
 export type PublishState = 'ready' | 'current' | 'issues' | 'busy' | 'publishing'
 
@@ -53,6 +53,7 @@ export function WorkspacePublishIsland({
   readonly state: PublishState
 }): ReactElement {
   const t = useTranslate()
+  const exportAction = useWorkflowExportAction(onExport)
   const [popupContainer, setPopupContainer] = useState<HTMLDivElement | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -124,7 +125,7 @@ export function WorkspacePublishIsland({
           </div>
         </PopoverContent>
       </Popover>
-      <DropdownMenu>
+      <DropdownMenu onOpenChangeComplete={exportAction.onOpenChangeComplete}>
         <CanvasTooltip getPopupContainer={() => popupContainer ?? document.body} placement="bottom" title={menuLabel}>
           <DropdownMenuTrigger
             render={
@@ -136,7 +137,7 @@ export function WorkspacePublishIsland({
         </CanvasTooltip>
         <DropdownMenuContent align="end" className="w-max min-w-44 max-w-(--available-width)" container={popupContainer} side="bottom" sideOffset={8}>
           {onExport != null && (
-            <WorkflowExportMenuItem className="gap-2 px-2 py-[5px]" disabled={state == 'busy' || state == 'publishing'} onClick={onExport} />
+            <WorkflowExportMenuItem className="gap-2 px-2 py-[5px]" disabled={state == 'busy' || state == 'publishing'} onClick={exportAction.onClick} />
           )}
           {onExportPng != null && (
             <DropdownMenuSub>

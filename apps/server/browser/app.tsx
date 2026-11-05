@@ -534,6 +534,24 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                       ? (file, name, key, options) => createHostedFlow(name, options, { file, key })
                       : undefined
                   }
+                  importFlowBundle={
+                    team.kind == 'ready' && team.selectedTeamId != null
+                      ? async (file, name, key, options) => {
+                          const teamId = team.selectedTeamId!
+                          const result = await client.importFlowBundle(file, { name, idempotencyKey: key, teamId, tagIds: options?.tagIds })
+                          const bindings = result.flows.map((item) => ({ flowId: item.flowId, teamId }))
+                          setTeam((current) =>
+                            current.kind == 'ready'
+                              ? {
+                                  ...current,
+                                  bindings: [...current.bindings.filter((item) => !result.flows.some((flow) => flow.flowId == item.flowId)), ...bindings],
+                                }
+                              : current,
+                          )
+                          return result
+                        }
+                      : undefined
+                  }
                   createFlow={team.kind == 'ready' && team.selectedTeamId != null ? createHostedFlow : undefined}
                   createFlowDisabled={team.kind != 'hidden' && (team.kind != 'ready' || team.selectedTeamId == null)}
                   createFlowField={createFlowField}

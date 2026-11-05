@@ -35,6 +35,7 @@ import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunStatusIslandContainer } from './runs/runStatusIsland.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { FlowSettingsButton } from './shell/flowSettings.tsx'
+import { WorkflowExportDialog } from './shell/workflowTransfer.tsx'
 import { WorkspaceDiagnosticsIsland } from './shell/workspaceDiagnosticsIsland.tsx'
 import { WorkspaceNavigationIsland } from './shell/workspaceNavigationIsland.tsx'
 import { WorkspacePublishIsland } from './shell/workspacePublishIsland.tsx'
@@ -724,6 +725,7 @@ export default function FlowWorkspace({
   readonly store: WorkbenchStore
   readonly theme: WorkbenchTheme
 }): ReactElement {
+  const [transferContainer, setTransferContainer] = useState<HTMLElement | null>(null)
   const t = useTranslate()
   const [runDrawerOpen, setRunDrawerOpen] = useState(() => readRunDrawerOpen(store.preferences) ?? false)
   const runDrawerPreference = useRef(readRunDrawerOpen(store.preferences))
@@ -809,7 +811,8 @@ export default function FlowWorkspace({
   return (
     <IconifyProvider>
       <WorkbenchLinkContext.Provider value={hrefFor}>
-        <main className="workspace">
+        <main className="workspace" ref={setTransferContainer}>
+          <WorkflowExportDialog workspace={store.workspace} container={transferContainer} />
           {view == 'design' && !canvasReady && <div className="workspace-navigation-placement">{navigationIsland}</div>}
           {view == 'design' && !canvasReady ? (
             <div aria-label={t('workspace.design')} className="editor-grid context-panel-closed" id="workspace-panel-design" role="region" tabIndex={0}>

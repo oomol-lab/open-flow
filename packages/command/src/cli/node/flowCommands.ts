@@ -2,7 +2,7 @@ import type { ParsedArguments } from './arguments.ts'
 import type { CommandHost, Runtime } from './support.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
-import { encodeWorkflowFile, parseWorkflowFile, workflowNameFromFile } from '@oomol-lab/open-flow/flow-encoding'
+import { encodeWorkflowBundle, encodeWorkflowFile, parseWorkflowImportFile, workflowNameFromFile } from '@oomol-lab/open-flow/flow-encoding'
 import { importedWorkflowName } from '@oomol-lab/open-flow/localization'
 import { basename } from 'node:path'
 import { connectorCommand, triggerCommand } from './connectorCommands.ts'
@@ -131,15 +131,24 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     case 'export': {
       requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} export <flow>`)
       const flow = await referencedFlow(client, operands[0]!)
-      runtime.stdout.write(encodeWorkflowFile(await client.exportFlow(flow.flowId)))
+      runtime.stdout.write(
+        args.includeDependencies ? encodeWorkflowBundle(await client.exportFlowBundle(flow.flowId)) : encodeWorkflowFile(await client.exportFlow(flow.flowId)),
+      )
       return
     }
     case 'import': {
       requireCount(operands, 0, `${runtime.commandPrefix ?? 'oo flow'} import --file <path|-> [--name name] [--json]`)
       if (args.file == null) throw new CliError('cli.invalid-arguments', 'Import requires --file <path|->.')
-      const file = parseWorkflowFile(await argumentText(args.file == '-' ? '-' : `@${args.file}`, 'file', 'flow.import-unreadable', runtime))
-      const name = args.name ?? file.name ?? (args.file == '-' ? importedWorkflowName(runtime.language ?? 'en') : workflowNameFromFile(basename(args.file)))
-      const flow = await client.importFlow(file, { name: checkedResourceName(name, 'Flow'), idempotencyKey: args.idempotencyKey })
+      const file = parseWorkflowImportFile(await argumentText(args.file == '-' ? '-' : `@${args.file}`, 'file', 'flow.import-unreadable', runtime))
+      const entry = file.kind == 'open-flow-workflow-bundle' ? file.workflows.find((item) => item.flowId == file.entryFlowId)!.file : file
+      const name = args.name ?? entry.name ?? (args.file == '-' ? importedWorkflowName(runtime.language ?? 'en') : workflowNameFromFile(basename(args.file)))
+      const options = { name: checkedResourceName(name, 'Flow'), idempotencyKey: args.idempotencyKey, ...(args.tags.length ? { tagIds: args.tags } : {}) }
+      if (file.kind == 'open-flow-workflow-bundle') {
+        const result = await client.importFlowBundle(file, options)
+        write(runtime, args.json, { ...result, idempotencyKey: args.idempotencyKey, kind: 'flow.import' }, result.flows.map(flowText).join('\n'))
+        return
+      }
+      const flow = await client.importFlow(file, options)
       write(runtime, args.json, { flow, idempotencyKey: args.idempotencyKey, kind: 'flow.import', version: 1 }, flowText(flow))
       return
     }

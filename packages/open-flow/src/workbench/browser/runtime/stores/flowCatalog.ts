@@ -2,9 +2,11 @@ import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { FlowQuery, FlowUpdate } from '../../../../control/common/api.ts'
 import type { RevisionContent } from '../../../../flow/common/change.ts'
+import type { WorkflowBundle } from '../../../../flow/common/workflowBundle.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
 import type { FlowCreationOptions } from '../api.ts'
 import type { WorkbenchClient, Flow } from '../api.ts'
+import type { WorkflowBundleImporter } from '../contract.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 
 import * as Effect from 'effect/Effect'
@@ -251,6 +253,23 @@ export class FlowCatalog {
         ? this.#client.importFlow(file, { name, idempotencyKey: key, ...(tagIds == null ? {} : { tagIds }) })
         : this.#client.getFlow(await (tagIds == null ? importer(file, name, key) : importer(file, name, key, { tagIds }))),
     )
+  }
+
+  public importBundle(
+    file: WorkflowBundle,
+    name: string,
+    key: string,
+    importer?: WorkflowBundleImporter,
+    tagIds?: readonly string[],
+  ): Promise<Flow | undefined> {
+    return this.#create(async () => {
+      const result =
+        importer == null
+          ? await this.#client.importFlowBundle(file, { name, idempotencyKey: key, ...(tagIds == null ? {} : { tagIds }) })
+          : await (tagIds == null ? importer(file, name, key) : importer(file, name, key, { tagIds }))
+      if (!this.#disposed) for (const member of result.flows) this.#insert(member)
+      return result.flow
+    })
   }
 
   async #create(create: () => Promise<Flow>): Promise<Flow | undefined> {

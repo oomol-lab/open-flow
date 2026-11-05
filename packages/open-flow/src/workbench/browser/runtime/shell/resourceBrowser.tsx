@@ -1,4 +1,5 @@
 import type { ComponentProps, FormEvent, ReactElement } from 'react'
+import type { WorkflowBundle, WorkflowImportFile } from '../../../../flow/common/workflowBundle.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
 import type { Flow } from '../api.ts'
 import type { OpenFlowWorkbenchHandle, WorkbenchImportInput, WorkbenchLanguage, WorkbenchView } from '../contract.ts'
@@ -13,7 +14,8 @@ import { useLang, useTranslate } from 'val-i18n-react'
 import { val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { resourceNameIssue, resourceNameMaxLength } from '../../../../flow/common/change.ts'
-import { parseWorkflowFile, workflowNameFromFile } from '../../../../flow/common/workflowFile.ts'
+import { parseWorkflowImportFile } from '../../../../flow/common/workflowBundle.ts'
+import { workflowNameFromFile } from '../../../../flow/common/workflowFile.ts'
 import { importedWorkflowName } from '../../../../localization/common/languages.ts'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -34,7 +36,8 @@ import { FlowReferencesButton } from './flowReferences.tsx'
 import { FlowSettingsDialog } from './flowSettings.tsx'
 import { FlowTagChips, TagPicker } from './flowTags.tsx'
 import { IdTooltip } from './idTooltip.tsx'
-import { WorkflowExportMenuItem } from './workflowExportMenuItem.tsx'
+import { useWorkflowExportAction, WorkflowExportMenuItem } from './workflowExportMenuItem.tsx'
+import { WorkflowBundleSummary, WorkflowExportDialog } from './workflowTransfer.tsx'
 
 const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
 
@@ -75,6 +78,7 @@ function formatUpdatedAt(updatedAt: string, locale: string): string {
 }
 
 function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store, onTagFilter, onChanged, settingsFinalFocus }: FlowItemProps): ReactElement {
+  const exportAction = useWorkflowExportAction(() => void store.workspace.exportFlow(flow.flowId))
   const [root, setRoot] = useState<HTMLDivElement | null>(null)
   const renameAnchor = useRef<HTMLSpanElement>(null)
   const actionsButton = useRef<HTMLButtonElement>(null)
@@ -244,7 +248,7 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store, onTagFilter,
       </div>
       <div className="resource-live-controls" aria-busy={pending != null}>
         <FlowReferencesButton flow={flow} workspace={store.workspace} container={root} hrefForFlow={hrefForFlow} onSelectFlow={onSelect} />
-        <DropdownMenu>
+        <DropdownMenu onOpenChangeComplete={exportAction.onOpenChangeComplete}>
           <Tooltip>
             <TooltipTrigger
               render={<DropdownMenuTrigger render={<Button ref={actionsButton} aria-label={t('resource.actions')} size="icon-sm" variant="ghost" />} />}
@@ -295,7 +299,7 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store, onTagFilter,
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator className="mx-2 bg-border/50" />
-            <WorkflowExportMenuItem disabled={flow.status != 'active' || busy != null} onClick={() => void store.workspace.exportFlow(flow.flowId)} />
+            <WorkflowExportMenuItem disabled={flow.status != 'active' || busy != null} onClick={exportAction.onClick} />
             <DropdownMenuItem disabled={flow.status != 'active'} onClick={() => onSelect(flow, 'publications')}>
               <i aria-hidden="true" className="i-lucide-light:cloud-upload size-4 shrink-0" />
               {t('workspace.publications')}
@@ -363,7 +367,9 @@ function FlowSkeleton(): ReactElement {
   )
 }
 
-type FlowCreation = { readonly kind: 'create' } | { readonly kind: 'import'; readonly file: WorkflowFile; readonly key: string; readonly sourceUrl?: string }
+type FlowCreation =
+  | { readonly kind: 'create' }
+  | { readonly kind: 'import'; readonly file: WorkflowImportFile; readonly key: string; readonly sourceUrl?: string }
 
 interface FlowBrowserProps extends LanguageSelectProps {
   readonly catalogWidth?: OpenFlowWorkbenchProps['catalogWidth']
@@ -372,6 +378,7 @@ interface FlowBrowserProps extends LanguageSelectProps {
   readonly hrefForFlow: (flow: Pick<Flow, 'flowId'>, view?: WorkbenchView) => string
   readonly initializing?: boolean
   readonly onImportFlow?: (file: WorkflowFile, name: string, key: string, tagIds?: readonly string[]) => Promise<boolean>
+  readonly onImportFlowBundle?: ((file: WorkflowBundle, name: string, key: string, tagIds?: readonly string[]) => Promise<boolean>) | undefined
   readonly onCreateFlow: (name: string, tagIds?: readonly string[]) => Promise<boolean>
   readonly onSelectFlow: (flow: Pick<Flow, 'flowId'>, view?: WorkbenchView) => void
   readonly store: WorkbenchStore
@@ -386,6 +393,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
     initializing = false,
     onCreateFlow,
     onImportFlow,
+    onImportFlowBundle,
     onSelectFlow,
     store,
     language,
@@ -432,16 +440,21 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
 
   function openImport(input: WorkbenchImportInput): ReturnType<OpenFlowWorkbenchHandle['openImport']> {
     if (initializing || store.workspace.$.busy.value != null || creation$.value != null || onImportFlow == null) return 'unavailable'
-    let file: WorkflowFile
+    let file: WorkflowImportFile
     try {
-      file = parseWorkflowFile(input.text)
+      file = parseWorkflowImportFile(input.text)
     } catch {
       store.workspace.notify({ kind: 'error', message: t('resource.importInvalid') })
       return 'invalid-file'
     }
+    if (file.kind == 'open-flow-workflow-bundle' && onImportFlowBundle == null) {
+      store.workspace.notify({ kind: 'error', message: t('workflowTransfer.hostUnsupported') })
+      return 'unavailable'
+    }
+    const entry = file.kind == 'open-flow-workflow-bundle' ? file.workflows.find((item) => item.flowId == file.entryFlowId)!.file : file
     setCreationTags([])
     setCreatingTag(false)
-    setName(file.name ?? (input.fileName == null ? importedWorkflowName(language) : workflowNameFromFile(input.fileName)))
+    setName(entry.name ?? (input.fileName == null ? importedWorkflowName(language) : workflowNameFromFile(input.fileName)))
     creation$.set({ kind: 'import', file, key: randomId(), ...(input.sourceUrl == null ? {} : { sourceUrl: input.sourceUrl }) })
     return 'opened'
   }
@@ -460,7 +473,11 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
     const nextName = name.trim()
     if (request == null || creatingTag || resourceNameIssue(nextName) != null) return
     const success =
-      request.kind == 'create' ? await onCreateFlow(nextName, creationTags) : await onImportFlow?.(request.file, nextName, request.key, creationTags)
+      request.kind == 'create'
+        ? await onCreateFlow(nextName, creationTags)
+        : request.file.kind == 'open-flow-workflow-bundle'
+          ? await onImportFlowBundle?.(request.file, nextName, request.key, creationTags)
+          : await onImportFlow?.(request.file, nextName, request.key, creationTags)
     if (!success || command.current == null || creation$.value !== request) return
     creation$.set(undefined)
     setName('')
@@ -641,6 +658,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
             </div>
           )}
         </section>
+        <WorkflowExportDialog workspace={store.workspace} container={root} />
         {creation != null && (
           <Suspense fallback={null}>
             <CreateResourceDialog
@@ -658,6 +676,11 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
                   />
                 </Field>
               )}
+              summary={
+                creation.kind == 'import' && creation.file.kind == 'open-flow-workflow-bundle' ? (
+                  <WorkflowBundleSummary bundle={creation.file} entryName={name} />
+                ) : undefined
+              }
               field={createFlowField}
               id="flow-name"
               issue={resourceNameIssue(name)}

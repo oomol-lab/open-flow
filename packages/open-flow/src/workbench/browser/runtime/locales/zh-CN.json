@@ -1810,5 +1810,13 @@
     "loadFailed": "加载失败",
     "valuesHelp": "{{name}}：工作流主动保存的内容，后续运行可以继续读取。",
     "historyHelp": "{{name}}：条目的识别标记，用来避免重复处理。"
+  },
+  "workflowTransfer": {
+    "includeDependencies": "包含引用的工作流",
+    "workflowCount": "{{count}} 个工作流",
+    "unavailable": "{{count}} 个引用的工作流不可用。",
+    "export": "导出",
+    "hostUnsupported": "当前宿主尚不支持导入工作流包。",
+    "unnamed": "未命名工作流"
   }
 }

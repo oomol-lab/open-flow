@@ -21,6 +21,7 @@ import type {
 import { isTriggerNode, currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { decodeRevisionEnvelope, repairRevisionEnvelope } from './changeSchema.ts'
 export * from './workflowFile.ts'
+export * from './workflowBundle.ts'
 export { maxJsonDepth } from './json.ts'
 
 export { decodeFlowDocument, decodeRevisionContent, upgradeWorkflowInterfaceDocument } from './changeSchema.ts'

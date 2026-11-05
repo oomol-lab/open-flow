@@ -63,7 +63,7 @@ describe('canvas direction', () => {
     expect(onChangeDirection).toHaveBeenCalledTimes(1)
     const positions = onChangeDirection.mock.calls[0]![1]
     const ordered = Array.from({ length: 10 }, (_, index) => positions[`step-${index}`]!)
-    expect(ordered[1]!.y).toBeGreaterThanOrEqual(ordered[0]!.y + 480)
+    expect(ordered[1]!.y - ordered[0]!.y - 400).toBe(48)
     for (let index = 1; index < ordered.length; index++) {
       expect(ordered[index]!.x + 336 / 2).toBe(ordered[0]!.x + 742 / 2)
       expect(ordered[index]!.y).toBeGreaterThan(ordered[index - 1]!.y)

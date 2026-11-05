@@ -1810,5 +1810,13 @@
     "loadFailed": "Chargement impossible",
     "valuesHelp": "{{name}} : contenu enregistré explicitement par le workflow, accessible aux exécutions suivantes.",
     "historyHelp": "{{name}} : identifiants des éléments utilisés pour éviter les traitements en double."
+  },
+  "workflowTransfer": {
+    "includeDependencies": "Inclure les workflows référencés",
+    "workflowCount": "Workflows ({{count}})",
+    "unavailable": "Workflows référencés indisponibles : {{count}}.",
+    "export": "Exporter",
+    "hostUnsupported": "Cet hôte ne prend pas encore en charge l’import de lots de workflows.",
+    "unnamed": "Workflow sans nom"
   }
 }

@@ -1810,5 +1810,13 @@
     "loadFailed": "載入失敗",
     "valuesHelp": "{{name}}：工作流主動儲存的內容，後續執行可以繼續讀取。",
     "historyHelp": "{{name}}：項目的識別標記，用來避免重複處理。"
+  },
+  "workflowTransfer": {
+    "includeDependencies": "包含參照的工作流程",
+    "workflowCount": "{{count}} 個工作流程",
+    "unavailable": "{{count}} 個參照的工作流程無法使用。",
+    "export": "匯出",
+    "hostUnsupported": "目前的宿主尚未支援匯入工作流程套件。",
+    "unnamed": "未命名工作流程"
   }
 }

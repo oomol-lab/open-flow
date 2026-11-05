@@ -91,7 +91,7 @@ afterEach(() => vi.useRealTimers())
 describe('code autosave', () => {
   it('waits for code, draft and Presentation saves before exporting, and blocks failed saves', async () => {
     const { client, commit, store, workspace } = await setup()
-    const exported = vi.spyOn(client, 'exportFlow').mockRejectedValue(new Error('Stop at download boundary'))
+    const exported = vi.spyOn(client, 'getFlowExportPreview').mockRejectedValue(new Error('Stop at download boundary'))
     const held = Promise.withResolvers<void>()
     const presentation = vi.spyOn(client, 'updatePresentation').mockImplementation(async () => {
       await held.promise
@@ -127,7 +127,7 @@ describe('code autosave', () => {
       await held.promise
       throw new Error('Layout unavailable')
     })
-    const exported = vi.spyOn(client, 'exportFlow')
+    const exported = vi.spyOn(client, 'getFlowExportPreview')
     try {
       const moving = workspace.moveViewport({ x: 20, y: 30, zoom: 1 })
       const exporting = workspace.exportFlow('flow')

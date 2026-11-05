@@ -186,6 +186,48 @@ MCP exposes `flow_export` and `flow_import` with the same service and retry sema
 Cleanup does not inspect or rewrite strings in code, prompts or arbitrary business JSON.
 Files can still contain literal sensitive information; review them before sharing.
 
+### Workflow bundles
+
+Dependency export uses a single `.openflow.json` file with
+`{ kind: 'open-flow-workflow-bundle', version: 1, entryFlowId, workflows: [{ flowId, file: WorkflowFile }] }`.
+Entries contain current persisted Drafts, including declarations in disconnected nodes, Code
+workflow capabilities and Agent workflow tools. Shared dependencies appear once. Tags and
+Publications are not included. Existing single-workflow files and routes are unchanged.
+
+`GET /v1/flows/:flowId/export-preview` returns
+`{ version: 1, entryFlowId, workflows, unavailableFlowIds }`. The entry comes first and remaining
+entries are ordered by ID. Every available entry belongs to the authenticated account; unavailable
+references expose only IDs already present in the source definitions. The Workbench flushes its
+selected editor before requesting this snapshot. Confirmation downloads that exact snapshot.
+Missing dependencies block bundle export, while single-workflow export remains available.
+
+`POST /v1/flows/import-bundle` accepts the same request fields as single import, with a bundle in
+`file`. It requires `Idempotency-Key` and returns `201 { version: 1, flow, flows }`, where `flow` is
+the entry. An identical retry returns 200 with the same identities and their current metadata.
+Changed request arguments or retired/deleted members return `409 flow.conflict`; replay never
+recreates members or restores tags. Flow/Revision creation, Presentation, Team, tag assignments,
+reference indexes and the durable receipt commit in one transaction. One catalog invalidation
+follows a successful creation. The optional name overrides only the entry; selected tags and Team
+apply to every member. Source tags are never copied.
+
+The package decoder rejects duplicate identities, a missing entry or a nonempty workflow target
+outside the bundle. Incomplete drafts and cyclic declarations remain drafts subject to normal
+validation. Import allocates new identities and rewrites only structured workflow targets; saved
+ports, input mappings, aliases, node/Module IDs and business strings remain. Old call Revision
+provenance is cleared. Configure and publish dependencies, then refresh their callers' interfaces
+before executing. Import does not publish or enable workflows.
+
+`flow-encoding` exposes bundle types, strict codecs, cleanup, preview conversion,
+`parseWorkflowImportFile` and `remapWorkflowBundle`. The SDK adds `getFlowExportPreview`,
+`exportFlowBundle`, `importFlowBundle` and `WorkflowBundleImportResult`. Workbench hosts may supply
+`importFlowBundle`; hosts with a custom single-file importer must provide this callback to accept
+bundles. The callback must forward the selected destination scope and tags and return all members.
+
+CLI `flow export FLOW --include-dependencies` emits bundle JSON. Import detects either format from
+a file or stdin and accepts repeatable `--tag TAG_ID` options. Bundle JSON output retains
+`kind: 'flow.import'` and includes `flow` and `flows`. MCP `flow_export` accepts
+`includeDependencies`; `flow_import` detects bundles and accepts `tagIds` for either format.
+
 Flow is a top-level resource:
 
 ```ts

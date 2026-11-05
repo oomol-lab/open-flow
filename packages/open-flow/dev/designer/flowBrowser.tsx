@@ -1,4 +1,5 @@
 import type { Flow } from '../../src/control/common/api.ts'
+import type { WorkflowBundle } from '../../src/flow/common/workflowBundle.ts'
 import type { WorkflowFile } from '../../src/flow/common/workflowFile.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { OpenFlowWorkbenchHandle } from '../../src/workbench/browser/runtime/contract.ts'
@@ -7,6 +8,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { Toaster, toast } from 'sonner'
 import { I18nProvider } from 'val-i18n-react'
+import { currentFlowModelVersion } from '../../src/flow/common/change.ts'
 import { notificationToasterProps } from '../../src/ui/browser/public.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -27,7 +29,45 @@ const sampleWorkflow: WorkflowFile = {
 }
 const sampleText = JSON.stringify({ ...sampleWorkflow, name: 'GitHub sample' })
 
+function bundleFixture(entryFlowId = 'root', count = 3): WorkflowBundle {
+  return {
+    kind: 'open-flow-workflow-bundle',
+    version: 1,
+    entryFlowId,
+    workflows: Array.from({ length: count }, (_, index) => ({
+      flowId: index == 0 ? entryFlowId : `dependency-${index}`,
+      file: {
+        ...sampleWorkflow,
+        name: index == 0 ? 'Order processing' : index == 1 ? 'Look up customer information and delivery preferences' : `Prepare order step ${index}`,
+        content: {
+          ...sampleWorkflow.content,
+          modelVersion: currentFlowModelVersion,
+          document: {
+            ...sampleWorkflow.content.document,
+            graph: {
+              edges: [],
+              nodes:
+                index == 0
+                  ? {
+                      start: { kind: 'start', name: 'Start', inputDefs: [] },
+                      call: {
+                        kind: 'task',
+                        name: 'Customer',
+                        inputs: {},
+                        task: { name: 'Customer', inputs: [], outputs: [], executor: { kind: 'workflow', flowId: 'dependency-1', revisionId: '' } },
+                      },
+                    }
+                  : sampleWorkflow.content.document.graph.nodes,
+            },
+          },
+        },
+      },
+    })),
+  }
+}
+
 function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
+  const exportMode = useRef<'bundle' | 'single' | 'missing' | 'long' | 'failed'>('bundle')
   const importRef = useRef<OpenFlowWorkbenchHandle>(null)
   const [referenceFailure, setReferenceFailureState] = useState<'none' | 'initial' | 'next'>('none')
   const referenceFailureRef = useRef<typeof referenceFailure>('none')
@@ -45,6 +85,19 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
   const [connected, setConnected] = useState(false)
   const [session, setSession] = useState<{ connect: () => void; i18n: ReturnType<typeof createI18n>; store: WorkbenchStore }>()
   useStoryActions([
+    ...(['bundle', 'single', 'missing', 'long', 'failed'] as const).map((mode) => ({
+      label: `Export: ${mode}`,
+      onClick: () => {
+        exportMode.current = mode
+        const flowId = session?.store.workspace.$.flows.value[0]?.flowId
+        if (flowId != null) void session?.store.workspace.exportFlow(flowId)
+      },
+    })),
+    {
+      label: 'Import bundle',
+      onClick: () => log('import.open', importRef.current?.openImport({ text: JSON.stringify(bundleFixture()), fileName: 'orders.openflow.json' })),
+    },
+
     {
       label: 'Fail next tag read',
       onClick: () => {
@@ -213,6 +266,20 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
             ...(offset + 50 < references.length ? { nextOffset: offset + 50 } : {}),
           })
         }
+        if (url.endsWith('/export-preview')) {
+          if (exportMode.current == 'failed')
+            return Response.json({ error: { code: 'flow.unavailable', message: 'Export preview unavailable.' } }, { status: 503 })
+          const entryFlowId = url.split('/')[3]!
+          const bundle = bundleFixture(entryFlowId, exportMode.current == 'long' ? 24 : 3)
+          const missing = exportMode.current == 'missing'
+          return Response.json({
+            version: 1,
+            entryFlowId,
+            workflows:
+              exportMode.current == 'single' ? [{ flowId: entryFlowId, file: sampleWorkflow }] : missing ? bundle.workflows.slice(0, 1) : bundle.workflows,
+            unavailableFlowIds: missing ? ['dependency-1'] : [],
+          })
+        }
         if (url.endsWith('/export')) return Response.json(sampleWorkflow)
         if (url.endsWith('/error-listeners'))
           return Response.json({
@@ -302,6 +369,11 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
             if (failImport) session.store.workspace.notify({ kind: 'error', message: session.i18n.t('notice.requestFailed') })
             return !failImport
           }}
+          onImportFlowBundle={async (file, name, key, tagIds) => {
+            log('flow.import-bundle', { file, name, key, tagIds })
+            if (failImport) session.store.workspace.notify({ kind: 'error', message: session.i18n.t('notice.requestFailed') })
+            return !failImport
+          }}
           onSelectFlow={(flow, view = 'design') => log('flow.open', { flowId: flow.flowId, view })}
         />
       </div>
@@ -314,7 +386,7 @@ export const flowBrowserStory: FrontendStory = {
   id: 'flow-browser',
   title: 'Flow list',
   description:
-    'Tags appear below names on one line. Long labels truncate and the overflow count stays on that line; its menu shows each remaining tag with a leading tag icon without changing row height. Click a tag or use the tag filter to combine labels, untagged flows and name search. Selected conditions sit below a divider with a leading filter icon; check their wrapping and clear/remove actions at compact widths. Open Flow settings from a row menu to edit the title and tags together. Unsaved title or tag changes require confirmation when cancelling, closing, pressing Escape, clicking the backdrop or following a tag usage link. Continue editing retains both fields; discard closes without saving. Restoring the original values allows closing immediately. The list uses an icon to open tag filters. Settings, create and import forms place an Add tags chip beside selected tags. Search stays inside the shared panel; verify keyboard search, multiple selections, creating a tag, management and focus restoration. The filter hint remains visible. Tag, untagged and create options use distinct icons; the row, icon, label and usage count share a pointer cursor. Manage tags uses the Flow list toolbar and table, with a count, search, New tag button and row action menus. The close button shares the header controls’ center line; at narrow widths, search and New tag move below the title and close button. Check name truncation, reference links, anchored create/rename forms that keep the table stationary, and focus after saving or cancelling deletion. Duplicate tag names use input-attached danger feedback. Fail next tag read and Fail next tag save each fail once to exercise retry. Check centered usage counts across used and unused tags. Open the AI tag usage to compare draft, changed, disabled and long-name flows: the workflow icon and name sit on the left with compact publication/runtime chips on the right, following Variables reference rows. Workflow names stay on one line with ellipses and full-text tooltips. Panel titles may wrap across lines. Status chips wrap at narrow widths, and drafts show only one state. Flow reference counts also load a second page. Fail initial reference request and Fail next reference page each fail once, allowing retry without losing loaded rows. Reference links log their target flow and view. Delete the first row to inspect compact impact summaries; expand each summary for calling workflows or error listeners. The other rows have no references. Reference lookup failures block deletion until retry succeeds. Deleting removes only the sample workflow. Show single workflow reproduces a short name and a full-length ID in an embedded list. Compare column spacing at wide and compact widths; search and dialog inputs keep the same text size at both widths. Hover or focus a flow name to see its full text. Hover, focus, or click a Flow ID to inspect its full value and copy action; Escape closes the tooltip. Embedded layout leaves page width and spacing to the host. Show empty list to inspect the empty state. New Flow and Import workflow include a team field for checking modal controls. Import external file and Import invalid file exercise the production ref entry. The source link sits beneath the dialog title and uses the muted theme color. Fail import submission keeps the dialog open for retry; submitted keys are logged. Team cycles ready, loading and disabled submission states. Import accepts .openflow.json files and logs the submitted content; malformed files show a notification without moving the table. Row menus export a deterministic sample file that can be imported again. The list loads before notifications connect. Connect notifications to refresh the Draft row without clearing the list. Show startup to inspect the skeleton. Use the row menu to rename a flow, start/stop its publication, or open publication and run history (logged with the target flow and view). With a name filter active, rename a matching flow so it no longer matches: it leaves the list immediately. Starting/stopping also refreshes the filtered row without connecting notifications. Check that renaming stays centered on the flow name with compact controls; invalid names show feedback below the controls, and Enter, Escape, and Cancel retain their usual behavior. Search for Published flow to verify the menu extends beyond a single-row table. The name column receives more flexible space; the action column fits its reference count and menu. Compare publication and runtime columns with equal flexible space at each width. At compact widths, flow names and status columns stay aligned across rows. Switch language and theme to inspect labels and menus.',
+    'Export actions cover single files, dependency bundles, unavailable dependencies, long lists and load failures. Import bundle uses the production confirmation with a collapsed workflow list and shared tags. Tags appear below names on one line. Long labels truncate and the overflow count stays on that line; its menu shows each remaining tag with a leading tag icon without changing row height. Click a tag or use the tag filter to combine labels, untagged flows and name search. Selected conditions sit below a divider with a leading filter icon; check their wrapping and clear/remove actions at compact widths. Open Flow settings from a row menu to edit the title and tags together. Unsaved title or tag changes require confirmation when cancelling, closing, pressing Escape, clicking the backdrop or following a tag usage link. Continue editing retains both fields; discard closes without saving. Restoring the original values allows closing immediately. The list uses an icon to open tag filters. Settings, create and import forms place an Add tags chip beside selected tags. Search stays inside the shared panel; verify keyboard search, multiple selections, creating a tag, management and focus restoration. The filter hint remains visible. Tag, untagged and create options use distinct icons; the row, icon, label and usage count share a pointer cursor. Manage tags uses the Flow list toolbar and table, with a count, search, New tag button and row action menus. The close button shares the header controls’ center line; at narrow widths, search and New tag move below the title and close button. Check name truncation, reference links, anchored create/rename forms that keep the table stationary, and focus after saving or cancelling deletion. Duplicate tag names use input-attached danger feedback. Fail next tag read and Fail next tag save each fail once to exercise retry. Check centered usage counts across used and unused tags. Open the AI tag usage to compare draft, changed, disabled and long-name flows: the workflow icon and name sit on the left with compact publication/runtime chips on the right, following Variables reference rows. Workflow names stay on one line with ellipses and full-text tooltips. Panel titles may wrap across lines. Status chips wrap at narrow widths, and drafts show only one state. Flow reference counts also load a second page. Fail initial reference request and Fail next reference page each fail once, allowing retry without losing loaded rows. Reference links log their target flow and view. Delete the first row to inspect compact impact summaries; expand each summary for calling workflows or error listeners. The other rows have no references. Reference lookup failures block deletion until retry succeeds. Deleting removes only the sample workflow. Show single workflow reproduces a short name and a full-length ID in an embedded list. Compare column spacing at wide and compact widths; search and dialog inputs keep the same text size at both widths. Hover or focus a flow name to see its full text. Hover, focus, or click a Flow ID to inspect its full value and copy action; Escape closes the tooltip. Embedded layout leaves page width and spacing to the host. Show empty list to inspect the empty state. New Flow and Import workflow include a team field for checking modal controls. Import external file and Import invalid file exercise the production ref entry. The source link sits beneath the dialog title and uses the muted theme color. Fail import submission keeps the dialog open for retry; submitted keys are logged. Team cycles ready, loading and disabled submission states. Import accepts .openflow.json files and logs the submitted content; malformed files show a notification without moving the table. Row menus export a deterministic sample file that can be imported again. The list loads before notifications connect. Connect notifications to refresh the Draft row without clearing the list. Show startup to inspect the skeleton. Use the row menu to rename a flow, start/stop its publication, or open publication and run history (logged with the target flow and view). With a name filter active, rename a matching flow so it no longer matches: it leaves the list immediately. Starting/stopping also refreshes the filtered row without connecting notifications. Check that renaming stays centered on the flow name with compact controls; invalid names show feedback below the controls, and Enter, Escape, and Cancel retain their usual behavior. Search for Published flow to verify the menu extends beyond a single-row table. The name column receives more flexible space; the action column fits its reference count and menu. Compare publication and runtime columns with equal flexible space at each width. At compact widths, flow names and status columns stay aligned across rows. Switch language and theme to inspect labels and menus.',
   standalone: true,
   render: (log, dark, language) => <FlowBrowserStory dark={dark} language={language} log={log} />,
 }

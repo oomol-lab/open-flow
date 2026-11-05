@@ -2,10 +2,12 @@ import type { I18n } from 'val-i18n'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../../../canvas/common/commands.ts'
 import type { CanvasDirection } from '../../../../canvas/common/direction.ts'
 import type { FlowUpdate } from '../../../../control/common/api.ts'
+import type { WorkflowBundle, WorkflowExportPreview, WorkflowImportFile } from '../../../../flow/common/workflowBundle.ts'
 import type { WorkflowFile } from '../../../../flow/common/workflowFile.ts'
 import type { FlowCreationOptions } from '../api.ts'
 import type { WorkbenchClient, ConnectorConnection, Flow, JsonValue, Live, TriggerKeySnapshot } from '../api.ts'
 import type { DesignerViewport, Point } from '../canvasPresentation.ts'
+import type { WorkflowBundleImporter } from '../contract.ts'
 import type { FlowChangeEvent } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { DiagnosticItem } from '../editor/diagnostics.ts'
@@ -15,9 +17,12 @@ import type { DesignerEdge, DesignerGraph } from '../workspace.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 import type { Workspace$ } from './workspaceModel.ts'
 
+import { val } from 'value-enhancer'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '../../../../flow/common/edgeChanges.ts'
+import { flowResourceReferences } from '../../../../flow/common/semantics.ts'
+import { encodeWorkflowBundle, workflowBundleFromPreview } from '../../../../flow/common/workflowBundle.ts'
 import { encodeWorkflowFile, workflowFileName } from '../../../../flow/common/workflowFile.ts'
 import { workflowCandidate } from '../../../../workflow/common/workflow.ts'
 import { ApiError } from '../api.ts'
@@ -47,6 +52,8 @@ import { errorNotice } from './workbenchNotice.ts'
 import { WorkspaceModel } from './workspaceModel.ts'
 
 export class WorkspaceStore {
+  public readonly exportPreview = val<WorkflowExportPreview | undefined>(undefined)
+  #exporting = false
   readonly #edits: EditSession
   public readonly history$: EditSession['history$']
   readonly #canvasCommandListeners = new Set<(command: CanvasCommand) => void>()
@@ -110,6 +117,7 @@ export class WorkspaceStore {
   public dispose(): void {
     this.catalogs.dispose()
     this.#disposed = true
+    this.exportPreview.dispose()
     this.#edits.dispose()
     this.#stopCatalogWatch?.()
     this.#stopFlowWatch?.()
@@ -331,26 +339,61 @@ export class WorkspaceStore {
   }
 
   public async exportFlow(flowId: string): Promise<void> {
+    if (this.#exporting || this.exportPreview.value != null || this.$.busy.value != null) return
+    this.#exporting = true
     const current = this.#edits.capture()
     const selected = this.#model.value.flowId == flowId
-    if (selected && (!(await this.#edits.flush()) || !current())) {
-      this.#setNotice({ kind: 'error', message: this.#i18n.t('notice.exportSaveFailed') })
-      return
-    }
-    this.#edits.set({ busy: 'flow' })
     try {
-      const file = await this.#client.exportFlow(flowId)
+      if (selected && (!(await this.#edits.flush()) || !current())) {
+        this.#setNotice({ kind: 'error', message: this.#i18n.t('notice.exportSaveFailed') })
+        return
+      }
+      this.#edits.set({ busy: 'flow' })
+      const preview = await this.#client.getFlowExportPreview(flowId)
       if (this.#disposed || (selected && !current())) return
-      const url = URL.createObjectURL(new Blob([encodeWorkflowFile(file)], { type: 'application/json;charset=utf-8' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = workflowFileName(file.name ?? 'workflow')
-      link.click()
-      setTimeout(() => URL.revokeObjectURL(url), 0)
+      if (
+        preview.workflows.length == 1 &&
+        preview.unavailableFlowIds.length == 0 &&
+        !flowResourceReferences(preview.workflows[0]!.file.content).calledFlowIds?.length
+      )
+        this.#downloadWorkflow(preview.workflows[0]!.file)
+      else this.exportPreview.set(preview)
     } catch (error) {
       if (!this.#disposed) this.#setNotice(errorNotice(error, this.#i18n.t))
     } finally {
-      this.#edits.set({ busy: undefined })
+      this.#exporting = false
+      if (!this.#disposed) this.#edits.set({ busy: undefined })
+    }
+  }
+
+  public closeExport(): void {
+    this.exportPreview.set(undefined)
+  }
+
+  public completeExport(includeDependencies: boolean): void {
+    const preview = this.exportPreview.value
+    if (preview == null || this.#disposed) return
+    try {
+      this.#downloadWorkflow(
+        includeDependencies ? workflowBundleFromPreview(preview) : preview.workflows.find((item) => item.flowId == preview.entryFlowId)!.file,
+      )
+      this.closeExport()
+    } catch (error) {
+      this.#setNotice(errorNotice(error, this.#i18n.t))
+    }
+  }
+
+  #downloadWorkflow(file: WorkflowImportFile): void {
+    const entry = file.kind == 'open-flow-workflow-bundle' ? file.workflows.find((item) => item.flowId == file.entryFlowId)!.file : file
+    const text = file.kind == 'open-flow-workflow-bundle' ? encodeWorkflowBundle(file) : encodeWorkflowFile(file)
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = workflowFileName(entry.name ?? 'workflow')
+      link.click()
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 0)
     }
   }
 
@@ -371,6 +414,16 @@ export class WorkspaceStore {
     tagIds?: readonly string[],
   ): Promise<Flow | undefined> {
     return this.#createFlow(() => this.#flows.import(file, name, key, importer, tagIds))
+  }
+
+  public importFlowBundle(
+    file: WorkflowBundle,
+    name: string,
+    key: string,
+    importer?: WorkflowBundleImporter,
+    tagIds?: readonly string[],
+  ): Promise<Flow | undefined> {
+    return this.#createFlow(() => this.#flows.importBundle(file, name, key, importer, tagIds))
   }
 
   async #createFlow(create: () => Promise<Flow | undefined>): Promise<Flow | undefined> {

@@ -8,6 +8,8 @@ export interface ParsedArguments {
   readonly scope?: string
   readonly key?: string
   readonly space?: string
+  readonly includeDependencies: boolean
+  readonly tags: readonly string[]
   readonly idempotencyKey: string
   readonly expectedPublication?: string
   readonly trigger?: string
@@ -50,6 +52,8 @@ export interface ParsedArguments {
 const runStatuses: ReadonlySet<RunStatus> = new Set(runStatusValues)
 
 export function parseArguments(args: readonly string[]): ParsedArguments {
+  let includeDependencies = false
+  const tags: string[] = []
   let scope: string | undefined
   let key: string | undefined
   let space: string | undefined
@@ -97,11 +101,12 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     const equals = raw.startsWith('--') ? raw.indexOf('=') : -1
     const argument = equals < 0 ? raw : raw.slice(0, equals)
     const inlineValue = equals < 0 ? undefined : raw.slice(equals + 1)
-    if (inlineValue != null && ['--json', '--follow', '--wait', '--yes', '--pending-wait'].includes(argument))
+    if (inlineValue != null && ['--json', '--follow', '--wait', '--yes', '--pending-wait', '--include-dependencies'].includes(argument))
       throw new CliError('cli.invalid-arguments', `${argument} does not accept a value.`)
     if (argument.startsWith('--')) {
       const flag = argument.slice(2)
-      if (options.includes(flag) && flag != 'set' && flag != 'unset') throw new CliError('cli.invalid-arguments', `Duplicate option --${flag}.`)
+      if (options.includes(flag) && flag != 'set' && flag != 'unset' && flag != 'tag')
+        throw new CliError('cli.invalid-arguments', `Duplicate option --${flag}.`)
       options.push(flag)
     }
     if (['--scope', '--key', '--space'].includes(argument)) {
@@ -112,6 +117,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       else space = value
     } else if (argument == '--json') {
       json = true
+    } else if (argument == '--include-dependencies') {
+      includeDependencies = true
     } else if (argument == '--follow') {
       follow = true
     } else if (argument == '--wait') {
@@ -148,6 +155,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--comment' ||
       argument == '--timeout' ||
       argument == '--timezone' ||
+      argument == '--tag' ||
       argument == '--set' ||
       argument == '--unset'
     ) {
@@ -176,6 +184,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       else if (argument == '--outputs') outputs = value
       else if (argument == '--cursor') cursor = value
       else if (argument == '--timezone') timezone = value
+      else if (argument == '--tag') tags.push(value)
       else if (argument == '--set') sets.push(value)
       else if (argument == '--unset') unsets.push(value)
       else if (argument == '--source') {
@@ -215,6 +224,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     }
   }
   return {
+    includeDependencies,
+    tags,
     scope,
     key,
     space,

@@ -27,6 +27,16 @@ if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error
 
 const api = await import('@oomol-lab/open-flow/control-api')
 if (typeof api.ControlClient !== 'function') throw new Error('Missing Control API client.')
+const encoding = await import('@oomol-lab/open-flow/flow-encoding')
+const portable = { kind: 'open-flow-workflow', version: 1, content: { modelVersion: 6, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] } } } }
+const bundle = { kind: 'open-flow-workflow-bundle', version: 1, entryFlowId: 'root', workflows: [{ flowId: 'root', file: portable }] }
+assert.deepEqual(encoding.parseWorkflowImportFile(encoding.encodeWorkflowBundle(bundle)), bundle)
+assert.equal(encoding.remapWorkflowBundle(bundle, new Map([['root', 'imported']])).entryFlowId, 'imported')
+const bundleClient = new api.ControlClient(async (url) => {
+  assert.equal(url, '/v1/flows/root/export-preview')
+  return Response.json({ version: 1, entryFlowId: 'root', workflows: bundle.workflows, unavailableFlowIds: [] })
+})
+assert.deepEqual(await bundleClient.exportFlowBundle('root'), bundle)
 const liveClient = new api.ControlClient(async (url) => {
   assert.equal(url, '/v1/flows/flow/live/details')
   return Response.json({ flowId: 'flow', publication: null, inputDefs: null, status: 'not-published', entries: [], version: 1 })
@@ -99,7 +109,6 @@ if (typeof nodejsCompat.nodejsGuestModules[fsModule] !== 'string' || typeof node
   throw new Error('Missing Node compatibility guest modules.')
 const webhook = await import('@oomol-lab/open-flow/webhook-trigger')
 if (webhook.maximumWebhookBodyBytes !== 65536) throw new Error('Missing Webhook Trigger contract.')
-const encoding = await import('@oomol-lab/open-flow/flow-encoding')
 if (typeof encoding.encodeRevision !== 'function') throw new Error('Missing Flow encoding runtime.')
 const semantics = await import('@oomol-lab/open-flow/flow-semantics')
 if (typeof semantics.prepareFlow !== 'function') throw new Error('Missing Flow semantics runtime.')

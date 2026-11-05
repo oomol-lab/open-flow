@@ -1810,5 +1810,13 @@
     "loadFailed": "불러오기 실패",
     "valuesHelp": "{{name}}: 워크플로가 직접 저장하여 이후 실행에서 읽을 수 있는 내용입니다.",
     "historyHelp": "{{name}}: 같은 항목을 반복 처리하지 않기 위한 식별 정보입니다."
+  },
+  "workflowTransfer": {
+    "includeDependencies": "참조된 워크플로 포함",
+    "workflowCount": "워크플로 {{count}}개",
+    "unavailable": "참조된 워크플로 {{count}}개를 사용할 수 없습니다.",
+    "export": "내보내기",
+    "hostUnsupported": "이 호스트는 아직 워크플로 번들 가져오기를 지원하지 않습니다.",
+    "unnamed": "이름 없는 워크플로"
   }
 }

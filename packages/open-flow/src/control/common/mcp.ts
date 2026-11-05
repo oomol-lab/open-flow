@@ -103,13 +103,13 @@ export const mcpTools = {
     true,
   ),
   flow_export: tool(
-    'Export the current draft as a shareable workflow JSON file. Structured external references are cleared. Literal secrets in code, prompts or business JSON remain; review before sharing.',
-    z.strictObject({ flowId: flow }),
+    'Export the current draft as shareable workflow JSON. Set includeDependencies to bundle all referenced drafts. Structured external references are cleared. Literal secrets in code, prompts or business JSON remain; review before sharing.',
+    z.strictObject({ flowId: flow, includeDependencies: z.boolean().optional() }),
     true,
   ),
   flow_import: tool(
-    'Import workflow JSON as a new unpublished draft. External references are cleared and must be configured again. Keep identical arguments and idempotencyKey when retrying.',
-    z.strictObject({ file: json, name: id.optional(), teamId: id.optional(), idempotencyKey: mutationKey }),
+    'Import workflow JSON or a bundle as new unpublished drafts. tagIds apply to every imported workflow. External references are cleared and must be configured again. Keep identical arguments and idempotencyKey when retrying.',
+    z.strictObject({ file: json, name: id.optional(), teamId: id.optional(), tagIds: z.array(id).optional(), idempotencyKey: mutationKey }),
     false,
   ),
   flow_create: tool(

@@ -152,7 +152,7 @@ it('migrates byte-accounted data without losing values or history', async () => 
   store.insert('f', 'draft', 'flow', await hashIdentities(['a']))
   restoreGroupedServiceSettings(database.connection)
   database.connection.exec(
-    "CREATE TABLE flow_state_usage (flow_id TEXT, scope TEXT, bytes INTEGER); ALTER TABLE flow_dedupe_spaces ADD COLUMN mode TEXT NOT NULL DEFAULT 'new'; ALTER TABLE flow_dedupe_spaces ADD COLUMN watermark_json TEXT; DROP TABLE flow_dedupe_pending; UPDATE flow_state_values SET size = 999; PRAGMA user_version = 58",
+    "CREATE TABLE flow_state_usage (flow_id TEXT, scope TEXT, bytes INTEGER); ALTER TABLE flow_dedupe_spaces ADD COLUMN mode TEXT NOT NULL DEFAULT 'new'; ALTER TABLE flow_dedupe_spaces ADD COLUMN watermark_json TEXT; DROP TABLE flow_dedupe_pending; UPDATE flow_state_values SET size = 999; DROP TABLE workflow_bundle_imports; PRAGMA user_version = 58",
   )
   migrate(database)
   expect(store.view('f', 'draft')).toMatchObject({ values: [{ key: 'key', size: 8 }], spaces: [{ count: 1 }] })

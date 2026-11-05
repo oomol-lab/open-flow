@@ -5,6 +5,7 @@ import type { ServerService } from '../application/service.ts'
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
 import { controlErrorCode, actionSummary, searchTriggerKeys } from '@oomol-lab/open-flow/control-api'
 import { authoringSchema } from '@oomol-lab/open-flow/control-requests'
+import { workflowBundleFromPreview } from '@oomol-lab/open-flow/flow-encoding'
 import { importedWorkflowName, resolveMetadataLanguage } from '@oomol-lab/open-flow/localization'
 import { mcpTools, mcpProtocolVersion, mcpInstructions } from '@oomol-lab/open-flow/mcp'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
@@ -135,12 +136,19 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
     mcpTools.flow_create,
     async ({ name, idempotencyKey, teamId }) => (await control.flows.createFlow(actorId, name, idempotencyKey, teamId)).flow,
   )
-  register('flow_export', mcpTools.flow_export, ({ flowId }) => control.flows.exportFlow(actorId, flowId))
-  register(
-    'flow_import',
-    mcpTools.flow_import,
-    async ({ file, name, teamId, idempotencyKey }) => (await control.flows.importFlow(actorId, file, idempotencyKey, name, teamId, defaultImportName)).flow,
-  )
+  register('flow_export', mcpTools.flow_export, ({ flowId, includeDependencies }) => {
+    if (!includeDependencies) return control.flows.exportFlow(actorId, flowId)
+    const preview = control.flows.getExportPreview(actorId, flowId)
+    if (preview.unavailableFlowIds.length) throw new ControlError(controlErrorCode.flowInvalid, 'Some referenced workflows are unavailable.')
+    return workflowBundleFromPreview(preview)
+  })
+  register('flow_import', mcpTools.flow_import, async ({ file, name, teamId, idempotencyKey, tagIds }) => {
+    if (file != null && typeof file == 'object' && 'kind' in file && file.kind == 'open-flow-workflow-bundle') {
+      const { created: _created, ...imported } = await control.flows.importBundle(actorId, file, idempotencyKey, name, teamId, defaultImportName, tagIds)
+      return imported
+    }
+    return (await control.flows.importFlow(actorId, file, idempotencyKey, name, teamId, defaultImportName, tagIds)).flow
+  })
   register('flow_edit', mcpTools.flow_edit, ({ flowId, ...request }) => control.drafts.editAuthoring(actorId, flowId, request))
   register('flow_check', mcpTools.flow_check, ({ flowId, revisionId }) => control.drafts.checkAuthoring(actorId, flowId, revisionId))
   register('flow_publish', mcpTools.flow_publish, ({ flowId, revisionId, expectedLivePublicationId, idempotencyKey }) =>
