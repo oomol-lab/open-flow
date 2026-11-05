@@ -469,11 +469,20 @@ describe('Agent streaming adapter', () => {
   it.each([undefined, 'delivery_unconfirmed', 'notification_unavailable'] as const)(
     'terminates an uncertain call (%s) without executing the rest of the batch or requesting another model round',
     async (failureCode) => {
+      const connector = new ConnectorClient('https://connector.example', '')
+      const message = failureCode == null ? 'Outcome unknown.' : `Leina notification failed (${failureCode}).`
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => Response.json({ success: false, errorCode: 'provider_error', data: { error: failureCode, retryable: true } }, { status: 502 })),
+      )
       const source = {
         ...task,
         executor: {
           ...task.executor,
-          tools: task.executor.kind == 'agent' ? task.executor.tools.map((tool) => Object.assign({}, tool, { approval: false })) : [],
+          tools:
+            task.executor.kind == 'agent'
+              ? task.executor.tools.map((tool) => Object.assign({}, tool, { action: 'leina.send_notification', approval: false }))
+              : [],
         },
       } as ManagedTaskDefinition
       const { model, prompts } = fixture([
@@ -489,26 +498,21 @@ describe('Agent streaming adapter', () => {
           source,
           invocation,
           model,
-          async (_tool, _input, id) => {
+          async (_tool, input, id, signal) => {
             calls.push(id)
-            throw failureCode == null
-              ? new ConnectorTaskError('connector.indeterminate', 'Outcome unknown.')
-              : new ConnectorTaskError('connector.unavailable', 'Request failed.', 502, {
-                  executionFailure: { code: failureCode, message: 'Outcome unknown.' },
-                  outcomeUnknown: true,
-                  retryable: false,
-                })
+            if (failureCode == null) throw new ConnectorTaskError('connector.indeterminate', message)
+            return connector.execute('leina.send_notification', undefined, { message: input.body!, subscription: 'sub_test' }, id, signal)
           },
           async (event) => {
             events.push(event)
           },
         ),
-      ).rejects.toThrow()
+      ).rejects.toMatchObject({ code: 'connector.indeterminate', retryable: false, catchable: false })
       expect(calls).toEqual(['invocation:1:a'])
       expect(prompts).toHaveLength(1)
       expect(events.find((event) => event.status == 'failed')).toMatchObject({
         executed: null,
-        message: 'Outcome unknown.',
+        message,
         code: failureCode ?? 'connector.indeterminate',
       })
     },

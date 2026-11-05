@@ -173,13 +173,14 @@ Retries must not duplicate accepted execution. If side-effect outcomes cannot be
 Cancellation and completion races must produce one authoritative terminal state.
 The deployment limits concurrency and execution budgets and owns queuing and recovery. Clients must not take ownership of scheduling facts.
 
-Leina subscription notifications use a success/failure delivery contract as an explicit exception.
+Direct Leina subscription notification Tasks use a success/failure delivery contract as an explicit exception.
 Direct Connector Tasks may retry unknown delivery outcomes with the same event identity within the notification budget, according to Connector retryability.
 The deployment's Connector execution adapter owns this identity and budget across attempts. Run
 execution and Agent tools consume normalized failure details and outcome certainty; the deployment
 composition supplies the Connector's allowed public failure codes to the generic event projector.
 A confirmed retry may complete the Run. An unhandled final notification error, including `delivery_unconfirmed`, ends it as `failed`.
 A failed notification Run can include a delivered message. Manual reruns create a new event identity and may deliver it again.
+Calls inside Code or Agent Tasks keep the general indeterminate-side-effect rule; they do not share the direct Task's stable identity or retry policy.
 See the [notification execution contract](control/contracts/control-api.md#connector-passthrough) for identity, retry and deadline rules.
 
 ### Flow State

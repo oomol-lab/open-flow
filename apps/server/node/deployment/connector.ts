@@ -79,6 +79,15 @@ function notificationFailure(code: (typeof notificationErrorCodes)[number], mess
   })
 }
 
+class NotificationError extends ConnectorTaskError {
+  readonly deliveryRetryable: boolean
+
+  constructor(code: (typeof notificationErrorCodes)[number], message: string, retryable: boolean, status?: number) {
+    super('connector.indeterminate', message, status, { executionFailure: { code, message }, retryable: false })
+    this.deliveryRetryable = retryable
+  }
+}
+
 /** Owns direct Task identity and delivery budgets across attempts within one Run. */
 export class ConnectorExecution {
   readonly #deadlines = new Map<string, number>()
@@ -126,6 +135,12 @@ export class ConnectorExecution {
       .catch((error: unknown) => {
         if (context.signal.aborted) throw context.signal.reason
         if (timeout?.aborted) throw notificationFailure('delivery_timeout', 'The notification exceeded its one-hour delivery deadline.', false)
+        if (deadline != null && error instanceof NotificationError)
+          throw new ConnectorTaskError('connector.unavailable', error.message, error.status, {
+            executionFailure: error.executionFailure,
+            outcomeUnknown: error.outcomeUnknown,
+            retryable: error.deliveryRetryable && deadline - performance.now() > context.retryIntervalMs,
+          })
         if (deadline != null && error instanceof ConnectorTaskError && error.retryable && deadline - performance.now() <= context.retryIntervalMs)
           throw new ConnectorTaskError(error.code, error.message, error.status, {
             executionFailure: error.executionFailure,
@@ -516,7 +531,7 @@ export class ConnectorClient implements ConnectorHost {
         if (signal.aborted) throw signal.reason
         if (!(error instanceof RequestError)) throw error
         if (subscribedNotification)
-          throw notificationFailure('notification_unavailable', `${error.reason}. The notification outcome is unknown.`, true, error.status)
+          throw new NotificationError('notification_unavailable', `${error.reason}. The notification outcome is unknown.`, true, error.status)
         throw new ConnectorTaskError(
           'connector.indeterminate',
           `${error.reason}${error.status == null ? '' : ` (HTTP ${error.status})`}. The action outcome is unknown.`,
@@ -525,7 +540,7 @@ export class ConnectorClient implements ConnectorHost {
     const response = actionResponse.value
     if (!record(response)) {
       if (subscribedNotification)
-        throw notificationFailure(
+        throw new NotificationError(
           'notification_unavailable',
           'Connector returned an invalid notification response. The notification outcome is unknown.',
           true,
@@ -545,7 +560,7 @@ export class ConnectorClient implements ConnectorHost {
       const data = record(response.data) ? response.data : undefined
       const code = notificationErrorCodes.find((candidate) => candidate == data?.error) ?? 'notification_unavailable'
       const retryable = typeof data?.retryable == 'boolean' ? data.retryable : actionResponse.status == 429 || actionResponse.status >= 500
-      throw notificationFailure(code, `Leina notification failed (${code}).`, retryable, actionResponse.status)
+      throw new NotificationError(code, `Leina notification failed (${code}).`, retryable, actionResponse.status)
     }
     throw new ConnectorTaskError(
       'connector.indeterminate',

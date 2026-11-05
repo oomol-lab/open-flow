@@ -388,7 +388,7 @@ export class RunExecutor {
               error instanceof CodeFetchDeniedError
             )
               return {
-                ...(error instanceof ConnectorTaskError && error.executionFailure != null
+                ...(error instanceof ConnectorTaskError && !error.indeterminate && error.executionFailure != null
                   ? error.executionFailure
                   : { code: error.code, message: error.message }),
                 retryable: error.retryable,

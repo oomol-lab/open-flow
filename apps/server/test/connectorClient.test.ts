@@ -11,7 +11,7 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
-import { ConnectorClient } from '../node/deployment/connector.ts'
+import { ConnectorClient, ConnectorExecution } from '../node/deployment/connector.ts'
 import { createLogger } from '../node/logger.ts'
 import { acceptRun } from './runFixture.ts'
 import { closeService, openService, startService as startRuntime } from './serviceFixture.ts'
@@ -161,6 +161,76 @@ async function readBody(request: IncomingMessage): Promise<unknown> {
 const app = { alias: 'work', id: 'connection-work', service: 'example', status: 'active' }
 
 describe('Server Connector client', () => {
+  it.each(['network', 'invalid-json', 'invalid-response', 'delivery-unconfirmed'].flatMap((failure) => [false, true].map((caught) => ({ failure, caught }))))(
+    'keeps subscribed Code calls indeterminate after $failure (caught: $caught)',
+    async ({ failure, caught }) => {
+      const keys: (string | undefined)[] = []
+      const origin = await startConnector((request, response) => {
+        if (request.url == '/v1/apps') return send(response, 200, success([{ ...app, service: 'leina' }]))
+        keys.push(request.headers['idempotency-key'] as string | undefined)
+        if (failure == 'network') {
+          request.socket.destroy()
+          return
+        }
+        if (failure == 'invalid-json') {
+          response.writeHead(502)
+          response.end('invalid JSON')
+          return
+        }
+        send(
+          response,
+          502,
+          failure == 'invalid-response' ? null : { success: false, errorCode: 'provider_error', data: { error: 'delivery_unconfirmed', retryable: false } },
+        )
+      })
+      const { service } = await startService(origin)
+      const revision = capabilityFlow()
+      const node = revision.document.graph.nodes.capability
+      if (node?.kind != 'task' || !('moduleId' in node.task)) throw new Error('Expected Code Task')
+      const call = `capability.actions.leina.send_notification({ message: input.message, subscription: 'sub_test' })`
+      const source: RevisionContent = {
+        ...revision,
+        document: {
+          ...revision.document,
+          graph: {
+            ...revision.document.graph,
+            nodes: {
+              capability: {
+                ...node,
+                retry: { maxRetries: 1, intervalMs: 1000 },
+                task: {
+                  ...node.task,
+                  capabilities: [
+                    {
+                      kind: 'connector',
+                      action: 'leina.send_notification',
+                      connections: [{ connectionId: 'connection-work' }],
+                      connectionId: 'connection-work',
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        modules: {
+          capability: {
+            ...revision.modules.capability!,
+            source: caught
+              ? `export default async (input, capability) => { try { await ${call} } catch {} return { message: 'ignored' } }`
+              : `export default async (input, capability) => await ${call}`,
+          },
+        },
+      }
+      const runId = await run(service, source)
+      expect(keys).toHaveLength(1)
+      expect(keys[0]).toEqual(expect.any(String))
+      expect(service.run(runId)).toMatchObject({ status: 'indeterminate', result: { error: { code: 'execution.terminal-unknown' } } })
+      expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({ payload: { error: { code: 'connector.indeterminate' } } })
+      expect(service.events(runId).filter((event) => event.kind == 'node.log')).toHaveLength(0)
+    },
+  )
+
   it.each([
     { failure: 'network', recover: false },
     { failure: 'invalid-json', recover: false },
@@ -254,16 +324,45 @@ describe('Server Connector client', () => {
       send(response, status, { success: false, errorCode: status == 429 ? 'rate_limited' : 'provider_error', message: 'credential=private-secret', data }),
     )
     const client = new ConnectorClient(origin, '')
+    const failure = {
+      executionFailure: { code, message: `Leina notification failed (${code}).` },
+      outcomeUnknown: true,
+      status,
+      message: `Leina notification failed (${code}).`,
+    }
     await expect(
       client.execute('leina.send_notification', undefined, { subscription: 'sub_test', message: 'hello' }, 'job', AbortSignal.timeout(5000)),
     ).rejects.toMatchObject({
-      executionFailure: { code, message: `Leina notification failed (${code}).` },
-      outcomeUnknown: true,
+      ...failure,
+      code: 'connector.indeterminate',
+      retryable: false,
+      catchable: false,
+      indeterminate: true,
+    })
+    await expect(
+      new ConnectorExecution(() => client).execute(
+        'leina.send_notification',
+        undefined,
+        { subscription: 'sub_test', message: 'hello' },
+        {
+          jobId: 'job',
+          invocationId: 'attempt',
+          signal: AbortSignal.timeout(5000),
+          retryIntervalMs: 1000,
+          access: {
+            scope: 'shared',
+            purpose: 'execute',
+            source: 'run',
+            providerAccess: { mode: 'implicit', sharedAccessDigest: 'implicit', sharedBindings: [], selectedBindings: [], version: 2 },
+          },
+        },
+      ),
+    ).rejects.toMatchObject({
+      ...failure,
+      code: 'connector.unavailable',
       retryable,
-      status,
       catchable: true,
       indeterminate: false,
-      message: `Leina notification failed (${code}).`,
     })
   })
 
@@ -282,7 +381,7 @@ describe('Server Connector client', () => {
   })
 
   it.each(['timeout', 'network', 'invalid-json', 'invalid-response'] as const)(
-    'allows subscribed notification recovery from %s with an unknown delivery outcome',
+    'preserves the unknown outcome of subscribed notification %s failures outside direct Tasks',
     async (failure) => {
       const keys: (string | undefined)[] = []
       const origin = await startConnector((request, response) => {
@@ -302,7 +401,14 @@ describe('Server Connector client', () => {
       const client = new ConnectorClient(origin, '', 25)
       await expect(
         client.execute('leina.send_notification', undefined, { subscription: 'sub_test' }, 'stable-job', AbortSignal.timeout(5000)),
-      ).rejects.toMatchObject({ executionFailure: { code: 'notification_unavailable' }, outcomeUnknown: true, retryable: true, indeterminate: false })
+      ).rejects.toMatchObject({
+        code: 'connector.indeterminate',
+        executionFailure: { code: 'notification_unavailable' },
+        outcomeUnknown: true,
+        retryable: false,
+        catchable: false,
+        indeterminate: true,
+      })
       expect(keys).toEqual(['stable-job'])
     },
   )
