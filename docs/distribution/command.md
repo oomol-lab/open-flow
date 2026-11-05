@@ -85,6 +85,13 @@ The CLI stores no current Flow or local transaction. The host selects the team a
 
 MCP accepts the same request directly, with an additional `flowId`. `schema TYPE` and request schemas are available offline. Action queries require a deployment.
 
+The CLI checks JSON request inputs for valid JSON objects and requires a non-empty `requestId`
+for Edit retry identity. It forwards all fields unchanged for `read/search/edit`, deployment
+schema queries, and canvas commands. The deployment validates supported fields, operations,
+node types, and business constraints. Offline schemas describe the installed command version;
+they do not limit requests sent to a newer deployment. Unknown fields in ordinary response
+objects are ignored while required fields, known types, identities, and versions remain checked.
+
 `read/search/edit/check --help --json` includes the command’s request schema, constraints, and examples. Text help includes the same instructions and examples. `schema check` describes the public request field `revisionId`; the CLI supplies it through `--revision`.
 
 `--help --json` does not access the deployment. Options accept `--option value` or `--option=value`. Use the latter for values that start with `-`; a standalone `-` means stdin. Unsupported options, repeated single-value options, and missing values are rejected before a request is sent.
@@ -109,6 +116,13 @@ The CLI writes normal results to stdout and invocation errors to stderr. `--json
 ### Execution and waiting
 
 A Run pins one Trigger. The CLI selects the Start node automatically even when the graph has other Triggers. A sole legacy Manual Trigger remains supported. Use `--trigger` to select another entry. `--outputs` accepts a JSON object indexed by Start parameter or Trigger output name. Its default is `{}`; Start requires its non-nullable parameters and normalizes omitted nullable parameters to `null`. Other Triggers require complete outputs.
+
+Entry selection reads only Trigger IDs, kinds, and names from the pinned Revision through
+`ControlClient.getRevisionTriggers`; it does not decode node configurations or CodeModules.
+New node types and additional configuration fields therefore do not block Run creation in the
+CLI. Run input values are forwarded unchanged, and additional response metadata is ignored.
+The deployment still validates inputs, entry eligibility, and the requested Engine contract;
+this does not allow an incompatible Engine or changed execution protocol to run implicitly.
 
 When a pending decision is detected, wait commands return the Run detail’s `waits` array. Each item includes `waitId`, `nodeId`, `prompt`, `actions`, and an expiry time. The Run can still be running. Use `runs list --pending-wait` to find all Runs with pending waits.
 

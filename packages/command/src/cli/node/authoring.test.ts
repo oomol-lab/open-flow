@@ -19,6 +19,14 @@ const flow = {
   version: 1,
 }
 const edit = { baseRevision: 'r1', requestId: 'one', edits: [{ op: 'node.add', as: 'code', type: 'code', name: 'Code', code: 'export default () => ({})' }] }
+const extendedEdit = {
+  ...edit,
+  future: { enabled: true },
+  edits: [
+    { ...edit.edits[0], type: 'future-node', future: true },
+    { op: 'future.operation', options: [null, false, 0] },
+  ],
+}
 const receipt = {
   flowId: 'flow',
   saved: true,
@@ -55,12 +63,12 @@ function io() {
   }
 }
 it.each([
-  ['--input', JSON.stringify(edit)],
+  ['--input', JSON.stringify(extendedEdit)],
   ['--input', '@edit.json'],
   ['--file', 'edit.json'],
   ['--input', '-'],
   ['--file', '-'],
-])('submits the same atomic semantic request via %s %s', async (...input) => {
+])('forwards new edit fields, node types and operations via %s %s', async (...input) => {
   const output = io(),
     writes: unknown[] = []
   const request = async (path: string, init?: RequestInit) => {
@@ -70,8 +78,19 @@ it.each([
     expect(new Headers(init?.headers).get('idempotency-key')).toBe('one')
     return Response.json(receipt)
   }
-  expect(await runCli(['edit', 'flow', ...input, '--json'], { request }, output.value), output.stderr()).toBe(0)
-  expect(writes).toEqual([edit])
+  expect(
+    await runCli(
+      ['edit', 'flow', ...input, '--json'],
+      { request },
+      {
+        ...output.value,
+        readFile: async () => JSON.stringify(extendedEdit),
+        readStdin: async () => JSON.stringify(extendedEdit),
+      },
+    ),
+    output.stderr(),
+  ).toBe(0)
+  expect(writes).toEqual([extendedEdit])
   expect(JSON.parse(output.stdout())).toEqual(receipt)
 })
 it('replays an identical request after the response is lost and the head advances', async () => {
@@ -84,13 +103,67 @@ it('replays an identical request after the response is lost and the head advance
   }
   const first = io(),
     second = io(),
-    args = ['edit', 'flow', '--file', '-', '--json']
+    args = ['edit', 'flow', '--input', JSON.stringify(extendedEdit), '--json']
   expect(await runCli(args, { request }, first.value)).toBe(1)
-  expect(JSON.parse(first.stderr())).toMatchObject({ error: { code: 'flow.mutation-outcome-unknown', details: { idempotencyKey: 'one', request: edit } } })
+  expect(JSON.parse(first.stderr())).toMatchObject({
+    error: { code: 'flow.mutation-outcome-unknown', details: { idempotencyKey: 'one', request: extendedEdit } },
+  })
   expect(await runCli(args, { request }, second.value), second.stderr()).toBe(0)
-  expect(writes).toEqual([edit, edit])
+  expect(writes).toEqual([extendedEdit, extendedEdit])
   expect(JSON.parse(second.stdout())).toEqual(receipt)
 })
+it.each([
+  { command: ['read', 'flow'], operation: 'read', body: { future: true }, response: { flowId: 'flow', revision: 'r1', data: {}, version: 1 } },
+  {
+    command: ['search', 'flow'],
+    operation: 'search',
+    body: { query: 'Code', type: 'future-node', future: { enabled: true } },
+    response: { flowId: 'flow', revision: 'r1', data: { matches: [], total: 0 }, version: 1 },
+  },
+  { command: ['schema', '--flow', 'flow'], operation: 'schema', body: { type: 'future-node', future: true }, response: { future: true } },
+])('forwards deployment-defined $operation requests without applying the installed schema', async ({ command, operation, body, response }) => {
+  const output = io()
+  const request = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path == '/v1/flows/flow') return Response.json(flow)
+    expect(path).toBe(`/v1/flows/flow/authoring/${operation}`)
+    expect(JSON.parse(String(init?.body))).toEqual(body)
+    return Response.json(response)
+  })
+  expect(await runCli([...command, '--input', JSON.stringify(body), '--json'], { request }, output.value), output.stderr()).toBe(0)
+  expect(request).toHaveBeenCalledTimes(2)
+  expect(JSON.parse(output.stdout())).toEqual(response)
+})
+
+it.each(['{', 'null', '[]', '1', 'false', '"text"'])('rejects non-object JSON input before contacting the host: %s', async (input) => {
+  const output = io()
+  const request = vi.fn()
+  expect(await runCli(['read', 'flow', '--input', input, '--json'], { request }, output.value)).toBe(1)
+  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'cli.invalid-arguments' } })
+  expect(request).not.toHaveBeenCalled()
+})
+
+it.each([{}, { requestId: null }, { requestId: 1 }, { requestId: '' }])('requires a usable Edit retry identity: %j', async (body) => {
+  const output = io()
+  const request = vi.fn()
+  expect(await runCli(['edit', 'flow', '--input', JSON.stringify(body), '--json'], { request }, output.value)).toBe(1)
+  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'cli.invalid-arguments', message: 'Edit requires a non-empty requestId.' } })
+  expect(request).not.toHaveBeenCalled()
+})
+
+it.each(['read', 'search', 'edit', 'canvas'])('preserves deployment validation errors for %s requests', async (operation) => {
+  const output = io()
+  const body = { requestId: 'one', future: true }
+  const error = { code: 'flow.invalid', message: 'Unsupported request field.', details: { field: 'future' } }
+  const request = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path == '/v1/flows/flow') return Response.json(flow)
+    expect(JSON.parse(String(init?.body))).toEqual(operation == 'canvas' ? { command: body, version: 1 } : body)
+    return Response.json({ error, version: 1 }, { status: 400 })
+  })
+  expect(await runCli([operation, 'flow', '--input', JSON.stringify(body), '--json'], { request }, output.value)).toBe(1)
+  expect(request).toHaveBeenCalledTimes(2)
+  expect(JSON.parse(output.stderr())).toEqual({ error: { ...error, details: { ...error.details, status: 400 } }, version: 1 })
+})
+
 it('keeps fixed revision errors and recoverable text edit details', async () => {
   const request = async (path: string) =>
     path == '/v1/flows/flow'

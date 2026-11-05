@@ -80,40 +80,44 @@ describe('CLI', () => {
     expect(await runCli(['state', 'show', flow.flowId, '--scope', 'live', '--full'], { request }, output.value)).toBe(1)
     expect(request).not.toHaveBeenCalled()
   })
-  it.each([{ type: 'focus', nodeId: 'node' }, { type: 'zoom', zoom: 0.8 }, { type: 'pan', dx: -200, dy: 100 }, { type: 'fit' }])(
-    'broadcasts canvas commands through the shared API: %j',
-    async (command) => {
-      for (const input of [
-        ['--input', JSON.stringify(command)],
-        ['--file', 'command.json'],
-        ['--input', '-'],
-      ]) {
-        const output = runtime()
-        const request = vi.fn(async (path: string, init?: RequestInit) => {
-          if (path == '/v1/flows?limit=100') return Response.json({ flows: [{ ...flow, referenceCount: 0 }], version: 1 })
-          if (path == '/v1/flows/Main') return Response.json({ version: 1, error: { code: 'flow.not-found', message: 'Not found' } }, { status: 404 })
-          if (path == `/v1/flows/${flow.flowId}`) return Response.json(flow)
-          expect(path).toBe(`/v1/flows/${flow.flowId}/canvas`)
-          expect(init?.method).toBe('POST')
-          expect(new Headers(init?.headers).has('idempotency-key')).toBe(false)
-          expect(JSON.parse(String(init?.body))).toEqual({ version: 1, command })
-          return Response.json({ version: 1, flowId: flow.flowId, broadcast: true })
-        })
-        expect(
-          await runCli(
-            ['canvas', 'Main', ...input, '--json'],
-            { request },
-            {
-              ...output.value,
-              readFile: async () => JSON.stringify(command),
-              readStdin: async () => JSON.stringify(command),
-            },
-          ),
-        ).toBe(0)
-        expect(JSON.parse(output.stdout())).toEqual({ version: 1, flowId: flow.flowId, broadcast: true, kind: 'flow.canvas' })
-      }
-    },
-  )
+  it.each([
+    { type: 'focus', nodeId: 'node' },
+    { type: 'zoom', zoom: 0.8 },
+    { type: 'pan', dx: -200, dy: 100 },
+    { type: 'fit' },
+    { type: 'fit', future: { enabled: true } },
+    { type: 'future-command', amount: 3 },
+  ])('broadcasts canvas commands through the shared API: %j', async (command) => {
+    for (const input of [
+      ['--input', JSON.stringify(command)],
+      ['--file', 'command.json'],
+      ['--input', '-'],
+    ]) {
+      const output = runtime()
+      const request = vi.fn(async (path: string, init?: RequestInit) => {
+        if (path == '/v1/flows?limit=100') return Response.json({ flows: [{ ...flow, referenceCount: 0 }], version: 1 })
+        if (path == '/v1/flows/Main') return Response.json({ version: 1, error: { code: 'flow.not-found', message: 'Not found' } }, { status: 404 })
+        if (path == `/v1/flows/${flow.flowId}`) return Response.json(flow)
+        expect(path).toBe(`/v1/flows/${flow.flowId}/canvas`)
+        expect(init?.method).toBe('POST')
+        expect(new Headers(init?.headers).has('idempotency-key')).toBe(false)
+        expect(JSON.parse(String(init?.body))).toEqual({ version: 1, command })
+        return Response.json({ version: 1, flowId: flow.flowId, broadcast: true })
+      })
+      expect(
+        await runCli(
+          ['canvas', 'Main', ...input, '--json'],
+          { request },
+          {
+            ...output.value,
+            readFile: async () => JSON.stringify(command),
+            readStdin: async () => JSON.stringify(command),
+          },
+        ),
+      ).toBe(0)
+      expect(JSON.parse(output.stdout())).toEqual({ version: 1, flowId: flow.flowId, broadcast: true, kind: 'flow.canvas' })
+    }
+  })
 
   it('discovers the canvas request and guidance through the ordinary command contract', async () => {
     const contract = commandContract('canvas')!
@@ -128,7 +132,7 @@ describe('CLI', () => {
   })
 
   it('rejects missing or invalid canvas inputs before contacting the server', async () => {
-    for (const input of [[], ['--input', '{"type":"zoom","zoom":4}'], ['--input', '{"type":"fit","extra":1}'], ['--file', 'a', '--input', '{}']]) {
+    for (const input of [[], ['--input', '{'], ['--input', 'null'], ['--input', '[]'], ['--file', 'a', '--input', '{}']]) {
       const output = runtime()
       const request = vi.fn()
       expect(await runCli(['canvas', 'Main', ...input, '--json'], { request }, output.value)).toBe(1)
@@ -339,19 +343,20 @@ it.each([
         createdAt: flow.createdAt,
         digest: 'digest',
         flowId: flow.flowId,
-        modelVersion: legacy ? 6 : currentFlowModelVersion,
+        modelVersion: legacy ? 6 : currentFlowModelVersion + 1,
         parentRevisionId: null,
         revisionId: 'revision-1',
         version: 1,
         content: {
-          modelVersion: legacy ? 6 : currentFlowModelVersion,
-          modules: {},
+          modelVersion: legacy ? 6 : currentFlowModelVersion + 1,
+          modules: { future: { format: 'future-module' } },
           document: {
             bindings: {},
 
             graph: {
               edges: [],
               nodes: {
+                future: { kind: 'future-node', inputs: {}, config: { future: true } },
                 start: {
                   ...(legacy
                     ? { kind: 'manual', name: 'Start' }
@@ -428,6 +433,83 @@ const revisionFixture = {
     document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   },
 } as const
+
+it.each(['draft', 'live'] as const)('runs %s with newer workflow data and response metadata while preserving inputs and retry identity', async (source) => {
+  const output = runtime()
+  const inputs = { future: { data: { extra: [null, false, 0, 'text'] } } }
+  const outputs = { message: { extra: [null, true, 0] } }
+  const publication = {
+    actorId: 'actor',
+    createdAt: flow.createdAt,
+    flowId: flow.flowId,
+    revisionId: 'revision-1',
+    publicationId: 'published',
+    operation: 'publish',
+    closureDigest: 'closure',
+    engineContract: 'future-engine',
+    modelVersion: 999,
+    sharedAccessDigest: 'access',
+    revisionDigest: 'revision',
+    version: 1,
+  }
+  const created = { ...runFixture, source, status: 'queued', ...(source == 'live' ? { publicationId: 'published' } : {}), extra: true }
+  const request = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path == '/v1/flows/flow-1/publications?limit=100') return Response.json({ version: 1, flowId: flow.flowId, publications: [publication], extra: true })
+    if (path.endsWith('/revisions/revision-1'))
+      return Response.json({
+        ...revisionFixture,
+        modelVersion: 999,
+        content: {
+          modelVersion: 999,
+          modules: { future: { format: 'future-module' } },
+          document: {
+            graph: {
+              nodes: {
+                start: { kind: 'start', name: 'Start', extra: true },
+                future: { kind: 'future-node', inputs: {}, config: { extra: true } },
+              },
+            },
+          },
+        },
+      })
+    if (path == '/v1/runs/run-1') return Response.json({ ...created, status: 'completed', extra: { enabled: true } })
+    expect(path).toBe(source == 'draft' ? '/v1/flows/flow-1/revisions/revision-1/runs' : '/v1/runs')
+    expect(new Headers(init?.headers).get('idempotency-key')).toBe('stable')
+    expect(JSON.parse(String(init?.body))).toEqual({
+      inputs,
+      trigger: { nodeId: 'start', outputs },
+      version: 2,
+      ...(source == 'live' ? { publicationId: 'published' } : { engineContract: expect.any(String) }),
+    })
+    return Response.json(created)
+  })
+  const expected = source == 'draft' ? ['--expected-revision', 'revision-1'] : ['--expected-publication', 'published']
+  expect(
+    await runCli(
+      [
+        'run',
+        'flow-1',
+        '--source',
+        source,
+        ...expected,
+        '--idempotency-key',
+        'stable',
+        '--input',
+        JSON.stringify(inputs),
+        '--outputs',
+        JSON.stringify(outputs),
+        '--wait',
+        '--json',
+      ],
+      { request },
+      output.value,
+    ),
+    output.stderr(),
+  ).toBe(0)
+  expect(JSON.parse(output.stdout())).toMatchObject({ idempotencyKey: 'stable', timedOut: false, run: { source, status: 'completed' } })
+  expect(JSON.parse(output.stdout()).run).not.toHaveProperty('extra')
+})
 
 describe('agent command contract', () => {
   it.each(['failed', 'canceled', 'indeterminate'])('returns failure when a waited run is %s', async (status) => {

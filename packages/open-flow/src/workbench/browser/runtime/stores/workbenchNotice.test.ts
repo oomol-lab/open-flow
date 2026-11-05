@@ -74,7 +74,7 @@ describe('Workbench notices', () => {
     const error = await client.listProviderAccessBindingCandidates('flow', ['gmail']).catch((failure: unknown) => failure)
 
     expect(error).toMatchObject({ code: 'response.invalid', status: 502 })
-    expect(errorNotice(error, createI18n('zh-CN').t).message).toBe('服务返回了无法识别的数据，请稍后重试。 (Unexpected fields: incompatible.)')
+    expect(errorNotice(error, createI18n('zh-CN').t).message).toBe('服务返回了无法识别的数据，请稍后重试。 (results: missing requested providers.)')
   })
 })
 

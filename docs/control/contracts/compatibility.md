@@ -216,6 +216,13 @@ A valid structure does not establish that the graph can execute. Flow validation
 
 `@oomol-lab/open-flow/control-requests` provides `controlRequests` decoders and `controlRequestSchema`. They cover Flow creation and renaming, Draft changes, Live enable/disable, Presentation, checks, publication, rollback, Draft/Live Runs, Wait resolution, Variable writes, and version-only requests. Deployments map decoding exceptions to the corresponding public invalid errors. Deployments still own HTTP body limits, identity, scope, permissions, route parameters, pagination cursors, and storage transactions.
 
+The CLI forwards JSON object requests without applying its installed business schemas. Edit
+requires a non-empty `requestId` locally for retry identity; supported fields and operations are
+validated by the deployment. `ControlClient.getRevisionTriggers` reads only the pinned Revision
+metadata and Trigger identities, so Run entry selection does not require the client to decode
+newer node configurations. Ordinary response objects tolerate additional fields while known
+types, required fields, versions, identity checks, and execution contracts remain enforced.
+
 `@oomol-lab/open-flow/mcp` provides tool parameters, descriptions, annotations, protocol versions, and service instructions. Deployments register `mcpTools` through Standard Schema and implement only operation invocation, identity, and error mapping. A deployment must not add parameter defaults, change the definition of a tool with the same name, or weaken request validation. Business errors retain Control error codes. For an unconfirmed write outcome, require a retry with the original arguments and idempotency key.
 
 ## Conformance verification

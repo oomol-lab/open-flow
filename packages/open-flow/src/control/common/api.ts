@@ -68,7 +68,7 @@ import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnection
 import { requiredFields, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { errorListener, flow, flowPage, variable, variableListItem, variableReferences } from './flowDecoders.ts'
 import { live, publication, publicationPage, publishOperation } from './publicationDecoders.ts'
-import { draft, draftChange, draftSync, presentation } from './revisionDecoders.ts'
+import { draft, draftChange, draftSync, presentation, revisionTriggers } from './revisionDecoders.ts'
 import { runCancellation, runDetails, runPage, runResult, waitResolution } from './runDecoders.ts'
 import { pollTriggerTestResult, triggerActivityPage, triggerBinding, triggerBindingDetail, triggerKey, triggerKeySummary } from './triggerDecoders.ts'
 
@@ -968,7 +968,7 @@ export class ControlClient {
     )
   }
 
-  async broadcastCanvas(flowId: string, command: CanvasCommand): Promise<CanvasBroadcast> {
+  async broadcastCanvas(flowId: string, command: CanvasCommand | Readonly<Record<string, unknown>>): Promise<CanvasBroadcast> {
     const source = record(
       await this.request(`/v1/flows/${segment(flowId)}/canvas`, {
         method: 'POST',
@@ -1178,6 +1178,12 @@ export class ControlClient {
     return draft(await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}`, { signal }))
   }
 
+  async getRevisionTriggers(flowId: string, revisionId: string, signal?: AbortSignal) {
+    const revision = revisionTriggers(await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}`, { signal }))
+    if (revision.flowId != flowId || revision.revisionId != revisionId) return invalidResponse()
+    return revision
+  }
+
   async listTriggerConfigOptions(flowId: string, nodeId: string, field: string, signal?: AbortSignal): Promise<readonly TriggerConfigOption[]> {
     const source = record(await this.request(`/v1/flows/${segment(flowId)}/triggers/${segment(nodeId)}/options/${segment(field)}`, { signal }))
     requiredFields(source, ['options', 'version'])
@@ -1325,19 +1331,19 @@ export class ControlClient {
     }
   }
 
-  async readAuthoring(flowId: string, query: AuthoringRead = {}) {
+  async readAuthoring(flowId: string, query: AuthoringRead | Readonly<Record<string, unknown>> = {}) {
     return authoringReadResponse.parse(await this.request(`/v1/flows/${segment(flowId)}/authoring/read`, { method: 'POST', body: JSON.stringify(query) }))
   }
 
-  async searchAuthoring(flowId: string, query: AuthoringSearch) {
+  async searchAuthoring(flowId: string, query: AuthoringSearch | Readonly<Record<string, unknown>>) {
     return authoringSearchResponse.parse(await this.request(`/v1/flows/${segment(flowId)}/authoring/search`, { method: 'POST', body: JSON.stringify(query) }))
   }
 
-  async authoringSchema(flowId: string, query: { type?: AuthoringType; action?: string }) {
+  async authoringSchema(flowId: string, query: { type?: AuthoringType; action?: string } | Readonly<Record<string, unknown>>) {
     return record(await this.request(`/v1/flows/${segment(flowId)}/authoring/schema`, { method: 'POST', body: JSON.stringify(query) }))
   }
 
-  async editAuthoring(flowId: string, request: AuthoringRequest) {
+  async editAuthoring(flowId: string, request: AuthoringRequest | { readonly requestId: string; readonly [key: string]: unknown }) {
     return authoringEditResponse.parse(
       await this.request(`/v1/flows/${segment(flowId)}/authoring/edit`, {
         method: 'POST',

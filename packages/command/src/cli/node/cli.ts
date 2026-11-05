@@ -6,7 +6,7 @@ import { parseArguments } from './arguments.ts'
 import { commandContract, commandHelp, commandOptions, commandSchema, examplesForCommand } from './commands.ts'
 import { flowCommand } from './flowCommands.ts'
 import { createI18n } from './i18n.ts'
-import { CliError, cloudError, argumentText, referencedFlow } from './support.ts'
+import { CliError, cloudError, referencedFlow, requestInput } from './support.ts'
 
 function help(runtime: Runtime, args: readonly string[]) {
   const path = args.filter((argument) => !argument.startsWith('-'))
@@ -136,8 +136,7 @@ export async function runCli(args: readonly string[], host: CommandHost, runtime
       return await host.request(path, init)
     }, 'cli')
     if (parsed.positionals[0] == 'schema' && parsed.flow != null) {
-      const query =
-        parsed.input == null ? { type: parsed.positionals[1] } : JSON.parse(await argumentText(parsed.input, 'input', 'flow.authoring-unreadable', runtime))
+      const query = parsed.input == null ? { type: parsed.positionals[1] } : await requestInput(parsed.input, runtime)
       const flow = await referencedFlow(client, parsed.flow)
       runtime.stdout.write(`${JSON.stringify(await client.authoringSchema(flow.flowId, query))}\n`)
       return 0

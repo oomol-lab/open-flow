@@ -3,6 +3,7 @@ import { workflowContractSchema } from '../../workflow/common/workflow.ts'
 import { allConnectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { decodeEventSources } from './eventSources.ts'
 import { decodeResultList } from './results.ts'
+import { runDetails, runResult } from './runDecoders.ts'
 
 const source = {
   version: 1,
@@ -42,6 +43,29 @@ const cases: { name: string; decode: (value: unknown) => unknown; value: unknown
   },
   { name: 'Event Sources', decode: decodeEventSources, value: { version: 1, sources: [source] } },
   { name: 'Results', decode: decodeResultList, value: { version: 1, runId: 'run', results: [result] } },
+  {
+    name: 'Run details',
+    decode: runDetails,
+    value: {
+      version: 1,
+      runId: 'run',
+      flowId: 'flow',
+      revisionId: 'revision',
+      source: 'draft',
+      status: 'waiting',
+      createdAt: '2026-10-16T00:00:00.000Z',
+      closureDigest: 'closure',
+      engineContract: 'future-engine',
+      engineDigest: 'engine',
+      modelVersion: 999,
+      sharedAccessDigest: 'access',
+      revisionDigest: 'revision',
+      initiator: { channel: 'cli', actorId: 'actor' },
+      caller: { flowId: 'caller-flow', runId: 'caller-run', nodeId: 'call', executionId: 'execution' },
+      waits: [{ waitId: 'wait', nodeId: 'node', actions: ['continue'], expiresAt: 'later', waitingSince: 'now', prompt: 'Continue?' }],
+    },
+  },
+  { name: 'Run result', decode: runResult, value: { version: 1, runId: 'run', status: 'completed', finishedAt: 'now', result: 0 } },
   {
     name: 'Workflow contract',
     decode: (value) => workflowContractSchema.parse(value),
