@@ -257,7 +257,8 @@ describe('Server Connector client', () => {
     await expect(
       client.execute('leina.send_notification', undefined, { subscription: 'sub_test', message: 'hello' }, 'job', AbortSignal.timeout(5000)),
     ).rejects.toMatchObject({
-      notificationCode: code,
+      executionFailure: { code, message: `Leina notification failed (${code}).` },
+      outcomeUnknown: true,
       retryable,
       status,
       catchable: true,
@@ -301,7 +302,7 @@ describe('Server Connector client', () => {
       const client = new ConnectorClient(origin, '', 25)
       await expect(
         client.execute('leina.send_notification', undefined, { subscription: 'sub_test' }, 'stable-job', AbortSignal.timeout(5000)),
-      ).rejects.toMatchObject({ notificationCode: 'notification_unavailable', retryable: true, indeterminate: false })
+      ).rejects.toMatchObject({ executionFailure: { code: 'notification_unavailable' }, outcomeUnknown: true, retryable: true, indeterminate: false })
       expect(keys).toEqual(['stable-job'])
     },
   )

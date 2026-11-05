@@ -16,14 +16,7 @@ import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-ac
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import { silentLogger } from '../logger.ts'
-import {
-  accessInvalid,
-  assertConnectionNotDeferred,
-  connectionRequired,
-  ConnectorTaskError,
-  flowNotificationErrorCodes,
-  unavailable,
-} from './connector-contract.ts'
+import { accessInvalid, assertConnectionNotDeferred, connectionRequired, ConnectorTaskError, unavailable } from './connector-contract.ts'
 import {
   connectorFailureDetails,
   mapAction,
@@ -51,6 +44,98 @@ const maxActionCatalogBytes = 8 * 1024 * 1024
 const catalogConcurrency = 16
 const readinessTimeoutMs = 1_000
 const hostedAccessFreshMs = 5 * 60 * 1_000
+
+const notificationErrorCodes = [
+  'invalid_request',
+  'payload_too_large',
+  'invalid_signature',
+  'subscription_not_found',
+  'idempotency_conflict',
+  'platform_unavailable',
+  'platform_not_supported',
+  'rate_limited',
+  'delivery_unconfirmed',
+  'delivery_failed',
+  'notification_unavailable',
+  'delivery_timeout',
+  'agent_not_found',
+  'agent_not_ready',
+  'agent_timeout',
+  'bot_group_not_found',
+  'bot_group_conflict',
+] as const
+
+export const connectorFailureCodes: ReadonlySet<string> = new Set(notificationErrorCodes)
+
+function isSubscribedNotification(action: string, input: Readonly<Record<string, JsonValue>>): boolean {
+  return action == 'leina.send_notification' && typeof input.subscription == 'string'
+}
+
+function notificationFailure(code: (typeof notificationErrorCodes)[number], message: string, retryable: boolean, status?: number): ConnectorTaskError {
+  return new ConnectorTaskError('connector.unavailable', message, status, {
+    executionFailure: { code, message },
+    outcomeUnknown: true,
+    retryable,
+  })
+}
+
+/** Owns direct Task identity and delivery budgets across attempts within one Run. */
+export class ConnectorExecution {
+  readonly #deadlines = new Map<string, number>()
+  readonly #resolve: () => ConnectorHost | undefined
+
+  constructor(resolve: () => ConnectorHost | undefined) {
+    this.#resolve = resolve
+  }
+
+  release(jobId: string): void {
+    this.#deadlines.delete(jobId)
+  }
+
+  async execute(
+    action: string,
+    connectionId: string | undefined,
+    input: Readonly<Record<string, JsonValue>>,
+    context: {
+      readonly jobId: string
+      readonly invocationId: string
+      readonly signal: AbortSignal
+      readonly retryIntervalMs: number
+      readonly access: ConnectorAccessContext
+    },
+  ): Promise<JsonValue> {
+    assertConnectionNotDeferred(connectionId)
+    const connector = this.#resolve()
+    if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+    const subscribedNotification = isSubscribedNotification(action, input)
+    const deadline = subscribedNotification ? (this.#deadlines.get(context.jobId) ?? performance.now() + 60 * 60 * 1000) : undefined
+    if (deadline != null) this.#deadlines.set(context.jobId, deadline)
+    const remainingMs = deadline == null ? undefined : deadline - performance.now()
+    if (remainingMs != null && remainingMs <= 0)
+      throw notificationFailure('delivery_timeout', 'The notification exceeded its one-hour delivery deadline.', false)
+    const timeout = remainingMs == null ? undefined : AbortSignal.timeout(Math.ceil(remainingMs))
+    return await connector
+      .execute(
+        action,
+        connectionId,
+        input,
+        subscribedNotification ? context.jobId : context.invocationId,
+        timeout == null ? context.signal : AbortSignal.any([context.signal, timeout]),
+        context.access,
+      )
+      .catch((error: unknown) => {
+        if (context.signal.aborted) throw context.signal.reason
+        if (timeout?.aborted) throw notificationFailure('delivery_timeout', 'The notification exceeded its one-hour delivery deadline.', false)
+        if (deadline != null && error instanceof ConnectorTaskError && error.retryable && deadline - performance.now() <= context.retryIntervalMs)
+          throw new ConnectorTaskError(error.code, error.message, error.status, {
+            executionFailure: error.executionFailure,
+            outcomeUnknown: error.outcomeUnknown,
+            retryable: false,
+          })
+        throw error
+      })
+  }
+}
 
 function selectedGrants(access: Exclude<ConnectorAccessContext, { readonly scope: 'catalog' }>): readonly ConnectorAccessGrant[] {
   switch (access.scope) {
@@ -365,7 +450,7 @@ export class ConnectorClient implements ConnectorHost {
     action: string,
     connectionId: string | undefined,
     input: Readonly<Record<string, JsonValue>>,
-    invocationId: string,
+    idempotencyKey: string,
     signal: AbortSignal,
     access?: ConnectorClientAccess,
   ): Promise<JsonValue> {
@@ -406,7 +491,7 @@ export class ConnectorClient implements ConnectorHost {
     }
     if (connectionId != null) await this.#assertConnection(connectionId, providerId, signal, teamId)
 
-    const subscribedNotification = action == 'leina.send_notification' && typeof input.subscription == 'string'
+    const subscribedNotification = isSubscribedNotification(action, input)
     const actionResponse = await this.#transport
       .request(
         'action.execute',
@@ -415,22 +500,23 @@ export class ConnectorClient implements ConnectorHost {
           body: JSON.stringify({ input }),
           headers: {
             'content-type': 'application/json',
-            'idempotency-key': invocationId,
+            'idempotency-key': idempotencyKey,
             ...(connectionId == null ? {} : { 'x-oo-connector-app-id': connectionId }),
           },
           method: 'POST',
         },
         signal,
-        { fields: { actionId: action, ...(connectionId == null ? {} : { connectionId }), invocationId }, maximumResponseBytes: maxActionResponseBytes, teamId },
+        {
+          fields: { actionId: action, ...(connectionId == null ? {} : { connectionId }), idempotencyKey },
+          maximumResponseBytes: maxActionResponseBytes,
+          teamId,
+        },
       )
       .catch((error: unknown) => {
         if (signal.aborted) throw signal.reason
         if (!(error instanceof RequestError)) throw error
         if (subscribedNotification)
-          throw new ConnectorTaskError('connector.unavailable', `${error.reason}. The notification outcome is unknown.`, error.status, {
-            notificationCode: 'notification_unavailable',
-            retryable: true,
-          })
+          throw notificationFailure('notification_unavailable', `${error.reason}. The notification outcome is unknown.`, true, error.status)
         throw new ConnectorTaskError(
           'connector.indeterminate',
           `${error.reason}${error.status == null ? '' : ` (HTTP ${error.status})`}. The action outcome is unknown.`,
@@ -439,11 +525,11 @@ export class ConnectorClient implements ConnectorHost {
     const response = actionResponse.value
     if (!record(response)) {
       if (subscribedNotification)
-        throw new ConnectorTaskError(
-          'connector.unavailable',
+        throw notificationFailure(
+          'notification_unavailable',
           'Connector returned an invalid notification response. The notification outcome is unknown.',
+          true,
           actionResponse.status,
-          { notificationCode: 'notification_unavailable', retryable: true },
         )
       throw new ConnectorTaskError(
         'connector.indeterminate',
@@ -457,12 +543,9 @@ export class ConnectorClient implements ConnectorHost {
     if (failure.code == 'connector.input-invalid') throw failure
     if (subscribedNotification) {
       const data = record(response.data) ? response.data : undefined
-      const code = flowNotificationErrorCodes.find((candidate) => candidate == data?.error) ?? 'notification_unavailable'
+      const code = notificationErrorCodes.find((candidate) => candidate == data?.error) ?? 'notification_unavailable'
       const retryable = typeof data?.retryable == 'boolean' ? data.retryable : actionResponse.status == 429 || actionResponse.status >= 500
-      throw new ConnectorTaskError('connector.unavailable', `Leina notification failed (${code}).`, actionResponse.status, {
-        notificationCode: code,
-        retryable,
-      })
+      throw notificationFailure(code, `Leina notification failed (${code}).`, retryable, actionResponse.status)
     }
     throw new ConnectorTaskError(
       'connector.indeterminate',

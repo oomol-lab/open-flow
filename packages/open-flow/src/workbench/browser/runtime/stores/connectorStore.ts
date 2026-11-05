@@ -13,6 +13,7 @@ import type { WorkspaceStore } from './workspaceStore.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { ApiError } from '../api.ts'
 import { connectionCatalog, actionWithConnections } from '../connectionCatalog.ts'
+import { connectorActionPresentation } from '../editor/connectorActionPresentation.tsx'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { Latest } from './latest.ts'
@@ -71,7 +72,8 @@ function ports(values: Readonly<Record<string, { readonly description?: string; 
 }
 
 function option(action: ConnectorActionView, t: TFunction): AddNodeOption {
-  if (action.actionId == 'leina.send_notification') action = { ...action, name: t('leina.notification') }
+  const presentation = connectorActionPresentation(action.actionId, t)
+  if (presentation != null) action = { ...action, name: presentation.name }
   return {
     connector: action,
     description:

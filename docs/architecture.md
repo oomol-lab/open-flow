@@ -51,6 +51,10 @@ Inside the public package, node families depend only on the shared Flow model; t
 features that read whole Flows, execution, and control sit above it. [Node authoring](authoring/node-authoring.md#module-placement)
 defines the layers, and the package checks enforce them.
 
+Connector owns built-in Action input constraints and pending-message input roles. The shared Flow
+validator and edge authoring interpret these declarations without identifying a Provider or its fields.
+Workbench's Connector presentation adapter owns Action-specific labels and input controls.
+
 Workbench owns Flow editing and its product UI. The deployment host owns login, account roles, deployment settings, and browser analytics.
 Hosts integrate through public props, shared UI, and product theme contracts. They must not override internal product selectors or copy Workbench implementations.
 Server-owned pages compose `apps/server/browser/host-ui.tsx`; its stylesheet owns page widths, fixed navigation spacing, cards, and field presentation. Feature pages own their data, actions, and content. Route tabs retain links, while local panels use the shared accessible Tabs primitives.
@@ -171,6 +175,9 @@ The deployment limits concurrency and execution budgets and owns queuing and rec
 
 Leina subscription notifications use a success/failure delivery contract as an explicit exception.
 Direct Connector Tasks may retry unknown delivery outcomes with the same event identity within the notification budget, according to Connector retryability.
+The deployment's Connector execution adapter owns this identity and budget across attempts. Run
+execution and Agent tools consume normalized failure details and outcome certainty; the deployment
+composition supplies the Connector's allowed public failure codes to the generic event projector.
 A confirmed retry may complete the Run. An unhandled final notification error, including `delivery_unconfirmed`, ends it as `failed`.
 A failed notification Run can include a delivered message. Manual reruns create a new event identity and may deliver it again.
 See the [notification execution contract](control/contracts/control-api.md#connector-passthrough) for identity, retry and deadline rules.

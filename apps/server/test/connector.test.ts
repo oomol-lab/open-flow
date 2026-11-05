@@ -11,8 +11,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
-import { ConnectorTaskError, flowNotificationErrorCodes } from '../node/deployment/connector-contract.ts'
-import { ConnectorClient } from '../node/deployment/connector.ts'
+import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
+import { ConnectorClient, connectorFailureCodes } from '../node/deployment/connector.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { acceptRun, storeRevision } from './runFixture.ts'
@@ -137,6 +137,7 @@ async function run(service: ServerService, revision: RevisionContent): Promise<s
 describe('Server Connector host', () => {
   it.each([
     { action: 'leina.send_notification', subscription: 'sub_test', stable: true },
+    { action: 'leina.send_notification', subscription: '', stable: true },
     { action: 'leina.send_notification', subscription: null, stable: false },
     { action: 'leina.send_notification', subscription: undefined, stable: false },
     { action: 'example.echo', subscription: 'sub_test', stable: false },
@@ -144,7 +145,11 @@ describe('Server Connector host', () => {
     const execute = vi
       .fn<ConnectorHost['execute']>()
       .mockRejectedValueOnce(
-        new ConnectorTaskError('connector.unavailable', 'Temporarily unavailable.', 409, { notificationCode: 'platform_unavailable', retryable: true }),
+        new ConnectorTaskError('connector.unavailable', 'Temporarily unavailable.', 409, {
+          executionFailure: { code: 'platform_unavailable', message: 'Temporarily unavailable.' },
+          outcomeUnknown: true,
+          retryable: true,
+        }),
       )
       .mockResolvedValue({ message: 'sent' })
     const service = await open(createConnectorHost({ execute }))
@@ -195,9 +200,13 @@ describe('Server Connector host', () => {
     }
   })
 
-  it.each(flowNotificationErrorCodes)('preserves the notification error %s in public Run events without retrying explicit false', async (code) => {
+  it.each([...connectorFailureCodes])('preserves the Connector failure %s in public Run events without retrying explicit false', async (code) => {
     const execute = vi.fn<ConnectorHost['execute']>(async () => {
-      throw new ConnectorTaskError('connector.unavailable', 'Notification rejected.', 502, { notificationCode: code, retryable: false })
+      throw new ConnectorTaskError('connector.unavailable', 'Request rejected.', 502, {
+        executionFailure: { code, message: 'Notification rejected.' },
+        outcomeUnknown: true,
+        retryable: false,
+      })
     })
     const service = await open(createConnectorHost({ execute }))
     const revision = connectorFlow()
@@ -223,7 +232,11 @@ describe('Server Connector host', () => {
     const execute = vi.fn<ConnectorHost['execute']>(async (_action, _connectionId, _input, _key, signal) => {
       if (failure == 'retry-wait') {
         elapsed = 60 * 60 * 1000 - 500
-        throw new ConnectorTaskError('connector.unavailable', 'Temporarily unavailable.', 409, { notificationCode: 'platform_unavailable', retryable: true })
+        throw new ConnectorTaskError('connector.unavailable', 'Temporarily unavailable.', 409, {
+          executionFailure: { code: 'platform_unavailable', message: 'Temporarily unavailable.' },
+          outcomeUnknown: true,
+          retryable: true,
+        })
       }
       return await new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
     })

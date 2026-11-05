@@ -13,7 +13,7 @@ export interface ConnectorHost {
     action: string,
     connectionId: string | undefined,
     input: Readonly<Record<string, JsonValue>>,
-    invocationId: string,
+    idempotencyKey: string,
     signal: AbortSignal,
     access?: ConnectorAccessContext,
   ): Promise<JsonValue>
@@ -66,26 +66,6 @@ export type ConnectorAccessContext = ConnectorContext &
     | { readonly scope: 'proxy'; readonly providerAccess: ConnectorAccessSnapshot; readonly providerId: string; readonly connectionId: string }
   )
 
-export const flowNotificationErrorCodes = [
-  'invalid_request',
-  'payload_too_large',
-  'invalid_signature',
-  'subscription_not_found',
-  'idempotency_conflict',
-  'platform_unavailable',
-  'platform_not_supported',
-  'rate_limited',
-  'delivery_unconfirmed',
-  'delivery_failed',
-  'notification_unavailable',
-  'delivery_timeout',
-  'agent_not_found',
-  'agent_not_ready',
-  'agent_timeout',
-  'bot_group_not_found',
-  'bot_group_conflict',
-] as const
-
 export type ConnectorErrorCode =
   | 'connector.access-invalid'
   | 'connector.access-required'
@@ -100,19 +80,25 @@ export class ConnectorTaskError extends Error {
   readonly code: ConnectorErrorCode
   readonly status?: number
   readonly retryable: boolean
-  readonly notificationCode?: (typeof flowNotificationErrorCodes)[number]
+  readonly executionFailure?: { readonly code: string; readonly message: string }
+  readonly outcomeUnknown: boolean
 
   constructor(
     code: ConnectorErrorCode,
     message: string,
     status?: number,
-    options?: { readonly retryable: boolean; readonly notificationCode?: (typeof flowNotificationErrorCodes)[number] },
+    options?: {
+      readonly retryable: boolean
+      readonly executionFailure?: { readonly code: string; readonly message: string }
+      readonly outcomeUnknown?: boolean
+    },
   ) {
     super(message)
     this.code = code
     this.status = status
     this.retryable = options?.retryable ?? code == 'connector.unavailable'
-    this.notificationCode = options?.notificationCode
+    this.executionFailure = options?.executionFailure
+    this.outcomeUnknown = options?.outcomeUnknown ?? code == 'connector.indeterminate'
     this.name = 'ConnectorTaskError'
   }
 

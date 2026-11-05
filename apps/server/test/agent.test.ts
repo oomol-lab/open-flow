@@ -468,7 +468,7 @@ describe('Agent streaming adapter', () => {
 
   it.each([undefined, 'delivery_unconfirmed', 'notification_unavailable'] as const)(
     'terminates an uncertain call (%s) without executing the rest of the batch or requesting another model round',
-    async (notificationCode) => {
+    async (failureCode) => {
       const source = {
         ...task,
         executor: {
@@ -491,9 +491,13 @@ describe('Agent streaming adapter', () => {
           model,
           async (_tool, _input, id) => {
             calls.push(id)
-            throw notificationCode == null
+            throw failureCode == null
               ? new ConnectorTaskError('connector.indeterminate', 'Outcome unknown.')
-              : new ConnectorTaskError('connector.unavailable', 'Outcome unknown.', 502, { notificationCode, retryable: false })
+              : new ConnectorTaskError('connector.unavailable', 'Request failed.', 502, {
+                  executionFailure: { code: failureCode, message: 'Outcome unknown.' },
+                  outcomeUnknown: true,
+                  retryable: false,
+                })
           },
           async (event) => {
             events.push(event)
@@ -505,7 +509,7 @@ describe('Agent streaming adapter', () => {
       expect(events.find((event) => event.status == 'failed')).toMatchObject({
         executed: null,
         message: 'Outcome unknown.',
-        code: notificationCode ?? 'connector.indeterminate',
+        code: failureCode ?? 'connector.indeterminate',
       })
     },
   )
