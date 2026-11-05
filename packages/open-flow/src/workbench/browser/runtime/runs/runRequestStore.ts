@@ -10,13 +10,13 @@ import type { RunStore } from './runStore.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { isTriggerNode } from '../../../../flow/common/change.ts'
-import { sampleErrorOutputs } from '../../../../trigger/common/contract.ts'
 import { normalizeTriggerOutputs, triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { Latest } from '../stores/latest.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
 import { readRunInputs, writeRunInputs } from './runInputStorage.ts'
+import { defaultTriggerTestOutputs } from './triggerTestInputs.ts'
 
 interface RequestState {
   readonly inputRequest?: RunInputRequest
@@ -56,9 +56,7 @@ function inputSpec(draft: Draft, triggerId: string) {
   const trigger = revisionView(draft).graph()?.nodes[triggerId]
   if (trigger == null || !isTriggerNode(trigger) || trigger.kind == 'manual' || trigger.kind == 'cron') return undefined
   const definitions = triggerOutputDefinitions(trigger)
-  return definitions.length === 0
-    ? undefined
-    : { definitions, allowOmittedNullable: trigger.kind == 'start', samples: trigger.kind == 'error' ? sampleErrorOutputs : undefined }
+  return definitions.length === 0 ? undefined : { definitions, allowOmittedNullable: trigger.kind == 'start', trigger }
 }
 
 function inputSignature(spec: ReturnType<typeof inputSpec>): string {
@@ -76,16 +74,14 @@ async function inputEditor(
   if (spec == null) return undefined
   const { FlowRunInputEditorStore } = await import('../../flowRunInputEditorStore.ts')
   const editor = new FlowRunInputEditorStore(spec.definitions, language, { allowOmittedNullable: spec.allowOmittedNullable })
-  const initial = values ?? spec.samples
-  if (initial != null)
-    editor.replaceValues(Object.fromEntries(spec.definitions.flatMap(({ handle }) => (Object.hasOwn(initial, handle) ? [[handle, initial[handle]]] : []))))
+  const initial = values ?? defaultTriggerTestOutputs(spec.trigger)
+  editor.replaceValues(Object.fromEntries(spec.definitions.flatMap(({ handle }) => (Object.hasOwn(initial, handle) ? [[handle, initial[handle]]] : []))))
   return editor
 }
 
 function testOutputs(revision: Draft, triggerId: string): Readonly<Record<string, JsonValue>> {
   const node = revisionView(revision).graph()?.nodes[triggerId]
-  if (node?.kind == 'error') return sampleErrorOutputs
-  return node?.kind === 'cron' ? { scheduledAt: new Date().toISOString() } : {}
+  return node != null && isTriggerNode(node) ? defaultTriggerTestOutputs(node) : {}
 }
 
 export class RunRequestStore {

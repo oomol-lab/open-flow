@@ -374,20 +374,21 @@ it('keeps the run button idle throughout opening the test data editor', async ()
   }
 })
 
-it('preserves missing webhook data across untouched open/close cycles', async () => {
+it('prefills Webhook test data for review and remembers it after closing', async () => {
   const { client, store } = harness()
   const revision = webhookDraft()
   try {
-    for (let cycle = 0; cycle < 2; cycle++) {
-      expect(await store.editDraft(flow, revision, 'start')).toBe('input')
-      expect(store.$.inputRequest.value?.editor?.values()).toEqual({})
-      expect(store.$.inputRequest.value?.valid.value).toBe(false)
-      store.dismissInputs()
-      expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('missing')
-    }
+    const outputs = { headers: {}, query: {}, body: {}, webhookUrl: 'https://example.com/webhook' }
     expect(await store.requestDraft(flow, revision, 'start')).toBe('input')
-    expect(await store.confirmInputs()).toBe(false)
+    expect(store.$.inputRequest.value?.editor?.values()).toEqual(outputs)
+    expect(store.$.inputRequest.value?.valid.value).toBe(true)
     expect(client.createDraftRun).not.toHaveBeenCalled()
+    store.dismissInputs()
+    expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('ready')
+    expect(await store.editDraft(flow, revision, 'start')).toBe('input')
+    expect(store.$.inputRequest.value?.editor?.values()).toEqual(outputs)
+    expect(await store.confirmInputs()).toBe(true)
+    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', outputs } }))
   } finally {
     store.dispose()
   }
@@ -461,7 +462,8 @@ it('edits only the selected trigger outputs and remembers each trigger separatel
     expect(store.$.inputRequest.value?.editor?.definitions.map((definition) => definition.handle)).toEqual(['headers', 'query', 'body', 'webhookUrl'])
     store.$.inputRequest.value?.editor?.replaceValues(webhookOutputs)
     await store.selectTrigger('other')
-    expect(store.$.inputRequest.value?.editor?.values()).toEqual({})
+    expect(store.$.inputRequest.value?.editor?.values()).toEqual({ ...webhookOutputs, webhookUrl: 'https://example.com/webhook' })
+    store.$.inputRequest.value?.editor?.replaceValues({})
     expect(await store.confirmInputs()).toBe(false)
     await store.selectTrigger('start')
     expect(store.$.inputRequest.value?.editor?.values()).toEqual(webhookOutputs)
@@ -697,6 +699,7 @@ it('rejects invalid Live inputs without preparing a Run or saving the Draft', as
   client.getRevision.mockResolvedValue(startDraft(true))
   try {
     expect(await store.requestLive(flow)).toBe('input')
+    store.$.inputRequest.value?.editor?.setValue('message', undefined)
     expect(await store.confirmInputs()).toBe(false)
     expect(store.$.inputRequest.value?.attempted).toBe(true)
     expect(prepare).not.toHaveBeenCalled()
@@ -837,6 +840,7 @@ it('refreshes a previously invalid form after its saved definition changes inste
   const saved = { ...startDraft(), revisionId: 'nullable-now' }
   try {
     await store.requestDraft(flow, startDraft(true))
+    store.$.inputRequest.value?.editor?.setValue('message', undefined)
     expect(store.$.inputRequest.value?.valid.value).toBe(false)
     prepare.mockResolvedValue(saved)
     expect(await store.confirmInputs()).toBe(false)
@@ -918,6 +922,7 @@ it('leaves the selected Run untouched when Draft inputs remain invalid after sav
   const selected = selection.capture()
   try {
     await store.requestDraft(flow, startDraft(true))
+    store.$.inputRequest.value?.editor?.setValue('message', undefined)
     expect(await store.confirmInputs()).toBe(false)
     expect(prepare).toHaveBeenCalledOnce()
     expect(runs.captureSelection).toHaveBeenCalledOnce()

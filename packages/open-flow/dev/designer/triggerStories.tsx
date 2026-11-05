@@ -226,7 +226,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
   )
 }
 
-type RunState = 'closed' | 'empty' | 'ready' | 'invalid' | 'starting' | 'direct' | 'disabled'
+type RunState = 'closed' | 'defaults' | 'empty' | 'ready' | 'invalid' | 'starting' | 'direct' | 'disabled'
 function RunSample({
   fixture,
   dark,
@@ -302,9 +302,10 @@ function RunSample({
       if (state !== 'closed' && state !== 'direct' && state !== 'disabled') {
         await store.editDraft(flow, draft, 'trigger')
         if (disposed) return
-        store.$.inputRequest.value?.editor?.replaceValues(
-          state === 'empty' ? {} : state === 'invalid' ? Object.fromEntries(Object.keys(fixture.outputs).map((handle) => [handle, null])) : fixture.outputs,
-        )
+        if (state !== 'defaults')
+          store.$.inputRequest.value?.editor?.replaceValues(
+            state === 'empty' ? {} : state === 'invalid' ? Object.fromEntries(Object.keys(fixture.outputs).map((handle) => [handle, null])) : fixture.outputs,
+          )
         if (state === 'invalid' || state === 'starting') void store.confirmInputs()
       }
       if (!disposed) {
@@ -403,7 +404,7 @@ function RunStory(props: StoryProps) {
           </>
         ) : (
           <>
-            {(['empty', 'ready', 'invalid', 'starting'] as const).map((state) => (
+            {(['defaults', 'empty', 'ready', 'invalid', 'starting'] as const).map((state) => (
               <RunSample key={state} {...props} state={state} />
             ))}
             <RunSample {...props} state="ready" downstream />
@@ -677,6 +678,8 @@ function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { reado
             <div className="trigger-case-grid">
               {view === 'run' ? (
                 <>
+                  <RunSample {...props} fixture={integrationExample} state="defaults" />
+                  <RunSample {...props} fixture={pollExample} state="defaults" />
                   <RunSample {...props} fixture={integrationExample} state="ready" />
                   <RunSample {...props} fixture={integrationExample} state="invalid" />
                   <RunSample {...props} fixture={pollExample} state="empty" />
@@ -772,7 +775,7 @@ export const triggerStories: readonly FrontendStory[] = [
         group: `Trigger ${fixture.trigger.name}`,
         id: `trigger-${fixture.id}-run`,
         title: 'Run menu states',
-        description: `${fixture.trigger.name} · Run panels shown side by side. The closed sample saves test data in IndexedDB; run it and reload to verify restoration. Start parameters allow empty nullable values after confirmation. Triggers with no test inputs run directly.`,
+        description: `${fixture.trigger.name} · Compare generated defaults, cleared and edited test data. The closed sample saves data in IndexedDB; run it and reload to verify restoration. Start parameters allow empty nullable values after confirmation. Triggers with no test inputs run directly.`,
         standalone: true,
         render: (log, dark, language) => <RunStory fixture={fixture} log={log} dark={dark} language={language} />,
       },
@@ -799,7 +802,7 @@ export const triggerStories: readonly FrontendStory[] = [
         view === 'nodes'
           ? 'Provider trigger states and configuration.'
           : view === 'run'
-            ? 'Provider payloads, validation and run states.'
+            ? 'Generated test defaults, edited Provider payloads, validation and run states.'
             : 'Provider properties, permitted default accounts, missing permissions and optional configuration. Compare Gmail, Google Sheets and GitHub: business fields stay visible while technical options start collapsed under Advanced settings. Expand, edit, collapse and reopen to check saved values and keyboard access in editable and read-only panels.',
       id: `trigger-provider-${view}`,
       title: view === 'nodes' ? 'Node states' : view === 'run' ? 'Run menu states' : 'Properties',
