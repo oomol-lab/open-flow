@@ -112,6 +112,8 @@ export interface FlowResources {
 
 export interface FlowUpdate {
   readonly name?: string
+  readonly icon?: string | null
+  readonly description?: string | null
   readonly tagIds?: readonly string[]
 }
 
@@ -157,6 +159,8 @@ export interface Flow {
   /** Connector Team scope used by the OOMOL resource cache. */
   readonly connectorTeamId?: string
   readonly name: string
+  readonly icon?: string
+  readonly description?: string
   readonly status: 'active' | 'retiring'
   readonly updatedAt: string
   readonly version: 1

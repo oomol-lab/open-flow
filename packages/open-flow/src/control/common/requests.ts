@@ -45,7 +45,18 @@ const schemas = {
   }),
   saveTag: z.strictObject({ name: tagName, version }),
   setFlowTags: z.strictObject({ tagIds, version }),
-  updateFlow: z.union([z.strictObject({ name: flowName, tagIds: tagIds.optional(), version }), z.strictObject({ name: flowName.optional(), tagIds, version })]),
+  updateFlow: z
+    .strictObject({
+      name: flowName.optional(),
+      icon: z.string().nullable().optional(),
+      description: z.string().nullable().optional(),
+      tagIds: tagIds.optional(),
+      version,
+    })
+    .refine(
+      (value) => value.name !== undefined || value.icon !== undefined || value.description !== undefined || value.tagIds !== undefined,
+      'Flow settings are empty.',
+    ),
   renameFlow: z.strictObject({ name: flowName, version }),
   changeDraft: z.strictObject({ expectedRevisionId: id, operations: z.array(json).min(1), version }),
   repairDraft: z.strictObject({ expectedRevisionId: id, version }),

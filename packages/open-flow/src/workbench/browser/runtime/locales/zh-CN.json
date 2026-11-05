@@ -1757,7 +1757,10 @@
     "discardTitle": "放弃修改？",
     "discardDescription": "工作流设置的修改尚未保存。",
     "continueEditing": "继续编辑",
-    "discardChanges": "放弃修改"
+    "discardChanges": "放弃修改",
+    "icon": "图标",
+    "resetIcon": "重置图标",
+    "description": "描述"
   },
   "flowState": {
     "title": "持久化数据",

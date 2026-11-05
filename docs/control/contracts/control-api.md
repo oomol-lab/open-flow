@@ -101,9 +101,13 @@ lowercasing. Renaming keeps its ID. `tag.invalid`, `tag.conflict`, and `tag.not-
 - `PUT /v1/flows/:flowId/tags` accepts `{tagIds, version: 1}`, atomically replaces the set, and
   returns the Flow. IDs must all belong to the Flow owner; duplicates are deduplicated.
   Retiring Flows reject changes with `flow.busy`.
-- `PATCH /v1/flows/:flowId` accepts `{name?, tagIds?, version: 1}` with at least one field.
-  It updates the title and replaces tag membership in one transaction and returns the Flow.
-  Omitted fields retain their current values. An invalid title or tag leaves both unchanged.
+- `PATCH /v1/flows/:flowId` accepts `{name?, icon?, description?, tagIds?, version: 1}` with at least one field.
+  It updates metadata and replaces tag membership in one transaction and returns the Flow.
+  Omitted fields retain their current values. An invalid title or tag leaves all settings unchanged.
+  `icon` and `description` accept strings or `null` to clear them. Icons use the shared content-icon
+  format, including Iconify sources and image URLs; descriptions preserve multiline text.
+  Flow and list responses include these optional strings when configured. These edits invalidate
+  the catalog without changing Draft, Presentation, or publication identity.
 
 Flow responses include `tagIds` in ID order. Older responses without this optional field decode
 as an empty set. Creation and import accept optional `tagIds`; membership is committed with the
@@ -145,6 +149,8 @@ interface WorkflowFile {
   kind: 'open-flow-workflow'
   version: 1
   name?: string
+  icon?: string
+  description?: string
   content: RevisionContent
   presentation?: Record<string, JsonValue>
 }
@@ -162,7 +168,7 @@ are emptied. Shared event source IDs and event selections (including Jira), Feis
 team/state selections become unset under their Trigger configuration contracts. External business resource selections, including Tally and Typeform `formId`, are preserved. After importing, select a Connection authorized to access those resources; saved resource IDs do not confer access.
 
 Node and Module IDs, edges, shared Module relationships, ports, code, prompts, fixed
-inputs, model selections, and Presentation values remain. Flow/Revision IDs are newly
+inputs, model selections, Flow icons and descriptions, and Presentation values remain. Flow/Revision IDs are newly
 allocated. Ownership, shared deployment grants, Variable values, Publications, Runs,
 and subscriptions are never copied. Import creates an unpublished Draft with its initial
 Revision and Presentation in one transaction. Any failure rolls back the creation.

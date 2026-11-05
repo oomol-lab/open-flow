@@ -1757,7 +1757,10 @@
     "discardTitle": "변경 사항을 버릴까요?",
     "discardDescription": "워크플로 설정의 변경 사항이 저장되지 않았습니다.",
     "continueEditing": "계속 편집",
-    "discardChanges": "변경 사항 버리기"
+    "discardChanges": "변경 사항 버리기",
+    "icon": "아이콘",
+    "resetIcon": "아이콘 초기화",
+    "description": "설명"
   },
   "flowState": {
     "title": "영구 데이터",

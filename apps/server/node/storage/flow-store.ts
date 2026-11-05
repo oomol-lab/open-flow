@@ -21,6 +21,8 @@ export interface FlowCreation {
   readonly idempotencyKey: string
   readonly modelVersion: number
   readonly name: string
+  readonly icon?: string | undefined
+  readonly description?: string | undefined
   readonly requestDigest: string
   readonly presentation?: Readonly<Record<string, JsonValue>>
   readonly revisionId: string
@@ -41,6 +43,8 @@ export interface StoredFlow {
   readonly sharedProviderIds: string
   readonly sharedBindings: string
   readonly name: string
+  readonly icon: string | null
+  readonly description: string | null
   readonly ownerId: string
   readonly flowId: string
   readonly status: 'active' | 'retiring'
@@ -86,7 +90,7 @@ const flowColumns = `(SELECT json_group_array(tag_id) FROM (SELECT tag_id FROM f
                      (SELECT publication_id FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS publicationId,
                      (SELECT publications.revision_id FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS publishedRevisionId,
                      flows.create_request_digest AS createRequestDigest, flows.created_at AS createdAt,
-                     flows.draft_revision_id AS draftRevisionId, flows.name, flows.flow_id AS flowId, flows.status, flows.updated_at AS updatedAt,
+                     flows.draft_revision_id AS draftRevisionId, flows.name, flows.icon, flows.description, flows.flow_id AS flowId, flows.status, flows.updated_at AS updatedAt,
                      flows.draft_resource_references AS draftResourceReferences,
                      COALESCE(access.access_revision, 0) AS sharedAccessRevision,
                      COALESCE(access.provider_ids_json, '[]') AS sharedProviderIds,
@@ -181,13 +185,15 @@ export class FlowStore {
     this.#database
       .prepare(
         `INSERT INTO flows (
-           flow_id, name, status, draft_revision_id, create_idempotency_key,
+           flow_id, name, icon, description, status, draft_revision_id, create_idempotency_key,
            create_request_digest, created_at, updated_at, owner_id, draft_resource_references
-         ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.flowId,
         input.name,
+        input.icon ?? null,
+        input.description ?? null,
         input.revisionId,
         idempotencyKey,
         input.requestDigest,
@@ -259,8 +265,12 @@ export class FlowStore {
       const ids = changes.tagIds == null ? undefined : [...new Set(changes.tagIds)].toSorted()
       if (ids != null) this.#tags.replace(current.ownerId, flowId, ids)
       const name = changes.name ?? current.name
-      if (name != current.name || (ids != null && current.tagIds != JSON.stringify(ids))) {
-        this.#database.prepare('UPDATE flows SET name = ?, updated_at = ? WHERE flow_id = ?').run(name, updatedAt, flowId)
+      const icon = changes.icon === undefined ? current.icon : changes.icon
+      const description = changes.description === undefined ? current.description : changes.description
+      if (name != current.name || icon != current.icon || description != current.description || (ids != null && current.tagIds != JSON.stringify(ids))) {
+        this.#database
+          .prepare('UPDATE flows SET name = ?, icon = ?, description = ?, updated_at = ? WHERE flow_id = ?')
+          .run(name, icon, description, updatedAt, flowId)
       }
       return this.get(flowId)
     })

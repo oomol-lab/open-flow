@@ -134,14 +134,25 @@ it('updates the Flow title and memberships atomically without changing its defin
   const foreign = control.tags.saveTag('other', 'Private')
   const { flow } = await control.flows.createFlow('owner', 'Original', 'settings', undefined, [a.tagId])
   const before = await control.flows.getEditor('owner', flow.flowId)
-  expect(() => control.flows.updateFlow('owner', flow.flowId, { name: 'Partial', tagIds: [foreign.tagId] })).toThrow(
-    expect.objectContaining({ code: 'tag.not-found' }),
-  )
+  expect(() =>
+    control.flows.updateFlow('owner', flow.flowId, { name: 'Partial', icon: ':twemoji:package:', description: 'Partial update', tagIds: [foreign.tagId] }),
+  ).toThrow(expect.objectContaining({ code: 'tag.not-found' }))
   expect(control.flows.getFlow('owner', flow.flowId)).toEqual(flow)
   expect(() => control.flows.updateFlow('other', flow.flowId, { name: 'Changed', tagIds: [] })).toThrow(expect.objectContaining({ code: 'flow.not-found' }))
   expect(() => control.flows.updateFlow('owner', flow.flowId, {})).toThrow(expect.objectContaining({ code: 'flow.invalid' }))
-  const changed = control.flows.updateFlow('owner', flow.flowId, { name: 'Changed', tagIds: [] })
-  expect(changed).toMatchObject({ name: 'Changed', tagIds: [], draftRevisionId: flow.draftRevisionId })
+  const changed = control.flows.updateFlow('owner', flow.flowId, {
+    name: 'Changed',
+    icon: ':twemoji:package:',
+    description: 'Process orders.\nNotify the team.',
+    tagIds: [],
+  })
+  expect(changed).toMatchObject({
+    name: 'Changed',
+    icon: ':twemoji:package:',
+    description: 'Process orders.\nNotify the team.',
+    tagIds: [],
+    draftRevisionId: flow.draftRevisionId,
+  })
   const after = await control.flows.getEditor('owner', flow.flowId)
   expect(after.draft).toEqual(before.draft)
   expect(after.live).toEqual(before.live)

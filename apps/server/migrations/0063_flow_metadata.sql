@@ -1,0 +1,2 @@
+ALTER TABLE flows ADD COLUMN icon TEXT;
+ALTER TABLE flows ADD COLUMN description TEXT;

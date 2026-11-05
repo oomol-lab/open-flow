@@ -803,6 +803,8 @@ export default function FlowWorkspace({
         )
       }
       flowName={flow?.name ?? flow?.flowId ?? ''}
+      flowIcon={flow?.icon}
+      flowDescription={flow?.description}
       flowsHref={hrefFor({ view: 'design' })}
       onOpenFlows={() => void navigation.openFlows()}
     />

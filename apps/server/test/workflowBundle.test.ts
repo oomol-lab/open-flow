@@ -31,6 +31,8 @@ function file(name: string, targets: readonly string[] = []): WorkflowFile {
     kind: 'open-flow-workflow',
     version: 1,
     name,
+    icon: ':twemoji:package:',
+    description: `Process ${name}.\nNotify the team.`,
     presentation: { comments: [name] },
     content: {
       modelVersion: currentFlowModelVersion,
@@ -77,6 +79,8 @@ it('imports the whole bundle with tags and layout, restores shared references, a
   const leaf = result.flows.find((item) => item.name == 'Leaf')!
   for (const flow of result.flows) {
     expect(flow.tagIds).toEqual([tag.tagId])
+    const original = bundle.workflows.find((item) => item.file.name == (flow.name == 'Renamed root' ? 'Root' : flow.name))!.file
+    expect(flow).toMatchObject({ icon: original.icon, description: original.description })
     expect(flow.live).toBeUndefined()
     expect(['root', 'middle', 'leaf']).not.toContain(flow.flowId)
   }
@@ -90,6 +94,7 @@ it('imports the whole bundle with tags and layout, restores shared references, a
   expect(preview.workflows[0]?.flowId).toBe(result.flow.flowId)
   expect(preview.workflows).toHaveLength(3)
   expect(preview.unavailableFlowIds).toEqual([])
+  expect(preview.workflows[0]?.file).toMatchObject({ icon: bundle.workflows[0]!.file.icon, description: bundle.workflows[0]!.file.description })
   expect(await client.exportFlowBundle(result.flow.flowId)).toEqual(workflowBundleFromPreview(preview))
   expect(await client.importFlowBundle(bundle, { name: 'Renamed root', tagIds: [tag.tagId], idempotencyKey: 'import' })).toEqual(result)
   await expect(client.importFlowBundle(bundle, { name: 'Changed', tagIds: [tag.tagId], idempotencyKey: 'import' })).rejects.toMatchObject({

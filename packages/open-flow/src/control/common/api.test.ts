@@ -966,6 +966,23 @@ it('preserves optional Wait timing and resolution audit metadata while accepting
 })
 
 describe('Flow tags', () => {
+  it('preserves optional Flow icons and descriptions and rejects malformed metadata', async () => {
+    const metadata = { icon: ':twemoji:package:', description: 'Collect updates.\nSend the daily report.' }
+    expect(await new ControlClient(async () => Response.json({ ...flow, ...metadata })).getFlow(flow.flowId)).toMatchObject(metadata)
+    expect((await new ControlClient(async () => Response.json(flow)).getFlow(flow.flowId)).icon).toBeUndefined()
+    for (const field of ['icon', 'description'])
+      for (const value of [null, 1, {}])
+        await expect(new ControlClient(async () => Response.json({ ...flow, [field]: value })).getFlow(flow.flowId)).rejects.toMatchObject({
+          code: 'response.invalid',
+        })
+    const request = vi.fn(async (_path: string, _init?: RequestInit) => Response.json(flow))
+    await new ControlClient(request).updateFlow(flow.flowId, { icon: null, description: null })
+    expect(request).toHaveBeenLastCalledWith(
+      '/v1/flows/flow%2F1',
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ icon: null, description: null, version: 1 }) }),
+    )
+  })
+
   it('reads older Flow responses as having no tags and rejects malformed memberships', async () => {
     const { tagIds: _tagIds, ...legacy } = flow
     expect((await new ControlClient(async () => Response.json(legacy)).getFlow(flow.flowId)).tagIds).toEqual([])

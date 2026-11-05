@@ -1757,7 +1757,10 @@
     "discardTitle": "Ignorer les modifications ?",
     "discardDescription": "Les modifications des paramètres du workflow n’ont pas été enregistrées.",
     "continueEditing": "Continuer à modifier",
-    "discardChanges": "Ignorer les modifications"
+    "discardChanges": "Ignorer les modifications",
+    "icon": "Icône",
+    "resetIcon": "Réinitialiser l’icône",
+    "description": "Description"
   },
   "flowState": {
     "title": "Données persistantes",

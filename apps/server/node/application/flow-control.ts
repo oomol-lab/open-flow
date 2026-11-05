@@ -91,6 +91,8 @@ export class FlowControl {
       kind: 'open-flow-workflow',
       version: 1,
       name: currentFlow.name,
+      icon: currentFlow.icon,
+      description: currentFlow.description,
       content: currentDraft.content,
       presentation: this.getPresentation(actorId, flowId).value,
     }).file
@@ -178,6 +180,8 @@ export class FlowControl {
           digest: await digestBytes(bytes),
           modelVersion: file.content.modelVersion,
           name: mappedNames.get(flowId)!,
+          icon: file.icon,
+          description: file.description,
           presentation: file.presentation,
           revisionId: `revision_${randomUUID().replaceAll('-', '')}`,
         }
@@ -212,6 +216,8 @@ export class FlowControl {
       actorId,
       tagIds,
       name: resolvedName,
+      icon: file.icon,
+      description: file.description,
       idempotencyKey,
       connectorTeamId: teamId,
       content: file.content,
@@ -244,6 +250,8 @@ export class FlowControl {
     actorId,
     tagIds = [],
     name,
+    icon,
+    description,
     idempotencyKey,
     connectorTeamId,
     content,
@@ -253,6 +261,8 @@ export class FlowControl {
     readonly actorId: string
     readonly tagIds?: readonly string[]
     readonly name: string
+    readonly icon?: string | undefined
+    readonly description?: string | undefined
     readonly idempotencyKey: string
     readonly connectorTeamId?: string
     readonly content: RevisionContent
@@ -285,6 +295,8 @@ export class FlowControl {
         modelVersion: content.modelVersion,
         presentation: initialPresentation,
         name,
+        icon,
+        description,
         flowId: `flow_${randomUUID().replaceAll('-', '')}`,
         requestDigest,
         revisionId: `revision_${randomUUID().replaceAll('-', '')}`,
@@ -335,7 +347,9 @@ export class FlowControl {
     const current = this.access.requireFlow(actorId, flowId)
     if (current.status != 'active') throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
     if (
-      (changes.name == null && changes.tagIds == null) ||
+      (changes.name === undefined && changes.tagIds === undefined && changes.icon === undefined && changes.description === undefined) ||
+      (changes.icon != null && typeof changes.icon != 'string') ||
+      (changes.description != null && typeof changes.description != 'string') ||
       (changes.name != null && (changes.name != changes.name.trim() || resourceNameIssue(changes.name) != null))
     ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Flow settings are invalid.')

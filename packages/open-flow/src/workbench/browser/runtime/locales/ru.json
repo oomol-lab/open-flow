@@ -1757,7 +1757,10 @@
     "discardTitle": "Отменить изменения?",
     "discardDescription": "Изменения настроек процесса не сохранены.",
     "continueEditing": "Продолжить редактирование",
-    "discardChanges": "Отменить изменения"
+    "discardChanges": "Отменить изменения",
+    "icon": "Значок",
+    "resetIcon": "Сбросить значок",
+    "description": "Описание"
   },
   "flowState": {
     "title": "Постоянные данные",

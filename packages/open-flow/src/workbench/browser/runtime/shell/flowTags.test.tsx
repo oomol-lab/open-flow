@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import type { Root } from 'react-dom/client'
-import type { Flow, Tag } from '../../../../control/common/api.ts'
+import type { Flow, FlowUpdate, Tag } from '../../../../control/common/api.ts'
 
 import { act, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -14,6 +14,14 @@ import { WorkbenchStore } from '../stores/workbenchStore.ts'
 import { FlowSettingsButton } from './flowSettings.tsx'
 import { FlowTagChips } from './flowTags.tsx'
 import { FlowBrowser } from './resourceBrowser.tsx'
+
+vi.mock('../../../../ui/browser/icons/picker/IconPicker.tsx', () => ({
+  IconPicker: ({ onChange }: { onChange: (collection: string, icon: string, color: string) => void }) => (
+    <button type="button" onClick={() => onChange('carbon', 'document', 'currentColor')}>
+      Select document icon
+    </button>
+  ),
+}))
 
 let root: Root | undefined
 let store: WorkbenchStore
@@ -36,9 +44,12 @@ function button(name: string): HTMLButtonElement {
 async function click(name: string): Promise<void> {
   await act(async () => button(name).click())
 }
-async function fill(input: HTMLInputElement, value: string): Promise<void> {
+async function fill(input: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    Object.getOwnPropertyDescriptor(input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      value,
+    )
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
 }
@@ -57,7 +68,11 @@ async function chooseTag(name: string): Promise<void> {
   await act(async () => option.click())
 }
 
-async function fixture(editor = false, referenceState: 'draft' | 'published' | 'changed' | 'disabled' = 'published') {
+async function fixture(
+  editor = false,
+  referenceState: 'draft' | 'published' | 'changed' | 'disabled' = 'published',
+  metadata: Pick<Flow, 'icon' | 'description'> = {},
+) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const timestamp = '2026-10-30T00:00:00.000Z'
   let tags: Tag[] = [
@@ -76,6 +91,7 @@ async function fixture(editor = false, referenceState: 'draft' | 'published' | '
       draftRevisionId: 'draft',
       resourceReferences: { draft: null, sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] } },
     }
+    if (index == 0) Object.assign(flow, metadata)
     return referenceState == 'draft'
       ? flow
       : Object.assign(flow, {
@@ -152,10 +168,17 @@ async function fixture(editor = false, referenceState: 'draft' | 'published' | '
         return Response.json({ error: { code: 'request.failed', message: 'Unavailable' } }, { status: 500 })
       }
       const flowId = url.pathname.split('/')[3]
-      const changes = JSON.parse(String(init.body)) as { name?: string; tagIds?: string[] }
+      const changes = JSON.parse(String(init.body)) as FlowUpdate
       flows = flows.map((flow) =>
         flow.flowId == flowId
-          ? Object.assign({}, flow, changes.name == null ? {} : { name: changes.name }, changes.tagIds == null ? {} : { tagIds: changes.tagIds })
+          ? Object.assign(
+              {},
+              flow,
+              changes.name == null ? {} : { name: changes.name },
+              changes.icon === undefined ? {} : { icon: changes.icon ?? undefined },
+              changes.description === undefined ? {} : { description: changes.description ?? undefined },
+              changes.tagIds == null ? {} : { tagIds: changes.tagIds },
+            )
           : flow,
       )
       return Response.json(flows.find((flow) => flow.flowId == flowId))
@@ -346,6 +369,77 @@ it('validates the title and saves a title-only change without replacing tags', a
   await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
   expect(JSON.parse(String(request.mock.calls.find(([, init]) => init?.method == 'PATCH')?.[1]?.body))).toEqual({ name: 'Updated title', version: 1 })
   expect(store.workspace.$.flows.value[0]?.tagIds).toEqual(['sales'])
+})
+
+it('shows the full title and description in the title tooltip without adding description text to list rows', async () => {
+  const description = 'Collect updates.\nSend the daily report.'
+  await fixture(false, 'published', { description })
+  expect(container.querySelector('.resource-list-section')?.textContent).not.toContain(description)
+  const title = container.querySelector<HTMLAnchorElement>('a[href="/flows/0/design"]')!
+  await act(async () => title.focus())
+  await vi.waitFor(() => {
+    const tooltip = document.querySelector('[data-slot="tooltip-content"]')
+    expect(tooltip?.textContent).toContain('One')
+    expect(tooltip?.textContent).toContain(description)
+  })
+})
+
+it('retains icon and multiline description edits after a failed save and clears them without replacing other settings', async () => {
+  const { request, failUpdate } = await fixture(true)
+  await click('Flow settings')
+  await click('Icon')
+  await click('Select document icon')
+  const description = document.querySelector<HTMLTextAreaElement>('textarea[name="flow-description"]')!
+  await fill(description, 'Collect updates.\nSend the daily report.')
+  failUpdate()
+  await click('Save')
+  expect(description.value).toBe('Collect updates.\nSend the daily report.')
+  expect(button('Reset icon').disabled).toBe(false)
+  await click('Save')
+  await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+  expect(store.workspace.$.flow.value).toMatchObject({
+    name: 'One',
+    icon: ':carbon:document:',
+    description: description.value,
+    tagIds: ['sales'],
+    draftRevisionId: 'draft',
+  })
+  const saves = request.mock.calls.filter(([, init]) => init?.method == 'PATCH')
+  expect(saves).toHaveLength(2)
+  expect(saves[0]?.[1]?.body).toBe(saves[1]?.[1]?.body)
+  expect(JSON.parse(String(saves[0]?.[1]?.body))).toEqual({ icon: ':carbon:document:', description: description.value, version: 1 })
+  await click('Flow settings')
+  expect(document.querySelector<HTMLTextAreaElement>('textarea[name="flow-description"]')!.value).toBe(description.value)
+  await click('Reset icon')
+  await fill(document.querySelector<HTMLTextAreaElement>('textarea[name="flow-description"]')!, '')
+  await click('Save')
+  await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+  expect(JSON.parse(String(request.mock.calls.findLast(([, init]) => init?.method == 'PATCH')?.[1]?.body))).toEqual({
+    icon: null,
+    description: null,
+    version: 1,
+  })
+  expect(store.workspace.$.flow.value).toMatchObject({ name: 'One', tagIds: ['sales'], draftRevisionId: 'draft' })
+  expect(store.workspace.$.flow.value?.icon).toBeUndefined()
+  expect(store.workspace.$.flow.value?.description).toBeUndefined()
+})
+
+it.each(['icon', 'description'])('guards unsaved %s edits and allows closing after restoring the original value', async (field) => {
+  const { request } = await fixture(true)
+  await click('Flow settings')
+  if (field == 'icon') {
+    await click('Icon')
+    await click('Select document icon')
+  } else await fill(document.querySelector<HTMLTextAreaElement>('textarea[name="flow-description"]')!, 'Unsaved')
+  await click('Cancel')
+  await vi.waitFor(() => expect(document.body.textContent).toContain('Discard changes?'))
+  await click('Continue editing')
+  if (field == 'icon') await click('Reset icon')
+  else await fill(document.querySelector<HTMLTextAreaElement>('textarea[name="flow-description"]')!, '')
+  expect(button('Save').disabled).toBe(true)
+  await click('Cancel')
+  await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+  expect(request.mock.calls.filter(([, init]) => init?.method == 'PATCH')).toHaveLength(0)
 })
 
 it.each(['cancel', 'close', 'escape'])('confirms unsaved title and tag changes on %s', async (method) => {

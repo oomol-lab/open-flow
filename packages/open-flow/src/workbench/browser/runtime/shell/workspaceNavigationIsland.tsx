@@ -5,12 +5,15 @@ import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { TooltipProvider } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
 
 export function WorkspaceNavigationIsland({
   flowName,
+  flowIcon,
+  flowDescription,
   settings,
   flowsHref,
   ghost = false,
@@ -19,6 +22,8 @@ export function WorkspaceNavigationIsland({
 }: {
   readonly settings?: ReactNode
   readonly flowName: string
+  readonly flowIcon?: string | undefined
+  readonly flowDescription?: string | undefined
   readonly flowsHref: string
   readonly ghost?: boolean
   readonly onOpenFlows: () => void
@@ -51,7 +56,24 @@ export function WorkspaceNavigationIsland({
               <Icon name="chevron-left" />
             </Button>
           </CanvasTooltip>
-          <CanvasTooltip getPopupContainer={() => tooltipContainer ?? document.body} placement="bottom" title={flowName}>
+          {flowIcon && (
+            <ContentIcon src={flowIcon} className="size-4 shrink-0" fallback={<i aria-hidden="true" className="i-lucide-light:workflow size-4 shrink-0" />} />
+          )}
+          <CanvasTooltip
+            getPopupContainer={() => tooltipContainer ?? document.body}
+            placement="bottom"
+            title={
+              flowDescription ? (
+                <span className="whitespace-pre-wrap">
+                  {flowName}
+                  {'\n'}
+                  {flowDescription}
+                </span>
+              ) : (
+                flowName
+              )
+            }
+          >
             <span className="workspace-flow-name" tabIndex={0}>
               {flowName}
             </span>

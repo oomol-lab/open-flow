@@ -3,6 +3,7 @@ import type { ComponentProps, ReactNode } from 'react'
 import { useState } from 'react'
 import { Button } from '../button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../popover.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../tooltip.tsx'
 import { IconPicker } from './picker/IconPicker.tsx'
 
 export function IconPickerButton({
@@ -29,9 +30,16 @@ export function IconPickerButton({
   return (
     <div className="inline-flex" ref={setContainer}>
       <Popover open={open && !disabled} onOpenChange={setOpen}>
-        <PopoverTrigger render={<Button aria-label={label} className={className} disabled={disabled} size={size} variant={variant} />}>
-          {children}
-        </PopoverTrigger>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger render={<Button type="button" aria-label={label} className={className} disabled={disabled} size={size} variant={variant} />} />
+            }
+          >
+            {children}
+          </TooltipTrigger>
+          <TooltipContent container={container}>{label}</TooltipContent>
+        </Tooltip>
         <PopoverContent aria-label={label} container={container} side={side} className="w-auto overflow-hidden border border-foreground/10 p-0 ring-0">
           <IconPicker
             emoji

@@ -1757,7 +1757,10 @@
     "discardTitle": "変更を破棄しますか？",
     "discardDescription": "ワークフロー設定の変更は保存されていません。",
     "continueEditing": "編集を続ける",
-    "discardChanges": "変更を破棄"
+    "discardChanges": "変更を破棄",
+    "icon": "アイコン",
+    "resetIcon": "アイコンをリセット",
+    "description": "説明"
   },
   "flowState": {
     "title": "永続データ",

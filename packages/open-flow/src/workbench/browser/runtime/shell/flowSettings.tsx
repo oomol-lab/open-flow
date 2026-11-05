@@ -8,7 +8,10 @@ import { resourceNameIssue, resourceNameMaxLength } from '../../../../flow/commo
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../../ui/browser/dialog.tsx'
 import { Field, FieldError, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
+import { IconPickerButton } from '../../../../ui/browser/icons/icon-picker-button.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
+import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { TagPicker } from './flowTags.tsx'
 
@@ -27,6 +30,8 @@ export function FlowSettingsDialog({
   const t = useTranslate()
   const original = useRef(flow).current
   const [name, setName] = useState(original.name)
+  const [icon, setIcon] = useState(original.icon ?? null)
+  const [description, setDescription] = useState(original.description ?? '')
   const [ids, setIds] = useState<readonly string[]>(original.tagIds ?? [])
   const [creating, setCreating] = useState(false)
   const [pending, setPending] = useState(false)
@@ -37,25 +42,36 @@ export function FlowSettingsDialog({
   const tags = useVal(context.store.tags.state)
   const titleId = useId()
   const tagsId = useId()
+  const descriptionId = useId()
   const issue = resourceNameIssue(name)
   const nameChanged = name.trim() != original.name
   const tagsChanged = JSON.stringify(ids.toSorted()) != JSON.stringify((original.tagIds ?? []).toSorted())
+  const iconChanged = icon != (original.icon ?? null)
+  const descriptionChanged = description != (original.description ?? '')
+  const changed = nameChanged || iconChanged || descriptionChanged || tagsChanged
   function requestClose(proceed = onClose): void {
     if (pending || creating) return
-    if (nameChanged || tagsChanged) {
+    if (changed) {
       leaveAction.current = proceed
       setConfirmDiscard(true)
     } else proceed()
   }
   async function save(): Promise<void> {
     if (pending || creating || issue != null || (tagsChanged && (tags.loading || tags.failed))) return
-    if (!nameChanged && !tagsChanged) {
+    if (!changed) {
       onClose()
       return
     }
     setPending(true)
     try {
-      if (await context.store.updateFlowSettings(flow.flowId, { ...(nameChanged ? { name: name.trim() } : {}), ...(tagsChanged ? { tagIds: ids } : {}) })) {
+      if (
+        await context.store.updateFlowSettings(flow.flowId, {
+          ...(nameChanged ? { name: name.trim() } : {}),
+          ...(iconChanged ? { icon } : {}),
+          ...(descriptionChanged ? { description: description || null } : {}),
+          ...(tagsChanged ? { tagIds: ids } : {}),
+        })
+      ) {
         onSaved?.()
         onClose()
       }
@@ -83,6 +99,17 @@ export function FlowSettingsDialog({
           </DialogHeader>
           <fieldset className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0" disabled={pending}>
             <legend className="sr-only">{t('flowSettings.title')}</legend>
+            <Field>
+              <FieldLabel>{t('flowSettings.icon')}</FieldLabel>
+              <div className="flex items-center gap-2">
+                <IconPickerButton label={t('flowSettings.icon')} disabled={pending} size="icon" variant="outline" onChange={setIcon}>
+                  <ContentIcon src={icon ?? undefined} className="size-5" fallback={<i aria-hidden="true" className="i-lucide-light:workflow size-5" />} />
+                </IconPickerButton>
+                <Button type="button" variant="ghost" size="sm" disabled={icon == null} onClick={() => setIcon(null)}>
+                  {t('flowSettings.resetIcon')}
+                </Button>
+              </div>
+            </Field>
             <Field data-invalid={issue != null}>
               <FieldLabel htmlFor={titleId}>{t('flowSettings.name')}</FieldLabel>
               <Input
@@ -95,6 +122,17 @@ export function FlowSettingsDialog({
                 onChange={(event) => setName(event.target.value)}
               />
               {issue != null && <FieldError id={`${titleId}-error`}>{t(`resource.nameIssue.${issue}`, { max: resourceNameMaxLength })}</FieldError>}
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={descriptionId}>{t('flowSettings.description')}</FieldLabel>
+              <Textarea
+                id={descriptionId}
+                name="flow-description"
+                rows={3}
+                className="max-h-40 resize-y"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor={tagsId}>{t('tags.title')}</FieldLabel>
@@ -119,10 +157,7 @@ export function FlowSettingsDialog({
             <Button type="button" variant="outline" disabled={pending || creating} onClick={() => requestClose()}>
               {t('common.cancel')}
             </Button>
-            <Button
-              type="submit"
-              disabled={pending || creating || issue != null || (!nameChanged && !tagsChanged) || (tagsChanged && (tags.loading || tags.failed))}
-            >
+            <Button type="submit" disabled={pending || creating || issue != null || !changed || (tagsChanged && (tags.loading || tags.failed))}>
               {t('common.save')}
             </Button>
           </DialogFooter>

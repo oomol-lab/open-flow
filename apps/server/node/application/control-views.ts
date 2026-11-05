@@ -52,6 +52,8 @@ export function flow(stored: StoredFlow): Flow {
       },
     },
     name: stored.name,
+    ...(stored.icon == null ? {} : { icon: stored.icon }),
+    ...(stored.description == null ? {} : { description: stored.description }),
     flowId: stored.flowId,
     status: stored.status,
     updatedAt: timestamp(stored.updatedAt),

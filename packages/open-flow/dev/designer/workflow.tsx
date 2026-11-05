@@ -1,6 +1,7 @@
 import type { FlowPngResult } from '../../src/canvas/browser/graph/FlowCanvas/exportPng.ts'
 import type { FlowCanvasViewModel, FlowCanvasViewProps } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../src/canvas/common/commands.ts'
+import type { Flow, FlowUpdate } from '../../src/control/common/api.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { Draft } from '../../src/workbench/browser/runtime/api.ts'
 import type { CanvasNodePickerRequest } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
@@ -767,9 +768,11 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
   const [tagStore, setTagStore] = useState<WorkbenchStore>()
   const tagFlows = useVal(tagStore?.workspace.$.flows)
   useEffect(() => {
-    let flow = {
+    let flow: Flow & { readonly tagIds: readonly string[] } = {
       flowId: 'navigation-sample',
       name: 'nn',
+      icon: ':twemoji:package:',
+      description: 'Review customer onboarding and notify the account team.',
       version: 1 as const,
       status: 'active' as const,
       tagIds: ['production', 'ai'],
@@ -804,8 +807,14 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
       if (url == '/v1/tags')
         return Response.json({ tags: tags.map((tag) => Object.assign({}, tag, { referenceCount: flow.tagIds.includes(tag.tagId) ? 1 : 0 })), version: 1 })
       if (url == `/v1/flows/${flow.flowId}` && init?.method == 'PATCH') {
-        const changes = JSON.parse(String(init.body)) as { name?: string; tagIds?: string[] }
-        flow = { ...flow, ...(changes.name == null ? {} : { name: changes.name }), ...(changes.tagIds == null ? {} : { tagIds: changes.tagIds }) }
+        const changes = JSON.parse(String(init.body)) as FlowUpdate
+        flow = {
+          ...flow,
+          ...(changes.name == null ? {} : { name: changes.name }),
+          ...(changes.icon === undefined ? {} : { icon: changes.icon ?? undefined }),
+          ...(changes.description === undefined ? {} : { description: changes.description ?? undefined }),
+          ...(changes.tagIds == null ? {} : { tagIds: [...changes.tagIds] }),
+        }
         log('flow.settings', changes)
         return Response.json(flow)
       }
@@ -869,6 +878,8 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
         )
       }
       flowName={tagFlows?.[0]?.name ?? 'nn'}
+      flowIcon={tagFlows?.[0]?.icon}
+      flowDescription={tagFlows?.[0]?.description}
       flowsHref="#workflows"
       onOpenFlows={() => log('flows.open')}
     />

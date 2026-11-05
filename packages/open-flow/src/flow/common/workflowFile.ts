@@ -12,6 +12,8 @@ export interface WorkflowFile {
   readonly kind: 'open-flow-workflow'
   readonly version: 1
   readonly name?: string
+  readonly icon?: string
+  readonly description?: string
   readonly content: RevisionContent
   readonly presentation?: Readonly<Record<string, JsonValue>>
 }
@@ -25,6 +27,8 @@ const envelope = z.strictObject({
   kind: z.literal('open-flow-workflow'),
   version: z.literal(1),
   name: z.string().optional(),
+  icon: z.string().optional(),
+  description: z.string().optional(),
   content: z.unknown(),
   presentation: z.record(z.string(), z.json()).optional(),
 })

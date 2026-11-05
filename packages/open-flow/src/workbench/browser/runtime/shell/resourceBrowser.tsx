@@ -22,6 +22,8 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { Field, FieldError, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
+import { IconifyProvider } from '../../../../ui/browser/icons/iconifyContext.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Popover, PopoverContent, PopoverTitle } from '../../../../ui/browser/popover.tsx'
@@ -132,7 +134,7 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store, onTagFilter,
       <div className="resource-list-row flow-columns">
         <span className="resource-primary-cell">
           <span aria-hidden="true" className="resource-flow-icon">
-            <i className="i-lucide-light:workflow" />
+            <ContentIcon src={flow.icon} className="size-3.5" fallback={<i className="i-lucide-light:workflow" />} />
           </span>
           <span className="resource-primary-copy">
             <span className="resource-primary-heading">
@@ -159,7 +161,10 @@ function FlowItem({ busy, flow, href, hrefForFlow, onSelect, store, onTagFilter,
                   </span>
                 </TooltipTrigger>
                 <TooltipContent container={root} collisionBoundary={[]} positionMethod="fixed">
-                  {flow.name}
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span>{flow.name}</span>
+                    {flow.description && <span className="whitespace-pre-wrap">{flow.description}</span>}
+                  </div>
                 </TooltipContent>
               </Tooltip>
               {flow.status == 'active' && (
@@ -484,224 +489,226 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
   }
 
   return (
-    <main className="resource-browser" data-tooltip-portal ref={setRoot}>
-      <div
-        className={cn('resource-page', {
-          'resource-page-full': catalogWidth == null || catalogWidth == 'full',
-          'resource-page-embedded': catalogWidth == 'embedded',
-        })}
-      >
-        <h1 className="sr-only">{t('resource.flows')}</h1>
-        <section aria-busy={loading || refreshing} aria-labelledby="flow-list-title" className="resource-list-section rounded-lg">
-          <div className="resource-list-title">
-            <div className="resource-list-heading">
-              <h2 id="flow-list-title">{t('resource.flows')}</h2>
-              {!loading && total != null && <span>{t('resource.flowCount', { count: total })}</span>}
-            </div>
-            <div className="resource-list-actions">
-              <InputGroup className="w-full sm:w-56">
-                <InputGroupAddon>
-                  <Icon name="search" size={17} />
-                </InputGroupAddon>
-                <InputGroupInput
-                  ref={searchInput}
-                  autoComplete="off"
-                  aria-label={t('resource.searchByName')}
-                  name="flow-search"
-                  onChange={(event) => setFilter(event.target.value)}
-                  placeholder={t('resource.searchByName')}
-                  value={filter}
-                />
-              </InputGroup>
-              <TagPicker {...tagsContext} value={tagIds} onChange={setTagIds} untagged={untagged} onUntaggedChange={setUntagged} />
-              {onImportFlow != null && (
-                <>
-                  <Input
-                    ref={fileInput}
-                    className="hidden"
-                    type="file"
-                    accept=".openflow.json,.json,application/json"
-                    aria-label={t('resource.importFlow')}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      event.target.value = ''
-                      if (file == null) return
-                      void file
-                        .text()
-                        .then((text) => {
-                          command.current?.({ text, fileName: file.name })
-                        })
-                        .catch(() => store.workspace.notify({ kind: 'error', message: t('resource.importInvalid') }))
-                    }}
+    <IconifyProvider>
+      <main className="resource-browser" data-tooltip-portal ref={setRoot}>
+        <div
+          className={cn('resource-page', {
+            'resource-page-full': catalogWidth == null || catalogWidth == 'full',
+            'resource-page-embedded': catalogWidth == 'embedded',
+          })}
+        >
+          <h1 className="sr-only">{t('resource.flows')}</h1>
+          <section aria-busy={loading || refreshing} aria-labelledby="flow-list-title" className="resource-list-section rounded-lg">
+            <div className="resource-list-title">
+              <div className="resource-list-heading">
+                <h2 id="flow-list-title">{t('resource.flows')}</h2>
+                {!loading && total != null && <span>{t('resource.flowCount', { count: total })}</span>}
+              </div>
+              <div className="resource-list-actions">
+                <InputGroup className="w-full sm:w-56">
+                  <InputGroupAddon>
+                    <Icon name="search" size={17} />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    ref={searchInput}
+                    autoComplete="off"
+                    aria-label={t('resource.searchByName')}
+                    name="flow-search"
+                    onChange={(event) => setFilter(event.target.value)}
+                    placeholder={t('resource.searchByName')}
+                    value={filter}
                   />
-                  <Button variant="outline" disabled={initializing || busy != null || createFlowDisabled} onClick={() => fileInput.current?.click()}>
-                    {t('resource.importFlow')}
-                  </Button>
-                </>
-              )}
-
-              <Button className="pr-3" disabled={initializing || busy != null} onClick={openCreate}>
-                <Icon data-icon="inline-start" name="plus" />
-                {t('resource.newFlow')}
-              </Button>
-            </div>
-          </div>
-          {(tagIds.length > 0 || untagged) && (
-            <div className="flex items-center gap-2 border-t border-border px-4 py-3">
-              <i aria-hidden="true" className="i-lucide-light:funnel size-4 shrink-0 text-muted-foreground" />
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                {tagState.tags
-                  .filter((tag) => tagIds.includes(tag.tagId))
-                  .map((tag) => (
-                    <Button
-                      key={tag.tagId}
-                      variant="secondary"
-                      size="sm"
-                      aria-label={t('tags.remove', { name: tag.name })}
-                      onClick={() => setTagIds(tagIds.filter((id) => id != tag.tagId))}
-                    >
-                      {tag.name}
-                      <i aria-hidden="true" className="i-lucide-light:x size-3" />
+                </InputGroup>
+                <TagPicker {...tagsContext} value={tagIds} onChange={setTagIds} untagged={untagged} onUntaggedChange={setUntagged} />
+                {onImportFlow != null && (
+                  <>
+                    <Input
+                      ref={fileInput}
+                      className="hidden"
+                      type="file"
+                      accept=".openflow.json,.json,application/json"
+                      aria-label={t('resource.importFlow')}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        event.target.value = ''
+                        if (file == null) return
+                        void file
+                          .text()
+                          .then((text) => {
+                            command.current?.({ text, fileName: file.name })
+                          })
+                          .catch(() => store.workspace.notify({ kind: 'error', message: t('resource.importInvalid') }))
+                      }}
+                    />
+                    <Button variant="outline" disabled={initializing || busy != null || createFlowDisabled} onClick={() => fileInput.current?.click()}>
+                      {t('resource.importFlow')}
                     </Button>
-                  ))}
-                {untagged && (
-                  <Button variant="secondary" size="sm" onClick={() => setUntagged(false)}>
-                    {t('tags.untagged')}
-                    <i aria-hidden="true" className="i-lucide-light:x size-3" />
-                  </Button>
+                  </>
                 )}
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  {t('tags.clear')}
+
+                <Button className="pr-3" disabled={initializing || busy != null} onClick={openCreate}>
+                  <Icon data-icon="inline-start" name="plus" />
+                  {t('resource.newFlow')}
                 </Button>
               </div>
             </div>
-          )}
-          <div className="resource-table-scroll">
-            <div className="resource-table">
-              <div aria-hidden="true" className="resource-list-columns-shell">
-                <div className="resource-list-columns flow-columns">
-                  <span>{t('resource.name')}</span>
-                  <span className="resource-flow-id-heading">{t('resource.flowId')}</span>
-                  <span className="resource-updated-heading">{t('resource.updated')}</span>
-                  <span>{t('resource.publicationStatus')}</span>
-                  <span>{t('resource.runtimeStatus')}</span>
-                </div>
-                <span className="resource-actions-heading">{t('resource.actions')}</span>
-              </div>
-              <div className="resource-list">
-                {loading ? (
-                  Array.from({ length: 5 }, (_, index) => <FlowSkeleton key={index} />)
-                ) : loadFailed ? (
-                  <Empty className="min-h-64" role="alert">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <Icon name="alert" size={20} />
-                      </EmptyMedia>
-                      <EmptyTitle>{t('resource.flowsLoadFailed')}</EmptyTitle>
-                      <EmptyDescription>{t('resource.flowsLoadFailedDescription')}</EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
-                      <Button onClick={() => void catalog?.reload()} variant="outline">
-                        {t('empty.retry')}
+            {(tagIds.length > 0 || untagged) && (
+              <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+                <i aria-hidden="true" className="i-lucide-light:funnel size-4 shrink-0 text-muted-foreground" />
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {tagState.tags
+                    .filter((tag) => tagIds.includes(tag.tagId))
+                    .map((tag) => (
+                      <Button
+                        key={tag.tagId}
+                        variant="secondary"
+                        size="sm"
+                        aria-label={t('tags.remove', { name: tag.name })}
+                        onClick={() => setTagIds(tagIds.filter((id) => id != tag.tagId))}
+                      >
+                        {tag.name}
+                        <i aria-hidden="true" className="i-lucide-light:x size-3" />
                       </Button>
-                    </EmptyContent>
-                  </Empty>
-                ) : flows.length == 0 ? (
-                  <Empty className="min-h-64">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <Icon name="flow" size={20} />
-                      </EmptyMedia>
-                      <EmptyTitle>{t(!hasFilters ? 'resource.noFlows' : 'resource.noMatchingFlows')}</EmptyTitle>
-                      <EmptyDescription>{t(!hasFilters ? 'resource.noFlowsDescription' : 'resource.noMatchingDescription')}</EmptyDescription>
-                    </EmptyHeader>
-                    {hasFilters && (
+                    ))}
+                  {untagged && (
+                    <Button variant="secondary" size="sm" onClick={() => setUntagged(false)}>
+                      {t('tags.untagged')}
+                      <i aria-hidden="true" className="i-lucide-light:x size-3" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    {t('tags.clear')}
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div className="resource-table-scroll">
+              <div className="resource-table">
+                <div aria-hidden="true" className="resource-list-columns-shell">
+                  <div className="resource-list-columns flow-columns">
+                    <span>{t('resource.name')}</span>
+                    <span className="resource-flow-id-heading">{t('resource.flowId')}</span>
+                    <span className="resource-updated-heading">{t('resource.updated')}</span>
+                    <span>{t('resource.publicationStatus')}</span>
+                    <span>{t('resource.runtimeStatus')}</span>
+                  </div>
+                  <span className="resource-actions-heading">{t('resource.actions')}</span>
+                </div>
+                <div className="resource-list">
+                  {loading ? (
+                    Array.from({ length: 5 }, (_, index) => <FlowSkeleton key={index} />)
+                  ) : loadFailed ? (
+                    <Empty className="min-h-64" role="alert">
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <Icon name="alert" size={20} />
+                        </EmptyMedia>
+                        <EmptyTitle>{t('resource.flowsLoadFailed')}</EmptyTitle>
+                        <EmptyDescription>{t('resource.flowsLoadFailedDescription')}</EmptyDescription>
+                      </EmptyHeader>
                       <EmptyContent>
-                        <Button variant="outline" onClick={clearFilters}>
-                          {t('tags.clear')}
+                        <Button onClick={() => void catalog?.reload()} variant="outline">
+                          {t('empty.retry')}
                         </Button>
                       </EmptyContent>
-                    )}
-                    {!hasFilters && (
-                      <EmptyContent>
-                        <Button onClick={openCreate} variant="outline">
-                          <Icon data-icon="inline-start" name="plus" />
-                          {t('resource.newFlow')}
-                        </Button>
-                      </EmptyContent>
-                    )}
-                  </Empty>
-                ) : (
-                  flows.map((flow) => (
-                    <FlowItem
-                      busy={busy}
-                      settingsFinalFocus={() => searchInput.current}
-                      onChanged={() => void catalog?.reload()}
-                      onTagFilter={(id) => setTagIds((current) => (current.includes(id) ? current : [...current, id]))}
-                      flow={flow}
-                      href={hrefForFlow(flow)}
-                      hrefForFlow={hrefForFlow}
-                      key={flow.flowId}
-                      onSelect={onSelectFlow}
-                      store={store}
-                    />
-                  ))
-                )}
+                    </Empty>
+                  ) : flows.length == 0 ? (
+                    <Empty className="min-h-64">
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <Icon name="flow" size={20} />
+                        </EmptyMedia>
+                        <EmptyTitle>{t(!hasFilters ? 'resource.noFlows' : 'resource.noMatchingFlows')}</EmptyTitle>
+                        <EmptyDescription>{t(!hasFilters ? 'resource.noFlowsDescription' : 'resource.noMatchingDescription')}</EmptyDescription>
+                      </EmptyHeader>
+                      {hasFilters && (
+                        <EmptyContent>
+                          <Button variant="outline" onClick={clearFilters}>
+                            {t('tags.clear')}
+                          </Button>
+                        </EmptyContent>
+                      )}
+                      {!hasFilters && (
+                        <EmptyContent>
+                          <Button onClick={openCreate} variant="outline">
+                            <Icon data-icon="inline-start" name="plus" />
+                            {t('resource.newFlow')}
+                          </Button>
+                        </EmptyContent>
+                      )}
+                    </Empty>
+                  ) : (
+                    flows.map((flow) => (
+                      <FlowItem
+                        busy={busy}
+                        settingsFinalFocus={() => searchInput.current}
+                        onChanged={() => void catalog?.reload()}
+                        onTagFilter={(id) => setTagIds((current) => (current.includes(id) ? current : [...current, id]))}
+                        flow={flow}
+                        href={hrefForFlow(flow)}
+                        hrefForFlow={hrefForFlow}
+                        key={flow.flowId}
+                        onSelect={onSelectFlow}
+                        store={store}
+                      />
+                    ))
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-          {nextCursor != null && (
-            <div className="resource-list-footer">
-              <Button disabled={loadingMore || refreshing} onClick={() => void catalog?.loadMore()} variant="outline">
-                {t(loadingMore ? 'resource.loadingMore' : loadMoreFailed ? 'resource.retryLoadMore' : 'resource.loadMore')}
-              </Button>
-            </div>
-          )}
-        </section>
-        <WorkflowExportDialog workspace={store.workspace} container={root} />
-        {creation != null && (
-          <Suspense fallback={null}>
-            <CreateResourceDialog
-              disabled={createFlowDisabled || creatingTag}
-              tagField={(container) => (
-                <Field>
-                  <FieldLabel>{t('tags.title')}</FieldLabel>
-                  <TagPicker
-                    {...tagsContext}
-                    onPendingChange={setCreatingTag}
-                    dialogContainer={root}
-                    container={container}
-                    value={creationTags}
-                    onChange={setCreationTags}
-                  />
-                </Field>
-              )}
-              summary={
-                creation.kind == 'import' && creation.file.kind == 'open-flow-workflow-bundle' ? (
-                  <WorkflowBundleSummary bundle={creation.file} entryName={name} />
-                ) : undefined
-              }
-              field={createFlowField}
-              id="flow-name"
-              issue={resourceNameIssue(name)}
-              label={t('resource.flowName')}
-              name={name}
-              onNameChange={setName}
-              onOpenChange={(open) => {
-                if (!open) {
-                  creation$.set(undefined)
-                  setName('')
+            {nextCursor != null && (
+              <div className="resource-list-footer">
+                <Button disabled={loadingMore || refreshing} onClick={() => void catalog?.loadMore()} variant="outline">
+                  {t(loadingMore ? 'resource.loadingMore' : loadMoreFailed ? 'resource.retryLoadMore' : 'resource.loadMore')}
+                </Button>
+              </div>
+            )}
+          </section>
+          <WorkflowExportDialog workspace={store.workspace} container={root} />
+          {creation != null && (
+            <Suspense fallback={null}>
+              <CreateResourceDialog
+                disabled={createFlowDisabled || creatingTag}
+                tagField={(container) => (
+                  <Field>
+                    <FieldLabel>{t('tags.title')}</FieldLabel>
+                    <TagPicker
+                      {...tagsContext}
+                      onPendingChange={setCreatingTag}
+                      dialogContainer={root}
+                      container={container}
+                      value={creationTags}
+                      onChange={setCreationTags}
+                    />
+                  </Field>
+                )}
+                summary={
+                  creation.kind == 'import' && creation.file.kind == 'open-flow-workflow-bundle' ? (
+                    <WorkflowBundleSummary bundle={creation.file} entryName={name} />
+                  ) : undefined
                 }
-              }}
-              onSubmit={(event) => void create(event)}
-              pending={busy == 'flow'}
-              sourceUrl={creation.kind == 'import' ? creation.sourceUrl : undefined}
-              submitLabel={creation.kind == 'import' ? t('resource.importFlow') : undefined}
-              title={t(creation.kind == 'create' ? 'resource.newFlow' : 'resource.importFlow')}
-            />
-          </Suspense>
-        )}
-      </div>
-    </main>
+                field={createFlowField}
+                id="flow-name"
+                issue={resourceNameIssue(name)}
+                label={t('resource.flowName')}
+                name={name}
+                onNameChange={setName}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    creation$.set(undefined)
+                    setName('')
+                  }
+                }}
+                onSubmit={(event) => void create(event)}
+                pending={busy == 'flow'}
+                sourceUrl={creation.kind == 'import' ? creation.sourceUrl : undefined}
+                submitLabel={creation.kind == 'import' ? t('resource.importFlow') : undefined}
+                title={t(creation.kind == 'create' ? 'resource.newFlow' : 'resource.importFlow')}
+              />
+            </Suspense>
+          )}
+        </div>
+      </main>
+    </IconifyProvider>
   )
 })

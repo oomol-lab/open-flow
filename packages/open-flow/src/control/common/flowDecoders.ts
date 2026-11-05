@@ -67,6 +67,8 @@ export function flow(value: unknown): Flow {
     resourceReferences: resourceReferences(source.resourceReferences),
     flowId: string(source.flowId),
     name: string(source.name),
+    ...(source.icon === undefined ? {} : { icon: string(source.icon) }),
+    ...(source.description === undefined ? {} : { description: string(source.description) }),
     status: status as Flow['status'],
     updatedAt: string(source.updatedAt),
     version: 1,

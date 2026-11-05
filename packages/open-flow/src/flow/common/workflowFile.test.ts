@@ -25,6 +25,8 @@ function fixture(): WorkflowFile {
     kind: 'open-flow-workflow',
     version: 1,
     name: 'Template',
+    icon: ':twemoji:package:',
+    description: 'Process orders.\nNotify the team.',
     presentation: { positions: { code: { x: 10, y: 20 } }, viewport: { x: 1, y: 2, zoom: 0.5 }, comments: [{ text: 'secret literal stays' }] },
     content: {
       modelVersion: 6,

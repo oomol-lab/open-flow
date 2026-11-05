@@ -69,6 +69,7 @@ const migrations = [
   '0060_skip_duplicates.sql',
   '0061_independent_llm.sql',
   '0062_workflow_bundle_imports.sql',
+  '0063_flow_metadata.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

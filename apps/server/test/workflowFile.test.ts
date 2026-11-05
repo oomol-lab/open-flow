@@ -15,6 +15,8 @@ const file: WorkflowFile = {
   kind: 'open-flow-workflow',
   version: 1,
   name: 'Imported',
+  icon: ':twemoji:package:',
+  description: 'Process orders.\nNotify the team.',
   content: {
     modelVersion: 6,
     modules: {},
@@ -48,6 +50,7 @@ it('imports once, keeps layout and node identities, and isolates actor scopes on
   const app = createServerApp(service, { resolveControlActor: () => actor })
   const client = new ControlClient(async (path, init) => app.request(`http://test${path}`, init))
   const created = await client.importFlow(file, { idempotencyKey: 'import' })
+  expect(created).toMatchObject({ icon: file.icon, description: file.description })
   expect(await client.importFlow(file, { idempotencyKey: 'import' })).toEqual(created)
   await expect(client.importFlow(file, { name: 'Changed', idempotencyKey: 'import' })).rejects.toMatchObject({ code: 'flow.conflict' })
   const editor = await client.getEditor(created.flowId)

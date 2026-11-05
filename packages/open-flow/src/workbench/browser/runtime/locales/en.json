@@ -1757,7 +1757,10 @@
     "discardTitle": "Discard changes?",
     "discardDescription": "Your Flow settings have not been saved.",
     "continueEditing": "Continue editing",
-    "discardChanges": "Discard changes"
+    "discardChanges": "Discard changes",
+    "icon": "Icon",
+    "resetIcon": "Reset icon",
+    "description": "Description"
   },
   "flowState": {
     "title": "Persistent data",

@@ -1757,7 +1757,10 @@
     "discardTitle": "放棄變更？",
     "discardDescription": "工作流程設定的變更尚未儲存。",
     "continueEditing": "繼續編輯",
-    "discardChanges": "放棄變更"
+    "discardChanges": "放棄變更",
+    "icon": "圖示",
+    "resetIcon": "重設圖示",
+    "description": "說明"
   },
   "flowState": {
     "title": "持久化資料",
