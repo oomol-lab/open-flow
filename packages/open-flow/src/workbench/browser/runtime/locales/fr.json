@@ -1621,7 +1621,7 @@
   },
   "leina": {
     "notification": "Notification Leina",
-    "description": "Envoyez une notification via un robot de l’équipe.",
+    "subscription": "Abonnement aux notifications",
     "message": "Contenu de la notification",
     "loading": "Chargement des robots…",
     "robot": "Robot",

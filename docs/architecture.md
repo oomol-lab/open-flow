@@ -101,7 +101,8 @@ Projections update consistently with their sources. Execution always uses the co
 
 Presentation stores layout, viewport, comments, and other display state independently of the execution definition. It does not affect validation or execution.
 Publication fixes the corresponding display snapshot. Rollback and historical views do not rewrite the Draft's display state.
-Revisions do not store credentials, execution state, Engine IR, current Provider state, or deployment caches.
+Revisions do not store deployment-owned account credentials, execution state, Engine IR, current Provider state, or deployment caches.
+Explicitly supplied business capability values, such as a notification subscription, are ordinary input literals and participate in Revision persistence, copying and export.
 
 ### Deployment configuration and execution snapshots
 

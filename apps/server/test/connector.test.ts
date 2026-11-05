@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
-import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
+import { ConnectorTaskError, flowNotificationErrorCodes } from '../node/deployment/connector-contract.ts'
 import { ConnectorClient } from '../node/deployment/connector.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
@@ -23,6 +23,7 @@ const services: ServerService[] = []
 const port = { jsonSchema: {}, nullable: false } as const
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   await Promise.allSettled(services.splice(0).map(closeService))
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })))
@@ -134,6 +135,138 @@ async function run(service: ServerService, revision: RevisionContent): Promise<s
 }
 
 describe('Server Connector host', () => {
+  it.each([
+    { action: 'leina.send_notification', subscription: 'sub_test', stable: true },
+    { action: 'leina.send_notification', subscription: null, stable: false },
+    { action: 'leina.send_notification', subscription: undefined, stable: false },
+    { action: 'example.echo', subscription: 'sub_test', stable: false },
+  ])('keeps retry identity scoped to subscribed notifications: $action / $subscription', async ({ action, subscription, stable }) => {
+    const execute = vi
+      .fn<ConnectorHost['execute']>()
+      .mockRejectedValueOnce(
+        new ConnectorTaskError('connector.unavailable', 'Temporarily unavailable.', 409, { notificationCode: 'platform_unavailable', retryable: true }),
+      )
+      .mockResolvedValue({ message: 'sent' })
+    const service = await open(createConnectorHost({ execute }))
+    const revision = connectorFlow()
+    const node = revision.document.graph.nodes.connector
+    if (node?.kind != 'task' || !('executor' in node.task)) throw new Error('Expected managed Task')
+    const source: RevisionContent = {
+      ...revision,
+      document: {
+        ...revision.document,
+        graph: {
+          edges: [],
+          nodes: {
+            connector: {
+              ...node,
+              retry: { maxRetries: 1, intervalMs: 1000 },
+              inputs: {
+                ...node.inputs,
+                leinaId: { kind: 'value', value: 'default' },
+                ...(subscription === undefined ? {} : { subscription: { kind: 'value', value: subscription } }),
+              },
+              task: {
+                ...node.task,
+                executor: { kind: 'connector', action },
+                inputs: [
+                  ...node.task.inputs,
+                  { handle: 'leinaId', jsonSchema: { type: 'string' }, nullable: false },
+                  { handle: 'subscription', jsonSchema: { type: 'string' }, nullable: true, value: null },
+                ],
+              },
+            },
+          },
+        },
+      },
+    }
+    const runId = await run(service, source)
+    expect(service.run(runId)?.status).toBe('completed')
+    expect(execute).toHaveBeenCalledTimes(2)
+    const ids = execute.mock.calls.map((call) => call[3])
+    expect(new Set(ids).size).toBe(stable ? 1 : 2)
+    if (stable) {
+      expect(execute.mock.calls[0]?.[2].subscription).toBe(subscription)
+      const nextRunId = await run(service, source)
+      expect(service.run(nextRunId)?.status).toBe('completed')
+      expect(execute.mock.calls.at(-1)?.[3]).not.toBe(ids[0])
+    } else if (subscription == null) {
+      expect(execute.mock.calls[0]?.[2]).not.toHaveProperty('subscription')
+    }
+  })
+
+  it.each(flowNotificationErrorCodes)('preserves the notification error %s in public Run events without retrying explicit false', async (code) => {
+    const execute = vi.fn<ConnectorHost['execute']>(async () => {
+      throw new ConnectorTaskError('connector.unavailable', 'Notification rejected.', 502, { notificationCode: code, retryable: false })
+    })
+    const service = await open(createConnectorHost({ execute }))
+    const revision = connectorFlow()
+    const node = revision.document.graph.nodes.connector
+    if (node?.kind != 'task') throw new Error('Expected Task')
+    const runId = await run(service, {
+      ...revision,
+      document: { ...revision.document, graph: { ...revision.document.graph, nodes: { connector: { ...node, retry: { maxRetries: 2, intervalMs: 1000 } } } } },
+    })
+    expect(service.run(runId)?.status).toBe('failed')
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
+      payload: { error: { code, message: 'Notification rejected.' } },
+    })
+  })
+
+  it.each(['request-timeout', 'retry-wait'] as const)('bounds subscribed notification attempts including %s', async (failure) => {
+    const now = performance.now.bind(performance)
+    let elapsed = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now() + elapsed)
+    const timeout = AbortSignal.timeout.bind(AbortSignal)
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => timeout(milliseconds > 59 * 60 * 1000 ? 25 : milliseconds))
+    const execute = vi.fn<ConnectorHost['execute']>(async (_action, _connectionId, _input, _key, signal) => {
+      if (failure == 'retry-wait') {
+        elapsed = 60 * 60 * 1000 - 500
+        throw new ConnectorTaskError('connector.unavailable', 'Temporarily unavailable.', 409, { notificationCode: 'platform_unavailable', retryable: true })
+      }
+      return await new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+    })
+    const connector = createConnectorHost({ execute })
+    const service = await openService(await databaseFile(), { capabilities: { connector: () => connector }, runtime: { runTimeoutMs: 2 * 60 * 60 * 1000 } })
+    services.push(service)
+    await startService(service)
+    const revision = connectorFlow()
+    const node = revision.document.graph.nodes.connector
+    if (node?.kind != 'task' || !('executor' in node.task)) throw new Error('Expected managed Task')
+    const runId = await run(service, {
+      ...revision,
+      document: {
+        ...revision.document,
+        graph: {
+          edges: [],
+          nodes: {
+            connector: {
+              ...node,
+              retry: { maxRetries: 5, intervalMs: 1000 },
+              inputs: { ...node.inputs, leinaId: { kind: 'value', value: 'default' }, subscription: { kind: 'value', value: 'sub_test' } },
+              task: {
+                ...node.task,
+                executor: { kind: 'connector', action: 'leina.send_notification' },
+                inputs: [
+                  ...node.task.inputs,
+                  { handle: 'leinaId', jsonSchema: { type: 'string' }, nullable: false },
+                  { handle: 'subscription', jsonSchema: { type: 'string' }, nullable: true },
+                ],
+              },
+            },
+          },
+        },
+      },
+    })
+    expect(service.run(runId)?.status).toBe('failed')
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
+      payload: { error: { code: failure == 'request-timeout' ? 'delivery_timeout' : 'platform_unavailable' } },
+    })
+    expect(service.events(runId).filter((event) => event.kind == 'node.log')).toHaveLength(0)
+  })
+
   it('routes sequential and concurrent Code calls by fixed ID and alias with independent identities', async () => {
     const execute = vi.fn<ConnectorHost['execute']>(async (_action, connectionId, input) => {
       if (input.message == 'slow') await new Promise((resolve) => setTimeout(resolve, 20))

@@ -16,7 +16,14 @@ import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-ac
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import { silentLogger } from '../logger.ts'
-import { accessInvalid, assertConnectionNotDeferred, connectionRequired, ConnectorTaskError, unavailable } from './connector-contract.ts'
+import {
+  accessInvalid,
+  assertConnectionNotDeferred,
+  connectionRequired,
+  ConnectorTaskError,
+  flowNotificationErrorCodes,
+  unavailable,
+} from './connector-contract.ts'
 import {
   connectorFailureDetails,
   mapAction,
@@ -399,6 +406,7 @@ export class ConnectorClient implements ConnectorHost {
     }
     if (connectionId != null) await this.#assertConnection(connectionId, providerId, signal, teamId)
 
+    const subscribedNotification = action == 'leina.send_notification' && typeof input.subscription == 'string'
     const actionResponse = await this.#transport
       .request(
         'action.execute',
@@ -418,22 +426,44 @@ export class ConnectorClient implements ConnectorHost {
       .catch((error: unknown) => {
         if (signal.aborted) throw signal.reason
         if (!(error instanceof RequestError)) throw error
+        if (subscribedNotification)
+          throw new ConnectorTaskError('connector.unavailable', `${error.reason}. The notification outcome is unknown.`, error.status, {
+            notificationCode: 'notification_unavailable',
+            retryable: true,
+          })
         throw new ConnectorTaskError(
           'connector.indeterminate',
           `${error.reason}${error.status == null ? '' : ` (HTTP ${error.status})`}. The action outcome is unknown.`,
         )
       })
     const response = actionResponse.value
-    if (!record(response))
+    if (!record(response)) {
+      if (subscribedNotification)
+        throw new ConnectorTaskError(
+          'connector.unavailable',
+          'Connector returned an invalid notification response. The notification outcome is unknown.',
+          actionResponse.status,
+          { notificationCode: 'notification_unavailable', retryable: true },
+        )
       throw new ConnectorTaskError(
         'connector.indeterminate',
         `Connector returned an invalid action response (HTTP ${actionResponse.status}). The action outcome is unknown.`,
       )
+    }
     if (actionResponse.ok && response.success === true && Object.hasOwn(response, 'data')) return response.data as JsonValue
     if (response.errorCode === 'credential_expired' || response.errorCode === 'connection_not_allowed' || response.errorCode === 'connection_not_found')
       throw connectionRequired()
     const failure = actionFailure(response)
     if (failure.code == 'connector.input-invalid') throw failure
+    if (subscribedNotification) {
+      const data = record(response.data) ? response.data : undefined
+      const code = flowNotificationErrorCodes.find((candidate) => candidate == data?.error) ?? 'notification_unavailable'
+      const retryable = typeof data?.retryable == 'boolean' ? data.retryable : actionResponse.status == 429 || actionResponse.status >= 500
+      throw new ConnectorTaskError('connector.unavailable', `Leina notification failed (${code}).`, actionResponse.status, {
+        notificationCode: code,
+        retryable,
+      })
+    }
     throw new ConnectorTaskError(
       'connector.indeterminate',
       `Connector ${response.success === false ? 'reported an action failure' : 'returned an unexpected action response'} (HTTP ${actionResponse.status}). The action outcome is unknown.`,

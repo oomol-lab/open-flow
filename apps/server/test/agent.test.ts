@@ -466,40 +466,49 @@ describe('Agent streaming adapter', () => {
     expect(JSON.stringify(prompts.at(-1))).toContain('nextOffset')
   })
 
-  it('terminates an uncertain call without executing the rest of the batch or requesting another model round', async () => {
-    const source = {
-      ...task,
-      executor: {
-        ...task.executor,
-        tools: task.executor.kind == 'agent' ? task.executor.tools.map((tool) => Object.assign({}, tool, { approval: false })) : [],
-      },
-    } as ManagedTaskDefinition
-    const { model, prompts } = fixture([
-      [
-        { id: 'a', input: '{"body":"hello"}' },
-        { id: 'b', input: '{"body":"hello"}' },
-      ],
-    ])
-    const calls: string[] = []
-    const events: Readonly<Record<string, JsonValue>>[] = []
-    await expect(
-      executeAgent(
-        source,
-        invocation,
-        model,
-        async (_tool, _input, id) => {
-          calls.push(id)
-          throw new ConnectorTaskError('connector.indeterminate', 'Outcome unknown.')
+  it.each([undefined, 'delivery_unconfirmed', 'notification_unavailable'] as const)(
+    'terminates an uncertain call (%s) without executing the rest of the batch or requesting another model round',
+    async (notificationCode) => {
+      const source = {
+        ...task,
+        executor: {
+          ...task.executor,
+          tools: task.executor.kind == 'agent' ? task.executor.tools.map((tool) => Object.assign({}, tool, { approval: false })) : [],
         },
-        async (event) => {
-          events.push(event)
-        },
-      ),
-    ).rejects.toThrow()
-    expect(calls).toEqual(['invocation:1:a'])
-    expect(prompts).toHaveLength(1)
-    expect(events.find((event) => event.status == 'failed')).toMatchObject({ executed: null, message: 'Outcome unknown.', code: 'connector.indeterminate' })
-  })
+      } as ManagedTaskDefinition
+      const { model, prompts } = fixture([
+        [
+          { id: 'a', input: '{"body":"hello"}' },
+          { id: 'b', input: '{"body":"hello"}' },
+        ],
+      ])
+      const calls: string[] = []
+      const events: Readonly<Record<string, JsonValue>>[] = []
+      await expect(
+        executeAgent(
+          source,
+          invocation,
+          model,
+          async (_tool, _input, id) => {
+            calls.push(id)
+            throw notificationCode == null
+              ? new ConnectorTaskError('connector.indeterminate', 'Outcome unknown.')
+              : new ConnectorTaskError('connector.unavailable', 'Outcome unknown.', 502, { notificationCode, retryable: false })
+          },
+          async (event) => {
+            events.push(event)
+          },
+        ),
+      ).rejects.toThrow()
+      expect(calls).toEqual(['invocation:1:a'])
+      expect(prompts).toHaveLength(1)
+      expect(events.find((event) => event.status == 'failed')).toMatchObject({
+        executed: null,
+        message: 'Outcome unknown.',
+        code: notificationCode ?? 'connector.indeterminate',
+      })
+    },
+  )
 })
 
 it('resumes a streamed gateway batch after restart and retains earlier receipts after the next wait and terminal', async () => {

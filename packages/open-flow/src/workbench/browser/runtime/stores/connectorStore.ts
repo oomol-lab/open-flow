@@ -71,7 +71,7 @@ function ports(values: Readonly<Record<string, { readonly description?: string; 
 }
 
 function option(action: ConnectorActionView, t: TFunction): AddNodeOption {
-  if (action.actionId == 'leina.send_notification') action = { ...action, name: t('leina.notification'), description: t('leina.description') }
+  if (action.actionId == 'leina.send_notification') action = { ...action, name: t('leina.notification') }
   return {
     connector: action,
     description:

@@ -66,6 +66,26 @@ export type ConnectorAccessContext = ConnectorContext &
     | { readonly scope: 'proxy'; readonly providerAccess: ConnectorAccessSnapshot; readonly providerId: string; readonly connectionId: string }
   )
 
+export const flowNotificationErrorCodes = [
+  'invalid_request',
+  'payload_too_large',
+  'invalid_signature',
+  'subscription_not_found',
+  'idempotency_conflict',
+  'platform_unavailable',
+  'platform_not_supported',
+  'rate_limited',
+  'delivery_unconfirmed',
+  'delivery_failed',
+  'notification_unavailable',
+  'delivery_timeout',
+  'agent_not_found',
+  'agent_not_ready',
+  'agent_timeout',
+  'bot_group_not_found',
+  'bot_group_conflict',
+] as const
+
 export type ConnectorErrorCode =
   | 'connector.access-invalid'
   | 'connector.access-required'
@@ -79,20 +99,25 @@ export type ConnectorErrorCode =
 export class ConnectorTaskError extends Error {
   readonly code: ConnectorErrorCode
   readonly status?: number
+  readonly retryable: boolean
+  readonly notificationCode?: (typeof flowNotificationErrorCodes)[number]
 
-  constructor(code: ConnectorErrorCode, message: string, status?: number) {
+  constructor(
+    code: ConnectorErrorCode,
+    message: string,
+    status?: number,
+    options?: { readonly retryable: boolean; readonly notificationCode?: (typeof flowNotificationErrorCodes)[number] },
+  ) {
     super(message)
     this.code = code
     this.status = status
+    this.retryable = options?.retryable ?? code == 'connector.unavailable'
+    this.notificationCode = options?.notificationCode
     this.name = 'ConnectorTaskError'
   }
 
   get catchable(): boolean {
     return this.code != 'connector.indeterminate' && this.code != 'connector.unconfigured'
-  }
-
-  get retryable(): boolean {
-    return this.code == 'connector.unavailable'
   }
 
   get indeterminate(): boolean {

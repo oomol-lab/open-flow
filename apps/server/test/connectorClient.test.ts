@@ -1,4 +1,4 @@
-import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import type { DestinationStream, Logger } from 'pino'
 import type { ConnectorAccessContext } from '../node/deployment/connector-contract.ts'
@@ -161,6 +161,84 @@ async function readBody(request: IncomingMessage): Promise<unknown> {
 const app = { alias: 'work', id: 'connection-work', service: 'example', status: 'active' }
 
 describe('Server Connector client', () => {
+  it.each([
+    { status: 502, data: { error: 'delivery_unconfirmed', retryable: false }, code: 'delivery_unconfirmed', retryable: false },
+    { status: 409, data: { error: 'platform_unavailable', retryable: true }, code: 'platform_unavailable', retryable: true },
+    { status: 404, data: { error: 'subscription_not_found', retryable: false }, code: 'subscription_not_found', retryable: false },
+    { status: 429, data: { error: 'rate_limited' }, code: 'rate_limited', retryable: true },
+    { status: 503, data: { error: 'delivery_timeout', retryable: 'false' }, code: 'delivery_timeout', retryable: true },
+    { status: 409, data: { error: 'idempotency_conflict' }, code: 'idempotency_conflict', retryable: false },
+    { status: 502, data: { error: 'future_error', retryable: false }, code: 'notification_unavailable', retryable: false },
+    { status: 503, data: null, code: 'notification_unavailable', retryable: true },
+  ])('honors subscribed notification failure metadata: $status / $code / $retryable', async ({ status, data, code, retryable }) => {
+    const origin = await startConnector((_request, response) =>
+      send(response, status, { success: false, errorCode: status == 429 ? 'rate_limited' : 'provider_error', message: 'credential=private-secret', data }),
+    )
+    const client = new ConnectorClient(origin, '')
+    await expect(
+      client.execute('leina.send_notification', undefined, { subscription: 'sub_test', message: 'hello' }, 'job', AbortSignal.timeout(5000)),
+    ).rejects.toMatchObject({
+      notificationCode: code,
+      retryable,
+      status,
+      catchable: true,
+      indeterminate: false,
+      message: `Leina notification failed (${code}).`,
+    })
+  })
+
+  it.each<{ action: string; input: Record<string, JsonValue> }>([
+    { action: 'leina.send_notification', input: {} },
+    { action: 'example.echo', input: { subscription: 'sub_test' } },
+  ])('preserves ordinary Action uncertainty semantics: $action', async ({ action, input }) => {
+    const origin = await startConnector((_request, response) =>
+      send(response, 502, { success: false, errorCode: 'provider_error', data: { error: 'delivery_failed', retryable: true } }),
+    )
+    await expect(new ConnectorClient(origin, '').execute(action, undefined, input, 'call', AbortSignal.timeout(5000))).rejects.toMatchObject({
+      code: 'connector.indeterminate',
+      retryable: false,
+      indeterminate: true,
+    })
+  })
+
+  it.each(['timeout', 'network', 'invalid-json', 'invalid-response'] as const)(
+    'allows subscribed notification recovery from %s with an unknown delivery outcome',
+    async (failure) => {
+      const keys: (string | undefined)[] = []
+      const origin = await startConnector((request, response) => {
+        keys.push(request.headers['idempotency-key'] as string | undefined)
+        if (failure == 'timeout') return
+        if (failure == 'network') {
+          request.socket.destroy()
+          return
+        }
+        if (failure == 'invalid-json') {
+          response.writeHead(502)
+          response.end('credential=private-secret')
+          return
+        }
+        send(response, 502, null)
+      })
+      const client = new ConnectorClient(origin, '', 25)
+      await expect(
+        client.execute('leina.send_notification', undefined, { subscription: 'sub_test' }, 'stable-job', AbortSignal.timeout(5000)),
+      ).rejects.toMatchObject({ notificationCode: 'notification_unavailable', retryable: true, indeterminate: false })
+      expect(keys).toEqual(['stable-job'])
+    },
+  )
+
+  it('preserves caller cancellation for a subscribed notification', async () => {
+    const started = Promise.withResolvers<void>()
+    const origin = await startConnector(() => started.resolve())
+    const controller = new AbortController()
+    const reason = new Error('Caller canceled notification.')
+    const pending = new ConnectorClient(origin, '').execute('leina.send_notification', undefined, { subscription: 'sub_test' }, 'job', controller.signal)
+    const rejected = expect(pending).rejects.toBe(reason)
+    await started.promise
+    controller.abort(reason)
+    await rejected
+  })
+
   it.each(['upstream-status', 'transport', 'timeout', 'invalid-json', 'invalid-data'] as const)(
     'logs the actual Connection request destination for %s failures',
     async (failure) => {

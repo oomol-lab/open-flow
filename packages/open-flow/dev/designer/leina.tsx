@@ -13,11 +13,39 @@ import { createInspectorSession } from './inspectorSession.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 const input = { jsonSchema: { type: 'string' } as const, nullable: false }
+const messageSchema = { type: 'string', minLength: 1, pattern: '\\S' } as const
+const subscriptionSchema = {
+  ...messageSchema,
+  description: 'Use the subscription returned by the robot to send to its fixed conversation. Leave unset to use Home.',
+}
 const action: ConnectorAction = {
   actionId: 'leina.send_notification',
   authenticated: false,
-  description: 'Send a notification through a Leina robot’s Home channels.',
-  inputs: { leinaId: input, message: { jsonSchema: { type: 'string', minLength: 1, pattern: '\\S' }, nullable: false } },
+  description: 'Send to the subscribed conversation when a notification subscription is supplied; otherwise use the robot’s Home channels.',
+  inputSchema: {
+    type: 'object',
+    required: ['leinaId', 'message'],
+    properties: {
+      leinaId: input.jsonSchema,
+      message: messageSchema,
+      subscription: subscriptionSchema,
+    },
+  },
+  outputSchema: {
+    type: 'object',
+    required: ['status', 'requestId', 'leinaId'],
+    properties: { status: input.jsonSchema, requestId: input.jsonSchema, leinaId: input.jsonSchema },
+  },
+  inputs: {
+    leinaId: input,
+    message: { jsonSchema: messageSchema, nullable: false },
+    subscription: {
+      description: subscriptionSchema.description,
+      jsonSchema: subscriptionSchema,
+      nullable: true,
+      value: null,
+    },
+  },
   outputs: { status: input, requestId: input, leinaId: input },
   name: 'Send notification',
   serviceId: 'leina',
@@ -36,11 +64,21 @@ const content: RevisionContent = {
         notify: {
           kind: 'task',
           name: 'Leina notification',
-          inputs: { leinaId: { kind: 'value', value: robot }, message: { kind: 'value', value: 'The report is ready.' } },
+          inputs: {
+            leinaId: { kind: 'value', value: robot },
+            message: { kind: 'value', value: 'The report is ready.' },
+            subscription: { kind: 'value', value: 'sub_example_conversation' },
+          },
           task: {
             name: 'Leina notification',
             executor: { kind: 'connector', action: action.actionId },
-            inputs: Object.entries(action.inputs).map(([handle, definition]) => ({ handle, jsonSchema: definition.jsonSchema, nullable: definition.nullable })),
+            inputs: Object.entries(action.inputs).map(([handle, definition]) => ({
+              handle,
+              jsonSchema: definition.jsonSchema,
+              nullable: definition.nullable,
+              description: definition.description,
+              value: definition.value,
+            })),
             outputs: Object.entries(action.outputs).map(([handle, definition]) => ({
               handle,
               jsonSchema: definition.jsonSchema,
@@ -98,6 +136,8 @@ function Gallery({ language, dark, log }: { language: UiLanguage; dark: boolean;
       },
     },
     { label: 'Clear robot', onClick: () => void session?.store.nodes.setInputValue('notify', 'leinaId', undefined) },
+    { label: 'Use Home', onClick: () => void session?.store.nodes.setInputValue('notify', 'subscription', undefined) },
+    { label: 'Use subscription', onClick: () => void session?.store.nodes.setInputValue('notify', 'subscription', 'sub_example_conversation') },
     { label: disabled ? 'Enable editing' : 'Disable editing', onClick: () => setDisabled(!disabled) },
     {
       label: 'Reload saved data',
@@ -136,6 +176,6 @@ export const leinaStory: FrontendStory = {
   title: 'Leina notification',
   standalone: true,
   description:
-    'Clear the robot to inspect required-field feedback. Choose a robot and reload saved data to verify the saved identifier. Use refresh-error and reopen the list to verify the last loaded name survives a failed refresh. Switch response states to inspect loading, empty, failed and missing selections. Use Connect approval to empty message to verify automatic pending.message binding. Message and robot inputs retain their source selectors. Opening the list refreshes robots without changing the saved value.',
+    'Expand optional inputs to edit the notification subscription. Use Home clears it; Use subscription restores a fixed conversation. Reload saved data to check persistence. Robot selection and message sources remain independent. Clear robot checks required-field feedback; response states cover loading, empty, failed and missing selections. Connect approval to empty message checks automatic pending.message binding.',
   render: (log, dark, language) => <Gallery log={log} dark={dark} language={language} />,
 }

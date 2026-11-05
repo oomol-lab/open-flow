@@ -1621,7 +1621,7 @@
   },
   "leina": {
     "notification": "Leina 通知",
-    "description": "选择团队机器人，发送通知。",
+    "subscription": "通知订阅",
     "message": "通知内容",
     "loading": "正在加载机器人…",
     "robot": "机器人",

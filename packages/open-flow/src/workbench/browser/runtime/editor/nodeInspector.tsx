@@ -866,7 +866,11 @@ export function NodeInspector({
                 title={t(selection.kind === 'outputs' ? 'inspector.ports.outputsTitle' : 'inspector.ports.inputsTitle')}
                 titleIcon={selection.kind === 'outputs' ? 'output' : 'input'}
                 entries={entries}
-                fieldLabels={connector?.action == 'leina.send_notification' ? { leinaId: t('leina.robot'), message: t('leina.message') } : undefined}
+                fieldLabels={
+                  connector?.action == 'leina.send_notification'
+                    ? { leinaId: t('leina.robot'), message: t('leina.message'), subscription: t('leina.subscription') }
+                    : undefined
+                }
                 onReset={() => {
                   return store?.nodes.resetInputs(
                     selection.id,

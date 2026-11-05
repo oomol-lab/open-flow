@@ -22,7 +22,7 @@ import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
 import { CodeFetchDeniedError, executeCodeFetch } from '../deployment/code-fetch.ts'
-import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector-contract.ts'
+import { assertConnectionNotDeferred, ConnectorTaskError, flowNotificationErrorCodes } from '../deployment/connector-contract.ts'
 import { executeHttpRequest } from '../deployment/http-request.ts'
 import { HttpTaskError } from '../deployment/http-transport.ts'
 import { executeOpenApi } from '../deployment/openapi.ts'
@@ -49,6 +49,7 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'connector.indeterminate',
   'connector.unavailable',
   'connector.unconfigured',
+  ...flowNotificationErrorCodes,
   'llm.output-invalid',
   'llm.unavailable',
   'workflow.failed',
@@ -280,6 +281,7 @@ export class RunExecutor {
   ): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       const startedAt = performance.now()
+      const notificationDeadlines = new Map<string, number>()
       const budgetMs = run.remainingMs ?? this.#runTimeoutMs
       this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
 
@@ -303,6 +305,7 @@ export class RunExecutor {
       const emit = async (event: Parameters<NonNullable<Parameters<IsolatedVmHost['run']>[1]['emit']>>[0] | ArtifactEvent): Promise<void> => {
         if (event.type == 'run.started' && event.runId == run.runId) return
         if ((event.type == 'node.completed' || event.type == 'node.failed') && 'jobId' in event) {
+          notificationDeadlines.delete(event.jobId)
           if (event.type === 'node.failed') this.#store.state.discardInvocation(run.runId, event.jobId)
           this.#cancelNodeTools(run.runId, event.jobId)
           this.#artifacts.discard(run.runId, event.jobId)
@@ -357,7 +360,7 @@ export class RunExecutor {
           },
           invokeTask: (invocation) => {
             if (!('kind' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
-            return this.#invokeTask(flow, invocation, run, async (data) => {
+            return this.#invokeTask(flow, invocation, run, notificationDeadlines, async (data) => {
               const event = await projectEvent({
                 type: 'node.log',
                 runId: invocation.runId,
@@ -381,7 +384,12 @@ export class RunExecutor {
               error instanceof StateError ||
               error instanceof CodeFetchDeniedError
             )
-              return { code: error.code, message: error.message, retryable: error.retryable, catchable: error.catchable }
+              return {
+                code: error instanceof ConnectorTaskError ? (error.notificationCode ?? error.code) : error.code,
+                message: error.message,
+                retryable: error.retryable,
+                catchable: error.catchable,
+              }
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
           },
           runId: run.runId,
@@ -447,6 +455,7 @@ export class RunExecutor {
     prepared: PreparedFlow,
     invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal },
     run: StoredRun,
+    notificationDeadlines: Map<string, number>,
     report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
   ): Promise<unknown> {
     const access = this.#connectorContext(run, 'execute', 'selected')
@@ -518,21 +527,45 @@ export class RunExecutor {
           (code, input, callId, signal) => executeCode(this.#isolatedVm, code, input, callId, signal),
         )
       }
-      case 'connector':
+      case 'connector': {
         assertConnectionNotDeferred(executor.connectionId)
         const connector = this.#resolveConnector()
         if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-        return await connector.execute(
-          executor.action,
-          executor.connectionId,
-          normalizeConnectorRuntimeInputs(
-            task.inputs.filter((input) => 'handle' in input),
-            invocation.input,
-          ),
-          invocation.invocationId,
-          invocation.signal,
-          { ...access, scope: 'action', action: executor.action, connectionId: executor.connectionId },
+        const input = normalizeConnectorRuntimeInputs(
+          task.inputs.filter((port) => 'handle' in port),
+          invocation.input,
         )
+        const subscribedNotification = executor.action == 'leina.send_notification' && typeof input.subscription == 'string'
+        const deadline = subscribedNotification ? (notificationDeadlines.get(invocation.jobId) ?? performance.now() + 60 * 60 * 1000) : undefined
+        if (deadline != null) notificationDeadlines.set(invocation.jobId, deadline)
+        const remainingMs = deadline == null ? undefined : deadline - performance.now()
+        if (remainingMs != null && remainingMs <= 0)
+          throw new ConnectorTaskError('connector.unavailable', 'The notification exceeded its one-hour delivery deadline.', undefined, {
+            notificationCode: 'delivery_timeout',
+            retryable: false,
+          })
+        const timeout = remainingMs == null ? undefined : AbortSignal.timeout(Math.ceil(remainingMs))
+        return await connector
+          .execute(
+            executor.action,
+            executor.connectionId,
+            input,
+            subscribedNotification ? invocation.jobId : invocation.invocationId,
+            timeout == null ? invocation.signal : AbortSignal.any([invocation.signal, timeout]),
+            { ...access, scope: 'action', action: executor.action, connectionId: executor.connectionId },
+          )
+          .catch((error: unknown) => {
+            if (invocation.signal.aborted) throw invocation.signal.reason
+            if (timeout?.aborted)
+              throw new ConnectorTaskError('connector.unavailable', 'The notification exceeded its one-hour delivery deadline.', undefined, {
+                notificationCode: 'delivery_timeout',
+                retryable: false,
+              })
+            if (deadline != null && error instanceof ConnectorTaskError && error.retryable && deadline - performance.now() <= (node.retry?.intervalMs ?? 0))
+              throw new ConnectorTaskError(error.code, error.message, error.status, { notificationCode: error.notificationCode, retryable: false })
+            throw error
+          })
+      }
       case 'decision': {
         const decision = this.#resolveLlm()?.decision
         if (decision == null) throw new TaskHostError('llm.unavailable', 'AI Decision is not configured for this deployment.')
