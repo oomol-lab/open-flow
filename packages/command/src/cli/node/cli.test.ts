@@ -357,6 +357,7 @@ it.each([
               edges: [],
               nodes: {
                 future: { kind: 'future-node', inputs: {}, config: { future: true } },
+                outputs: { kind: 'outputs', name: 'Outputs', outputDefs: [], outputMappings: {} },
                 start: {
                   ...(legacy
                     ? { kind: 'manual', name: 'Start' }

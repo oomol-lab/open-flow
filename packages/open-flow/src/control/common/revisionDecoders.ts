@@ -34,7 +34,7 @@ export function revisionTriggers(value: unknown) {
   const graph = record(record(content.document).graph)
   const triggers = Object.entries(record(graph.nodes)).flatMap(([triggerId, entry]) => {
     const node = record(entry)
-    if (Object.hasOwn(node, 'inputs')) return []
+    if (node.kind == 'outputs' || Object.hasOwn(node, 'inputs')) return []
     const kind = string(node.kind)
     if (node.name !== undefined && typeof node.name != 'string') return invalidResponse()
     return [{ triggerId: string(triggerId), kind, ...(node.name === undefined ? {} : { name: node.name }) }]

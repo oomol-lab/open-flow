@@ -44,6 +44,7 @@ describe('ControlClient Flow API', () => {
               start: { kind: 'start', name: 'Start', future: true },
               trigger: { kind: 'future-trigger', name: 'Future', future: true },
               task: { kind: 'future-node', inputs: {}, config: { future: true } },
+              outputs: { kind: 'outputs', name: 'Outputs', outputDefs: [], outputMappings: {} },
             },
           },
         },
