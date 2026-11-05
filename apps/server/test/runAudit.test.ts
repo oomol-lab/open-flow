@@ -77,6 +77,7 @@ it('retains audit after restart and migrates old Runs without inventing identiti
   await closeService(reopened)
   const database = new DatabaseSync(file)
   restoreGroupedServiceSettings(database)
+  database.exec('ALTER TABLE flows DROP COLUMN icon; ALTER TABLE flows DROP COLUMN description;')
   database.exec('ALTER TABLE runs DROP COLUMN initiator_actor_id')
   database.exec('ALTER TABLE runs DROP COLUMN initiator_channel')
   database.exec(
