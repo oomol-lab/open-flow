@@ -63,8 +63,10 @@ the package before using the Node renderer.
 
 Network access is allowed by default, including requests to private endpoints.
 Set `allowNetwork: false` when rendering untrusted files to block requests in the
-renderer's Context. Bundled rendering resources remain available; blocked
-remote images use placeholders and set `hasImagePlaceholders` to `true`.
+renderer's Context. Bundled rendering resources remain available. The exporter sets
+`hasImagePlaceholders` to `true` when it substitutes an image placeholder. Remote
+node icons may instead use a component fallback or be omitted without setting this
+flag. A `false` value does not guarantee that every remote image loaded.
 
 ## Host themes
 
