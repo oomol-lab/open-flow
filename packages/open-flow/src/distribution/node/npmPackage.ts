@@ -174,6 +174,7 @@ function createManifest(version: string): object {
       './workbench-host-conformance': { types: './dist/browser/host-conformance.d.ts', import: './dist/browser/host-conformance.js' },
       './preview': { types: './dist/browser/preview.d.ts', import: './dist/browser/preview.js' },
       './preview.css': { types: './dist/browser/preview.css.d.ts', default: './dist/browser/preview.css' },
+      './render': { types: './dist/render/node/index.d.ts', import: './dist/render/node/index.js' },
       './workbench': {
         types: './dist/browser/workbench.d.ts',
         import: './dist/browser/workbench.js',
@@ -195,7 +196,9 @@ function createManifest(version: string): object {
       'zod': '^4.6.5',
       'react': '^18.3.1 || ^19.0.0',
       'react-dom': '^18.3.1 || ^19.0.0',
+      'playwright-core': sourceManifest.peerDependencies['playwright-core'],
     },
+    peerDependenciesMeta: { 'playwright-core': sourceManifest.peerDependenciesMeta['playwright-core'] },
     sideEffects: ['**/*.css'],
     publishConfig: {
       access: 'public',
@@ -220,6 +223,34 @@ Provider artwork and names load through the resource-cache App Catalog singleton
 same singleton share catalog requests, freshness and validation; no Provider prop is required.
 A Shadow DOM host must load the stylesheet inside its shadow root before mounting the component;
 Vite hosts can import \`@oomol-lab/open-flow/preview.css?url\` for the stylesheet URL.
+
+## Node PNG rendering
+
+On Node.js 20+, install the optional \`playwright-core\` peer and supply your own
+Chromium Browser. Prepare the browser executable, its system libraries and required
+Chinese fonts yourself. The renderer reuses the Workbench PNG implementation and
+ships its own rendering resources; it does not require a running Workbench service.
+
+\`\`\`ts
+import { readFile, writeFile } from 'node:fs/promises'
+import { chromium } from 'playwright-core'
+import { flowToPng } from '@oomol-lab/open-flow/render'
+
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH })
+try {
+  const workflow = JSON.parse(await readFile('workflow.openflow.json', 'utf8'))
+  const result = await flowToPng(browser, workflow, { language: 'zh-CN', dark: true, frame: true })
+  await writeFile('workflow.png', result.buffer)
+} finally {
+  await browser.close()
+}
+\`\`\`
+
+Pass a parsed \`.openflow.json\` object. Options default to English, light mode and
+no frame; \`title\` overrides the file name shown in the frame. The result also
+provides \`width\`, \`height\` and \`hasImagePlaceholders\`. Image scale and allocation
+retries adapt automatically. Each call closes its own Context, leaving your Browser
+available for reuse. It validates the file without modifying it or executing nodes.
 
 Install the Task contracts as a development dependency:
 

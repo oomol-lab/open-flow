@@ -1,0 +1,6 @@
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { flowToPng } from '@oomol-lab/open-flow/render'
+
+assert.equal(typeof flowToPng, 'function')
+assert.throws(() => createRequire(import.meta.url).resolve('playwright-core'), { code: 'MODULE_NOT_FOUND' })

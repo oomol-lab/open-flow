@@ -147,6 +147,7 @@
         "oxfmt": "^0.60.0",
         "oxlint": "^1.75.0",
         "pathe": "^2.0.3",
+        "playwright-core": "1.64.1",
         "radash": "^12.1.1",
         "react": "^18.3.1",
         "react-colorful": "^5.8.0",
@@ -185,6 +186,12 @@
         "zod": "4.6.5",
         "zustand": "^4.4.0",
       },
+      "peerDependencies": {
+        "playwright-core": "^1.64.1",
+      },
+      "optionalPeers": [
+        "playwright-core",
+      ],
     },
   },
   "packages": {
@@ -1565,6 +1572,8 @@
     "pkce-challenge": ["pkce-challenge@5.0.1", "", {}, "sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ=="],
 
     "pkg-dir": ["pkg-dir@5.0.0", "", { "dependencies": { "find-up": "^5.0.0" } }, "sha512-NPE8TDbzl/3YQYY7CSS228s3g2ollTFnc+Qi3tqmqJp9Vg2ovUpixcJEo2HJScN2Ez+kEaal6y70c0ehqJBJeA=="],
+
+    "playwright-core": ["playwright-core@1.64.1", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ=="],
 
     "possible-typed-array-names": ["possible-typed-array-names@1.1.0", "", {}, "sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg=="],
 

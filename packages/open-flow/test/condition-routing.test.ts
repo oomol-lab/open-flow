@@ -1,3 +1,4 @@
+import type { Draft } from '../src/control/common/api.ts'
 import type { SchedulerEvent } from '../src/execution/common/scheduler.ts'
 import type { ConditionCase, ConditionExpression, ConditionNode, JsonValue, RevisionContent } from '../src/flow/common/change.ts'
 
@@ -15,7 +16,7 @@ import { updateCondition, updateTaskPorts } from '../src/workbench/browser/runti
 import { copyNodes, pasteNodes } from '../src/workbench/browser/runtime/editor/nodeClipboard.ts'
 import { revisionView } from '../src/workbench/browser/runtime/revisionView.ts'
 
-const draft = (revision: RevisionContent) => ({ content: revision, flowId: 'flow', revision: 'draft' }) as unknown as Parameters<typeof revisionView>[0]
+const draft = (revision: RevisionContent) => ({ content: revision, flowId: 'flow', revision: 'draft' }) as unknown as Draft
 
 const literal = (value: JsonValue) => ({ kind: 'value' as const, value })
 const expression = (value: boolean): ConditionExpression => ({ left: literal(value), operator: 'isTrue' })

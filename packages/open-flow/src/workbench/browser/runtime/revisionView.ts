@@ -51,9 +51,12 @@ export interface ResolvedTrigger {
 
 export type ResolvedSelection = ResolvedNode | ResolvedTrigger
 
-const views = new WeakMap<Draft, RevisionView>()
+/** File snapshots contain content without the server identity used for run matching. */
+export type RevisionSource = Pick<Draft, 'content'> & Partial<Omit<Draft, 'content'>>
 
-export class RevisionView {
+const views = new WeakMap<RevisionSource, RevisionView<RevisionSource>>()
+
+export class RevisionView<Source extends RevisionSource = Draft> {
   public readonly connectorReferences: ReturnType<typeof connectorAccessReferences>
   public readonly connectorActionIds: ReadonlySet<string>
   public readonly connectorProviderIds: ReadonlySet<string>
@@ -62,7 +65,7 @@ export class RevisionView {
   readonly #resolvedNodes = new WeakMap<GraphNode, Map<string, ResolvedSelection>>()
   readonly #inputSources = new Map<string, InputSourceQuery>()
 
-  public constructor(public readonly revision: Draft) {
+  public constructor(public readonly revision: Source) {
     this.#document = revision.content.document
     this.#modules = revision.content.modules
     this.connectorReferences = connectorAccessReferences(this.#document)
@@ -217,12 +220,12 @@ export class RevisionView {
   }
 }
 
-export function revisionView(revision: Draft): RevisionView {
-  let view = views.get(revision)
-  if (view == null) {
-    view = new RevisionView(revision)
-    views.set(revision, view)
-  }
+export function revisionView<Source extends RevisionSource>(revision: Source): RevisionView<Source> {
+  const cached = views.get(revision)
+  // Each cached view retains the exact source object used as its key.
+  if (cached) return cached as RevisionView<Source>
+  const view = new RevisionView(revision)
+  views.set(revision, view)
   return view
 }
 

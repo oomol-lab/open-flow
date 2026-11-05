@@ -21,8 +21,9 @@ const layers: readonly (readonly [name: string, patterns: readonly RegExp[]])[] 
   ['flow', [/^flow\//]],
   ['workflow calls', [/^workflow\//]],
   ['execution', [/^execution\//]],
-  ['control', [/^control\//, /^canvas\/common\//, /^form\/common\//]],
+  ['control', [/^control\//, /^canvas\/common\//, /^form\/common\//, /^render\/common\//]],
   ['browser', [/^(?:canvas|form|trigger|ui|workbench|designer|distribution)\/browser\//]],
+  ['rendering', [/^render\/(?:browser|node)\//]],
   ['build', [/^build\//, /^distribution\/node\//]],
 ]
 

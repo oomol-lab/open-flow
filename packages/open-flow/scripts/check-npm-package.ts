@@ -40,7 +40,7 @@ await execFileAsync(process.execPath, [path.join(rootPath, 'scripts/build.ts'), 
 const entries = await unpackTar(gunzipSync(await readFile(tarballPath)), { strict: true })
 const entryNames = entries.map((entry) => entry.header.name)
 // Documentation and legal notices must ship even though consumers do not import them.
-for (const expected of ['LICENSE', 'NOTICE', 'README.md', 'dist/browser/licenses.md', 'dist/command/licenses.md']) {
+for (const expected of ['LICENSE', 'NOTICE', 'README.md', 'dist/browser/licenses.md', 'dist/command/licenses.md', 'dist/render/browser/licenses.md']) {
   assert.ok(entryNames.includes(`package/${expected}`), `Missing npm package entry ${expected}.`)
 }
 for (const expected of [
@@ -74,6 +74,8 @@ assert.equal(packedManifest.name, '@oomol-lab/open-flow')
 assert.equal(packedManifest.version, manifest.version)
 assert.equal(packedManifest.license, 'SEE LICENSE IN LICENSE')
 assert.equal(readPackedText('LICENSE'), await readFile(path.join(rootPath, '../../LICENSE'), 'utf8'))
+assert.equal((packedManifest.peerDependencies as Record<string, string>)['playwright-core'], '^1.64.1')
+assert.deepEqual((packedManifest.peerDependenciesMeta as Record<string, unknown>)['playwright-core'], { optional: true })
 // Validate advertised targets without freezing the internal output layout or export inventory.
 assert.ok(packedManifest.exports && typeof packedManifest.exports == 'object')
 verifyExportTargets(packedManifest.exports)
@@ -169,6 +171,7 @@ async function verifyConsumer(): Promise<void> {
             'react-dom': manifest.devDependencies['react-dom'],
           },
           devDependencies: {
+            '@types/node': manifest.devDependencies['@types/node'],
             '@types/react': manifest.devDependencies['@types/react'],
             '@types/react-dom': manifest.devDependencies['@types/react-dom'],
             // Exercise the Rollup consumer pipeline as well as our Rolldown package build.
@@ -207,10 +210,41 @@ async function verifyConsumer(): Promise<void> {
     await execFileAsync(process.execPath, [runtimePath], { cwd: directory })
     const browserPath = path.join(directory, 'browser.mjs')
     await execFileAsync(process.execPath, [browserPath], { cwd: directory })
+    await verifyRenderConsumer(directory)
     await verifyCommandConsumer(directory, manifest.version)
   } finally {
     await rm(directory, { force: true, recursive: true })
   }
+}
+
+async function verifyRenderConsumer(directory: string): Promise<void> {
+  await execFileAsync('node', ['render-import.mjs'], { cwd: directory })
+  await execFileAsync(process.execPath, ['add', '--ignore-scripts', `playwright-core@${manifest.devDependencies['playwright-core']}`], { cwd: directory })
+  await execFileAsync(
+    process.execPath,
+    [
+      compiler,
+      '--ignoreConfig',
+      '--noEmit',
+      '--strict',
+      '--module',
+      'nodenext',
+      '--target',
+      'es2024',
+      '--lib',
+      'es2024,dom,esnext.disposable',
+      '--types',
+      'node',
+      'render.ts',
+    ],
+    {
+      cwd: directory,
+    },
+  )
+  if (process.env.OPEN_FLOW_RENDER_BROWSER_PATH) {
+    const result = await execFileAsync('node', ['render.mjs'], { cwd: directory, maxBuffer: 1024 * 1024 })
+    console.log(result.stdout.trim())
+  } else console.log('Real Node PNG rendering not run: set OPEN_FLOW_RENDER_BROWSER_PATH to a prepared Chromium executable.')
 }
 
 async function verifyCommandConsumer(consumer: string, version: string): Promise<void> {

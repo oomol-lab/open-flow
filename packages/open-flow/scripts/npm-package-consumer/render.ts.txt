@@ -1,0 +1,12 @@
+import type { Browser } from 'playwright-core'
+import { flowToPng, type FlowPngOptions, type FlowPngResult, type WorkflowFile } from '@oomol-lab/open-flow/render'
+
+export async function render(browser: Browser, workflow: WorkflowFile): Promise<FlowPngResult> {
+  const options: FlowPngOptions = { language: 'zh-CN', dark: true, frame: true, title: '发布包验证' }
+  const result = await flowToPng(browser, workflow, options)
+  const bytes: Buffer = result.buffer
+  const width: number = result.width
+  const replaced: boolean = result.hasImagePlaceholders
+  void [bytes, width, replaced]
+  return result
+}

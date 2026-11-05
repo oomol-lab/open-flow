@@ -31,6 +31,36 @@ is not exported by this package.
 
 [Read the repository documentation](../../docs/README.md).
 
+## Node PNG rendering
+
+On Node.js 20+, import `flowToPng` from `@oomol-lab/open-flow/render` and pass a
+parsed `.openflow.json` object and your Chromium Browser. Install the optional
+`playwright-core` peer dependency and prepare Chromium, its system libraries and any
+required Chinese fonts yourself.
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises'
+import { chromium } from 'playwright-core'
+import { flowToPng } from '@oomol-lab/open-flow/render'
+
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH })
+try {
+  const workflow = JSON.parse(await readFile('workflow.openflow.json', 'utf8'))
+  const result = await flowToPng(browser, workflow, { language: 'zh-CN', dark: true, frame: true })
+  await writeFile('workflow.png', result.buffer)
+} finally {
+  await browser.close()
+}
+```
+
+The result also includes `width`, `height` and `hasImagePlaceholders`. Options default
+to English, light mode and no frame; `title` overrides the file name shown in a frame.
+Image scale and allocation retries follow the Workbench PNG exporter automatically.
+The function validates the file without changing it or executing nodes, and closes
+its own Context after each call. You own the Browser lifecycle. Rendering resources
+ship with the package; no Workbench server is needed. In a source checkout, build
+the package before using the Node renderer.
+
 ## Host themes
 
 The host selects light/dark mode through the `theme` prop. Open Flow does not read a host's
