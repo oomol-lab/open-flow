@@ -1,5 +1,5 @@
 import styles from './verticalWorkflow.module.scss'
-import type { CanvasDirection, FlowCanvasViewPosition } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
+import type { CanvasDirection, FlowCanvasViewCommentNode, FlowCanvasViewPosition } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../src/canvas/common/commands.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { ApplicationScenario } from './fixtures/applicationWorkflow.ts'
@@ -75,12 +75,19 @@ function WorkflowCanvas({ dark, language, log }: { readonly dark: boolean; reado
     },
   ])
   const sample = applicationWorkflow(scenario, showRecords)
+  const note: FlowCanvasViewCommentNode = {
+    id: 'comment',
+    kind: 'comment',
+    title: 'Review notes',
+    content: 'Check the score and route before approving an application.',
+    position: { x: 780, y: 300 },
+  }
   const model = {
     ...sample,
     direction,
     viewport,
     edges: edges.filter((edge) => !removed.includes(edge.source) && !removed.includes(edge.target)),
-    nodes: sample.nodes
+    nodes: [...sample.nodes, note]
       .filter((node) => !removed.includes(node.id))
       .map((node) =>
         Object.assign(
@@ -137,6 +144,6 @@ export const verticalWorkflowStory: FrontendStory = {
   title: 'Vertical workflow',
   standalone: true,
   description:
-    'Inspect automatic spacing between compact cards, content and branches. Change direction or re-layout from the canvas view controls. Compare Provider disconnection, run failure, configuration errors, deferred accounts, manual review and compact status icons. Layout changes stay in this sample.',
+    'Inspect automatic spacing between compact cards, content, branches and comments. Change direction or re-layout from the canvas view controls; comments participate in both. Compare Provider disconnection, run failure, configuration errors, deferred accounts, manual review and compact status icons. Layout changes stay in this sample.',
   render: (log, dark, language) => <WorkflowCanvas dark={dark} language={language} log={log} />,
 }

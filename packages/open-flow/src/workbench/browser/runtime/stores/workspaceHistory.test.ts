@@ -765,17 +765,18 @@ it('adds and selects a response node without an execution edge in one undoable c
   }
 })
 
-it('saves direction and measured positions in one history entry and retains earlier history', async () => {
+it('saves direction and measured node and comment positions in one history entry and retains earlier history', async () => {
   const { store, saved, change, update } = await session()
   try {
-    await store.moveNodes({ code: { x: 700, y: 20 } })
+    await store.moveNodes({ code: { x: 700, y: 20 }, note: { x: 700, y: 300 } })
     const before = saved().presentation.value
     const content = saved().draft.content
     update.mockClear()
-    expect(await store.changeDirection('vertical', { code: { x: 80, y: 300 }, value: { x: 80, y: 0 } })).toBe(true)
+    expect(await store.changeDirection('vertical', { code: { x: 80, y: 300 }, value: { x: 80, y: 0 }, note: { x: 500, y: 0 } })).toBe(true)
     const after = saved().presentation.value
     expect(update).toHaveBeenCalledTimes(1)
     expect(savedDirection(after)).toBe('vertical')
+    expect(designerGraph(saved().draft, after).nodes.find((node) => node.id === 'note')).toMatchObject({ position: { x: 500, y: 0 }, content: 'Keep this' })
     expect(change).not.toHaveBeenCalled()
     await store.undo()
     expect(saved().presentation.value).toEqual(before)

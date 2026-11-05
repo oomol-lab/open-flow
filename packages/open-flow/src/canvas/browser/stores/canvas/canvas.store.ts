@@ -261,8 +261,8 @@ export class CanvasStore {
     this.$$.changingDirection.set(false)
   }
 
-  private allLayoutNodes(): NodeStore[] {
-    return [...this.$.nodes.values()]
+  private allLayoutNodes(): (NodeStore | CommentNodeStore)[] {
+    return [...this.$.nodes.values(), ...(this.$.commentNodes?.values() ?? [])]
   }
 
   /** Deletes nodes programmatically, such as from a menu action. */
@@ -355,7 +355,7 @@ export class CanvasStore {
   // https://reactflow.dev/learn/layouting/layouting#dagre
   private doRelayout(availableWidth?: number) {
     const selected = this.$.selectedNodes.value.length > 1 ? this.$.selectedNodes.value : []
-    const nodes = selected.length > 0 ? selected.filter(NodeStore.is) : this.allLayoutNodes()
+    const nodes = selected.length > 0 ? selected : this.allLayoutNodes()
     if (nodes.length === 0) return
     let positions = this.layoutPositions(nodes, availableWidth)
     if (selected.length > 0) {
@@ -374,7 +374,7 @@ export class CanvasStore {
     }
   }
 
-  private layoutPositions(nodes: readonly NodeStore[], availableWidth?: number): Readonly<Record<string, FlowCanvasViewPosition>> {
+  private layoutPositions(nodes: readonly (NodeStore | CommentNodeStore)[], availableWidth?: number): Readonly<Record<string, FlowCanvasViewPosition>> {
     const g = new graphlib.Graph().setDefaultEdgeLabel(() => ({}))
     const vertical = this.$.direction.value === 'vertical'
     // Vertical smooth-step edges need less room than horizontal Bézier curves.
@@ -411,6 +411,7 @@ export class CanvasStore {
     const constraints: { left: string; right: string }[] = []
     const ordering = new graphlib.Graph()
     for (const node of nodes) {
+      if (!NodeStore.is(node)) continue
       const content = node.content$.value
       if (content.kind !== 'condition' && content.kind !== 'approval' && content.kind !== 'wait') continue
       const targets = [

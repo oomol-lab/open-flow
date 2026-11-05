@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { ReactFlowInstance, Viewport } from '@xyflow/react'
+import type { Node, ReactFlowInstance, Viewport } from '@xyflow/react'
 import type { NodeId } from '../../../../schema/index.ts'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../../common/commands.ts'
 import type { FlowCanvasProps } from './FlowCanvas.tsx'
@@ -101,6 +101,19 @@ function update(initial: FlowCanvasViewProps, next: FlowCanvasViewProps): FlowCa
   const view = renderView(initial)
   renderView(next)
   return view.props.flowCanvasStore
+}
+
+function expectNoOverlaps(nodes: readonly Node[]) {
+  for (const [index, node] of nodes.entries()) {
+    for (const other of nodes.slice(index + 1)) {
+      expect(
+        node.position.x + node.measured!.width! <= other.position.x ||
+          other.position.x + other.measured!.width! <= node.position.x ||
+          node.position.y + node.measured!.height! <= other.position.y ||
+          other.position.y + other.measured!.height! <= node.position.y,
+      ).toBe(true)
+    }
+  }
 }
 
 afterEach(() => {
@@ -746,20 +759,31 @@ describe('FlowCanvasView model synchronization', () => {
     store.dispose()
   })
 
-  it('sends automatic and requested layout positions to the host for persistence', () => {
+  it.each([
+    ['horizontal', 1000],
+    ['horizontal', 200],
+    ['vertical', 200],
+  ] as const)('includes measured comments in automatic and requested %s layouts with width %s', (direction, availableWidth) => {
     const onMoveNodes = vi.fn()
-    const view = renderView(props(model([task([])]), { autoLayout: true, onMoveNodes }))
+    const value = { ...model([source, task([]), commentNode('Note')]), direction }
+    const view = renderView(props(value, { autoLayout: true, onMoveNodes }))
     const store = view.props.flowCanvasStore
-    const node = [...store.$.nodes.values()][0]
-    if (node == null) throw new Error('Expected a Task node.')
-    node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 420, height: 240 } })
-    store.completeLayout()
-    expect(onMoveNodes).toHaveBeenLastCalledWith({ [node.nodeId]: node.$.position.value })
-    node.$$.position.set({ x: 2000, y: 3000 })
-    store.onRelayout()
-    expect(node.$.position.value).not.toEqual({ x: 2000, y: 3000 })
+    for (const node of store.$.nodes.values()) node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 200, height: 80 } })
+    expect(store.completeLayout(availableWidth)).toBe(false)
+    expect(onMoveNodes).not.toHaveBeenCalled()
+    const comment = [...store.$.commentNodes!.values()][0]!
+    comment.$$.rfNode.set({ ...comment.$.rfNode.value, measured: { width: 560, height: 360 } })
+
+    expect(store.completeLayout(availableWidth)).toBe('relayout')
+    const positions = Object.fromEntries(store.$.rfNodes.value.map((node) => [node.data.store.nodeId, node.position]))
+    expect(Object.keys(positions).toSorted()).toEqual(['comment', 'source', 'target'])
+    expect(onMoveNodes).toHaveBeenLastCalledWith(positions)
+    expectNoOverlaps(store.$.rfNodes.value)
+    comment.$$.position.set({ x: 2000, y: 3000 })
+    store.onRelayout(availableWidth)
+    expect(comment.$.position.value).toEqual(positions.comment)
     expect(onMoveNodes).toHaveBeenCalledTimes(2)
-    expect(onMoveNodes).toHaveBeenLastCalledWith({ [node.nodeId]: node.$.position.value })
+    expect(onMoveNodes).toHaveBeenLastCalledWith(positions)
     store.dispose()
   })
 
@@ -770,9 +794,10 @@ describe('FlowCanvasView model synchronization', () => {
   ] as const)('rearranges and persists only selected nodes in a %s layout with width %s', (direction, availableWidth) => {
     const before = { ...source, id: 'before', position: { x: 100, y: 200 } }
     const after = { ...source, id: 'after', position: { x: 1800, y: 1500 } }
-    const note = commentNode('Keep this note')
+    const note = commentNode('Selected note')
+    const otherNote = { ...commentNode('Unselected note'), id: 'other-comment', position: { x: 2400, y: 0 } }
     const value: FlowCanvasViewModel = {
-      ...model([before, { ...source, position: { x: 500, y: 1200 } }, { ...task([]), position: { x: 700, y: 900 } }, after, note]),
+      ...model([before, { ...source, position: { x: 500, y: 1200 } }, { ...task([]), position: { x: 700, y: 900 } }, after, note, otherNote]),
       direction,
       edges: [
         { id: 'incoming', source: 'before', target: 'source', sourceHandle: '$out', targetHandle: '$in' },
@@ -780,25 +805,28 @@ describe('FlowCanvasView model synchronization', () => {
         { id: 'outgoing', source: 'target', target: 'after', sourceHandle: '$out', targetHandle: '$in' },
       ],
     }
-    const onMoveNodes = vi.fn()
+    const onMoveNodes = vi.fn<FlowCanvasViewProps['onMoveNodes']>()
     const view = renderView(props(value, { onMoveNodes, selectedNodeIds: ['source', 'target', 'comment'] }))
     const store = view.props.flowCanvasStore
     for (const node of store.$.nodes.values()) node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 200, height: 80 } })
+    for (const node of store.$.commentNodes!.values()) node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 560, height: 360 } })
 
     store.onRelayout(availableWidth)
 
     expect(onMoveNodes).toHaveBeenCalledOnce()
     const positions = onMoveNodes.mock.calls[0]![0]
-    expect(Object.keys(positions).toSorted()).toEqual(['source', 'target'])
-    expect(positions.source).toEqual({ x: 500, y: 900 })
+    expect(Object.keys(positions).toSorted()).toEqual(['comment', 'source', 'target'])
+    expect(Math.min(...Object.values(positions).map((position) => position.x))).toBe(0)
+    expect(Math.min(...Object.values(positions).map((position) => position.y))).toBe(100)
+    expectNoOverlaps(store.$.rfNodes.value.filter((node) => node.selected))
     if (direction === 'horizontal' && availableWidth === 1000) {
       expect(positions.target.x).toBeGreaterThan(positions.source.x + 200)
       expect(positions.target.y).toBe(positions.source.y)
     } else {
-      expect(positions.target.x).toBe(positions.source.x)
       expect(positions.target.y).toBeGreaterThan(positions.source.y + 80)
     }
-    for (const node of [before, after, note]) {
+    if (direction === 'vertical') expect(positions.target.x).toBe(positions.source.x)
+    for (const node of [before, after, otherNote]) {
       expect(store.$.rfNodes.value.find((item) => item.data.store.nodeId === node.id)?.position).toEqual(node.position)
     }
     store.onRelayout(availableWidth)
@@ -819,16 +847,20 @@ describe('FlowCanvasView model synchronization', () => {
     store.dispose()
   })
 
-  it('does not rearrange the graph when a selection contains only comments', () => {
+  it.each(['horizontal', 'vertical'] as const)('rearranges only selected comments in a %s layout', (direction) => {
     const value = model([source, task([]), commentNode('Note'), { ...commentNode('Second note'), id: 'second-comment' }])
     const onMoveNodes = vi.fn()
-    const view = renderView(props(value, { onMoveNodes, selectedNodeIds: ['comment', 'second-comment'] }))
+    const view = renderView(props({ ...value, direction }, { onMoveNodes, selectedNodeIds: ['comment', 'second-comment'] }))
     const store = view.props.flowCanvasStore
+    for (const node of store.$.commentNodes!.values()) node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 350, height: 260 } })
 
     store.onRelayout()
 
-    expect(onMoveNodes).not.toHaveBeenCalled()
-    for (const node of value.nodes) expect(store.$.rfNodes.value.find((item) => item.data.store.nodeId === node.id)?.position).toEqual(node.position)
+    expect(onMoveNodes).toHaveBeenCalledOnce()
+    expect(Object.keys(onMoveNodes.mock.calls[0]![0]).toSorted()).toEqual(['comment', 'second-comment'])
+    expectNoOverlaps(store.$.rfNodes.value.filter((node) => node.selected))
+    for (const node of value.nodes.filter((item) => item.kind !== 'comment'))
+      expect(store.$.rfNodes.value.find((item) => item.data.store.nodeId === node.id)?.position).toEqual(node.position)
     store.dispose()
   })
 

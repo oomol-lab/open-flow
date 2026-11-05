@@ -76,6 +76,31 @@ describe('canvas direction', () => {
     expect(store.$.editable.value).toBe(editable)
   })
 
+  it.each([
+    ['horizontal', 'vertical', 2],
+    ['vertical', 'horizontal', 2],
+    ['horizontal', 'vertical', 0],
+    ['vertical', 'horizontal', 0],
+  ] as const)('includes comments when switching %s to %s with %s connected nodes', async (from, to, count) => {
+    const { store, model, onMoveNodes, onChangeDirection } = await setup(count, from)
+    const note: FlowCanvasViewNode = { id: 'note', kind: 'comment', title: 'Note', content: '', position: { x: 2000, y: 2000 } }
+    store.reconcile({ ...model, nodes: [...model.nodes, note] }, true, 'en', ['note'])
+    const comment = [...store.$.commentNodes!.values()][0]!
+    comment.$$.rfNode.set({ ...comment.$.rfNode.value, measured: { width: 560, height: 360 } })
+
+    store.changeDirection(to)
+    expect(store.completeLayout(5000)).toBe('relayout')
+
+    const positions = Object.fromEntries(store.$.rfNodes.value.map((node) => [node.data.store.nodeId, node.position]))
+    expect(comment.$.position.value).not.toEqual(note.position)
+    expect(positions.note).toEqual(comment.$.position.value)
+    expect(onChangeDirection).toHaveBeenCalledExactlyOnceWith(to, positions)
+    expect(onMoveNodes).not.toHaveBeenCalled()
+    await Promise.resolve()
+    expect(store.$.direction.value).toBe(to)
+    expect(store.$.changingDirection.value).toBe(false)
+  })
+
   it('blocks repeated switches until saving completes and restores the model on failure', async () => {
     let finish!: (saved: boolean) => void
     const save = vi.fn(
@@ -85,8 +110,14 @@ describe('canvas direction', () => {
         }),
     )
     const { store, model } = await setup(2, 'horizontal', { onChangeDirection: save })
+    const note: FlowCanvasViewNode = { id: 'note', kind: 'comment', title: 'Note', content: '', position: { x: 2000, y: 2000 } }
+    const value = { ...model, nodes: [...model.nodes, note] }
+    store.reconcile(value, true, 'en', [])
+    const comment = [...store.$.commentNodes!.values()][0]!
+    comment.$$.rfNode.set({ ...comment.$.rfNode.value, measured: { width: 560, height: 360 } })
     store.changeDirection('vertical')
     store.completeLayout()
+    expect(comment.$.position.value).not.toEqual(note.position)
     store.changeDirection('horizontal')
     expect(store.$.direction.value).toBe('vertical')
     expect(store.$.changingDirection.value).toBe(true)
@@ -96,6 +127,7 @@ describe('canvas direction', () => {
     expect(store.$.changingDirection.value).toBe(false)
     expect(store.$.direction.value).toBe('horizontal')
     expect([...store.$.nodes.values()].map((node) => node.$.position.value)).toEqual(model.nodes.map((node) => node.position))
+    expect(comment.$.position.value).toEqual(note.position)
   })
 
   it('saves direction on an empty canvas and does not commit a disposed canvas', async () => {
