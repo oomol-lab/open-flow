@@ -28,7 +28,7 @@ own infrastructure.
 [Explore the interactive demo](https://openflow.run) · [Use OOMOL Hosted](https://console.openflow.run) ·
 [Self-host with Docker](#run-it-your-way)
 
-![A customer onboarding workflow in the current Open Flow Workbench, with explicit customer data, JavaScript, approval, and a subflow](docs/assets/readme-workbench.png)
+![A vertical AI trend workflow in the Open Flow Workbench, with parallel X, GitHub, and Hugging Face sources and the Research & write node's prompt, tools, inputs, and output in the property panel](docs/assets/readme-workbench.png)
 
 > [!IMPORTANT]
 > Open Flow is in beta. The product and its versioned contracts are still evolving.

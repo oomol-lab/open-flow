@@ -25,7 +25,7 @@ Open Flow 是一個原始碼可用的工作流程平台，結合 AI 輔助建構
 
 [體驗互動示範](https://openflow.run) · [使用 OOMOL Hosted](https://console.openflow.run) · [用 Docker 自行部署](#選擇適合你的執行方式)
 
-![新版 Open Flow Workbench 中的客戶入門流程，包含明確的客戶資料、JavaScript、核准和子流程](assets/readme-workbench.png)
+![Open Flow Workbench 中的直向 AI 趨勢工作流程，包含 X、GitHub 和 Hugging Face 平行蒐集，右側屬性面板展示研究寫作節點的提示詞、工具、輸入與輸出](assets/readme-workbench.png)
 
 > [!IMPORTANT]
 > Open Flow 目前處於 Beta 階段，產品及其版本化契約仍在持續演進。

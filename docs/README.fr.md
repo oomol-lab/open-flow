@@ -25,7 +25,7 @@ Combinez JavaScript, applications connectées, IA, embranchements et validation 
 
 [Explorer la démo interactive](https://openflow.run) · [Utiliser OOMOL Hosted](https://console.openflow.run) · [Auto-héberger avec Docker](#exécutez-open-flow-où-vous-voulez)
 
-![Un workflow d'accueil client dans le Workbench actuel, avec des données client explicites, du JavaScript, une validation et un sous-flux](assets/readme-workbench.png)
+![Un workflow vertical de veille IA dans le Workbench Open Flow, avec collecte parallèle sur X, GitHub et Hugging Face, et le prompt, les outils, les entrées et la sortie du nœud de recherche et de rédaction dans le panneau de propriétés à droite](assets/readme-workbench.png)
 
 > [!IMPORTANT]
 > Open Flow est en bêta. Le produit et ses contrats versionnés continuent d'évoluer.
