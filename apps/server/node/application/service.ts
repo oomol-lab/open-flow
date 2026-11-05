@@ -27,7 +27,7 @@ import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
 import { ConfiguredConnectorAccessHost, ImplicitConnectorAccessHost } from '../deployment/connector-access.ts'
 import { ConnectorTaskError } from '../deployment/connector-contract.ts'
-import { ConnectorClient } from '../deployment/connector.ts'
+import { ConnectorClient, connectorFailureCodes } from '../deployment/connector.ts'
 import { ControlError } from '../error.ts'
 import { silentLogger } from '../logger.ts'
 import { IntegrationRuntime } from '../runtime/integration-runtime.ts'
@@ -160,6 +160,7 @@ export class ServerService {
         this.#watchFlow(flowId, (event) => {
           if (event.kind == 'run.changed' && event.runId == runId) changed()
         }),
+      connectorFailureCodes,
     )
     const pollDefinitions = triggerDefinitions.filter((definition): definition is PollDefinition => definition.snapshot.type == 'poll')
     const integrationDefinitions = triggerDefinitions.filter((definition): definition is IntegrationDefinition => definition.snapshot.type == 'integration')

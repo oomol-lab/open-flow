@@ -23,6 +23,7 @@ import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
 import { CodeFetchDeniedError, executeCodeFetch } from '../deployment/code-fetch.ts'
 import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector-contract.ts'
+import { ConnectorExecution } from '../deployment/connector.ts'
 import { executeHttpRequest } from '../deployment/http-request.ts'
 import { HttpTaskError } from '../deployment/http-transport.ts'
 import { executeOpenApi } from '../deployment/openapi.ts'
@@ -98,6 +99,7 @@ export class RunExecutor {
   readonly #resolveLlm: () => LlmHost | undefined
   readonly #resolveWaitPublicOrigin: () => URL | undefined
   readonly #runTimeoutMs: number
+  readonly #nodeFailureCodes: ReadonlySet<string>
   readonly #logger: Logger
   readonly #runChanged: (flowId: string, runId: string) => void
   readonly #wakeMaintenance: () => void
@@ -125,6 +127,7 @@ export class RunExecutor {
     invokeWorkflow: RunControl['invokeWorkflow'],
     invokeWorkflowTarget: RunControl['invokeWorkflowTarget'],
     subscribeRun: (flowId: string, runId: string, changed: () => void) => () => void,
+    additionalFailureCodes: ReadonlySet<string>,
   ) {
     this.#invokeWorkflowTarget = invokeWorkflowTarget
     this.#subscribeRun = subscribeRun
@@ -137,6 +140,7 @@ export class RunExecutor {
     this.#resolveLlm = resolveLlm
     this.#resolveWaitPublicOrigin = resolveWaitPublicOrigin
     this.#runTimeoutMs = runTimeoutMs
+    this.#nodeFailureCodes = new Set([...nodeFailureCodes, ...additionalFailureCodes])
     this.#logger = logger
     this.#runChanged = runChanged
     this.#wakeMaintenance = wakeMaintenance
@@ -189,7 +193,7 @@ export class RunExecutor {
         try: (signal) => checkCodePermissions(codeActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility'), signal),
         catch: (error) => error,
       })
-      const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
+      const projectEvent = createEventProjector(run.runId, this.#nodeFailureCodes)
       const started = yield* Effect.tryPromise({
         try: () => projectEvent({ flowId: run.flowId, runId: run.runId, type: 'run.started' }),
         catch: (error) => error,
@@ -280,6 +284,7 @@ export class RunExecutor {
   ): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       const startedAt = performance.now()
+      const connectors = new ConnectorExecution(this.#resolveConnector)
       const budgetMs = run.remainingMs ?? this.#runTimeoutMs
       this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
 
@@ -303,6 +308,7 @@ export class RunExecutor {
       const emit = async (event: Parameters<NonNullable<Parameters<IsolatedVmHost['run']>[1]['emit']>>[0] | ArtifactEvent): Promise<void> => {
         if (event.type == 'run.started' && event.runId == run.runId) return
         if ((event.type == 'node.completed' || event.type == 'node.failed') && 'jobId' in event) {
+          connectors.release(event.jobId)
           if (event.type === 'node.failed') this.#store.state.discardInvocation(run.runId, event.jobId)
           this.#cancelNodeTools(run.runId, event.jobId)
           this.#artifacts.discard(run.runId, event.jobId)
@@ -357,7 +363,7 @@ export class RunExecutor {
           },
           invokeTask: (invocation) => {
             if (!('kind' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
-            return this.#invokeTask(flow, invocation, run, async (data) => {
+            return this.#invokeTask(flow, invocation, run, connectors, async (data) => {
               const event = await projectEvent({
                 type: 'node.log',
                 runId: invocation.runId,
@@ -381,7 +387,13 @@ export class RunExecutor {
               error instanceof StateError ||
               error instanceof CodeFetchDeniedError
             )
-              return { code: error.code, message: error.message, retryable: error.retryable, catchable: error.catchable }
+              return {
+                ...(error instanceof ConnectorTaskError && !error.indeterminate && error.executionFailure != null
+                  ? error.executionFailure
+                  : { code: error.code, message: error.message }),
+                retryable: error.retryable,
+                catchable: error.catchable,
+              }
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
           },
           runId: run.runId,
@@ -447,6 +459,7 @@ export class RunExecutor {
     prepared: PreparedFlow,
     invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal },
     run: StoredRun,
+    connectors: ConnectorExecution,
     report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
   ): Promise<unknown> {
     const access = this.#connectorContext(run, 'execute', 'selected')
@@ -518,21 +531,19 @@ export class RunExecutor {
           (code, input, callId, signal) => executeCode(this.#isolatedVm, code, input, callId, signal),
         )
       }
-      case 'connector':
-        assertConnectionNotDeferred(executor.connectionId)
-        const connector = this.#resolveConnector()
-        if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-        return await connector.execute(
-          executor.action,
-          executor.connectionId,
-          normalizeConnectorRuntimeInputs(
-            task.inputs.filter((input) => 'handle' in input),
-            invocation.input,
-          ),
-          invocation.invocationId,
-          invocation.signal,
-          { ...access, scope: 'action', action: executor.action, connectionId: executor.connectionId },
+      case 'connector': {
+        const input = normalizeConnectorRuntimeInputs(
+          task.inputs.filter((port) => 'handle' in port),
+          invocation.input,
         )
+        return connectors.execute(executor.action, executor.connectionId, input, {
+          jobId: invocation.jobId,
+          invocationId: invocation.invocationId,
+          signal: invocation.signal,
+          retryIntervalMs: node.retry?.intervalMs ?? 0,
+          access: { ...access, scope: 'action', action: executor.action, connectionId: executor.connectionId },
+        })
+      }
       case 'decision': {
         const decision = this.#resolveLlm()?.decision
         if (decision == null) throw new TaskHostError('llm.unavailable', 'AI Decision is not configured for this deployment.')

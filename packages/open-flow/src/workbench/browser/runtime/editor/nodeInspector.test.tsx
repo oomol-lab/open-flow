@@ -109,6 +109,39 @@ it('offers workflow output fields under the output node name in the status sourc
   expect(status!.getAttribute('aria-disabled')).not.toBe('true')
 })
 
+it('shows the localized optional notification subscription without changing the saved value', async () => {
+  const { container, i18n } = inspector(
+    {
+      kind: 'task',
+      inputs: {
+        leinaId: { kind: 'value', value: 'default' },
+        message: { kind: 'value', value: 'Report ready.' },
+        subscription: { kind: 'value', value: 'sub_conversation' },
+      },
+      task: {
+        name: 'Notify',
+        executor: { kind: 'connector', action: 'leina.send_notification' },
+        inputs: [
+          { handle: 'leinaId', jsonSchema: { type: 'string' }, nullable: false },
+          { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
+          { handle: 'subscription', jsonSchema: { type: 'string' }, nullable: true, description: 'A fixed conversation; leave unset for Home.' },
+        ],
+        outputs: [],
+      },
+    },
+    { readOnly: true },
+  )
+  const optional = [...container.querySelectorAll('summary')].find((summary) => summary.textContent?.includes(i18n.t('inspector.ports.optionalInputs')))
+  expect(optional).toBeDefined()
+  await click(optional!)
+  const values = () => [...container.querySelectorAll('input')].map((input) => input.value)
+  expect(values()).toContain(i18n.t('leina.subscription'))
+  expect(values()).toContain('sub_conversation')
+  await act(() => i18n.switchLang('zh-CN'))
+  expect(values()).toContain('通知订阅')
+  expect(values()).toContain('sub_conversation')
+})
+
 it.each(['mixed', 'grouped', 'required-only', 'optional-only'] as const)('groups %s Provider inputs without changing saved definitions', (kind) => {
   const i18n = createI18n('en')
   const optional = { handle: 'cc', jsonSchema: { type: 'string' }, nullable: true }

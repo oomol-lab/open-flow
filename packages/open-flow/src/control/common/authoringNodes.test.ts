@@ -3,7 +3,7 @@ import type { AuthoringHost, AuthoringRequest } from './authoring.ts'
 
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
-import { connectorActionPorts } from '../../connector/common/actionSchema.ts'
+import { connectorActionPorts, normalizeConnectorRuntimeInputs } from '../../connector/common/actionSchema.ts'
 import { runFlow } from '../../execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../../flow/common/change.ts'
 import { decodeRevisionContent } from '../../flow/common/changeSchema.ts'
@@ -81,6 +81,65 @@ async function roundTrip(content: RevisionContent, ref: string) {
 }
 
 describe('business configuration authoring contracts', () => {
+  it('authors and persists a notification subscription through ordinary Connector inputs', async () => {
+    const ports = connectorActionPorts(
+      {
+        type: 'object',
+        required: ['leinaId', 'message'],
+        properties: {
+          leinaId: { type: 'string' },
+          message: { type: 'string' },
+          subscription: { type: 'string', minLength: 1, pattern: '\\S' },
+        },
+      },
+      { type: 'object', properties: { status: { type: 'string' } }, required: ['status'] },
+    )
+    const action: AuthoringHost['action'] = async (id) => ({
+      ...(await host.action(id)),
+      inputs: Object.fromEntries(
+        ports.inputs.map((port) => [
+          port.handle,
+          { jsonSchema: port.json_schema as JsonValue, nullable: port.nullable, ...(port.value === undefined ? {} : { value: port.value as JsonValue }) },
+        ]),
+      ),
+      outputs: { status: { jsonSchema: { type: 'string' }, nullable: false } },
+    })
+    const created = await edit(
+      empty,
+      [
+        {
+          op: 'node.add',
+          type: 'connector',
+          as: 'notify',
+          name: 'Notify',
+          config: { action: 'leina.send_notification' },
+          inputs: {
+            leinaId: { kind: 'value', value: 'default' },
+            message: { kind: 'value', value: 'The report is ready.' },
+            subscription: { kind: 'value', value: 'sub_conversation' },
+          },
+        },
+      ],
+      { action },
+    )
+    const ref = created.nodes.notify!
+    const saved = decodeRevision(encodeRevision(created.content))
+    expect(authoringNode(saved, ref)).toMatchObject({
+      type: 'connector',
+      config: { action: 'leina.send_notification' },
+      inputs: { subscription: { kind: 'value', value: 'sub_conversation' } },
+    })
+    expect((await validateFlow(saved, findEngineContract(currentEngineContract)!)).diagnostics).toEqual([])
+    const updated = await edit(saved, [{ op: 'input.set', node: ref, input: 'message', source: { kind: 'value', value: 'Updated report.' } }])
+    expect(authoringNode(updated.content, ref)).toMatchObject({ inputs: { subscription: { kind: 'value', value: 'sub_conversation' } } })
+    expect(task(updated.content, ref)).toEqual(task(saved, ref))
+    const cleared = await edit(updated.content, [{ op: 'input.set', node: ref, input: 'subscription', source: { kind: 'unset' } }])
+    expect(authoringNode(cleared.content, ref)).toMatchObject({ inputs: { subscription: { kind: 'unset' } } })
+    const definitions = task(saved, ref).inputs.filter((port) => 'handle' in port)
+    expect(normalizeConnectorRuntimeInputs(definitions, { subscription: null, message: 'hello' })).toEqual({ message: 'hello' })
+    expect(normalizeConnectorRuntimeInputs(definitions, { subscription: '', message: 'hello' })).toEqual({ subscription: '', message: 'hello' })
+  })
+
   it('authors a Tally form subscription and preserves its output binding during a local form edit', async () => {
     const definition = triggerDefinitions.find((item) => item.snapshot.key == 'tally.on_form_response')!.snapshot
     const created = await edit(

@@ -1,4 +1,5 @@
 import { dequal } from 'dequal/lite'
+import { connectorActionContracts } from '../../connector/common/actionContract.ts'
 import { decisionTaskIssues } from '../../decision/common/decision.ts'
 import { httpRequestIssues, httpAuthHandles, httpRequestTask, httpRequestUrl } from '../../http/common/httpRequest.ts'
 import { openApiIssues, authHandles } from '../../openapi/common/openapi.ts'
@@ -22,7 +23,7 @@ import { canonicalJsonBytes, canonicalModule, canonicalRevisionGraph, digestByte
 import { nodeInputPorts, validateFlowGraph } from './graph.ts'
 import { inputValue } from './inputValue.ts'
 import { compareDiagnostics, validateModuleGraph } from './modules.ts'
-import { hasRetiredRef } from './schema.ts'
+import { hasRetiredRef, matchesSchema } from './schema.ts'
 export { availableOutputs, graphOrder, nodeInputPorts } from './graph.ts'
 export { validateModules } from './modules.ts'
 export { matchesSchema, schemaValidationErrors, variableInputCompatible } from './schema.ts'
@@ -349,16 +350,18 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
     for (const message of agentConfigIssues(task)) {
       checked.diagnostics.push({ code: 'agent.config-invalid', column: 0, line: 1, message, path: `/document/graph/nodes/${nodeId}/task/executor` })
     }
-    if (task.executor.kind == 'connector' && task.executor.action == 'leina.send_notification') {
-      const mapping = node.inputs.leinaId
-      const value = inputValue(mapping, nodeInputPorts(node).leinaId?.value)
-      if ((mapping?.kind != 'sources' || mapping.sources.length == 0) && (typeof value != 'string' || value.trim().length == 0)) {
+    if (task.executor.kind == 'connector') {
+      for (const constraint of connectorActionContracts[task.executor.action]?.inputConstraints ?? []) {
+        const mapping = node.inputs[constraint.handle]
+        if (mapping?.kind == 'sources' && mapping.sources.length > 0) continue
+        const value = inputValue(mapping, nodeInputPorts(node)[constraint.handle]?.value)
+        if (value !== undefined && matchesSchema(value, constraint.jsonSchema)) continue
         checked.diagnostics.push({
-          code: 'leina.robot-required',
+          code: constraint.code,
           column: 0,
           line: 1,
-          message: 'Select a Leina robot or bind its identifier to an input source.',
-          path: `/document/graph/nodes/${nodeId}/inputs/leinaId`,
+          message: constraint.message,
+          path: `/document/graph/nodes/${nodeId}/inputs/${constraint.handle}`,
         })
       }
     }

@@ -45,6 +45,7 @@ import {
 import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { ConnectorAccount, TriggerConnection, SavedConnectionReference } from './connectionSettings.tsx'
+import { connectorActionPresentation } from './connectorActionPresentation.tsx'
 import { presentConnectorInputs } from './connectorInputPresentation.ts'
 import { DecisionSection } from './decisionSection.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
@@ -54,7 +55,6 @@ import { FlowStateButton } from './flowStatePanel.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
 import { HttpParameterEditor } from './httpParameterEditor.tsx'
 import { HttpRequestSection } from './httpRequestSection.tsx'
-import { LeinaBotSelect } from './leinaBotSelect.tsx'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { LlmTaskSection } from './llmTaskSection.tsx'
 import { NodeDescription } from './nodeDescription.tsx'
@@ -347,6 +347,7 @@ export function NodeInspector({
   const unconfiguredOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi' && !task.executor.path
   const isLlm = task != null && 'executor' in task && task.executor.kind == 'llm'
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
+  const connectorPresentation = connector == null ? undefined : connectorActionPresentation(connector.action, t)
   const nodeId = selection?.kind == 'task' ? selection.id : undefined
   const workflowSettings =
     task != null && 'executor' in task && task.executor.kind == 'workflow' && selection != null
@@ -835,22 +836,18 @@ export function NodeInspector({
                   definition,
                   sourceOnly: isHttpRequest && definition.handle.startsWith('auth.'),
                   editor:
-                    !readOnly &&
-                    connectors != null &&
-                    connector?.action == 'leina.send_notification' &&
-                    definition.handle == 'leinaId' &&
-                    mapping?.kind != 'sources' ? (
-                      <LeinaBotSelect
-                        key={revision.revision.flowId}
-                        source={connectors}
-                        flowId={revision.revision.flowId}
-                        value={inputValue(mapping, definition.value)}
-                        disabled={disabled}
-                        onChange={(value) => {
-                          void store?.nodes.setInputValue(selection.id, definition.handle, value)
-                        }}
-                      />
-                    ) : undefined,
+                    !readOnly && connectors != null && mapping?.kind != 'sources'
+                      ? connectorPresentation?.renderInput({
+                          handle: definition.handle,
+                          source: connectors,
+                          flowId: revision.revision.flowId,
+                          value: inputValue(mapping, definition.value),
+                          disabled,
+                          onChange: (value) => {
+                            void store?.nodes.setInputValue(selection.id, definition.handle, value)
+                          },
+                        })
+                      : undefined,
                   value: inputValue(mapping, definition.value),
                   onReset:
                     definition.value !== undefined && mapping != null ? () => void store?.nodes.resetInputs(selection.id, [definition.handle]) : undefined,
@@ -866,7 +863,7 @@ export function NodeInspector({
                 title={t(selection.kind === 'outputs' ? 'inspector.ports.outputsTitle' : 'inspector.ports.inputsTitle')}
                 titleIcon={selection.kind === 'outputs' ? 'output' : 'input'}
                 entries={entries}
-                fieldLabels={connector?.action == 'leina.send_notification' ? { leinaId: t('leina.robot'), message: t('leina.message') } : undefined}
+                fieldLabels={connectorPresentation?.fieldLabels}
                 onReset={() => {
                   return store?.nodes.resetInputs(
                     selection.id,

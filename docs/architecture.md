@@ -51,6 +51,10 @@ Inside the public package, node families depend only on the shared Flow model; t
 features that read whole Flows, execution, and control sit above it. [Node authoring](authoring/node-authoring.md#module-placement)
 defines the layers, and the package checks enforce them.
 
+Connector owns built-in Action input constraints and pending-message input roles. The shared Flow
+validator and edge authoring interpret these declarations without identifying a Provider or its fields.
+Workbench's Connector presentation adapter owns Action-specific labels and input controls.
+
 Workbench owns Flow editing and its product UI. The deployment host owns login, account roles, deployment settings, and browser analytics.
 Hosts integrate through public props, shared UI, and product theme contracts. They must not override internal product selectors or copy Workbench implementations.
 Server-owned pages compose `apps/server/browser/host-ui.tsx`; its stylesheet owns page widths, fixed navigation spacing, cards, and field presentation. Feature pages own their data, actions, and content. Route tabs retain links, while local panels use the shared accessible Tabs primitives.
@@ -101,7 +105,8 @@ Projections update consistently with their sources. Execution always uses the co
 
 Presentation stores layout, viewport, comments, and other display state independently of the execution definition. It does not affect validation or execution.
 Publication fixes the corresponding display snapshot. Rollback and historical views do not rewrite the Draft's display state.
-Revisions do not store credentials, execution state, Engine IR, current Provider state, or deployment caches.
+Revisions do not store deployment-owned account credentials, execution state, Engine IR, current Provider state, or deployment caches.
+Explicitly supplied business capability values, such as a notification subscription, are ordinary input literals and participate in Revision persistence, copying and export.
 
 ### Deployment configuration and execution snapshots
 
@@ -164,9 +169,19 @@ Internal Run storage must not become a second data channel through which scripts
 Node execution, events, and capability calls share cancellation and deadlines. Catching an ordinary business error cannot disable resource limits or termination requirements.
 
 The deployment owns the Run's sole execution authority and terminal state. Admission fixes the version, execution scope, and runtime identity.
-Retries must not duplicate accepted execution. If side-effect outcomes cannot be confirmed, execution ends as indeterminate and is not automatically replayed.
+Retries must not duplicate accepted execution. If side-effect outcomes cannot be confirmed, execution ends as indeterminate and is not automatically replayed, except for the subscribed-notification policy below.
 Cancellation and completion races must produce one authoritative terminal state.
 The deployment limits concurrency and execution budgets and owns queuing and recovery. Clients must not take ownership of scheduling facts.
+
+Direct Leina subscription notification Tasks use a success/failure delivery contract as an explicit exception.
+Direct Connector Tasks may retry unknown delivery outcomes with the same event identity within the notification budget, according to Connector retryability.
+The deployment's Connector execution adapter owns this identity and budget across attempts. Run
+execution and Agent tools consume normalized failure details and outcome certainty; the deployment
+composition supplies the Connector's allowed public failure codes to the generic event projector.
+A confirmed retry may complete the Run. An unhandled final notification error, including `delivery_unconfirmed`, ends it as `failed`.
+A failed notification Run can include a delivered message. Manual reruns create a new event identity and may deliver it again.
+Calls inside Code or Agent Tasks keep the general indeterminate-side-effect rule; they do not share the direct Task's stable identity or retry policy.
+See the [notification execution contract](control/contracts/control-api.md#connector-passthrough) for identity, retry and deadline rules.
 
 ### Flow State
 

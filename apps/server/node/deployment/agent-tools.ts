@@ -126,12 +126,21 @@ export function createAgentTools(config: Extract<ManagedTaskExecutor, { readonly
               await report({
                 kind: 'tool',
                 status: 'failed',
-                executed: executed ? true : error instanceof ConnectorTaskError && error.code != 'connector.indeterminate' ? false : null,
+                executed: executed ? true : error instanceof ConnectorTaskError && !error.outcomeUnknown ? false : null,
                 message:
-                  error instanceof ConnectorTaskError || error instanceof WorkflowToolError ? error.message : 'The Agent tool result could not be processed.',
+                  error instanceof ConnectorTaskError
+                    ? (error.executionFailure?.message ?? error.message)
+                    : error instanceof WorkflowToolError
+                      ? error.message
+                      : 'The Agent tool result could not be processed.',
                 callId,
                 toolId: tool.id,
-                code: error instanceof ConnectorTaskError || error instanceof WorkflowToolError ? error.code : 'agent.tool-result-invalid',
+                code:
+                  error instanceof ConnectorTaskError
+                    ? (error.executionFailure?.code ?? error.code)
+                    : error instanceof WorkflowToolError
+                      ? error.code
+                      : 'agent.tool-result-invalid',
               })
               if (error instanceof ConnectorTaskError && error.code == 'connector.input-invalid') throw error
               return fail(error)

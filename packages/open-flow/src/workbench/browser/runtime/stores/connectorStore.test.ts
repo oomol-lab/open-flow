@@ -255,9 +255,13 @@ it('presents Leina notifications in the selected language while preserving the c
     serviceId: 'leina',
     serviceName: 'Leina',
     name: 'send_notification',
-    description: 'Send a notification.',
+    description: '填写通知订阅时发送到指定会话；留空则发送到机器人 Home。',
     authenticated: false,
-    inputs: { leinaId: { jsonSchema: { type: 'string' }, nullable: false }, message: { jsonSchema: { type: 'string' }, nullable: false } },
+    inputs: {
+      leinaId: { jsonSchema: { type: 'string' }, nullable: false },
+      message: { jsonSchema: { type: 'string' }, nullable: false },
+      subscription: { description: '由机器人创建的通知订阅。', jsonSchema: { type: 'string' }, nullable: true, value: null },
+    },
     outputs: {},
   }
   const request = vi.fn(async (_path: string) => Response.json({ version: 1, actions: [action] }))
@@ -270,9 +274,9 @@ it('presents Leina notifications in the selected language while preserving the c
     const options = await resourceValue(connectors.provideAddNodeOptions('通知', controller.signal))
     expect(options).toHaveLength(1)
     const option = options![0]!
-    expect(option).toMatchObject({ label: 'Leina 通知', description: '选择团队机器人，发送通知。', kind: 'connector' })
+    expect(option).toMatchObject({ label: 'Leina 通知', description: action.description, kind: 'connector' })
     const intent = addNodeIntent(option, new RevisionView(draft('flow-a', 'revision-1')), i18n.t)
-    expect(intent).toMatchObject({ kind: 'connector', action: { ...action, name: 'Leina 通知', description: '选择团队机器人，发送通知。' } })
+    expect(intent).toMatchObject({ kind: 'connector', action: { ...action, name: 'Leina 通知' } })
     expect(request.mock.calls[0]?.[0]).toContain('q=%E9%80%9A%E7%9F%A5')
   } finally {
     controller.abort()

@@ -915,6 +915,8 @@ it.each([
   { kind: 'value', value: null },
   { kind: 'value', value: '' },
   { kind: 'value', value: '   ' },
+  { kind: 'value', value: '\t\n\u00a0\ufeff' },
+  { kind: 'value', value: 42 },
 ] as const)('diagnoses an unselected Leina robot (%j)', async (mapping) => {
   const content: RevisionFixture = {
     modelVersion: currentFlowModelVersion,
@@ -945,6 +947,7 @@ it.each([
   if (node.kind != 'task') throw new Error('Expected task')
   for (const inputs of [
     { leinaId: { kind: 'value', value: 'default' } },
+    { leinaId: { kind: 'value', value: '  robot-1  ' } },
     { leinaId: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'robot' }] } },
   ] as const) {
     const configured: RevisionFixture = {

@@ -1625,7 +1625,7 @@
   },
   "leina": {
     "notification": "Leina 알림",
-    "description": "팀 로봇을 통해 알림을 보냅니다.",
+    "subscription": "알림 구독",
     "message": "알림 내용",
     "loading": "로봇 불러오는 중…",
     "robot": "로봇",

@@ -13,7 +13,7 @@ export interface ConnectorHost {
     action: string,
     connectionId: string | undefined,
     input: Readonly<Record<string, JsonValue>>,
-    invocationId: string,
+    idempotencyKey: string,
     signal: AbortSignal,
     access?: ConnectorAccessContext,
   ): Promise<JsonValue>
@@ -79,20 +79,31 @@ export type ConnectorErrorCode =
 export class ConnectorTaskError extends Error {
   readonly code: ConnectorErrorCode
   readonly status?: number
+  readonly retryable: boolean
+  readonly executionFailure?: { readonly code: string; readonly message: string }
+  readonly outcomeUnknown: boolean
 
-  constructor(code: ConnectorErrorCode, message: string, status?: number) {
+  constructor(
+    code: ConnectorErrorCode,
+    message: string,
+    status?: number,
+    options?: {
+      readonly retryable: boolean
+      readonly executionFailure?: { readonly code: string; readonly message: string }
+      readonly outcomeUnknown?: boolean
+    },
+  ) {
     super(message)
     this.code = code
     this.status = status
+    this.retryable = options?.retryable ?? code == 'connector.unavailable'
+    this.executionFailure = options?.executionFailure
+    this.outcomeUnknown = options?.outcomeUnknown ?? code == 'connector.indeterminate'
     this.name = 'ConnectorTaskError'
   }
 
   get catchable(): boolean {
     return this.code != 'connector.indeterminate' && this.code != 'connector.unconfigured'
-  }
-
-  get retryable(): boolean {
-    return this.code == 'connector.unavailable'
   }
 
   get indeterminate(): boolean {
