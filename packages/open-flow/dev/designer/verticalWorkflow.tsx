@@ -101,6 +101,7 @@ function WorkflowCanvas({ dark, language, log }: { readonly dark: boolean; reado
         dark={dark}
         language={language}
         fitView
+        autoLayout
         ignoredNodeIds={[]}
         selectedNodeIds={selected}
         onSelectionChange={setSelected}
@@ -136,6 +137,6 @@ export const verticalWorkflowStory: FrontendStory = {
   title: 'Vertical workflow',
   standalone: true,
   description:
-    'Choose a layout direction from the canvas view controls. Compare Provider disconnection, run failure, configuration errors, deferred accounts, manual review and compact status icons. Layout changes stay in this sample.',
+    'Inspect automatic spacing between compact cards, content and branches. Change direction or re-layout from the canvas view controls. Compare Provider disconnection, run failure, configuration errors, deferred accounts, manual review and compact status icons. Layout changes stay in this sample.',
   render: (log, dark, language) => <WorkflowCanvas dark={dark} language={language} log={log} />,
 }

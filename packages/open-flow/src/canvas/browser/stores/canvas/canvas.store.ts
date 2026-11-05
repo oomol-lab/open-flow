@@ -376,8 +376,9 @@ export class CanvasStore {
 
   private layoutPositions(nodes: readonly NodeStore[], availableWidth?: number): Readonly<Record<string, FlowCanvasViewPosition>> {
     const g = new graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-    // Leave enough room for both ends of a smooth-step edge and a short middle segment.
-    g.setGraph({ rankdir: this.$.direction.value === 'vertical' ? 'TB' : 'LR', ranksep: 80 })
+    const vertical = this.$.direction.value === 'vertical'
+    // Vertical smooth-step edges need less room than horizontal Bézier curves.
+    g.setGraph({ rankdir: vertical ? 'TB' : 'LR', ranksep: vertical ? 48 : 80 })
 
     const singles = new Set<string>()
     for (const node of nodes) {
