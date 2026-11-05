@@ -6,6 +6,8 @@ export interface FlowPngOptions {
   readonly dark?: boolean
   readonly frame?: boolean
   readonly title?: string
+  /** Allow remote resources by default. Set false when rendering untrusted workflows. */
+  readonly allowNetwork?: boolean
 }
 
 /** Private, serializable bridge between Node and the bundled browser renderer. */

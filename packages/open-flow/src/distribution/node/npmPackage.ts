@@ -252,6 +252,11 @@ provides \`width\`, \`height\` and \`hasImagePlaceholders\`. Image scale and all
 retries adapt automatically. Each call closes its own Context, leaving your Browser
 available for reuse. It validates the file without modifying it or executing nodes.
 
+Network access is allowed by default, including requests to private endpoints.
+Set \`allowNetwork: false\` when rendering untrusted files to block requests in the
+renderer's Context. Bundled rendering resources remain available; blocked
+remote images use placeholders and set \`hasImagePlaceholders\` to \`true\`.
+
 Install the Task contracts as a development dependency:
 
 \`\`\`bash

@@ -23,9 +23,10 @@ export async function flowToPng(browser: Browser, workflow: WorkflowFile, option
     readFile(join(packageRoot, 'dist/render/browser/runtime.js'), 'utf8'),
     readFile(join(packageRoot, 'dist/render/browser/runtime.css'), 'utf8'),
   ])
-  const context = await browser.newContext({ deviceScaleFactor: 1 })
+  const context = await browser.newContext({ deviceScaleFactor: 1, serviceWorkers: 'block' })
   let failed = false
   try {
+    if (options.allowNetwork === false) await context.route('**/*', (route) => route.abort())
     const page = await context.newPage()
     await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>')
     await page.addStyleTag({ content: style })

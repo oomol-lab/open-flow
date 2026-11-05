@@ -61,6 +61,11 @@ its own Context after each call. You own the Browser lifecycle. Rendering resour
 ship with the package; no Workbench server is needed. In a source checkout, build
 the package before using the Node renderer.
 
+Network access is allowed by default, including requests to private endpoints.
+Set `allowNetwork: false` when rendering untrusted files to block requests in the
+renderer's Context. Bundled rendering resources remain available; blocked
+remote images use placeholders and set `hasImagePlaceholders` to `true`.
+
 ## Host themes
 
 The host selects light/dark mode through the `theme` prop. Open Flow does not read a host's
