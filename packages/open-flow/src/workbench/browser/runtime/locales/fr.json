@@ -1790,7 +1790,7 @@
     "count": "Entrées",
     "updated": "Mise à jour",
     "shared": "Partagé par le workflow",
-    "globalUsage": "Utilisation du workflow",
+    "globalUsage": "Total des entrées de déduplication du workflow",
     "valuesNearLimit": "Les données enregistrées occupent au moins 80 % du quota. Supprimez les données inutiles.",
     "pendingClear": "{{count}} en attente de validation. Terminez ou annulez les exécutions concernées avant de vider.",
     "clearBlocked": "Des entrées sont en attente de validation. Terminez ou annulez les exécutions concernées, puis actualisez.",

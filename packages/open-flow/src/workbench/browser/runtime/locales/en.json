@@ -1790,7 +1790,7 @@
     "count": "Records",
     "updated": "Updated",
     "shared": "Workflow shared",
-    "globalUsage": "Workflow usage",
+    "globalUsage": "Total workflow deduplication records",
     "valuesNearLimit": "Saved data is at least 80% full. Clear entries you no longer need.",
     "pendingClear": "{{count}} pending; finish or cancel their Runs before clearing.",
     "clearBlocked": "This history has pending records. Finish or cancel their Runs, then refresh.",

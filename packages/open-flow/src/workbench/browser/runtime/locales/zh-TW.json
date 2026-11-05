@@ -1766,7 +1766,7 @@
     "delete": "刪除",
     "clear": "清空",
     "orphaned": "目前檢視之外",
-    "nearLimit": "此流程的去重記錄已使用至少 80%。請清理不再需要的記錄。",
+    "nearLimit": "此工作流的去重記錄已使用至少 80%。請清理不再需要的記錄。",
     "history": "歷史記錄",
     "scope": "範圍",
     "refresh": "重新整理",
@@ -1789,8 +1789,8 @@
     "source": "來源",
     "count": "筆數",
     "updated": "最近更新",
-    "shared": "流程共用",
-    "globalUsage": "全流程用量",
+    "shared": "工作流共用",
+    "globalUsage": "工作流去重記錄總數",
     "valuesNearLimit": "儲存資料已使用至少 80% 的額度。請清理不再需要的資料。",
     "pendingClear": "{{count}} 筆待提交，相關執行結束或取消後可清理。",
     "clearBlocked": "這些記錄尚待提交。請等待相關執行結束或取消後再重新整理。",
@@ -1804,7 +1804,7 @@
     "emptyValues": "尚無資料",
     "emptySpaces": "尚無記錄",
     "loadFailed": "載入失敗",
-    "valuesHelp": "{{name}}：流程主動儲存的內容，後續執行可以繼續讀取。",
+    "valuesHelp": "{{name}}：工作流主動儲存的內容，後續執行可以繼續讀取。",
     "historyHelp": "{{name}}：項目的識別標記，用來避免重複處理。"
   }
 }
