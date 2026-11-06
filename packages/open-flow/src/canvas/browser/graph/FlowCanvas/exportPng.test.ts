@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { ReactFlowInstance } from '@xyflow/react'
 import type { ReactElement } from 'react'
 import type { FlowCanvasProps } from './FlowCanvas.tsx'
 import type { FlowCanvasViewModel } from './model.ts'
@@ -6,7 +7,8 @@ import type { FlowCanvasViewModel } from './model.ts'
 import { toSvg } from 'html-to-image'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { downloadFlowPng, flowToPng } from './exportPng.ts'
+import { CanvasStore } from '../../stores/canvas/canvas.store.ts'
+import { downloadFlowPng, downloadPng, flowToPng } from './exportPng.ts'
 
 vi.mock('html-to-image', () => ({ toSvg: vi.fn() }))
 vi.mock('./FlowCanvas.tsx', () => ({ FlowCanvas: () => null }))
@@ -18,6 +20,8 @@ const model: FlowCanvasViewModel = {
   edges: [],
 }
 const png = new Blob(['encoded PNG'], { type: 'image/png' })
+const getInternalNode = vi.fn()
+const instance = { getInternalNode } as unknown as ReactFlowInstance
 const unmount = vi.fn()
 const drawImage = vi.fn()
 const fillRect = vi.fn()
@@ -44,6 +48,7 @@ beforeEach(() => {
   canvases = []
   snapshots = []
   allocationFailures = 0
+  getInternalNode.mockReset()
   unmount.mockClear()
   drawImage.mockReset()
   fillRect.mockClear()
@@ -100,6 +105,7 @@ beforeEach(() => {
           const canvas = content.props as FlowCanvasProps
           const store = canvas.flowCanvasStore
           store.onInit()
+          canvas.onInit?.(instance)
           store.handleNodesChange(store.$.rfNodes.value.map((node) => ({ type: 'dimensions', id: node.id, dimensions: { width: 320, height: 120 } })))
           const surface = document.createElement('div')
           surface.className = 'react-flow'
@@ -148,6 +154,13 @@ describe('canvas PNG export', () => {
     expect(canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(true)
   })
 
+  it.each([false, true])('leaves the outside of the rounded frame transparent (dark=%s)', async (dark) => {
+    await flowToPng(model, 'en', { frame: true, dark })
+    expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalledWith('2d', { alpha: true })
+    // Only the inset canvas receives a rectangular fill; the frame paints its own rounded shape.
+    expect(fillRect).toHaveBeenCalledExactlyOnceWith(20, 52, 864, 314)
+  })
+
   it('budgets the entire frame and halves it together with the graph on encoding failure', async () => {
     nodeBounds = edgeBounds = new DOMRect(0, 0, 20000, 5000)
     encodingResults = [null, png]
@@ -174,6 +187,7 @@ describe('canvas PNG export', () => {
     expect(decodeSnapshot).toHaveBeenCalledOnce()
     expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 1856, 756)
     expect(context.fillStyle).toBe(dark ? 'rgb(30, 30, 30)' : 'rgb(240, 240, 240)')
+    expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalledWith('2d', { alpha: false })
     expect(encodedSizes).toEqual([{ width: 1856, height: 756, type: 'image/png' }])
     expect(unmount).toHaveBeenCalledOnce()
     expect(document.body.children).toHaveLength(0)
@@ -356,4 +370,73 @@ describe('canvas PNG export', () => {
     expect(revoke).toHaveBeenCalledWith('blob:failed-download')
     expect(document.body.children).toHaveLength(0)
   })
+})
+
+it('arranges only the isolated vertical export when compact layout is requested', async () => {
+  const input = { ...model, direction: 'vertical' as const }
+  const before = structuredClone(input)
+  const arrange = vi.spyOn(CanvasStore.prototype, 'compactForExport')
+  await flowToPng(input, 'en', { layout: 'compact', frame: true })
+  expect(arrange).toHaveBeenCalledExactlyOnceWith({ width: 104, height: 136 }, instance, 1)
+  expect(input).toEqual(before)
+  expect(toSvg).toHaveBeenCalledOnce()
+  expect(unmount).toHaveBeenCalledOnce()
+  expect(document.querySelector('[aria-hidden="true"]')).toBeNull()
+})
+
+it('preserves saved positions by default and with explicit original layout', async () => {
+  const arrange = vi.spyOn(CanvasStore.prototype, 'compactForExport')
+  await flowToPng(model)
+  await flowToPng(model, 'en', { layout: 'original' })
+  expect(arrange).not.toHaveBeenCalled()
+})
+
+it.each([undefined, 'horizontal'] as const)('preserves horizontal positions when compact layout is requested (%s)', async (direction) => {
+  const input = { ...model, direction }
+  const before = structuredClone(input)
+  const arrange = vi.spyOn(CanvasStore.prototype, 'compactForExport')
+  await flowToPng(input, 'en', { layout: 'compact', frame: true })
+  expect(arrange).not.toHaveBeenCalled()
+  expect(input).toEqual(before)
+})
+
+it.each(['1:1', '4:3', '3:4', '16:9', '9:16'] as const)('fits the complete image into %s without cropping content', async (aspectRatio) => {
+  const [wide, high] = aspectRatio.split(':').map(Number)
+  for (const frame of [false, true]) {
+    vi.mocked(toSvg).mockClear()
+    const result = await flowToPng(model, 'en', { aspectRatio, frame })
+    expect(result.width * high!).toBe(result.height * wide!)
+    const size = vi.mocked(toSvg).mock.calls[0]![1]!
+    expect(size.width).toBeGreaterThanOrEqual(edgeBounds.width + (frame ? 64 : 128))
+    expect(size.height).toBeGreaterThanOrEqual(edgeBounds.height + (frame ? 64 : 128))
+    expect(result.width * result.height).toBeLessThanOrEqual(32_000_000)
+  }
+})
+
+it('keeps the chosen ratio when downscaling and retrying bitmap allocation', async () => {
+  nodeBounds = edgeBounds = new DOMRect(0, 0, 30000, 18000)
+  allocationFailures = 1
+  const result = await flowToPng(model, 'en', { aspectRatio: '16:9', frame: true })
+  expect(result.width * 9).toBe(result.height * 16)
+  expect(Math.max(result.width, result.height)).toBeLessThanOrEqual(16384)
+  expect(result.width * result.height).toBeLessThanOrEqual(32_000_000)
+  expect(canvases).toHaveLength(2)
+})
+
+it('uses the requested ratio to choose a compact layout', async () => {
+  const arrange = vi.spyOn(CanvasStore.prototype, 'compactForExport')
+  await flowToPng({ ...model, direction: 'vertical' }, 'en', { layout: 'compact', aspectRatio: '16:9', frame: true })
+  expect(arrange).toHaveBeenCalledExactlyOnceWith({ width: 104, height: 136 }, instance, 16 / 9)
+})
+
+it('downloads a rendered preview without capturing or encoding it again', async () => {
+  const result = { blob: png, width: 800, height: 450, hasImagePlaceholders: false }
+  const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview')
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  const trigger = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  downloadPng(result, '客户反馈')
+  expect(create).toHaveBeenCalledWith(png)
+  expect(trigger).toHaveBeenCalledOnce()
+  expect(toSvg).not.toHaveBeenCalled()
+  expect(encodedSizes).toHaveLength(0)
 })

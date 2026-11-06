@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import type { ComponentProps, ReactNode } from 'react'
 import type { Val } from 'value-enhancer'
+import type { FlowPngResult } from '../../../canvas/browser/graph/FlowCanvas/exportPng.ts'
 import type { NavigationStore } from './navigation.ts'
 import type { WorkbenchStore } from './stores/workbenchStore.ts'
 
@@ -8,21 +9,35 @@ import { act, Children, forwardRef, isValidElement, useImperativeHandle } from '
 import { val } from 'value-enhancer'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { render, click } from '../../../../test/support/render.tsx'
+import { flowToPng } from '../../../canvas/browser/graph/FlowCanvas/exportPng.ts'
 import { WorkbenchCanvas } from './editor/workbenchCanvas.tsx'
 import FlowWorkspace from './flowWorkspace.tsx'
 import { RunControl } from './runs/runControl.tsx'
 import { runDrawerPreferenceKey } from './runs/runDrawerPreference.ts'
+import { PngExportDialog } from './shell/pngExportDialog.tsx'
 import { WorkspaceDiagnosticsIsland } from './shell/workspaceDiagnosticsIsland.tsx'
 import { WorkspacePublishIsland } from './shell/workspacePublishIsland.tsx'
 
 const boundary = vi.hoisted(() => ({
   canvas: undefined as ComponentProps<typeof WorkbenchCanvas> | undefined,
   publish: undefined as ComponentProps<typeof WorkspacePublishIsland> | undefined,
+  png: undefined as ComponentProps<typeof PngExportDialog> | undefined,
+  renderPngDialog: false,
   diagnostics: undefined as ComponentProps<typeof WorkspaceDiagnosticsIsland> | undefined,
   run: undefined as ComponentProps<typeof RunControl> | undefined,
   addOutputs: undefined as (() => void) | undefined,
   addNode: vi.fn(),
 }))
+vi.mock('./shell/pngExportDialog.tsx', async (importOriginal) => {
+  const { PngExportDialog: ExportDialog } = await importOriginal<typeof import('./shell/pngExportDialog.tsx')>()
+  return {
+    PngExportDialog: (props: ComponentProps<typeof PngExportDialog>) => {
+      boundary.png = props
+      return boundary.renderPngDialog ? <ExportDialog {...props} /> : null
+    },
+  }
+})
+vi.mock('../../../canvas/browser/graph/FlowCanvas/exportPng.ts', () => ({ flowToPng: vi.fn() }))
 const preferences = new Map<string, string>()
 vi.mock('./editor/workbenchCanvas.tsx', () => ({
   WorkbenchCanvas: forwardRef((_props: ComponentProps<typeof WorkbenchCanvas>, _ref) => {
@@ -89,12 +104,18 @@ const value = val
 beforeEach(() => {
   preferences.clear()
   boundary.canvas = undefined
+  boundary.renderPngDialog = false
   boundary.run = undefined
   boundary.addOutputs = undefined
   boundary.addNode.mockReset()
 })
 function set(source: unknown, next: unknown) {
   act(() => (source as Val<unknown>).set(next))
+}
+async function previewTick() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 240))
+  })
 }
 function renderWorkspace(busy?: string, withTrigger = true, invalid = false, selectedNodeIds: readonly string[] = [], hasUnpublishedChanges = true) {
   const navigation = {
@@ -153,7 +174,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
     connectorAccess: { $: value({}) },
     addNode: vi.fn().mockResolvedValue('new-node'),
     selectNodes: vi.fn(),
-    exportPng: vi.fn().mockResolvedValue(undefined),
+    downloadPng: vi.fn().mockResolvedValue(true),
     editDraftRunInputs: vi.fn().mockResolvedValue('input'),
     requestDraftRun: vi.fn().mockResolvedValue('started'),
     requestLiveRun: vi.fn().mockResolvedValue('started'),
@@ -357,17 +378,61 @@ it.each([
 it.each([undefined, 'implicit', 'selectable'])('exports PNG only with selectable connector access (%s)', (mode) => {
   const view = renderWorkspace()
   set(view.store.connectorAccess.$, { access: mode == null ? undefined : { mode } })
-  expect(typeof boundary.publish!.onExportPng === 'function').toBe(mode === 'selectable')
+  expect(typeof boundary.publish!.onOpenPngExport === 'function').toBe(mode === 'selectable')
   set(view.store.$.designer, { nodes: [], viewport: { x: 0, y: 0, zoom: 1 } })
-  expect(boundary.publish!.onExportPng).toBeUndefined()
+  expect(boundary.publish!.onOpenPngExport).toBeUndefined()
 })
 
 it.each([false, true])('exports the chosen PNG theme independently of the workspace (dark=%s)', async (dark) => {
   const view = renderWorkspace()
   set(view.store.connectorAccess.$, { access: { mode: 'selectable' } })
-  await boundary.publish!.onExportPng!({ dark, frame: true })
-  expect(view.store.exportPng).toHaveBeenCalledWith('en', { dark, frame: true, ignoredNodeIds: [] })
-  expect(boundary.publish!.preferences).toBe(view.store.preferences)
+  act(() => boundary.publish!.onOpenPngExport!())
+  expect(boundary.png!.open).toBe(true)
+  await boundary.png!.render({ dark, frame: true, layout: 'compact', aspectRatio: '16:9' })
+  expect(flowToPng).toHaveBeenLastCalledWith(view.store.$.designer.value, 'en', {
+    dark,
+    frame: true,
+    layout: 'compact',
+    aspectRatio: '16:9',
+    ignoredNodeIds: [],
+  })
+  expect(boundary.png!.preferences).toBe(view.store.preferences)
+  set(view.store.workspace.$.flowId, 'other')
+  expect(boundary.png!.open).toBe(false)
+})
+
+it('finishes a PNG preview during run updates and captures the current canvas when reopened', async () => {
+  const image: FlowPngResult = { blob: new Blob(['PNG'], { type: 'image/png' }), width: 1600, height: 900, hasImagePlaceholders: false }
+  let finish!: (result: FlowPngResult) => void
+  const capture = new Promise<FlowPngResult>((resolve) => {
+    finish = resolve
+  })
+  vi.mocked(flowToPng).mockReset().mockReturnValueOnce(capture).mockResolvedValue(image)
+  boundary.renderPngDialog = true
+  const view = renderWorkspace('run')
+  const original = view.store.$.designer.value
+  set(view.store.connectorAccess.$, { access: { mode: 'selectable' } })
+  act(() => boundary.publish!.onOpenPngExport!())
+  await previewTick()
+  expect(flowToPng).toHaveBeenCalledOnce()
+  expect(vi.mocked(flowToPng).mock.calls[0]![0]).toBe(original)
+
+  set(view.store.$.designer, Object.assign({}, original, { runStatus: 'running' }))
+  await previewTick()
+  await act(async () => finish(image))
+  expect(flowToPng).toHaveBeenCalledOnce()
+  expect(view.button('Download PNG').disabled).toBe(false)
+  await click(view.button('Download PNG'))
+  expect(view.store.downloadPng).toHaveBeenCalledExactlyOnceWith(image)
+  expect(boundary.png!.open).toBe(false)
+
+  const current = Object.assign({}, original, { runStatus: 'idle' })
+  set(view.store.$.designer, current)
+  act(() => boundary.publish!.onOpenPngExport!())
+  await previewTick()
+  expect(flowToPng).toHaveBeenCalledTimes(2)
+  expect(vi.mocked(flowToPng).mock.calls[1]![0]).toBe(current)
+  expect(view.button('Download PNG').disabled).toBe(false)
 })
 
 it('updates canvas annotations with draft and unsaved code state', () => {

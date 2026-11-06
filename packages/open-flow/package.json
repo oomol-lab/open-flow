@@ -67,6 +67,7 @@
     "./http-request": "./src/http/common/httpRequest.ts"
   },
   "scripts": {
+    "benchmark:png-layout": "bun scripts/benchmark-png-layout.ts",
     "build": "bun scripts/build.ts",
     "check": "bun run format -- --check && bun run lint && bun run check:trigger-locales && bun run check:nodejs-builtins && bun run check:types && bun run check:boundaries",
     "check:boundaries": "bun scripts/check-platform-boundaries.ts && bun scripts/check-catalog-boundaries.ts && bun scripts/check-module-layers.ts",
@@ -158,7 +159,7 @@
     "fake-indexeddb": "^6.2.5",
     "fzf": "^0.5.2",
     "happy-dom": "^21.0.1",
-    "html-to-image": "1.11.11",
+    "html-to-image": "1.11.13",
     "katex": "0.16.27",
     "lucide-react": "^0.468",
     "memfs": "4.72.1",

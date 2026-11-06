@@ -108,3 +108,21 @@ it('can reuse a browser after a failed call', async () => {
   expect(nextContext.close).toHaveBeenCalledOnce()
   expect(view.browser.close).not.toHaveBeenCalled()
 })
+
+it.each(['original', 'compact'] as const)('forwards the %s layout through the Node renderer', async (layout) => {
+  const view = renderer()
+  await view.render(workflow, { layout })
+  expect(view.page.evaluate).toHaveBeenCalledWith(expect.any(Function), JSON.stringify({ workflow, options: { layout } }))
+})
+
+it.each(['auto', '1:1', '4:3', '3:4', '16:9', '9:16'] as const)('forwards the %s canvas ratio', async (aspectRatio) => {
+  const view = renderer()
+  await view.render(workflow, { layout: 'compact', aspectRatio })
+  expect(view.page.evaluate).toHaveBeenCalledWith(expect.any(Function), JSON.stringify({ workflow, options: { layout: 'compact', aspectRatio } }))
+})
+
+it('rejects unsupported canvas ratios before allocating a browser context', async () => {
+  const view = renderer()
+  await expect(view.render(workflow, { aspectRatio: '17:2' as FlowPngOptions['aspectRatio'] })).rejects.toThrow('aspect ratio')
+  expect(view.browser.newContext).not.toHaveBeenCalled()
+})

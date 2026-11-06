@@ -1,5 +1,5 @@
 import type { DisposableStore } from '@wopjs/disposable'
-import type { Connection as _RFConnection, OnBeforeDelete, OnEdgesChange, OnNodesChange, Viewport, XYPosition } from '@xyflow/react'
+import type { Connection as _RFConnection, OnBeforeDelete, OnEdgesChange, OnNodesChange, ReactFlowInstance, Viewport, XYPosition } from '@xyflow/react'
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { ReactiveMap, ReadonlyReactiveMap } from 'value-enhancer/collections'
@@ -8,20 +8,21 @@ import type { CanvasDirection } from '../../../common/direction.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFEdge, RFNode } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
+import type { LayoutPoint } from '../../base/wrapLayout.ts'
 import type { FlowCanvasViewEdge, FlowCanvasViewModel, FlowCanvasViewPosition, FlowCanvasViewViewport, ViewCallbacks } from '../../graph/FlowCanvas/model.ts'
 import type { NodeEntry } from '../../graph/FlowCanvas/node.tsx'
 import type { EdgeStore } from '../edge/edge.store.ts'
 import type { RFCommand } from './rfCommand.ts'
 import type { FlowRunStatus } from './typings.ts'
 
-import { graphlib, layout } from '@dagrejs/dagre'
 import { dispose, disposableStore } from '@wopjs/disposable'
-import { cluster } from 'radash'
 import { compute, derive, val } from 'value-enhancer'
 import { reactiveMap } from 'value-enhancer/collections'
 import { canvasDirection } from '../../../common/direction.ts'
+import { compactLayout } from '../../base/compactLayout.ts'
 import { isSameViewport } from '../../base/compare.ts'
 import { isInside, isMac } from '../../base/dom.ts'
+import { graphLayout } from '../../base/graphLayout.ts'
 import { applyEdgeChanges, applyNodeChanges, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
 import { coalesce } from '../../base/trivial.ts'
 import { wrapLayout } from '../../base/wrapLayout.ts'
@@ -83,6 +84,8 @@ export class CanvasStore {
   public readonly canDeleteNodes = true
 
   public readonly dispose: DisposableStore = disposableStore()
+  /** Temporary routes used only by an explicitly arranged export canvas. */
+  public readonly connectionRoutes = this.dispose.add(val<ReadonlyMap<string, readonly LayoutPoint[]>>(new Map()))
   public readonly ignoredNodeIds = this.dispose.add(val<readonly string[]>([]))
   public readonly ignoreNodes = (nodeIds: readonly string[], ignored: boolean): void => {
     if (this.$.editable.value) this.#callbacks.onIgnoreNodes?.(nodeIds, ignored)
@@ -374,84 +377,53 @@ export class CanvasStore {
     }
   }
 
-  private layoutPositions(nodes: readonly (NodeStore | CommentNodeStore)[], availableWidth?: number): Readonly<Record<string, FlowCanvasViewPosition>> {
-    const g = new graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-    const vertical = this.$.direction.value === 'vertical'
-    // Vertical smooth-step edges need less room than horizontal Bézier curves.
-    g.setGraph({ rankdir: vertical ? 'TB' : 'LR', ranksep: vertical ? 48 : 80 })
-
-    const singles = new Set<string>()
-    for (const node of nodes) {
-      const { id, measured } = node.$.rfNode.value
-      singles.add(id)
-      g.setNode(id, {
-        width: measured?.width ?? 0,
-        height: measured?.height ?? 0,
-      })
-    }
-
-    for (const rfEdge of this.$.rfEdges.value) {
-      if (!g.hasNode(rfEdge.source) || !g.hasNode(rfEdge.target)) continue
-      singles.delete(rfEdge.source)
-      singles.delete(rfEdge.target)
-      g.setEdge(rfEdge.source, rfEdge.target)
-    }
-
-    // Chain isolated nodes in small groups to avoid an excessively tall layout.
-    if (singles.size > 0) {
-      for (const list of cluster([...singles], 10)) {
-        for (let i = 0; i < list.length - 1; i++) {
-          g.setEdge(list[i], list[i + 1])
+  private measuredLayout(nodes: readonly (NodeStore | CommentNodeStore)[]) {
+    return graphLayout(
+      nodes.map((node) => {
+        const measured = node.$.measured.value
+        const content = NodeStore.is(node) ? node.content$.value : undefined
+        return {
+          id: node.nodeId,
+          width: measured?.width ?? 0,
+          height: measured?.height ?? 0,
+          branchHandles:
+            content?.kind === 'condition' || content?.kind === 'approval' || content?.kind === 'wait'
+              ? content.outputs.flatMap((port) => ('handle' in port ? ['$branch:' + port.handle] : []))
+              : undefined,
         }
-      }
-    }
+      }),
+      this.#connections.value.map((edge) => ({ ...edge, id: getRFEdgeId(edge) })),
+      this.$.direction.value,
+    )
+  }
 
-    // Branch order is part of the card layout, so keep the downstream lanes in
-    // that same order instead of letting equal-crossing Dagre solutions flip them.
-    const constraints: { left: string; right: string }[] = []
-    const ordering = new graphlib.Graph()
-    for (const node of nodes) {
-      if (!NodeStore.is(node)) continue
-      const content = node.content$.value
-      if (content.kind !== 'condition' && content.kind !== 'approval' && content.kind !== 'wait') continue
-      const targets = [
-        ...new Set(
-          content.outputs.flatMap((port) =>
-            'handle' in port
-              ? this.#connections.value
-                  .filter((edge) => edge.source === node.nodeId && edge.sourceHandle === `$branch:${port.handle}`)
-                  .flatMap((edge) => {
-                    const target = this.$.nodes.get(edge.target as NodeId)
-                    return target && g.hasNode(target.rfNodeId) ? [target.rfNodeId] : []
-                  })
-              : [],
-          ),
-        ),
-      ]
-      for (let index = 1; index < targets.length; index++) {
-        const left = targets[index - 1]!
-        const right = targets[index]!
-        ordering.setEdge(left, right)
-        if (graphlib.alg.isAcyclic(ordering)) constraints.push({ left, right })
-        else ordering.removeEdge(left, right)
-      }
-    }
-    layout(g, { constraints })
-
-    const layoutNodes = nodes.map((node) => {
-      const { x, y, width, height, rank } = g.node(node.rfNodeId)
-      return {
-        id: node.nodeId,
-        column: rank,
-        x: x - width / 2,
-        y: y - height / 2,
-        width,
-        height,
-      }
-    })
+  private layoutPositions(nodes: readonly (NodeStore | CommentNodeStore)[], availableWidth?: number): Readonly<Record<string, FlowCanvasViewPosition>> {
+    const { nodes: layoutNodes } = this.measuredLayout(nodes)
     return this.$.direction.value === 'horizontal'
       ? wrapLayout(layoutNodes, availableWidth)
       : Object.fromEntries(layoutNodes.map(({ id, x, y }) => [id, { x, y }]))
+  }
+
+  /** Arrange the isolated export store without saving presentation or history. */
+  public compactForExport(insets: { readonly width: number; readonly height: number }, instance?: Pick<ReactFlowInstance, 'getInternalNode'>, aspectRatio = 1) {
+    const graph = this.measuredLayout(this.allLayoutNodes())
+    const port = (id: string, handle: string | undefined, type: 'source' | 'target'): LayoutPoint | undefined => {
+      const node = this.$.nodes.get(id as NodeId)
+      const handles = node && instance?.getInternalNode(node.rfNodeId)?.internals.handleBounds?.[type]
+      const measured = handles?.find((entry) => entry.id === `h:${handle}`)
+      return measured && { x: measured.x + measured.width / 2, y: measured.y + (type === 'source' ? measured.height : 0) }
+    }
+    const connections = new Map<string, FlowCanvasViewEdge>(this.#connections.value.map((edge) => [getRFEdgeId(edge), edge]))
+    const edges = graph.edges.map((edge) =>
+      Object.assign({}, edge, {
+        sourceOffset: port(edge.source, connections.get(edge.id)?.sourceHandle, 'source'),
+        targetOffset: port(edge.target, connections.get(edge.id)?.targetHandle, 'target'),
+      }),
+    )
+    const result = compactLayout({ nodes: graph.nodes, edges }, insets, aspectRatio)
+    this.applyPositions(result.positions)
+    this.connectionRoutes.set(result.routes)
+    return result.bounds
   }
 
   public duplicateNodes = async (nodeIds?: NodeId[], offset?: XYPosition): Promise<void> => {

@@ -359,3 +359,29 @@ it('preserves Bézier routing between perpendicular ports', () => {
   const params = { ...backward, sourcePosition: Position.Bottom, targetPosition: Position.Left }
   expect(getConnectionPath(params)).toEqual(getBezierPath(params).slice(0, 3))
 })
+
+it('aligns folded waypoints with actual ports in both directions', () => {
+  const params = {
+    ...backward,
+    sourceY: 390,
+    targetY: 470,
+    waypoints: [
+      { x: 870, y: 380 },
+      { x: 910, y: 380 },
+      { x: 910, y: 600 },
+      { x: -40, y: 600 },
+      { x: -40, y: 460 },
+      { x: 0, y: 460 },
+    ],
+  }
+  for (const p of [params, { ...transpose(params), waypoints: params.waypoints.map(({ x, y }) => ({ x: y, y: x })) }]) {
+    const path = getConnectionPath(p)[0]
+    const points = pairs(path)
+    expect(points[0]).toEqual([p.sourceX, p.sourceY])
+    expect(points.at(-1)).toEqual([p.targetX, p.targetY])
+    const cross = p.sourcePosition === Position.Bottom ? 0 : 1
+    expect(points[1]![cross]).toBe(points[0]![cross])
+    expect(points.at(-2)![cross]).toBe(points.at(-1)![cross])
+    expect(path).not.toMatch(/NaN|Infinity/)
+  }
+})

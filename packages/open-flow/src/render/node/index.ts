@@ -7,9 +7,10 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { decodeWorkflowFile } from '../../flow/common/workflowFile.ts'
+import { getFlowPngAspectRatio } from '../common/png.ts'
 
 export type { WorkflowFile } from '../../flow/common/workflowFile.ts'
-export type { FlowPngOptions } from '../common/png.ts'
+export type { FlowPngAspectRatio, FlowPngLayout, FlowPngOptions } from '../common/png.ts'
 
 export interface FlowPngResult extends Omit<RenderResponse, 'dataUrl'> {
   readonly buffer: Buffer
@@ -18,6 +19,7 @@ export interface FlowPngResult extends Omit<RenderResponse, 'dataUrl'> {
 /** Render a workflow file without launching or closing the caller's browser. */
 export async function flowToPng(browser: Browser, workflow: WorkflowFile, options: FlowPngOptions = {}): Promise<FlowPngResult> {
   const file = decodeWorkflowFile(workflow)
+  getFlowPngAspectRatio(options.aspectRatio)
   const packageRoot = dirname(createRequire(import.meta.url).resolve('@oomol-lab/open-flow/package.json'))
   const [script, style] = await Promise.all([
     readFile(join(packageRoot, 'dist/render/browser/runtime.js'), 'utf8'),

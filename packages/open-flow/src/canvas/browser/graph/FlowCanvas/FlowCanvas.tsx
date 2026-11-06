@@ -35,6 +35,7 @@ export interface FlowCanvasProps {
   className?: string
   addNodeRequest?: ReactFlowContainerProps['addNodeRequest']
   addItemRequest?: ReactFlowContainerProps['addItemRequest']
+  onInit?: ReactFlowContainerProps['onInit']
   onMove?: OnMove
   onMoveEnd?: OnMoveEnd
   onNodeDragStop?: OnNodeDrag<RFNode<any>>
@@ -65,6 +66,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   className,
   addNodeRequest,
   addItemRequest,
+  onInit,
   onMove,
   onMoveEnd,
   onNodeDragStop,
@@ -130,7 +132,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
               onRelayout={editable ? flowCanvasStore.onRelayout : undefined}
               onLayoutMeasured={flowCanvasStore.completeLayout}
               onInstance={flowCanvasStore.rfCommand.onRFInstance}
-              onInit={flowCanvasStore.onInit}
+              onInit={(instance) => {
+                flowCanvasStore.onInit()
+                onInit?.(instance)
+              }}
               onCopy={flowCanvasStore.onCopy}
               onPaste={flowCanvasStore.onPaste}
               waitNode={flowCanvasStore.waitNode}

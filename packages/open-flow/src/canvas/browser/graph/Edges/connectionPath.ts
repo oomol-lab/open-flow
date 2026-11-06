@@ -1,8 +1,9 @@
 import type { GetBezierPathParams, InternalNode, Rect } from '@xyflow/react'
+import type { LayoutPoint } from '../../base/wrapLayout.ts'
 
 import { getBezierPath, getSmoothStepPath, Position } from '@xyflow/react'
 
-export type ConnectionPathParams = GetBezierPathParams & { sourceBounds?: Rect; targetBounds?: Rect }
+export type ConnectionPathParams = GetBezierPathParams & { sourceBounds?: Rect; targetBounds?: Rect; waypoints?: readonly LayoutPoint[] }
 
 export function connectionNodeBounds(node: InternalNode | undefined | null): Rect | undefined {
   if (!node?.measured.width || !node.measured.height) return undefined
@@ -10,7 +11,7 @@ export function connectionNodeBounds(node: InternalNode | undefined | null): Rec
 }
 
 /** Align arrows with their ports and route returns outside both cards. */
-export function getConnectionPath({ sourceBounds, targetBounds, ...params }: ConnectionPathParams): [string, number, number] {
+export function getConnectionPath({ sourceBounds, targetBounds, waypoints, ...params }: ConnectionPathParams): [string, number, number] {
   const { sourcePosition = Position.Bottom, targetPosition = Position.Top } = params
   const vertical =
     (sourcePosition === Position.Bottom && targetPosition === Position.Top) || (sourcePosition === Position.Top && targetPosition === Position.Bottom)
@@ -18,6 +19,20 @@ export function getConnectionPath({ sourceBounds, targetBounds, ...params }: Con
     (sourcePosition === Position.Left && targetPosition === Position.Right) || (sourcePosition === Position.Top && targetPosition === Position.Bottom)
   const horizontal =
     (sourcePosition === Position.Right && targetPosition === Position.Left) || (sourcePosition === Position.Left && targetPosition === Position.Right)
+  if (waypoints && waypoints.length > 2) {
+    const interior = waypoints.slice(1, -1)
+    const first = interior[0]!
+    const last = interior.at(-1)!
+    const points = [
+      { x: params.sourceX, y: params.sourceY },
+      vertical ? { x: params.sourceX, y: first.y } : { x: first.x, y: params.sourceY },
+      ...interior,
+      vertical ? { x: params.targetX, y: last.y } : { x: last.x, y: params.targetY },
+      { x: params.targetX, y: params.targetY },
+    ]
+    const label = interior[Math.floor(interior.length / 2)]!
+    return [roundedConnectionPath(points), label.x, label.y]
+  }
   const primary = (x: number, y: number) => (vertical ? y : x)
   const cross = (x: number, y: number) => (vertical ? x : y)
   const sourceX = primary(params.sourceX, params.sourceY)
@@ -74,6 +89,12 @@ export function getConnectionPath({ sourceBounds, targetBounds, ...params }: Con
     .filter((point, index, all) => index === 0 || point.x !== all[index - 1]!.x || point.y !== all[index - 1]!.y)
     .map((point) => (vertical ? { x: point.y, y: point.x } : point))
   if (reverse) points.reverse()
+  const middle = (left + right) / 2
+  return [roundedConnectionPath(points), vertical ? laneY : middle, vertical ? middle : laneY]
+}
+
+function roundedConnectionPath(input: readonly LayoutPoint[]): string {
+  const points = input.filter((point, index) => index === 0 || point.x !== input[index - 1]!.x || point.y !== input[index - 1]!.y)
   const radius = 16
   let path = `M ${points[0]!.x} ${points[0]!.y}`
   for (let i = 1; i < points.length - 1; i++) {
@@ -87,6 +108,5 @@ export function getConnectionPath({ sourceBounds, targetBounds, ...params }: Con
     path += ` Q ${corner.x} ${corner.y} ${corner.x + ((next.x - corner.x) * r) / after} ${corner.y + ((next.y - corner.y) * r) / after}`
   }
   const end = points.at(-1)!
-  const middle = (left + right) / 2
-  return [`${path} L ${end.x} ${end.y}`, vertical ? laneY : middle, vertical ? middle : laneY]
+  return `${path} L ${end.x} ${end.y}`
 }

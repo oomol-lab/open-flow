@@ -1,6 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { FlowPngOptions } from '../../../../canvas/browser/graph/FlowCanvas/exportPng.ts'
+import type { FlowPngResult } from '../../../../canvas/browser/graph/FlowCanvas/exportPng.ts'
 import type { InteractiveMode } from '../../../../canvas/browser/stores/canvas/canvas.store.ts'
 import type { CanvasDirection } from '../../../../canvas/common/direction.ts'
 import type { FlowUpdate } from '../../../../control/common/api.ts'
@@ -351,16 +351,17 @@ export class WorkbenchStore {
     if (!this.#disposed) this.#notice.set(undefined)
   }
 
-  public async exportPng(language: string, options: FlowPngOptions): Promise<void> {
-    const model = this.$.designer.value
+  public async downloadPng(result: FlowPngResult): Promise<boolean> {
     const title = this.workspace.$.flow.value?.name ?? this.workspace.$.flowId.value ?? 'Workflow'
     try {
-      const { downloadFlowPng } = await import('../../../../canvas/browser/graph/FlowCanvas/exportPng.ts')
-      const result = await downloadFlowPng(model, title, language, options)
+      const { downloadPng } = await import('../../../../canvas/browser/graph/FlowCanvas/exportPng.ts')
+      downloadPng(result, title)
       if (!this.#disposed)
         this.#notice.set({ kind: 'success', message: this.#i18n.t(result.hasImagePlaceholders ? 'resource.exportPngPartial' : 'resource.exportPngComplete') })
+      return true
     } catch {
       if (!this.#disposed) this.#notice.set({ kind: 'error', message: this.#i18n.t('resource.exportPngFailed') })
+      return false
     }
   }
 

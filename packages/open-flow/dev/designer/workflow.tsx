@@ -1,21 +1,22 @@
 import type { FlowPngResult } from '../../src/canvas/browser/graph/FlowCanvas/exportPng.ts'
-import type { FlowCanvasViewModel, FlowCanvasViewProps } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
+import type { CanvasDirection, FlowCanvasViewModel, FlowCanvasViewPosition, FlowCanvasViewProps } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../src/canvas/common/commands.ts'
 import type { Flow, FlowUpdate } from '../../src/control/common/api.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { Draft } from '../../src/workbench/browser/runtime/api.ts'
 import type { CanvasNodePickerRequest } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
+import type { PngExportSettings } from '../../src/workbench/browser/runtime/shell/pngExportDialog.tsx'
 import type { PublishState } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
 import type { WorkspaceStatus } from '../../src/workbench/browser/runtime/stores/workspaceModel.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { ReactFlow } from '@xyflow/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
-import { downloadFlowPng, flowToPng } from '../../src/canvas/browser/graph/FlowCanvas/exportPng.ts'
+import { downloadPng, flowToPng } from '../../src/canvas/browser/graph/FlowCanvas/exportPng.ts'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { CanvasViewControls, CanvasTopLeftControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
 import { CornerControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CornerControls.tsx'
@@ -30,11 +31,12 @@ import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 import { FlowSettingsButton } from '../../src/workbench/browser/runtime/shell/flowSettings.tsx'
-import { readPngExportFrame } from '../../src/workbench/browser/runtime/shell/pngExportPreference.ts'
+import { PngExportDialog } from '../../src/workbench/browser/runtime/shell/pngExportDialog.tsx'
 import { WorkspaceNavigationIsland } from '../../src/workbench/browser/runtime/shell/workspaceNavigationIsland.tsx'
 import { WorkspacePublishIsland } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
 import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
+import { applicationWorkflow } from './fixtures/applicationWorkflow.ts'
 import googleSheetsIcon from './fixtures/google-sheets.ico'
 import { remoteGithubArtwork, sampleSprite } from './fixtures/providerSprite.ts'
 import { useStoryActions } from './storyActions.tsx'
@@ -497,7 +499,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'workflow-png',
     title: 'PNG export',
     description:
-      'Choose Light or Dark from Export PNG image, independently of the canvas theme. Show frame is remembered locally; check the surrounding border and inset canvas corners in both themes. Compare trigger-marker spacing, Chinese labels, tool badges, Markdown and return lanes. Toggle failed images or the large workflow to inspect placeholders and automatic downscaling. Simulate a slow export to inspect the waiting dialog.',
+      'Use the production export panel to compare Auto, square, landscape and portrait canvases. The checkerboard shows transparency outside the rounded frame; downloads reuse the displayed PNG. Compare original and compact vertical layouts, U-shaped returns, short branches and shared joins. Show forest to check complete subgraphs wrapping into rows, including comments and isolated nodes. Horizontal export preserves the canvas layout. Ratio, layout, theme and frame choices are remembered locally. Check Chinese labels, artwork, both themes and large workflows. Simulate a slow export and change settings to check pending previews and disabled downloads.',
     standalone: true,
     render: (_log, dark, language) => <PngExportStory dark={dark} language={language} />,
   },
@@ -582,7 +584,84 @@ export const workflowStories: readonly FrontendStory[] = [
   },
 ]
 
+const branchApplication = applicationWorkflow('processing', false)
+const branchSteps = Array.from({ length: 18 }, (_, index) => ({
+  id: 'export-branch-' + index,
+  kind: 'task' as const,
+  title: String(index + 1) + ' · 检查申请记录',
+  reference: 'lab/task',
+  executorName: 'JavaScript',
+  position: { x: 0, y: 700 + index * 150 },
+  inputs: [],
+  outputs: [],
+}))
+const compactBranchWorkflow: FlowCanvasViewModel = {
+  ...branchApplication,
+  nodes: [
+    ...branchApplication.nodes,
+    ...branchSteps,
+    { id: 'export-note', kind: 'comment', title: '申请处理说明', content: '保留分支顺序与共同汇合节点。', position: { x: 1100, y: 100 } },
+  ],
+  edges: [
+    ...branchApplication.edges.filter((edge) => edge.source !== 'priority' || edge.target !== 'save'),
+    ...['priority', ...branchSteps.map((node) => node.id)].map((source, index, list) => ({
+      id: 'export-path-' + index,
+      source,
+      sourceHandle: '$out',
+      target: list[index + 1] ?? 'save',
+      targetHandle: '$in',
+    })),
+  ],
+}
+
+const forestChains = Array.from({ length: 6 }, (_value, tree) =>
+  Array.from({ length: 2 + (tree % 4) }, (_, step) => ({
+    id: `forest-${tree}-${step}`,
+    kind: 'task' as const,
+    title: `支路 ${tree + 1} · 检查记录 ${step + 1}`,
+    description: step === 0 && tree % 2 ? '独立子图保留完整的依赖关系。' : undefined,
+    reference: 'lab/task',
+    executorName: 'JavaScript',
+    position: { x: 2000 + tree * 650, y: step * 220 },
+    inputs: [],
+    outputs: [],
+  })),
+)
+const compactForestWorkflow: FlowCanvasViewModel = {
+  ...branchApplication,
+  nodes: [
+    ...branchApplication.nodes,
+    ...forestChains.flat(),
+    {
+      id: 'forest-note',
+      kind: 'comment',
+      title: '森林布局说明',
+      content: '每个子图连同连线作为整体换行。\n\n共享汇合节点仍只保留一个。',
+      position: { x: 6500, y: 0 },
+    },
+    { ...forestChains[0]![0]!, id: 'forest-single', title: '独立节点', position: { x: 7000, y: 0 } },
+  ],
+  edges: [
+    ...branchApplication.edges,
+    ...forestChains.flatMap((chain) =>
+      chain.slice(1).map((target, index) => ({
+        id: 'forest-path-' + target.id,
+        source: chain[index]!.id,
+        sourceHandle: '$out',
+        target: target.id,
+        targetHandle: '$in',
+      })),
+    ),
+  ],
+}
+
 function PngExportStory({ dark, language }: { readonly dark: boolean; readonly language: UiLanguage }) {
+  const [direction, setDirection] = useState<CanvasDirection>('vertical')
+  const [pngExportOpen, setPngExportOpen] = useState(true)
+  const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null)
+  const [positions, setPositions] = useState<Readonly<Record<string, FlowCanvasViewPosition>>>({})
+  const [branches, setBranches] = useState(false)
+  const [forest, setForest] = useState(false)
   const [wrapped, setWrapped] = useState(false)
   const [large, setLarge] = useState(false)
   const [brokenImages, setBrokenImages] = useState(false)
@@ -596,84 +675,109 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       ? providerIcon(remoteGithubArtwork)
       : providerIcon({ serviceId: 'google-sheets', serviceName: 'Google Sheets', icon: googleSheetsIcon })
   const i18n = useMemo(() => createI18n(language), [language])
-  const model = useMemo(
+  const sample = useMemo(
     () =>
-      large
-        ? {
-            viewport: workflowViewport,
-            nodes: Array.from({ length: 50 }, (_, index) => ({
-              id: `png-step-${index}`,
-              kind: 'task' as const,
-              title: `${index + 1} · Process records 中文`,
-              description: 'A production node in a large workflow.',
-              reference: 'lab/task',
-              executorName: 'JavaScript',
-              icon: ':carbon:code:',
-              position: { x: (index % 10) * 600, y: Math.floor(index / 10) * 280 },
-              inputs: [],
-              outputs: [],
-            })),
-            edges: Array.from({ length: 49 }, (_, index) => ({
-              id: `png-edge-${index}`,
-              source: `png-step-${index}`,
-              sourceHandle: '$out',
-              target: `png-step-${index + 1}`,
-              targetHandle: '$in',
-            })),
-          }
-        : wrapped
-          ? longChainModel
-          : {
-              ...workflow,
-              edges: workflow.edges.map((edge) => (edge.id == 'condition-value' ? Object.assign({}, edge, { target: 'task' }) : edge)),
-              nodes: workflow.nodes.map((node) =>
-                Object.assign({}, node, {
-                  title: node.kind == 'task' ? '汇总客户反馈并生成每周产品分析报告 & Review' : node.title,
-                  icon:
-                    node.kind == 'task'
-                      ? taskKind == 'agent'
-                        ? ':carbon:machine-learning-model:'
-                        : providerArtwork
-                      : node.kind == 'trigger'
-                        ? remoteIcons
-                          ? providerArtwork
-                          : providerIcon({ serviceId: 'sample', serviceName: 'Sample', iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } })
-                        : 'icon' in node
-                          ? node.icon
-                          : undefined,
-                  position: { x: node.position.x - 500, y: node.position.y - 180 },
-                  ...(node.kind == 'comment' && brokenImages
-                    ? { content: `![Unavailable sample](data:image/png;base64,broken-image)\n\n${node.content}` }
-                    : {}),
-                  ...(node.kind == 'task'
-                    ? {
-                        executorName:
-                          labelKind == 'short'
-                            ? '触发器'
-                            : labelKind == 'long'
-                              ? '这是包含工具连接和运行说明的很长的中文副标题，需要在保留工具徽章的同时正确省略'
-                              : taskKind == 'agent'
-                                ? 'AI Agent'
+      forest
+        ? compactForestWorkflow
+        : branches
+          ? compactBranchWorkflow
+          : large
+            ? {
+                viewport: workflowViewport,
+                nodes: Array.from({ length: 50 }, (_, index) => ({
+                  id: `png-step-${index}`,
+                  kind: 'task' as const,
+                  title: `${index + 1} · Process records 中文`,
+                  description: 'A production node in a large workflow.',
+                  reference: 'lab/task',
+                  executorName: 'JavaScript',
+                  icon: ':carbon:code:',
+                  position: { x: (index % 10) * 600, y: Math.floor(index / 10) * 280 },
+                  inputs: [],
+                  outputs: [],
+                })),
+                edges: Array.from({ length: 49 }, (_, index) => ({
+                  id: `png-edge-${index}`,
+                  source: `png-step-${index}`,
+                  sourceHandle: '$out',
+                  target: `png-step-${index + 1}`,
+                  targetHandle: '$in',
+                })),
+              }
+            : wrapped
+              ? longChainModel
+              : {
+                  ...workflow,
+                  edges: workflow.edges.map((edge) => (edge.id == 'condition-value' ? Object.assign({}, edge, { target: 'task' }) : edge)),
+                  nodes: workflow.nodes.map((node) =>
+                    Object.assign({}, node, {
+                      title: node.kind == 'task' ? '汇总客户反馈并生成每周产品分析报告 & Review' : node.title,
+                      icon:
+                        node.kind == 'task'
+                          ? taskKind == 'agent'
+                            ? ':carbon:machine-learning-model:'
+                            : providerArtwork
+                          : node.kind == 'trigger'
+                            ? remoteIcons
+                              ? providerArtwork
+                              : providerIcon({ serviceId: 'sample', serviceName: 'Sample', iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } })
+                            : 'icon' in node
+                              ? node.icon
+                              : undefined,
+                      position: { x: node.position.x - 500, y: node.position.y - 180 },
+                      ...(node.kind == 'comment' && brokenImages
+                        ? { content: `![Unavailable sample](data:image/png;base64,broken-image)\n\n${node.content}` }
+                        : {}),
+                      ...(node.kind == 'task'
+                        ? {
+                            executorName:
+                              labelKind == 'short'
+                                ? '触发器'
+                                : labelKind == 'long'
+                                  ? '这是包含工具连接和运行说明的很长的中文副标题，需要在保留工具徽章的同时正确省略'
+                                  : taskKind == 'agent'
+                                    ? 'AI Agent'
+                                    : taskKind == 'connector'
+                                      ? 'Connector · ' + (remoteIcons ? 'GitHub' : 'Google Sheets')
+                                      : 'JavaScript',
+                            fallbackIcon:
+                              taskKind == 'agent'
+                                ? ':carbon:machine-learning-model:'
                                 : taskKind == 'connector'
-                                  ? 'Connector · ' + (remoteIcons ? 'GitHub' : 'Google Sheets')
-                                  : 'JavaScript',
-                        fallbackIcon:
-                          taskKind == 'agent' ? ':carbon:machine-learning-model:' : taskKind == 'connector' ? ':carbon:connection-signal:' : ':carbon:code:',
-                        actionSummary:
-                          taskKind == 'connector'
-                            ? undefined
-                            : { count: 2, providers: [{ id: 'provider', icon: providerArtwork, label: remoteIcons ? 'GitHub' : 'Google Sheets' }] },
-                      }
-                    : {}),
-                }),
-              ),
-            },
-    [large, wrapped, brokenImages, labelKind, remoteIcons, taskKind, providerArtwork],
+                                  ? ':carbon:connection-signal:'
+                                  : ':carbon:code:',
+                            actionSummary:
+                              taskKind == 'connector'
+                                ? undefined
+                                : { count: 2, providers: [{ id: 'provider', icon: providerArtwork, label: remoteIcons ? 'GitHub' : 'Google Sheets' }] },
+                          }
+                        : {}),
+                    }),
+                  ),
+                },
+    [forest, branches, large, wrapped, brokenImages, labelKind, remoteIcons, taskKind, providerArtwork],
   )
-  const title = large ? 'Large workflow' : wrapped ? 'Weekly records pipeline' : 'Customer insights'
+  const model = useMemo(
+    () => ({ ...sample, direction, nodes: sample.nodes.map((node) => ({ ...node, position: positions[node.id] ?? node.position })) }),
+    [sample, direction, positions],
+  )
+  const title = forest
+    ? 'Forest workflow'
+    : branches
+      ? 'Branching workflow'
+      : large
+        ? 'Large workflow'
+        : wrapped
+          ? 'Weekly records pipeline'
+          : 'Customer insights'
+  const layoutReady = model.nodes.every((node) => positions[node.id] != null)
   const [image, setImage] = useState<FlowPngResult>()
   const [imageSrc, setImageSrc] = useState<string>()
   const [error, setError] = useState<string>()
+  useEffect(() => {
+    setImage(undefined)
+    setError(undefined)
+  }, [model])
   useEffect(() => {
     const src = image ? URL.createObjectURL(image.blob) : undefined
     setImageSrc(src)
@@ -681,28 +785,57 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       if (src) URL.revokeObjectURL(src)
     }
   }, [image])
-  useEffect(() => {
-    let active = true
-    setImage(undefined)
-    setError(undefined)
-    void flowToPng(model, language, { dark, frame: readPngExportFrame(localStorage), title }).then(
-      (value) => {
-        if (active) {
-          setImage(value)
-        }
-      },
-      (reason) => {
-        if (active) setError(String(reason))
-      },
-    )
-    return () => {
-      active = false
-    }
-  }, [model, title, language, dark])
+  const renderPng = useCallback(
+    async (options: PngExportSettings) => {
+      if (slowExport) await new Promise((resolve) => setTimeout(resolve, 5000))
+      return flowToPng(model, language, options)
+    },
+    [model, language, slowExport],
+  )
   useStoryActions([
+    { label: 'Open export panel', onClick: () => setPngExportOpen(true) },
+    {
+      label: direction === 'vertical' ? 'Use horizontal direction' : 'Use vertical direction',
+      onClick: () => {
+        setPositions({})
+        setDirection((value) => (value === 'vertical' ? 'horizontal' : 'vertical'))
+      },
+    },
+    {
+      label: branches ? 'Show standard workflow' : 'Show nested branches & shared join',
+      onClick: () => {
+        setPositions({})
+        setForest(false)
+        setBranches((value) => !value)
+      },
+    },
+    {
+      label: forest ? 'Show standard workflow' : 'Show forest',
+      onClick: () => {
+        setPositions({})
+        setBranches(false)
+        setLarge(false)
+        setWrapped(false)
+        setForest((value) => !value)
+      },
+    },
     { label: slowExport ? 'Use normal export speed' : 'Simulate slow export', onClick: () => setSlowExport((value) => !value) },
-    { label: wrapped ? 'Show branches & Chinese titles' : 'Show wrapped pipeline', onClick: () => setWrapped((value) => !value) },
-    { label: large ? 'Show normal workflow' : 'Show large workflow', onClick: () => setLarge((value) => !value) },
+    {
+      label: wrapped ? 'Show branches & Chinese titles' : 'Show wrapped pipeline',
+      onClick: () => {
+        setPositions({})
+        setForest(false)
+        setWrapped((value) => !value)
+      },
+    },
+    {
+      label: large ? 'Show normal workflow' : 'Show large workflow',
+      onClick: () => {
+        setPositions({})
+        setForest(false)
+        setLarge((value) => !value)
+      },
+    },
     { label: brokenImages ? 'Use working images' : 'Simulate failed images', onClick: () => setBrokenImages((value) => !value) },
     {
       label: labelKind == 'normal' ? 'Show short Chinese labels' : labelKind == 'short' ? 'Show long Chinese labels' : 'Show normal labels',
@@ -716,47 +849,70 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
   ])
   return (
     <I18nProvider i18n={i18n}>
-      <div style={{ display: 'grid', gap: 24, padding: 24, justifyItems: 'start', alignItems: 'start', alignContent: 'start' }}>
+      <div
+        className="open-flow-theme"
+        data-theme={dark ? 'dark' : 'light'}
+        ref={setPortalRoot}
+        style={{ display: 'grid', gap: 24, padding: 24, justifyItems: 'start', alignItems: 'start', alignContent: 'start' }}
+      >
+        <PngExportDialog
+          container={portalRoot}
+          defaultDark={dark}
+          direction={direction}
+          onDownload={async (result) => {
+            try {
+              downloadPng(result, title)
+              setImage(result)
+              setError(undefined)
+              return true
+            } catch (reason) {
+              setError(String(reason))
+              return false
+            }
+          }}
+          onOpenChange={setPngExportOpen}
+          open={pngExportOpen && layoutReady}
+          preferences={localStorage}
+          render={renderPng}
+          title={title}
+        />
         <WorkspacePublishIsland
           hasPublications={false}
-          preferences={localStorage}
-          onExportPng={async (options) => {
-            if (slowExport) await new Promise((resolve) => setTimeout(resolve, 5000))
-            const result = await downloadFlowPng(model, title, language, options)
-            setImage(result)
-          }}
+          onOpenPngExport={layoutReady ? () => setPngExportOpen(true) : undefined}
           onOpenPublications={() => {}}
           onOpenRuns={() => {}}
           onPublish={() => {}}
           state="current"
         />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 24, width: '100%' }}>
+        {error && <p role="alert">{error}</p>}
+        <div style={{ display: 'grid', gridTemplateColumns: imageSrc ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)', gap: 24, width: '100%' }}>
           <section>
             <p>Canvas</p>
             <div style={{ height: 620 }}>
               <FlowCanvasView
-                identity={`png-comparison:${wrapped}`}
+                identity={`png-comparison:${direction}:${forest}:${branches}:${wrapped}:${large}`}
                 model={model}
                 dark={dark}
                 language={language}
                 editable={false}
                 nodesDraggable={false}
                 fitView
-                autoLayout={false}
+                autoLayout
                 layoutMotion={false}
                 ignoredNodeIds={[]}
                 selectedNodeIds={[]}
-                onMoveNodes={() => {}}
+                onMoveNodes={setPositions}
                 onMoveViewport={() => {}}
                 onSelectionChange={() => {}}
               />
             </div>
           </section>
-          <section>
-            <p>Exported PNG{image && ` · ${image.width} × ${image.height}${image.hasImagePlaceholders ? ' · Image placeholders' : ''}`}</p>
-            {imageSrc && <img alt={title} src={imageSrc} style={{ width: '100%', height: 620, objectFit: 'contain' }} />}
-            {error && <p role="alert">{error}</p>}
-          </section>
+          {imageSrc && (
+            <section>
+              <p>Exported PNG{image && ` · ${image.width} × ${image.height}${image.hasImagePlaceholders ? ' · Image placeholders' : ''}`}</p>
+              <img alt={title} src={imageSrc} style={{ width: '100%', height: 620, objectFit: 'contain' }} />
+            </section>
+          )}
         </div>
       </div>
     </I18nProvider>
@@ -897,8 +1053,7 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
                   before={
                     <WorkspacePublishIsland
                       onExport={() => log('flow.export')}
-                      preferences={localStorage}
-                      onExportPng={async (options) => log('flow.exportPng', options)}
+                      onOpenPngExport={() => log('flow.exportPng.open')}
                       hasPublications={hasPublications}
                       onOpenPublications={() => log('publication.history')}
                       onOpenRuns={() => log('run.history')}

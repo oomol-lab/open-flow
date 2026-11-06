@@ -1,0 +1,140 @@
+diff --git a/es/clone-node.js b/es/clone-node.js
+index 114cbf214f65cda237dbba67458c2b68fadf421e..01da01a1ad4ff96a36004930c4520c87a36a4d9b 100644
+--- a/es/clone-node.js
++++ b/es/clone-node.js
+@@ -46,15 +46,11 @@ async function cloneSingleNode(node, options) {
+     if (isInstanceOfElement(node, HTMLIFrameElement)) {
+         return cloneIFrameElement(node, options);
+     }
+-    return node.cloneNode(isSVGElement(node));
++    return node.cloneNode(false);
+ }
+ const isSlotElement = (node) => node.tagName != null && node.tagName.toUpperCase() === 'SLOT';
+-const isSVGElement = (node) => node.tagName != null && node.tagName.toUpperCase() === 'SVG';
+ async function cloneChildren(nativeNode, clonedNode, options) {
+     var _a, _b;
+-    if (isSVGElement(clonedNode)) {
+-        return clonedNode;
+-    }
+     let children = [];
+     if (isSlotElement(nativeNode) && nativeNode.assignedNodes) {
+         children = toArray(nativeNode.assignedNodes());
+diff --git a/es/util.js b/es/util.js
+index 90a3cd19a6bcc763d98cbd476fde17f4bc0428fa..ae9f4a7bdae3796e45f796f5b6f8b4a49c677c1c 100644
+--- a/es/util.js
++++ b/es/util.js
+@@ -49,11 +49,10 @@ export function toArray(arrayLike) {
+ }
+ let styleProps = null;
+ export function getStyleProperties(options = {}) {
+-    if (styleProps) {
+-        return styleProps;
+-    }
+     if (options.includeStyleProperties) {
+-        styleProps = options.includeStyleProperties;
++        return options.includeStyleProperties;
++    }
++    if (styleProps) {
+         return styleProps;
+     }
+     styleProps = toArray(window.getComputedStyle(document.documentElement));
+diff --git a/lib/clone-node.js b/lib/clone-node.js
+index 214f4d30a50baae7f007d2399eeac298366538c7..13884b77108a2d6d9ae58bbc8c8e0652ee106e04 100644
+--- a/lib/clone-node.js
++++ b/lib/clone-node.js
+@@ -110,16 +110,13 @@ function cloneSingleNode(node, options) {
+             if ((0, util_1.isInstanceOfElement)(node, HTMLIFrameElement)) {
+                 return [2 /*return*/, cloneIFrameElement(node, options)];
+             }
+-            return [2 /*return*/, node.cloneNode(isSVGElement(node))];
++            return [2 /*return*/, node.cloneNode(false)];
+         });
+     });
+ }
+ var isSlotElement = function (node) {
+     return node.tagName != null && node.tagName.toUpperCase() === 'SLOT';
+ };
+-var isSVGElement = function (node) {
+-    return node.tagName != null && node.tagName.toUpperCase() === 'SVG';
+-};
+ function cloneChildren(nativeNode, clonedNode, options) {
+     var _a, _b;
+     return __awaiter(this, void 0, void 0, function () {
+@@ -127,9 +124,6 @@ function cloneChildren(nativeNode, clonedNode, options) {
+         return __generator(this, function (_c) {
+             switch (_c.label) {
+                 case 0:
+-                    if (isSVGElement(clonedNode)) {
+-                        return [2 /*return*/, clonedNode];
+-                    }
+                     children = [];
+                     if (isSlotElement(nativeNode) && nativeNode.assignedNodes) {
+                         children = (0, util_1.toArray)(nativeNode.assignedNodes());
+diff --git a/lib/util.js b/lib/util.js
+index 6a6ae9c8bd15b276d46773d853c2182aaba8326e..8d851f76a9ffafec6c532776005f72721e6f639f 100644
+--- a/lib/util.js
++++ b/lib/util.js
+@@ -95,11 +95,10 @@ exports.toArray = toArray;
+ var styleProps = null;
+ function getStyleProperties(options) {
+     if (options === void 0) { options = {}; }
+-    if (styleProps) {
+-        return styleProps;
+-    }
+     if (options.includeStyleProperties) {
+-        styleProps = options.includeStyleProperties;
++        return options.includeStyleProperties;
++    }
++    if (styleProps) {
+         return styleProps;
+     }
+     styleProps = toArray(window.getComputedStyle(document.documentElement));
+diff --git a/src/clone-node.ts b/src/clone-node.ts
+index 5dfcd117a1dd3d3d5cfb7c98ead3eb828085337a..48fdb03f1ac867fbad661c4cd5b8b88dc41d3a43 100644
+--- a/src/clone-node.ts
++++ b/src/clone-node.ts
+@@ -66,23 +66,17 @@ async function cloneSingleNode<T extends HTMLElement>(
+     return cloneIFrameElement(node, options)
+   }
+ 
+-  return node.cloneNode(isSVGElement(node)) as T
++  return node.cloneNode(false) as T
+ }
+ 
+ const isSlotElement = (node: HTMLElement): node is HTMLSlotElement =>
+   node.tagName != null && node.tagName.toUpperCase() === 'SLOT'
+ 
+-const isSVGElement = (node: HTMLElement): node is HTMLSlotElement =>
+-  node.tagName != null && node.tagName.toUpperCase() === 'SVG'
+-
+ async function cloneChildren<T extends HTMLElement>(
+   nativeNode: T,
+   clonedNode: T,
+   options: Options,
+ ): Promise<T> {
+-  if (isSVGElement(clonedNode)) {
+-    return clonedNode
+-  }
+ 
+   let children: T[] = []
+ 
+diff --git a/src/util.ts b/src/util.ts
+index 3d430c8f33948972f8991c3b3d5ebcf234662c21..9d6042900a067d7be2356f03770e9df9357fdd7f 100644
+--- a/src/util.ts
++++ b/src/util.ts
+@@ -67,12 +67,11 @@ export function toArray<T>(arrayLike: any): T[] {
+ 
+ let styleProps: string[] | null = null
+ export function getStyleProperties(options: Options = {}): string[] {
+-  if (styleProps) {
+-    return styleProps
++  if (options.includeStyleProperties) {
++    return options.includeStyleProperties
+   }
+ 
+-  if (options.includeStyleProperties) {
+-    styleProps = options.includeStyleProperties
++  if (styleProps) {
+     return styleProps
+   }
+ 
