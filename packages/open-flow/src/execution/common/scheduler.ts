@@ -198,11 +198,19 @@ export interface SchedulerFailure {
   readonly message: string
 }
 
+export interface TaskAdmission {
+  readonly runId: string
+  readonly nodeId: string
+  readonly jobId: string
+}
+
 export type FlowRunOptions = {
   readonly createId: () => string
   readonly emit?: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly flowId: string
   readonly invokeTask: (invocation: TaskInvocation) => Effect.Effect<unknown, Error>
+  /** Deployment admission for each Task invocation; it completes before the node timeout starts. */
+  readonly admitTask?: (admission: TaskAdmission) => Effect.Effect<void, Error>
   readonly projectFailure?: (error: unknown) => SchedulerFailure
   readonly runId: string
   readonly waits?: WaitHost
@@ -238,6 +246,7 @@ interface RunContext {
   readonly createId: FlowRunOptions['createId']
   readonly emit: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly invokeTask: FlowRunOptions['invokeTask']
+  readonly admitTask: FlowRunOptions['admitTask']
   readonly prepared: PreparedFlow
   readonly projectFailure: FlowRunOptions['projectFailure']
   readonly waits: WaitHost | undefined
@@ -670,6 +679,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
         createId: options.createId,
         emit,
         invokeTask: options.invokeTask,
+        admitTask: options.admitTask,
         prepared,
         projectFailure: options.projectFailure,
         waits: options.waits,

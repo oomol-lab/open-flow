@@ -20,6 +20,7 @@ interface NodeExecutionContext {
   readonly createId: FlowRunOptions['createId']
   readonly emit: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly invokeTask: FlowRunOptions['invokeTask']
+  readonly admitTask?: FlowRunOptions['admitTask']
   readonly projectFailure: FlowRunOptions['projectFailure']
 }
 
@@ -317,8 +318,9 @@ export function executeNode(
   const { nodeId, node, jobId, nodeInputs, flowId, runId, graph, dependencies, previousIds, saved, workflowRunId, resolution } = input
   const config = agentConfig(node)
   const nodeRemainingMs = saved?.remainingMs ?? node.timeoutMs
-  const startedAt = performance.now()
+  let startedAt = 0
   const execution = Effect.gen(function* () {
+    startedAt = performance.now()
     const kind = nodeKind(node)
     const title = nodeTitle(node)
     const projectedInputs = Object.fromEntries(
@@ -462,12 +464,15 @@ export function executeNode(
       catch: (error) => new NodeValidationError('node.output-invalid', error),
     })
   })
-  return nodeRemainingMs == null
-    ? execution
-    : execution.pipe(
-        Effect.timeoutOrElse({
-          duration: nodeRemainingMs,
-          orElse: () => Effect.fail(new Error(`Node "${nodeId}" timed out.`)),
-        }),
-      )
+  const timed =
+    nodeRemainingMs == null
+      ? execution
+      : execution.pipe(
+          Effect.timeoutOrElse({
+            duration: nodeRemainingMs,
+            orElse: () => Effect.fail(new Error(`Node "${nodeId}" timed out.`)),
+          }),
+        )
+  // Waiting for deployment admission is queueing, not node execution time.
+  return node.kind == 'task' && context.admitTask != null ? Effect.andThen(context.admitTask({ runId, nodeId, jobId }), timed) : timed
 }

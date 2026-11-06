@@ -219,11 +219,7 @@ it('resumes a persisted parent after restart without starting another child', as
   const held = vi
     .spyOn(store.runs, 'claim')
     .mockImplementation((excluded) =>
-      claim(
-        store.runViews.listControlRuns(parent.flowId, 1)[0]?.startedAt != null
-          ? [...(excluded ?? []), store.runViews.listControlRuns(parent.flowId, 1)[0]!.runId]
-          : excluded,
-      ),
+      claim(store.runViews.listControlRuns(parent.flowId, 1)[0]?.startedAt != null ? [...(excluded ?? []), parent.flowId] : excluded),
     )
   const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'restart', {
     nodeId: 'start',

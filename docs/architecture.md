@@ -175,8 +175,8 @@ The deployment owns the Run's sole execution authority and terminal state. Admis
 Retries must not duplicate accepted execution. If side-effect outcomes cannot be confirmed, execution ends as indeterminate and is not automatically replayed, except for the subscribed-notification policy below.
 Cancellation and completion races must produce one authoritative terminal state.
 The deployment limits active Runs and actual node execution independently and owns queuing and recovery.
-Independent Runs of one Flow may overlap; Flow identity is not an execution lock. Idle Waits release
-execution resources after persisting a complete checkpoint. Clients must not take ownership of scheduling facts.
+Active Runs of one Flow execute one at a time, so Flow State read-modify-write sequences do not
+interleave. Idle Waits release execution resources after persisting a complete checkpoint. Clients must not take ownership of scheduling facts.
 
 Direct Leina subscription notification Tasks use a success/failure delivery contract as an explicit exception.
 Direct Connector Tasks may retry unknown delivery outcomes with the same event identity within the notification budget, according to Connector retryability.

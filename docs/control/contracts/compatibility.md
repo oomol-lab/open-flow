@@ -54,10 +54,12 @@ published v6 recovery and normalizes it in memory; persisted historical bytes an
 hashes are unchanged until execution writes a new checkpoint. Formats older than v6 remain rejected.
 Older deployments cannot resume v7 checkpoints: finish those Runs before downgrading.
 
-Graph selection, joins, loop iterations and input provenance retain Engine v10 semantics. The Server
-now runs independent Runs of one Flow concurrently, freezes idle Waits immediately, and owns a
-separate global node-execution budget. These scheduling changes affect Run timing and observable
-queued/running/waiting transitions. Callers must not rely on per-Flow execution order. The obsolete
+Graph selection, joins, loop iterations and input provenance retain Engine v10 semantics. Active Runs
+of one Flow still execute one at a time. The Scheduler freezes idle Waits immediately, and the Server
+owns a separate global node-execution budget. Scheduler `admitTask` admits each Task invocation before
+its node timeout starts, so budget queueing never consumes `timeoutMs`. The Server therefore reports a
+paused Run as `waiting` and an accepted resolution as `queued` sooner than before. Control API
+conformance accepts both this immediate freeze and in-memory retention (`running`). The obsolete
 Scheduler `waitRetentionMs` export is removed.
 
 Executor loss after the start barrier ends affected Runs as indeterminate, without automatic replay.

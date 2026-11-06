@@ -329,10 +329,8 @@ export class RunExecutor {
       yield* this.#isolatedVm
         .run(flow, {
           capability: (capabilities, call) => this.#invokeCapability(capabilities, call, this.#connectorContext(run, 'execute'), run, flow, emit),
-          emit: async (event, signal) => {
-            if (event.type == 'node.started' && flow.graph.nodes[event.nodeId]?.kind == 'task') await this.#slots.acquire(run.runId, event.jobId, signal)
-            await emit(event)
-          },
+          emit,
+          admitTask: (admission, signal) => this.#slots.acquire(admission.runId, admission.jobId, signal),
           emitLogs: async (events, signal) => {
             const projected = (await Promise.all(events.map((event) => projectEvent(event).catch(() => undefined)))).filter((event) => event != null)
             if (signal.aborted) return
@@ -490,7 +488,6 @@ export class RunExecutor {
     connectors: ConnectorExecution,
     report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
   ): Promise<unknown> {
-    await this.#slots.acquire(run.runId, invocation.jobId, invocation.signal)
     const access = this.#connectorContext(run, 'execute', 'selected')
     const node = prepared.graph.nodes[invocation.nodeId]
     if (node?.kind != 'task' || !('executor' in node.task)) throw new Error('Managed Task node is unavailable.')
@@ -644,7 +641,6 @@ export class RunExecutor {
     flow: PreparedFlow,
     emit: (event: ArtifactEvent) => Promise<void>,
   ): Promise<RuntimeCapabilityResponse> {
-    if (call.jobId != null) await this.#slots.acquire(run.runId, call.jobId, call.signal)
     if (call.kind.startsWith('state.') || call.kind.startsWith('dedupe.')) {
       const node = call.nodeId == null ? undefined : flow.graph.nodes[call.nodeId]
       if (findEngineContract(run.engineContract)?.flowState !== true || node?.kind !== 'task' || !('moduleId' in node.task))
@@ -785,7 +781,7 @@ export class RunExecutor {
       signal.throwIfAborted()
       this.#pendingWorkflowCalls.set(run.runId, (this.#pendingWorkflowCalls.get(run.runId) ?? 0) + 1)
       this.waitingWorkflows.add(run.runId)
-      this.#slots.release(run.runId, jobId)
+      this.#slots.suspend(run.runId, jobId)
       this.#wakeMaintenance()
       try {
         return await new Promise<Readonly<Record<string, JsonValue>>>((resolve, reject) => {
@@ -820,7 +816,7 @@ export class RunExecutor {
         if (pending == 0) this.#pendingWorkflowCalls.delete(run.runId)
         else this.#pendingWorkflowCalls.set(run.runId, pending)
         await this.#resumeWorkflowCaller(run.runId, signal)
-        if (!signal.aborted) await this.#slots.acquire(run.runId, jobId, signal)
+        if (!signal.aborted) await this.#slots.resume(run.runId, jobId, signal)
       }
     } finally {
       this.#toolCalls.delete(key)

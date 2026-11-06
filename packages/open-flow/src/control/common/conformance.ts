@@ -31,6 +31,10 @@ function equal(actual: unknown, expected: unknown, message: string): void {
   if (!dequal(actual, expected)) fail(`${message}: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}.`)
 }
 
+function oneOf(actual: unknown, expected: readonly unknown[], message: string): void {
+  if (!expected.some((value) => dequal(actual, value))) fail(`${message}: expected one of ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}.`)
+}
+
 function record(value: unknown, message: string): RecordValue {
   if (value == null || typeof value != 'object' || Array.isArray(value)) fail(`${message}: expected an object.`)
   return value as RecordValue
@@ -940,9 +944,11 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         }
         return current
       }
-      const hasWait = (value: RecordValue) => list(value.waits, 'Waits').length > 0 && value.status == 'waiting'
+      // Deployments may keep an idle Wait session in memory or freeze it immediately.
+      const pausedStatuses = ['running', 'waiting']
+      const hasWait = (value: RecordValue) => list(value.waits, 'Waits').length > 0
       let detail = await awaitRun(run, hasWait, 'Wait Run to pause')
-      equal(detail.status, 'waiting', 'Wait Run status')
+      oneOf(detail.status, pausedStatuses, 'Wait Run status')
       const waiting = record(list(detail.waits, 'Waits')[0], 'Active Wait')
       equal(waiting.actions, ['approve', 'reject'], 'Wait actions')
       equal(waiting.nodeId, 'approval', 'Wait node')
@@ -972,7 +978,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const approved = await json(await resolveWait('approve'), 200, 'Approve Wait')
       equal(approved.action, 'approve', 'Approved action')
       equal(approved.resolutionAccepted, true, 'Approved resolution')
-      equal(approved.status, 'queued', 'Resolved Run status')
+      oneOf(approved.status, ['running', 'queued'], 'Resolved Run status')
       requiredString(approved.resolvedAt, 'Wait resolution time')
       const rejected = await json(await resolveWait('reject'), 200, 'Reject resolved Wait')
       equal(rejected.action, 'approve', 'Winning action')
@@ -995,7 +1001,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const canceled = await create('wait-run-cancel', 'Create cancelable Wait Run')
       const canceledRunId = requiredString(canceled.runId, 'Cancelable Wait Run id')
       const canceledDetail = await awaitRun(canceled, hasWait, 'Wait cancelable Run to pause')
-      equal(canceledDetail.status, 'waiting', 'Cancelable Wait status')
+      oneOf(canceledDetail.status, pausedStatuses, 'Cancelable Wait status')
       equal(
         (
           await json(

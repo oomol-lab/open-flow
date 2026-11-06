@@ -66,7 +66,7 @@ it.each([true, false])('waits beyond executor startup latency and diagnoses a mi
       if (pathname.endsWith('/draft/changes')) return Response.json({ revision: { revisionId: 'revision' } })
       if (pathname.endsWith('/revisions/revision/runs')) return Response.json(run, { status: 202 })
       if (pathname === '/v1/runs/run') {
-        return Response.json(appears && performance.now() - started >= 3_000 ? { ...run, status: 'waiting', waits: [{ actions: ['continue'] }] } : run)
+        return Response.json(appears && performance.now() - started >= 3_000 ? { ...run, waits: [{ actions: ['continue'] }] } : run)
       }
       throw new Error(`Unexpected request: ${req.method} ${pathname}`)
     },

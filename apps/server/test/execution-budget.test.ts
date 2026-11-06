@@ -7,7 +7,7 @@ import { childProcessId } from './processTree.ts'
 import { acceptRun } from './runFixture.ts'
 import { openService, startService } from './serviceFixture.ts'
 
-function parallelFlow(width: number): RevisionContent {
+function parallelFlow(width: number, timeoutMs?: number): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -20,6 +20,7 @@ function parallelFlow(width: number): RevisionContent {
             `llm${index}`,
             {
               kind: 'task' as const,
+              ...(timeoutMs == null ? {} : { timeoutMs }),
               inputs: { prompt: { kind: 'value' as const, value: 'Hello' } },
               task: {
                 name: `LLM ${index}`,
@@ -35,7 +36,7 @@ function parallelFlow(width: number): RevisionContent {
   }
 }
 
-it('bounds actual node execution across parallel nodes and independent Runs of one Flow', async () => {
+it('bounds actual node execution across parallel nodes and independent Runs', async () => {
   let active = 0
   let peak = 0
   let calls = 0
@@ -55,13 +56,64 @@ it('bounds actual node execution across parallel nodes and independent Runs of o
   })
   await startService(service)
   const revision = parallelFlow(8)
-  const first = await acceptRun(service, { flowId: 'flow', revision, revisionId: 'same', idempotencyKey: 'first' })
-  const second = await acceptRun(service, { flowId: 'flow', revision, revisionId: 'same', idempotencyKey: 'second' })
+  const first = await acceptRun(service, { flowId: 'first', revision, revisionId: 'first', idempotencyKey: 'first' })
+  const second = await acceptRun(service, { flowId: 'second', revision, revisionId: 'second', idempotencyKey: 'second' })
   if (first.kind != 'accepted' || second.kind != 'accepted') throw new Error('Expected acceptance')
   await service.waitForIdle()
   expect([service.run(first.runId)?.status, service.run(second.runId)?.status]).toEqual(['completed', 'completed'])
   expect(calls).toBe(16)
   expect(peak).toBe(2)
+})
+
+it('serializes active Runs of one Flow while other Flows proceed', async () => {
+  let active = 0
+  let peak = 0
+  const service = await openService(':memory:', {
+    clock: Date.now,
+    runtime: { maxConcurrentRuns: 3, maxConcurrentTasks: 3 },
+    capabilities: {
+      llm: () => async () => {
+        active++
+        peak = Math.max(peak, active)
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        active--
+        return { kind: 'completed', version: 1, value: { answer: 1 } }
+      },
+    },
+  })
+  await startService(service)
+  const revision = parallelFlow(1)
+  // The fixture maps one revision key to one Flow.
+  for (const key of ['first', 'second', 'third']) {
+    const run = await acceptRun(service, { flowId: 'flow', revision, revisionId: 'same', idempotencyKey: key })
+    if (run.kind != 'accepted') throw new Error('Expected acceptance')
+  }
+  const other = await acceptRun(service, { flowId: 'other', revision, revisionId: 'other', idempotencyKey: 'other' })
+  if (other.kind != 'accepted') throw new Error('Expected acceptance')
+  await service.waitForIdle()
+  expect(peak).toBe(2)
+})
+
+it('starts a node timeout only after the node is admitted to the Task budget', async () => {
+  let calls = 0
+  const service = await openService(':memory:', {
+    clock: Date.now,
+    runtime: { maxConcurrentTasks: 1 },
+    capabilities: {
+      llm: () => async () => {
+        calls++
+        await new Promise((resolve) => setTimeout(resolve, 150))
+        return { kind: 'completed', version: 1, value: { answer: 1 } }
+      },
+    },
+  })
+  await startService(service)
+  // Serialized execution exceeds one node's timeout, while each node alone stays well within it.
+  const accepted = await acceptRun(service, { flowId: 'flow', revision: parallelFlow(3, 400), revisionId: 'timeout', idempotencyKey: 'timeout' })
+  if (accepted.kind != 'accepted') throw new Error('Expected acceptance')
+  await service.waitForIdle()
+  expect(service.run(accepted.runId)?.status).toBe('completed')
+  expect(calls).toBe(3)
 })
 
 it('cancels queued node admissions and reuses every execution permit afterwards', async () => {
@@ -84,8 +136,8 @@ it('cancels queued node admissions and reuses every execution permit afterwards'
   })
   await startService(service)
   const revision = parallelFlow(4)
-  const first = await acceptRun(service, { flowId: 'flow', revision, revisionId: 'same', idempotencyKey: 'first' })
-  const second = await acceptRun(service, { flowId: 'flow', revision, revisionId: 'same', idempotencyKey: 'second' })
+  const first = await acceptRun(service, { flowId: 'first', revision, revisionId: 'first', idempotencyKey: 'first' })
+  const second = await acceptRun(service, { flowId: 'second', revision, revisionId: 'second', idempotencyKey: 'second' })
   if (first.kind != 'accepted' || second.kind != 'accepted') throw new Error('Expected acceptance')
   await started.promise
   service.control.runs.cancelRun('test', first.runId)
@@ -214,8 +266,8 @@ it('confines Executor loss to active Code Runs and rebuilds without interrupting
       graph: { edges: [], nodes: { code: { kind: 'task', inputs: {}, task: { name: 'Code', moduleId: 'main', inputs: [], outputs: [] } } } },
     },
   }
-  const first = await acceptRun(service, { flowId: 'flow', revision, revisionId: 'code', idempotencyKey: 'first' })
-  const second = await acceptRun(service, { flowId: 'flow', revision, revisionId: 'code', idempotencyKey: 'second' })
+  const first = await acceptRun(service, { flowId: 'first', revision, revisionId: 'first', idempotencyKey: 'first' })
+  const second = await acceptRun(service, { flowId: 'second', revision, revisionId: 'second', idempotencyKey: 'second' })
   const managed = await acceptRun(service, { flowId: 'managed', revision: parallelFlow(1), revisionId: 'managed', idempotencyKey: 'managed' })
   if (first.kind != 'accepted' || second.kind != 'accepted' || managed.kind != 'accepted') throw new Error('Expected acceptance')
   try {

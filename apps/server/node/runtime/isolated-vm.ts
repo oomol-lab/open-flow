@@ -1,7 +1,7 @@
 import type { TaskCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RuntimeCapabilityResponse, RuntimeInvocation, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOutcome, RunLaunch, WaitOperation, SchedulerEvent, SchedulerFailure, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOutcome, RunLaunch, WaitOperation, SchedulerEvent, SchedulerFailure, TaskAdmission, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { ChildProcess, ChildProcessByStdio } from 'node:child_process'
 import type { Readable } from 'node:stream'
 
@@ -171,7 +171,7 @@ interface PendingInvocation {
   readonly capabilityCalls: Map<string, number>
   readonly activeCalls: Map<number, Fiber.Fiber<void, never>>
   readonly cancel: () => void
-  readonly emit?: (event: SchedulerEvent, signal: AbortSignal) => void | Promise<void>
+  readonly emit?: (event: SchedulerEvent) => void | Promise<void>
   readonly emitLogs?: (events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[], signal: AbortSignal) => Promise<void>
   readonly getPrevious?: Extract<TaskInvocation, { readonly moduleId: string }>['getPrevious']
   readonly limits: IsolatedVmLimits
@@ -302,12 +302,13 @@ export class IsolatedVmHost {
     prepared: PreparedFlow,
     options: RunLaunch & {
       readonly capability: (capabilities: readonly TaskCapability[], call: Parameters<RuntimeInvocation['capability']>[0]) => Promise<RuntimeCapabilityResponse>
-      readonly emit?: (event: SchedulerEvent, signal: AbortSignal) => void | Promise<void>
+      readonly emit?: (event: SchedulerEvent) => void | Promise<void>
       readonly emitLogs?: (events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[], signal: AbortSignal) => Promise<void>
       readonly flowId: string
       readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
       readonly remainingMs?: number
       readonly invokeTask: (invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal }) => Promise<unknown>
+      readonly admitTask?: (admission: TaskAdmission, signal: AbortSignal) => Promise<void>
       readonly projectFailure: (error: unknown) => SchedulerFailure
       readonly runId: string
     },
@@ -317,11 +318,12 @@ export class IsolatedVmHost {
       if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
       if (serializedBytes(prepared) > limits.maxProgramBytes)
         return Effect.fail(new IsolatedVmError('limit-exceeded', 'Fixed Flow exceeds the configured byte limit.'))
-      const wait = options.wait
+      const { wait, admitTask } = options
       return runFlow(prepared, {
         ...options,
         createId: randomUUID,
-        emit: (event) => Effect.tryPromise({ try: async (signal) => options.emit?.(event, signal), catch: normalizedError }),
+        admitTask: admitTask == null ? undefined : (admission) => Effect.tryPromise({ try: (signal) => admitTask(admission, signal), catch: normalizedError }),
+        emit: (event) => Effect.tryPromise({ try: async () => options.emit?.(event), catch: normalizedError }),
         waits:
           wait == null
             ? undefined
@@ -446,7 +448,7 @@ export class IsolatedVmHost {
           if (signal.aborted) return
           // Logs remain best-effort independently, even when their IPC acknowledgement is shared.
           await Promise.resolve()
-            .then(() => pending.emit!(event, signal))
+            .then(() => pending.emit!(event))
             .catch(() => {})
         }
       })

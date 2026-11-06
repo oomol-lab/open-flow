@@ -1347,7 +1347,7 @@ describe('Server application service', () => {
     await closeService(service)
   })
 
-  it('runs independent Runs from one Flow concurrently within the deployment limit', async () => {
+  it('runs different Flows concurrently without overlapping Runs from one Flow', async () => {
     const releases: (() => void)[] = []
     let invocation = 0
     const service = await openService(await databaseFile(), {
@@ -1369,8 +1369,8 @@ describe('Server application service', () => {
     const other = await acceptRun(service, { flowId: 'main', idempotencyKey: 'revision-b', revision: llmFlow(), revisionId: 'revision-b' })
     if (first.kind != 'accepted' || second.kind != 'accepted' || other.kind != 'accepted') throw new Error('Concurrent Run setup conflicted.')
 
-    await Promise.all([waitForStatus(service, first.runId, 'running'), waitForStatus(service, second.runId, 'running')])
-    expect(service.run(other.runId)?.status).toBe('queued')
+    await Promise.all([waitForStatus(service, first.runId, 'running'), waitForStatus(service, other.runId, 'running')])
+    expect(service.run(second.runId)?.status).toBe('queued')
     await vi.waitFor(() => expect(releases).toHaveLength(2))
 
     for (const release of releases) release()
