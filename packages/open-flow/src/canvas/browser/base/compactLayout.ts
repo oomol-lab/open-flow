@@ -57,13 +57,84 @@ function dependencyLevels(nodes: LayoutNode[], edges: GraphLayout['edges'], gap:
   }
 }
 
-/** Bend dependency paths continuously; the ports retain their original orientation. */
+/** Compact each connected subgraph, then wrap the forest to the requested ratio. */
 export function compactLayout(
   graph: GraphLayout,
   insets: { readonly width: number; readonly height: number } = { width: 0, height: 0 },
   aspectRatio = 1,
 ): CompactLayout {
   if (!graph.nodes.length) return { positions: {}, routes: new Map(), bounds: { x: 0, y: 0, width: 320, height: 120 } }
+  const connected = new graphlib.Graph()
+  for (const node of graph.nodes) connected.setNode(node.id)
+  for (const edge of graph.edges) connected.setEdge(edge.source, edge.target)
+  const members = graphlib.alg.components(connected)
+  if (members.length === 1) return compactComponent(graph, insets, aspectRatio)
+
+  // Shared joins and feedback connections keep their roots in the same component.
+  const componentOf = new Map(members.flatMap((ids, index) => ids.map((id) => [id, index] as const)))
+  const edges = Map.groupBy(graph.edges, (edge) => componentOf.get(edge.source)!)
+  const components = [...Map.groupBy(graph.nodes, (node) => componentOf.get(node.id)!)]
+    .map(([id, nodes]) => ({
+      nodes,
+      edges: edges.get(id) ?? [],
+      bounds: bounds(nodes),
+    }))
+    .toSorted((a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y)
+  const layouts = components.map((component) =>
+    component.nodes.length === 1 && !component.edges.length
+      ? { positions: { [component.nodes[0]!.id]: component.nodes[0]! }, routes: new Map(), bounds: component.bounds }
+      : compactComponent(component, { width: 0, height: 0 }, aspectRatio),
+  )
+  return packComponents(layouts, insets, aspectRatio)
+}
+
+/** Keep reading order, with a larger gap between independent trees than within one. */
+function packComponents(layouts: readonly CompactLayout[], insets: { readonly width: number; readonly height: number }, aspectRatio: number): CompactLayout {
+  const gap = 96
+  const largestWidth = Math.max(...layouts.map((layout) => layout.bounds.width))
+  const contentArea = layouts.reduce((sum, layout) => sum + layout.bounds.width * layout.bounds.height, 0)
+  const limits = new Set([largestWidth, Math.max(largestWidth, Math.sqrt(contentArea * aspectRatio))])
+  let prefixWidth = -gap
+  for (const layout of layouts) {
+    prefixWidth += layout.bounds.width + gap
+    limits.add(Math.max(largestWidth, prefixWidth))
+  }
+  let best: { positions: LayoutPoint[]; width: number; height: number; score: number; area: number; rows: number } | undefined
+  for (const limit of limits) {
+    let x = 0
+    let y = 0
+    let width = 0
+    let rowHeight = 0
+    let rows = 1
+    const positions = layouts.map((layout) => {
+      if (x > 0 && x + layout.bounds.width > limit + 1e-6) {
+        y += rowHeight + gap
+        x = rowHeight = 0
+        rows++
+      }
+      const position = { x: x - layout.bounds.x, y: y - layout.bounds.y }
+      width = Math.max(width, x + layout.bounds.width)
+      rowHeight = Math.max(rowHeight, layout.bounds.height)
+      x += layout.bounds.width + gap
+      return position
+    })
+    const height = y + rowHeight
+    const score = Math.max((width + insets.width) / aspectRatio, height + insets.height)
+    const area = (width + insets.width) * (height + insets.height)
+    if (!best || score < best.score - 1e-9 || (Math.abs(score - best.score) < 1e-9 && (area < best.area || (area === best.area && rows < best.rows)))) {
+      best = { positions, width, height, score, area, rows }
+    }
+  }
+  const translate = (point: LayoutPoint, index: number): LayoutPoint => ({ x: point.x + best!.positions[index]!.x, y: point.y + best!.positions[index]!.y })
+  return {
+    positions: Object.fromEntries(layouts.flatMap((layout, index) => Object.entries(layout.positions).map(([id, point]) => [id, translate(point, index)]))),
+    routes: new Map(layouts.flatMap((layout, index) => [...layout.routes].map(([id, points]) => [id, points.map((point) => translate(point, index))]))),
+    bounds: { x: 0, y: 0, width: best!.width, height: best!.height },
+  }
+}
+
+/** Bend dependency paths continuously; the ports retain their original orientation. */
+function compactComponent(graph: GraphLayout, insets: { readonly width: number; readonly height: number }, aspectRatio: number): CompactLayout {
   const normalized = graph.nodes.map((node) => ({
     ...node,
     ...layoutAxes(node, 'vertical'),

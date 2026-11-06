@@ -112,7 +112,10 @@ describe('vertical compact layout', () => {
   })
 
   it('keeps short branches near their fork and folds the long branch before its tail', () => {
-    const graph = branched(direction, false, 2)
+    const forest = branched(direction, false, 2)
+    // Measure this connected tree's folding independently of forest row packing.
+    const independent = new Set(['second-root', 'second-leaf', 'note'])
+    const graph = { nodes: forest.nodes.filter((node) => !independent.has(node.id)), edges: forest.edges.filter((edge) => !independent.has(edge.source)) }
     const result = compactLayout(graph)
     const fork = layoutAxes(result.positions.root!, direction)
     const maximumSize = Math.max(...graph.nodes.map((node) => (direction === 'vertical' ? node.height : node.width)))
@@ -246,4 +249,125 @@ it('adapts folded runs to wide and tall canvas ratios', () => {
   expect(Object.keys(wide.positions)).toHaveLength(60)
   expect(Object.keys(tall.positions)).toHaveLength(60)
   expect(graph).toEqual(before)
+})
+
+describe('compact forest layout', () => {
+  it('keeps roots with a shared descendant in one tree', () => {
+    const graph = graphLayout(
+      ['first-root', 'second-root', 'join', 'end', 'isolated'].map((id) => ({ id, width: 320, height: 120 })),
+      [
+        { id: 'first', source: 'first-root', target: 'join' },
+        { id: 'second', source: 'second-root', target: 'join' },
+        { id: 'end', source: 'join', target: 'end' },
+      ],
+      'vertical',
+    )
+    const result = compactLayout(graph)
+    expect(Object.keys(result.positions)).toHaveLength(5)
+    expect(result.routes.size).toBe(3)
+    expect(result.positions['first-root']!.y).toBe(result.positions['second-root']!.y)
+    expect(result.positions.join!.y).toBeGreaterThan(result.positions['first-root']!.y + 120)
+    expect(result.positions.end!.y).toBeGreaterThan(result.positions.join!.y + 120)
+    expect(result.routes.get('first')!.at(-1)).toEqual(result.routes.get('second')!.at(-1))
+  })
+
+  it('wraps complete trees in reading order and adapts row capacity to the canvas ratio', () => {
+    const nodes = Array.from({ length: 12 }, (_value, tree) => Array.from({ length: 3 }, (_, step) => ({ id: `${tree}-${step}`, width: 320, height: 120 })))
+    const graph = graphLayout(
+      nodes.flat(),
+      nodes.flatMap((tree) => tree.slice(1).map((node, index) => ({ id: node.id, source: tree[index]!.id, target: node.id }))),
+      'vertical',
+    )
+    const before = structuredClone(graph)
+    const result = compactLayout(graph)
+    const roots = nodes.map((tree) => result.positions[tree[0]!.id]!)
+    expect(new Set(roots.map((point) => point.y)).size).toBeGreaterThan(1)
+    for (let index = 1; index < roots.length; index++) {
+      const previous = roots[index - 1]!
+      const point = roots[index]!
+      expect(point.y === previous.y ? point.x > previous.x : point.y > previous.y).toBe(true)
+    }
+    expect(result.bounds.width).toBeLessThan(Math.max(...graph.nodes.map((node) => node.x + node.width)) * 0.75)
+    const wide = compactLayout(graph, { width: 104, height: 136 }, 16 / 9)
+    const tall = compactLayout(graph, { width: 104, height: 136 }, 9 / 16)
+    expect(wide.bounds.width / wide.bounds.height).toBeGreaterThan(tall.bounds.width / tall.bounds.height)
+    expect(Object.keys(result.positions)).toHaveLength(nodes.flat().length)
+    expect(compactLayout(graph)).toEqual(result)
+    expect(graph).toEqual(before)
+  })
+
+  it('packs isolated cards and a large annotation without overlap or splitting a card', () => {
+    const graph = graphLayout(
+      [
+        { id: 'annotation', width: 700, height: 480 },
+        ...Array.from({ length: 24 }, (_, index) => ({ id: String(index), width: 280 + (index % 3) * 80, height: 90 + (index % 4) * 30 })),
+      ],
+      [],
+      'vertical',
+    )
+    const before = structuredClone(graph)
+    const result = compactLayout(graph)
+    const nodes = graph.nodes.map((node) => ({ ...node, ...result.positions[node.id]! }))
+    expect(nodes).toHaveLength(25)
+    expect(result.routes.size).toBe(0)
+    expect(result.bounds.width * result.bounds.height).toBeLessThan(nodes.reduce((area, node) => area + node.width * node.height, 0) * 4)
+    for (const [index, node] of nodes.entries()) {
+      expect(node.x).toBeGreaterThanOrEqual(result.bounds.x)
+      expect(node.y).toBeGreaterThanOrEqual(result.bounds.y)
+      expect(node.x + node.width).toBeLessThanOrEqual(result.bounds.x + result.bounds.width)
+      expect(node.y + node.height).toBeLessThanOrEqual(result.bounds.y + result.bounds.height)
+      for (const other of nodes.slice(index + 1)) {
+        expect(node.x + node.width <= other.x || other.x + other.width <= node.x || node.y + node.height <= other.y || other.y + other.height <= node.y).toBe(
+          true,
+        )
+      }
+    }
+    expect(graph).toEqual(before)
+  })
+
+  it('moves routes with their tree, preserving measured ports, shared joins and feedback connections', () => {
+    const base = branched('vertical', true)
+    const graph = {
+      nodes: base.nodes,
+      edges: base.edges.map((edge) =>
+        Object.assign({}, edge, {
+          sourceOffset: {
+            x: base.nodes.find((node) => node.id === edge.source)!.width / 2 - 10,
+            y: base.nodes.find((node) => node.id === edge.source)!.height + 2,
+          },
+          targetOffset: { x: base.nodes.find((node) => node.id === edge.target)!.width / 2 + 6, y: -2 },
+        }),
+      ),
+    }
+    const result = compactLayout(graph)
+    const nodes = graph.nodes.map((node) => ({ ...node, ...result.positions[node.id]! }))
+    expect(Object.keys(result.positions)).toHaveLength(graph.nodes.length)
+    expect(result.routes.size).toBe(graph.edges.length)
+    expect(result.positions.left0!.x).toBeLessThan(result.positions.right0!.x)
+    for (const edge of graph.edges) {
+      const route = result.routes.get(edge.id)!
+      const start = result.positions[edge.source]!
+      const end = result.positions[edge.target]!
+      expect(route[0]!.x).toBeCloseTo(start.x + edge.sourceOffset.x)
+      expect(route[0]!.y).toBeCloseTo(start.y + edge.sourceOffset.y)
+      expect(route.at(-1)!.x).toBeCloseTo(end.x + edge.targetOffset.x)
+      expect(route.at(-1)!.y).toBeCloseTo(end.y + edge.targetOffset.y)
+      for (const point of route) {
+        expect(point.x).toBeGreaterThanOrEqual(result.bounds.x - 1e-6)
+        expect(point.y).toBeGreaterThanOrEqual(result.bounds.y - 1e-6)
+        expect(point.x).toBeLessThanOrEqual(result.bounds.x + result.bounds.width + 1e-6)
+        expect(point.y).toBeLessThanOrEqual(result.bounds.y + result.bounds.height + 1e-6)
+      }
+      for (let index = 1; index < route.length; index++) {
+        for (const node of nodes) expect(intersects(route[index - 1]!, route[index]!, node), 'route crosses ' + node.id).toBe(false)
+      }
+    }
+    const ids = new Set(graph.nodes.filter((node) => !['second-root', 'second-leaf', 'note'].includes(node.id)).map((node) => node.id))
+    const tree = compactLayout({ nodes: graph.nodes.filter((node) => ids.has(node.id)), edges: graph.edges.filter((edge) => ids.has(edge.source)) })
+    const shift = { x: result.positions.root!.x - tree.positions.root!.x, y: result.positions.root!.y - tree.positions.root!.y }
+    for (const id of ids) {
+      expect(result.positions[id]!.x).toBeCloseTo(tree.positions[id]!.x + shift.x)
+      expect(result.positions[id]!.y).toBeCloseTo(tree.positions[id]!.y + shift.y)
+    }
+  })
 })

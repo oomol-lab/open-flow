@@ -153,6 +153,20 @@ try {
   large.presentation.designer.flow.comments = {}
   const scaled = await verify('large', large, { frame: true })
   assert.ok(scaled.width * scaled.height > 30_000_000)
+  const forest = structuredClone(large)
+  forest.name = '森林 · Independent workflows'
+  forest.presentation.designer.flow.direction = 'vertical'
+  forest.presentation.designer.flow.nodes = Object.fromEntries(Array.from({ length: 50 }, (_, index) => ['n' + index, { x: Math.floor(index / 5) * 500, y: index % 5 * 180 }]))
+  forest.content.document.graph.edges = forest.content.document.graph.edges.filter((edge) => Number(edge.target.slice(1)) % 5 !== 0)
+  forest.presentation.designer.flow.nodes.note = { x: 5500, y: 0 }
+  forest.presentation.designer.flow.comments.note = { title: '森林说明', content: '每个独立子图连同连线一起换行。' }
+  const forestBefore = structuredClone(forest)
+  const forestOriginal = await verify('forest-original', forest, { frame: true })
+  const forestCompact = await verify('forest-compact', forest, { frame: true, layout: 'compact' })
+  assert.ok(forestCompact.width < forestOriginal.width * 0.75)
+  assert.ok(Math.max(forestCompact.width / forestCompact.height, forestCompact.height / forestCompact.width) < 1.7)
+  await verify('forest-portrait', forest, { frame: true, layout: 'compact', aspectRatio: '9:16', dark: true })
+  assert.deepEqual(forest, forestBefore)
   for (const direction of ['vertical', 'horizontal']) {
     const file = structuredClone(large)
     file.presentation.designer.flow.direction = direction

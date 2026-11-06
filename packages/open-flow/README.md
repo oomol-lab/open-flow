@@ -61,6 +61,8 @@ direction, with a U-shaped return between runs. Branches start near their fork; 
 joins follow all incoming runs. Vertical nodes retain top inputs and bottom outputs,
 while horizontal workflows always preserve their saved layout. Compact layout preserves node sizes and branch order and does not change
 the input file.
+Disconnected subgraphs wrap as complete units into rows sized for the canvas ratio,
+including their connection paths, comments and isolated nodes. Roots sharing a descendant remain in one subgraph.
 Set `aspectRatio` to `1:1`, `4:3`, `3:4`, `16:9` or `9:16` to choose the ratio of the
 complete PNG, including its frame. The exporter centers the content with extra canvas
 space and uses the chosen ratio when arranging compact vertical workflows. It never

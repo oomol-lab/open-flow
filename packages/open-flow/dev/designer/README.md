@@ -30,6 +30,8 @@ The default **Cards · Content & records** gallery uses the production card, exe
 
 Run `bun run benchmark:png-layout` from `packages/open-flow` to measure layout and routing on 50, 200 and 1,000 nodes. The package rendering check records complete Node export durations and includes a 200-node compact export; it also exercises fonts, artwork, both directions and themes, and the pixel budget.
 
+The PNG Story's **Show forest** action combines independent chains, a branched workflow with shared joins, a comment and an isolated node. Compare original and compact vertical exports: compact wraps entire connected subgraphs into rows according to the selected canvas ratio. Each subgraph's routed bounds reserve space for its connections. Check Auto, wide and portrait ratios, both themes, and that horizontal export retains its original layout.
+
 **Comment / Properties** (`?story=comment-properties`) displays the production `EditorContextPanel` heading and `CommentInspector` Source/Markdown tabs, with editable, empty-content and read-only samples side by side. Each editable sample keeps its saved title and Markdown in local state. Trigger-specific property panels live under Triggers / [type] / Properties.
 
 The **Nodes** section collects production canvas nodes under boundary inputs. Its **Condition / Node States** story covers empty, single and multiple cases, plus long rule labels, long output labels and both sides overflowing together.

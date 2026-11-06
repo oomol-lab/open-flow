@@ -499,7 +499,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'workflow-png',
     title: 'PNG export',
     description:
-      'Use the production export panel to compare Auto, square, landscape and portrait canvases. The checkerboard shows transparency outside the rounded frame; downloads reuse the displayed PNG. Compare original and compact vertical layouts, U-shaped returns, short branches and shared joins. Horizontal export preserves the canvas layout. Ratio, layout, theme and frame choices are remembered locally. Check Chinese labels, artwork, comments, both themes and large workflows. Simulate a slow export and change settings to check pending previews and disabled downloads.',
+      'Use the production export panel to compare Auto, square, landscape and portrait canvases. The checkerboard shows transparency outside the rounded frame; downloads reuse the displayed PNG. Compare original and compact vertical layouts, U-shaped returns, short branches and shared joins. Show forest to check complete subgraphs wrapping into rows, including comments and isolated nodes. Horizontal export preserves the canvas layout. Ratio, layout, theme and frame choices are remembered locally. Check Chinese labels, artwork, both themes and large workflows. Simulate a slow export and change settings to check pending previews and disabled downloads.',
     standalone: true,
     render: (_log, dark, language) => <PngExportStory dark={dark} language={language} />,
   },
@@ -614,12 +614,54 @@ const compactBranchWorkflow: FlowCanvasViewModel = {
   ],
 }
 
+const forestChains = Array.from({ length: 6 }, (_value, tree) =>
+  Array.from({ length: 2 + (tree % 4) }, (_, step) => ({
+    id: `forest-${tree}-${step}`,
+    kind: 'task' as const,
+    title: `支路 ${tree + 1} · 检查记录 ${step + 1}`,
+    description: step === 0 && tree % 2 ? '独立子图保留完整的依赖关系。' : undefined,
+    reference: 'lab/task',
+    executorName: 'JavaScript',
+    position: { x: 2000 + tree * 650, y: step * 220 },
+    inputs: [],
+    outputs: [],
+  })),
+)
+const compactForestWorkflow: FlowCanvasViewModel = {
+  ...branchApplication,
+  nodes: [
+    ...branchApplication.nodes,
+    ...forestChains.flat(),
+    {
+      id: 'forest-note',
+      kind: 'comment',
+      title: '森林布局说明',
+      content: '每个子图连同连线作为整体换行。\n\n共享汇合节点仍只保留一个。',
+      position: { x: 6500, y: 0 },
+    },
+    { ...forestChains[0]![0]!, id: 'forest-single', title: '独立节点', position: { x: 7000, y: 0 } },
+  ],
+  edges: [
+    ...branchApplication.edges,
+    ...forestChains.flatMap((chain) =>
+      chain.slice(1).map((target, index) => ({
+        id: 'forest-path-' + target.id,
+        source: chain[index]!.id,
+        sourceHandle: '$out',
+        target: target.id,
+        targetHandle: '$in',
+      })),
+    ),
+  ],
+}
+
 function PngExportStory({ dark, language }: { readonly dark: boolean; readonly language: UiLanguage }) {
   const [direction, setDirection] = useState<CanvasDirection>('vertical')
   const [pngExportOpen, setPngExportOpen] = useState(true)
   const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null)
   const [positions, setPositions] = useState<Readonly<Record<string, FlowCanvasViewPosition>>>({})
   const [branches, setBranches] = useState(false)
+  const [forest, setForest] = useState(false)
   const [wrapped, setWrapped] = useState(false)
   const [large, setLarge] = useState(false)
   const [brokenImages, setBrokenImages] = useState(false)
@@ -635,85 +677,99 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
   const i18n = useMemo(() => createI18n(language), [language])
   const sample = useMemo(
     () =>
-      branches
-        ? compactBranchWorkflow
-        : large
-          ? {
-              viewport: workflowViewport,
-              nodes: Array.from({ length: 50 }, (_, index) => ({
-                id: `png-step-${index}`,
-                kind: 'task' as const,
-                title: `${index + 1} · Process records 中文`,
-                description: 'A production node in a large workflow.',
-                reference: 'lab/task',
-                executorName: 'JavaScript',
-                icon: ':carbon:code:',
-                position: { x: (index % 10) * 600, y: Math.floor(index / 10) * 280 },
-                inputs: [],
-                outputs: [],
-              })),
-              edges: Array.from({ length: 49 }, (_, index) => ({
-                id: `png-edge-${index}`,
-                source: `png-step-${index}`,
-                sourceHandle: '$out',
-                target: `png-step-${index + 1}`,
-                targetHandle: '$in',
-              })),
-            }
-          : wrapped
-            ? longChainModel
-            : {
-                ...workflow,
-                edges: workflow.edges.map((edge) => (edge.id == 'condition-value' ? Object.assign({}, edge, { target: 'task' }) : edge)),
-                nodes: workflow.nodes.map((node) =>
-                  Object.assign({}, node, {
-                    title: node.kind == 'task' ? '汇总客户反馈并生成每周产品分析报告 & Review' : node.title,
-                    icon:
-                      node.kind == 'task'
-                        ? taskKind == 'agent'
-                          ? ':carbon:machine-learning-model:'
-                          : providerArtwork
-                        : node.kind == 'trigger'
-                          ? remoteIcons
-                            ? providerArtwork
-                            : providerIcon({ serviceId: 'sample', serviceName: 'Sample', iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } })
-                          : 'icon' in node
-                            ? node.icon
-                            : undefined,
-                    position: { x: node.position.x - 500, y: node.position.y - 180 },
-                    ...(node.kind == 'comment' && brokenImages
-                      ? { content: `![Unavailable sample](data:image/png;base64,broken-image)\n\n${node.content}` }
-                      : {}),
-                    ...(node.kind == 'task'
-                      ? {
-                          executorName:
-                            labelKind == 'short'
-                              ? '触发器'
-                              : labelKind == 'long'
-                                ? '这是包含工具连接和运行说明的很长的中文副标题，需要在保留工具徽章的同时正确省略'
-                                : taskKind == 'agent'
-                                  ? 'AI Agent'
-                                  : taskKind == 'connector'
-                                    ? 'Connector · ' + (remoteIcons ? 'GitHub' : 'Google Sheets')
-                                    : 'JavaScript',
-                          fallbackIcon:
-                            taskKind == 'agent' ? ':carbon:machine-learning-model:' : taskKind == 'connector' ? ':carbon:connection-signal:' : ':carbon:code:',
-                          actionSummary:
-                            taskKind == 'connector'
-                              ? undefined
-                              : { count: 2, providers: [{ id: 'provider', icon: providerArtwork, label: remoteIcons ? 'GitHub' : 'Google Sheets' }] },
-                        }
-                      : {}),
-                  }),
-                ),
-              },
-    [branches, large, wrapped, brokenImages, labelKind, remoteIcons, taskKind, providerArtwork],
+      forest
+        ? compactForestWorkflow
+        : branches
+          ? compactBranchWorkflow
+          : large
+            ? {
+                viewport: workflowViewport,
+                nodes: Array.from({ length: 50 }, (_, index) => ({
+                  id: `png-step-${index}`,
+                  kind: 'task' as const,
+                  title: `${index + 1} · Process records 中文`,
+                  description: 'A production node in a large workflow.',
+                  reference: 'lab/task',
+                  executorName: 'JavaScript',
+                  icon: ':carbon:code:',
+                  position: { x: (index % 10) * 600, y: Math.floor(index / 10) * 280 },
+                  inputs: [],
+                  outputs: [],
+                })),
+                edges: Array.from({ length: 49 }, (_, index) => ({
+                  id: `png-edge-${index}`,
+                  source: `png-step-${index}`,
+                  sourceHandle: '$out',
+                  target: `png-step-${index + 1}`,
+                  targetHandle: '$in',
+                })),
+              }
+            : wrapped
+              ? longChainModel
+              : {
+                  ...workflow,
+                  edges: workflow.edges.map((edge) => (edge.id == 'condition-value' ? Object.assign({}, edge, { target: 'task' }) : edge)),
+                  nodes: workflow.nodes.map((node) =>
+                    Object.assign({}, node, {
+                      title: node.kind == 'task' ? '汇总客户反馈并生成每周产品分析报告 & Review' : node.title,
+                      icon:
+                        node.kind == 'task'
+                          ? taskKind == 'agent'
+                            ? ':carbon:machine-learning-model:'
+                            : providerArtwork
+                          : node.kind == 'trigger'
+                            ? remoteIcons
+                              ? providerArtwork
+                              : providerIcon({ serviceId: 'sample', serviceName: 'Sample', iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } })
+                            : 'icon' in node
+                              ? node.icon
+                              : undefined,
+                      position: { x: node.position.x - 500, y: node.position.y - 180 },
+                      ...(node.kind == 'comment' && brokenImages
+                        ? { content: `![Unavailable sample](data:image/png;base64,broken-image)\n\n${node.content}` }
+                        : {}),
+                      ...(node.kind == 'task'
+                        ? {
+                            executorName:
+                              labelKind == 'short'
+                                ? '触发器'
+                                : labelKind == 'long'
+                                  ? '这是包含工具连接和运行说明的很长的中文副标题，需要在保留工具徽章的同时正确省略'
+                                  : taskKind == 'agent'
+                                    ? 'AI Agent'
+                                    : taskKind == 'connector'
+                                      ? 'Connector · ' + (remoteIcons ? 'GitHub' : 'Google Sheets')
+                                      : 'JavaScript',
+                            fallbackIcon:
+                              taskKind == 'agent'
+                                ? ':carbon:machine-learning-model:'
+                                : taskKind == 'connector'
+                                  ? ':carbon:connection-signal:'
+                                  : ':carbon:code:',
+                            actionSummary:
+                              taskKind == 'connector'
+                                ? undefined
+                                : { count: 2, providers: [{ id: 'provider', icon: providerArtwork, label: remoteIcons ? 'GitHub' : 'Google Sheets' }] },
+                          }
+                        : {}),
+                    }),
+                  ),
+                },
+    [forest, branches, large, wrapped, brokenImages, labelKind, remoteIcons, taskKind, providerArtwork],
   )
   const model = useMemo(
     () => ({ ...sample, direction, nodes: sample.nodes.map((node) => ({ ...node, position: positions[node.id] ?? node.position })) }),
     [sample, direction, positions],
   )
-  const title = branches ? 'Branching workflow' : large ? 'Large workflow' : wrapped ? 'Weekly records pipeline' : 'Customer insights'
+  const title = forest
+    ? 'Forest workflow'
+    : branches
+      ? 'Branching workflow'
+      : large
+        ? 'Large workflow'
+        : wrapped
+          ? 'Weekly records pipeline'
+          : 'Customer insights'
   const layoutReady = model.nodes.every((node) => positions[node.id] != null)
   const [image, setImage] = useState<FlowPngResult>()
   const [imageSrc, setImageSrc] = useState<string>()
@@ -749,7 +805,18 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       label: branches ? 'Show standard workflow' : 'Show nested branches & shared join',
       onClick: () => {
         setPositions({})
+        setForest(false)
         setBranches((value) => !value)
+      },
+    },
+    {
+      label: forest ? 'Show standard workflow' : 'Show forest',
+      onClick: () => {
+        setPositions({})
+        setBranches(false)
+        setLarge(false)
+        setWrapped(false)
+        setForest((value) => !value)
       },
     },
     { label: slowExport ? 'Use normal export speed' : 'Simulate slow export', onClick: () => setSlowExport((value) => !value) },
@@ -757,6 +824,7 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       label: wrapped ? 'Show branches & Chinese titles' : 'Show wrapped pipeline',
       onClick: () => {
         setPositions({})
+        setForest(false)
         setWrapped((value) => !value)
       },
     },
@@ -764,6 +832,7 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       label: large ? 'Show normal workflow' : 'Show large workflow',
       onClick: () => {
         setPositions({})
+        setForest(false)
         setLarge((value) => !value)
       },
     },
@@ -821,7 +890,7 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
             <p>Canvas</p>
             <div style={{ height: 620 }}>
               <FlowCanvasView
-                identity={`png-comparison:${direction}:${branches}:${wrapped}:${large}`}
+                identity={`png-comparison:${direction}:${forest}:${branches}:${wrapped}:${large}`}
                 model={model}
                 dark={dark}
                 language={language}
