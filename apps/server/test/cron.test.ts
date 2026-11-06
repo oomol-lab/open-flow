@@ -327,8 +327,9 @@ describe('Server Cron Trigger', () => {
     const database = new DatabaseSync(file)
     try {
       await expect.poll(() => database.prepare('SELECT COUNT(*) AS count FROM wait_receipts').get()).toEqual({ count: 1 })
+      await service.waitForIdle()
       const first = database.prepare('SELECT run_id AS runId, status FROM runs').get() as { readonly runId: string; readonly status: string }
-      expect(first.status).toBe('running')
+      expect(first.status).toBe('waiting')
 
       now = Date.parse('2026-08-21T00:03:00.000Z')
       await service.tickCron(new Date(now).toISOString())

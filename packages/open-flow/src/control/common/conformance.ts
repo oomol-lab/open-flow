@@ -940,9 +940,9 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         }
         return current
       }
-      const hasWait = (value: RecordValue) => list(value.waits, 'Waits').length > 0
+      const hasWait = (value: RecordValue) => list(value.waits, 'Waits').length > 0 && value.status == 'waiting'
       let detail = await awaitRun(run, hasWait, 'Wait Run to pause')
-      equal(detail.status, 'running', 'Wait Run status')
+      equal(detail.status, 'waiting', 'Wait Run status')
       const waiting = record(list(detail.waits, 'Waits')[0], 'Active Wait')
       equal(waiting.actions, ['approve', 'reject'], 'Wait actions')
       equal(waiting.nodeId, 'approval', 'Wait node')
@@ -972,7 +972,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const approved = await json(await resolveWait('approve'), 200, 'Approve Wait')
       equal(approved.action, 'approve', 'Approved action')
       equal(approved.resolutionAccepted, true, 'Approved resolution')
-      equal(approved.status, 'running', 'Resolved Run status')
+      equal(approved.status, 'queued', 'Resolved Run status')
       requiredString(approved.resolvedAt, 'Wait resolution time')
       const rejected = await json(await resolveWait('reject'), 200, 'Reject resolved Wait')
       equal(rejected.action, 'approve', 'Winning action')
@@ -995,7 +995,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const canceled = await create('wait-run-cancel', 'Create cancelable Wait Run')
       const canceledRunId = requiredString(canceled.runId, 'Cancelable Wait Run id')
       const canceledDetail = await awaitRun(canceled, hasWait, 'Wait cancelable Run to pause')
-      equal(canceledDetail.status, 'running', 'Cancelable Wait status')
+      equal(canceledDetail.status, 'waiting', 'Cancelable Wait status')
       equal(
         (
           await json(

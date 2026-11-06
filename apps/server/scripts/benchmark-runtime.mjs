@@ -127,8 +127,9 @@ if (typeof IsolatedVmHost.prototype.run == 'function') {
     closureDigest: 'runtime-benchmark',
     engineContract: 'open-flow-engine/v6',
     graph: {
-      edges: [],
+      edges: [{ source: 'start', target: 'task' }],
       nodes: {
+        start: { kind: 'start', inputDefs: [], name: 'Start' },
         task: {
           inputs: {},
           kind: 'task',
@@ -145,6 +146,7 @@ if (typeof IsolatedVmHost.prototype.run == 'function') {
         capability: async () => ({ body: null, status: 200 }),
         emit: async () => undefined,
         flowId: 'main',
+        trigger: { nodeId: 'start', outputs: {} },
         invokeTask: async () => {
           throw new Error('Unexpected external Task invocation.')
         },

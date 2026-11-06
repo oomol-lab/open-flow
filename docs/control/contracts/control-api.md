@@ -1350,12 +1350,11 @@ as manual resolution. The first valid decision wins, even if a manual submission
 planned time but before the scheduler commits. Repeated ticks and later manual submissions cannot
 replace its source, time or comment. Cancellation and terminal Runs prevent automatic continuation.
 Due frozen waits are processed after restart if still unexpired; expiry retains priority once the
-seven-day deadline is reached. The existing two-minute session retention and crash recovery rules
-remain unchanged. A running session without a complete checkpoint becomes indeterminate after
-process loss. Timers provide eventual execution, not a guarantee of exact wall-clock execution.
+seven-day deadline is reached. Idle graphs checkpoint immediately and release their execution slot.
+A running session without a complete checkpoint becomes indeterminate after process loss. Timers provide eventual execution, not a guarantee of exact wall-clock execution.
 
 Automatic continuation requires Engine v7. Engine v6 rejects configured Waits before execution.
-Scheduler checkpoint version 6 and Flow model version 10 remain unchanged.
+Automatic continuation retains Flow model version 10. The current Scheduler checkpoint format is version 7.
 
 ### Wait local execution and freezing
 
@@ -1363,9 +1362,9 @@ Wait and Approval `inputDefinitions` declare multiple editable inputs; `inputs` 
 
 Optional plaintext comment is trimmed, normalized to null when blank, and limited to 2,000 Unicode code points. Decisions/comments persist atomically; retries cannot overwrite the first decision. Ordinary Wait and Approval store no inline notification configuration. Deployments supply public origins. Ordinary Wait has no special Run/Publish admission check; execution fails if it needs links without an origin. Unconnected and unreferenced pending outputs generate no links. Complete notification outputs are access-controlled recovery data.
 
-Public capability indexes store only digests; URLs enter neither Revisions nor ordinary service logs. Notification and selected action edges may execute together; approve/reject are mutually exclusive. Notification descendants execute as ordinary nodes. Resolution does not cancel them, and they have no special deadline. When the graph becomes idle with pending waits, retain the session for 120,000 ms without serializing/saving a full checkpoint or consuming execution budget.
+Public capability indexes store only digests; URLs enter neither Revisions nor ordinary service logs. Notification and selected action edges may execute together; approve/reject are mutually exclusive. Notification descendants execute as ordinary nodes. Resolution does not cancel them, and they have no special deadline. When the graph becomes idle with pending waits, serialize a complete checkpoint immediately and release its execution slot. Waiting time does not consume the remaining execution budget.
 
-A later idle transition restarts the timer; invalid wakeups do not extend it. On expiry, reread decisions before committing the checkpoint. Concurrently resolved Runs requeue. Wait records and decisions persist immediately; in-place approval needs no checkpoint. Scheduler WaitHost provides `create(WaitRequest)` and `resolutions(waitIds, block)`. Deployments guarantee pinned inputs, permissions, persistence, and wakeups. Recovery reads current decisions rather than relying on claim-time snapshots.
+Before committing the checkpoint, reread decisions in the authoritative storage transaction. Concurrently resolved Runs requeue. Wait records and decisions persist immediately. A decision received while another branch is active continues in that session; an idle graph resumes from its checkpoint. Scheduler WaitHost provides `create(WaitRequest)` and `resolutions(waitIds, block)`. Deployments guarantee pinned inputs, permissions, persistence, and wakeups. Recovery reads current decisions rather than relying on claim-time snapshots.
 
 ### Scheduler checkpoints and node events
 
@@ -1375,8 +1374,24 @@ The exact Scheduler checkpoint object is:
 {
   "bindingValues": {},
   "inputs": {},
-  "results": { "start": { "jobId": "start", "outputs": {} }, "source": { "jobId": "job-1", "outputs": { "value": 42 } } },
-  "counts": { "": { "source": 1, "approval": 1 } },
+  "results": {
+    "start": {
+      "jobId": "start",
+      "outputs": {}
+    },
+    "source": {
+      "jobId": "job-1",
+      "outputs": {
+        "value": 42
+      }
+    }
+  },
+  "counts": {
+    "": {
+      "source": 1,
+      "approval": 1
+    }
+  },
   "dependencies": {
     "nextId": 3,
     "iterations": {},
@@ -1387,8 +1402,8 @@ The exact Scheduler checkpoint object is:
         "previous": [],
         "released": [],
         "seeded": false,
-        "input": {},
-        "output": {}
+        "input": 0,
+        "output": 0
       },
       "source": {
         "id": 1,
@@ -1397,8 +1412,8 @@ The exact Scheduler checkpoint object is:
         "previous": ["start"],
         "released": ["value"],
         "seeded": false,
-        "input": { "start": { "execution": 0, "outputs": {} } },
-        "output": { "value": 42 }
+        "input": 1,
+        "output": 1
       },
       "approval": {
         "id": 2,
@@ -1407,19 +1422,61 @@ The exact Scheduler checkpoint object is:
         "previous": ["source"],
         "released": [],
         "seeded": false,
-        "input": { "start": { "execution": 0, "outputs": {} }, "source": { "execution": 1, "outputs": { "value": 42 } } }
+        "input": 2
       }
-    }
+    },
+    "frames": [
+      {
+        "input": {}
+      },
+      {
+        "parent": 0,
+        "input": {
+          "start": 0
+        }
+      },
+      {
+        "parent": 1,
+        "input": {
+          "source": 1
+        }
+      }
+    ],
+    "results": [
+      {
+        "nodeId": "start",
+        "execution": 0,
+        "outputs": {}
+      },
+      {
+        "nodeId": "source",
+        "execution": 1,
+        "outputs": {
+          "value": 42
+        }
+      }
+    ]
   },
-  "version": 6,
+  "version": 7,
   "agents": {},
-  "waits": [{ "jobId": "job-2", "nodeId": "approval", "value": { "value": 42 }, "waitId": "opaque-id" }]
+  "waits": [
+    {
+      "jobId": "job-2",
+      "nodeId": "approval",
+      "value": {
+        "value": 42
+      },
+      "waitId": "opaque-id"
+    }
+  ]
 }
 ```
 
-`inputs` stores launch inputs by node ID/input handle. `bindingValues` stores this Run’s Variable binding snapshot. `results` stores each node’s last completed outputs. `counts` stores cumulative executions by node ID with outer scope fixed to `""`. `dependencies` owns the invocation snapshots and progress: `nextId`, per-loop `iterations`, and per-node states (`id`, `status`, `input`, optional `output`, `previous`, `released`, optional `jobId`, and `seeded`). Each `input` entry records one ancestor’s `{ execution, outputs }`; the execution identity selects newer iterations of that ancestor independently of completion order. Input snapshots remain unchanged when a node releases pending or final output. Partial joins reuse the completed predecessors’ saved input and output instead of a separate snapshot table. `waits` stores all waits whose decisions remain to be applied. Entries also store complete `pending` outputs once released.
+`inputs` stores launch inputs by node ID/input handle. `bindingValues` stores this Run's Variable binding snapshot. `results` stores each node's last completed outputs. `counts` stores cumulative executions by node ID with outer scope fixed to `""`.
 
-`agents` maps job IDs to `{ invocationId, input, remainingMs?, checkpoint }`, where checkpoint follows the Agent continuation contract. With node timeoutMs, remainingMs must be positive and no greater than the original limit. Total JSON is limited to 16 MiB. Recovery verifies exact fields, unique job/wait identities, node execution limits, declared results, wait-input/path consistency, and Agent continuation inputs/budgets. Older checkpoints cannot recover as v6.
+`dependencies` owns invocation snapshots and progress. Each node's `input` references an entry in `frames`; its optional `output` references an entry in `dependencies.results`. Each result stores `nodeId`, invocation `execution`, `outputs`, and optional `systemOutputs`. Distinct selected port sets retain separate result views. A frame either stores a complete ancestor-to-result reference map, or extends an earlier `parent` frame with one ancestor result. Parent references must precede the child frame, and all node/result references must resolve. Shared ancestors and output bodies are serialized once instead of being expanded in every successor. Execution identities retain loop iteration and branch provenance independently of completion order. Input snapshots remain unchanged when a node releases pending or final output. `waits` stores all waits whose decisions remain to be applied, including complete `pending` outputs once released.
+
+`agents` maps job IDs to `{ invocationId, input, remainingMs?, checkpoint }`, where checkpoint follows the Agent continuation contract. With node timeoutMs, remainingMs must be positive and no greater than the original limit. Total JSON is limited to 16 MiB. Recovery verifies exact fields, unique job/wait identities, node execution limits, declared results, wait-input/path consistency, and Agent continuation inputs/budgets. Published v6 checkpoints are validated and normalized to v7 on read without replaying completed work; older development formats remain unsupported.
 
 Nodes outside the execution path create no jobs, execution identities, or events. Each invocation gets a separate identity, retained through suspension/recovery. Ordinary Task outputs declared but missing or `undefined` become `null`. An entirely `undefined` return becomes an empty object; explicit non-object returns remain invalid. Port contents are not recursively normalized. Unselected Condition/Wait branch ports remain absent. Runtime validates and copies return data before JSON transport.
 
@@ -1431,7 +1488,7 @@ Flow terminal results use `{ kind: 'node-results', nodes }`. `nodes` contains on
 
 ## 10. Code Action contract
 
-The script contract is `open-flow-engine/v8`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints use version 6; old development checkpoint shapes are rejected without conversion. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.workflows.call(name, input)` calls a declared workflow tool and returns its business outputs. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
+The script contract is `open-flow-engine/v8`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints use version 7 and retain published v6 recovery; older development checkpoint shapes are rejected. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.workflows.call(name, input)` calls a declared workflow tool and returns its business outputs. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
 
 ### Revision and edit operations
 
@@ -1794,7 +1851,7 @@ Each invocation checks current Live and interface compatibility before admitting
 
 Run details expose optional `triggerNodeId` for all entry types, optional `caller: { flowId, runId, nodeId, executionId }`, and `calls: [{ flowId, runId, nodeId, executionId, status }]`. Call status is null if the retained target Run is unavailable. Each loop invocation has its own execution identity and child association. Parent and child logs are independent. The parent Run records the call node's normal input/output and lifecycle; the child records its internal execution. Call associations remain available independently of event logs. `source` remains `draft | live`.
 
-Waiting calls are saved in the optional `calls` member of the version 6 checkpoint; old checkpoints without it remain valid. A pending call freezes as soon as no ordinary task is active, without the manual-Wait in-memory retention delay. Its child may use ordinary Wait and Agent approval recovery. An explicit call `timeoutMs` covers queueing, execution and waiting; otherwise child execution and wait limits apply. Parent cancellation/failure cancels unfinished children; an indeterminate child makes the caller indeterminate. No interrupted unconfirmed side effect is replayed.
+Waiting calls are saved in the optional `calls` member of the checkpoint; published v6 checkpoints without it remain valid. Both pending calls and manual Waits freeze as soon as no ordinary task is active. Its child may use ordinary Wait and Agent approval recovery. An explicit call `timeoutMs` covers queueing, execution and waiting; otherwise child execution and wait limits apply. Parent cancellation/failure cancels unfinished children; an indeterminate child makes the caller indeterminate. No interrupted unconfirmed side effect is replayed.
 
 `GET /v1/flows/:flowId/references?direction=incoming|outgoing&offset=0&limit=50` returns `{ version: 1, direction, total, references, nextOffset? }`; limit is 1–100. Each reference contains `flowId`, nullable `name`, `available`, `draft`, and `live: { publicationId, enabled } | null`. Draft/Live identify the source declaration scopes, with disabled Live included. Results are sorted by Flow ID, deduplicated across scopes and filtered by owner. Outgoing references retain missing/retiring target IDs. Pagination and total share a single database snapshot and never read Revision bodies.
 
@@ -1883,7 +1940,7 @@ A handled failure emits `node.failed` with `handled: true` and `systemOutputs`, 
 `status: "error-handled"` for handled terminal nodes. The Run can complete successfully and therefore
 does not dispatch Flow Error. A downstream failure follows that node's own error handling policy.
 
-Checkpoint v6 and per-execution dependency snapshots store system outputs separately from business
+Checkpoint v7 and per-execution dependency snapshots store system outputs separately from business
 outputs, including across loops and Wait recovery. Older execution snapshots are never replaced by a
 Run-wide latest value. Code `getPrevious()` returns optional `systemOutputs` beside ordinary outputs.
 Recovery never replays an already handled task, and storage failures do not release downstream work.

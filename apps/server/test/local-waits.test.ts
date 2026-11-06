@@ -56,12 +56,14 @@ function fixture(autoContinue?: WaitRequest['autoContinue']) {
     }),
   )
   const checkpoint: FlowRunCheckpoint = {
-    version: 6,
+    version: 7,
     dependencies: {
       nextId: waits.length,
       iterations: {},
+      frames: [{ input: {} }],
+      results: [],
       nodes: Object.fromEntries(
-        waits.map((wait, id) => [wait.nodeId, { id, status: 'running' as const, jobId: wait.jobId, input: {}, previous: [], released: [], seeded: false }]),
+        waits.map((wait, id) => [wait.nodeId, { id, status: 'running' as const, jobId: wait.jobId, input: 0, previous: [], released: [], seeded: false }]),
       ),
     },
     agents: {},
@@ -135,8 +137,9 @@ it('freezes a remaining legacy Wait after resuming and enriching its notificatio
       ...claimed.resume!.checkpoint.dependencies,
       nodes: {
         ...claimed.resume!.checkpoint.dependencies.nodes,
-        first: { ...claimed.resume!.checkpoint.dependencies.nodes.first!, status: 'completed', output: {} },
+        first: { ...claimed.resume!.checkpoint.dependencies.nodes.first!, status: 'completed', output: 0 },
       },
+      results: [{ nodeId: 'first', execution: 0, outputs: {} }],
     },
     waits: claimed
       .resume!.checkpoint.waits.filter((wait) => wait.waitId == 'second')
@@ -229,7 +232,7 @@ it('fails closed on corrupt stored checkpoint bytes', () => {
   expect(recovered.runViews.run(f.runId)).toMatchObject({ status: 'indeterminate', result: { error: { code: 'execution.resume-unavailable' } } })
 })
 
-it('releases the same-flow queue after freezing while honoring active worker exclusions', () => {
+it('admits another Run from the same Flow while its predecessor is running', () => {
   const f = fixture()
   const accepted = f.store.runs.acceptControlRun({
     initiator: { channel: 'api' },
@@ -245,8 +248,6 @@ it('releases the same-flow queue after freezing while honoring active worker exc
     variableNames: [],
   })
   if (accepted.kind != 'accepted') throw new Error('Expected acceptance')
-  expect(f.store.runs.claim(['flow'])).toBeUndefined()
-  f.pause()
   expect(f.store.runs.claim()?.runId).toBe(accepted.runId)
 })
 

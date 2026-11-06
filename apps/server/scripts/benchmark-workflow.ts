@@ -257,7 +257,7 @@ async function benchmark(service: ServerService, profiler: Session) {
           messages.mock.calls.filter(({ arguments: [event, value] }) => {
             if (event != 'message') return false
             const message = value as ExecutorMessage
-            return message.type == 'logs' || (message.type == 'event' && message.event.type == 'node.log')
+            return message.type == 'logs'
           }).length / samples,
         rootNotifications: notifications / samples,
       },

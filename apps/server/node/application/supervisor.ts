@@ -29,7 +29,7 @@ export class Supervisor {
   readonly #maintenance: Maintenance
   readonly #maxConcurrentRuns: number
   readonly #listeners: ListenerRuntime
-  readonly #runningFlows = new Set<string>()
+  readonly #runningRuns = new Map<string, string>()
   readonly #signals: Queue.Queue<Deferred.Deferred<void> | undefined>
   readonly #store: Store
   readonly #tasks: FiberMap.FiberMap<string, void, never>
@@ -69,7 +69,7 @@ export class Supervisor {
   }
 
   isFlowRunning(flowId: string): boolean {
-    return this.#runningFlows.has(flowId)
+    return [...this.#runningRuns.values()].includes(flowId)
   }
 
   signal(): void {
@@ -169,9 +169,9 @@ export class Supervisor {
           continue
         }
         // A retained caller lends its execution slot only to its dependencies.
-        const run = this.#store.runs.claim([...this.#runningFlows], workers >= this.#maxConcurrentRuns ? waiting : undefined)
+        const run = this.#store.runs.claim([...this.#runningRuns.keys()], workers >= this.#maxConcurrentRuns ? waiting : undefined)
         if (run == null) return true
-        this.#runningFlows.add(run.flowId)
+        this.#runningRuns.set(run.runId, run.flowId)
         yield* FiberMap.run(
           this.#workers,
           run.runId,
@@ -181,7 +181,7 @@ export class Supervisor {
             ),
             Effect.ensuring(
               Effect.sync(() => {
-                this.#runningFlows.delete(run.flowId)
+                this.#runningRuns.delete(run.runId)
                 this.signal()
               }),
             ),

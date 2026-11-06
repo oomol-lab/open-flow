@@ -381,9 +381,9 @@ export class RunStore {
     return { created: true, kind: 'accepted', runId, status: 'queued' }
   }
 
-  claim(excludedFlowIds: readonly string[] = [], parentRunIds?: readonly string[]): StoredRun | undefined {
+  claim(excludedRunIds: readonly string[] = [], parentRunIds?: readonly string[]): StoredRun | undefined {
     return this.#transaction(() => {
-      const flowFilter = excludedFlowIds.length == 0 ? '' : `AND runs.flow_id NOT IN (${excludedFlowIds.map(() => '?').join(', ')})`
+      const activeFilter = excludedRunIds.length == 0 ? '' : `AND runs.run_id NOT IN (${excludedRunIds.map(() => '?').join(', ')})`
       if (parentRunIds?.length == 0) return
       const parentFilter =
         parentRunIds == null
@@ -394,12 +394,12 @@ export class RunStore {
           `SELECT runs.run_id AS runId
            FROM work JOIN runs USING (run_id)
            WHERE runs.status IN ('queued', 'starting')
-             ${flowFilter}
+             ${activeFilter}
              ${parentFilter}
            ORDER BY work.sequence
            LIMIT 1`,
         )
-        .get(...excludedFlowIds, ...(parentRunIds ?? [])) as { readonly runId: string } | undefined
+        .get(...excludedRunIds, ...(parentRunIds ?? [])) as { readonly runId: string } | undefined
       if (claimed == null) return
       this.#database.prepare("UPDATE runs SET status = 'starting' WHERE run_id = ? AND status = 'queued'").run(claimed.runId)
       const row = this.#database

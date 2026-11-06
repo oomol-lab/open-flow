@@ -1,9 +1,23 @@
 import type { Graph, JsonValue } from '../../flow/common/change.ts'
 
+import { dequal } from 'dequal/lite'
 import { z } from 'zod'
 import { isTriggerNode } from '../../flow/common/change.ts'
 
 export interface DependenciesCheckpoint {
+  nextId: number
+  iterations: Record<string, number>
+  nodes: Record<string, Omit<DependencyState, 'input' | 'output' | 'systemOutputs'> & { input: number; output?: number }>
+  frames: readonly { readonly parent?: number; readonly input: Readonly<Record<string, number>> }[]
+  results: readonly {
+    readonly nodeId: string
+    readonly execution: number
+    readonly outputs: Readonly<Record<string, JsonValue>>
+    readonly systemOutputs?: Readonly<Record<string, JsonValue>>
+  }[]
+}
+
+interface DependenciesState {
   nextId: number
   iterations: Record<string, number>
   nodes: Record<string, DependencyState>
@@ -29,14 +43,10 @@ const inputSchema = z.record(
   z.string(),
   z.strictObject({ execution: z.number().int().nonnegative(), outputs: outputsSchema, systemOutputs: outputsSchema.optional() }),
 )
-type InputSnapshot = DependenciesCheckpoint['nodes'][string]['input']
+type InputSnapshot = DependencyState['input']
 type InputFrame =
   | { values: InputSnapshot }
   | { values?: InputSnapshot; source: string; result: InputSnapshot[string]; parent: InputFrame; cache: Map<string, InputSnapshot[string] | undefined> }
-
-export function dependencyValues(input: InputSnapshot): Readonly<Record<string, Readonly<Record<string, JsonValue>>>> {
-  return Object.fromEntries(Object.entries(input).map(([id, result]) => [id, result.outputs]))
-}
 
 const stateSchema = z.strictObject({
   id: z.number().int().nonnegative(),
@@ -49,11 +59,97 @@ const stateSchema = z.strictObject({
   jobId: z.string().optional(),
   seeded: z.boolean(),
 })
-export const dependenciesSchema = z.strictObject({
+const legacyDependenciesSchema = z.strictObject({
   nextId: z.number().int().nonnegative(),
   iterations: z.record(z.string(), z.number().int().nonnegative()),
   nodes: z.record(z.string(), stateSchema),
 })
+
+const referenceSchema = z.number().int().nonnegative()
+const dependenciesSchema = z.strictObject({
+  nextId: referenceSchema,
+  iterations: z.record(z.string(), referenceSchema),
+  nodes: z.record(
+    z.string(),
+    stateSchema.omit({ input: true, output: true, systemOutputs: true }).extend({ input: referenceSchema, output: referenceSchema.optional() }),
+  ),
+  frames: z.array(z.strictObject({ parent: referenceSchema.optional(), input: z.record(z.string(), referenceSchema) })),
+  results: z.array(z.strictObject({ nodeId: z.string(), execution: referenceSchema, outputs: outputsSchema, systemOutputs: outputsSchema.optional() })),
+})
+
+export function decodeDependenciesCheckpoint(input: unknown, version: 6 | 7): DependenciesCheckpoint {
+  const saved = version == 6 ? saveDependencies(legacyDependenciesSchema.parse(input)) : dependenciesSchema.parse(input)
+  for (const [index, frame] of saved.frames.entries()) {
+    if (frame.parent != null && (frame.parent >= index || Object.keys(frame.input).length != 1)) throw new Error('Checkpoint input frame parent is invalid.')
+    for (const [nodeId, reference] of Object.entries(frame.input)) {
+      const result = saved.results[reference]
+      if (result == null || result.nodeId != nodeId) throw new Error('Checkpoint input result reference is invalid.')
+    }
+  }
+  for (const [nodeId, state] of Object.entries(saved.nodes)) {
+    if (saved.frames[state.input] == null) throw new Error('Checkpoint input frame reference is invalid.')
+    if (state.output != null) {
+      const result = saved.results[state.output]
+      if (result == null || result.nodeId != nodeId || result.execution != state.id) throw new Error('Checkpoint output result reference is invalid.')
+    }
+  }
+  for (const result of saved.results) {
+    if (saved.nodes[result.nodeId] == null || result.execution > saved.nodes[result.nodeId]!.id || result.execution >= saved.nextId)
+      throw new Error('Checkpoint dependency result identity is invalid.')
+  }
+  return saved
+}
+
+function saveDependencies(state: DependenciesState, frames?: ReadonlyMap<string, InputFrame>): DependenciesCheckpoint {
+  const results: DependenciesCheckpoint['results'][number][] = []
+  const references = new Map<string, number>()
+  const saveResult = (nodeId: string, result: InputSnapshot[string]) => {
+    const key = JSON.stringify([nodeId, result.execution, Object.keys(result.outputs).toSorted()])
+    let reference = references.get(key)
+    if (reference == null) {
+      reference = results.length
+      references.set(key, reference)
+      results.push({ nodeId, ...result })
+    } else if (!dequal(results[reference]!.outputs, result.outputs) || !dequal(results[reference]!.systemOutputs, result.systemOutputs))
+      throw new Error('Checkpoint invocation results conflict.')
+    return reference
+  }
+  const savedFrames: DependenciesCheckpoint['frames'][number][] = []
+  const frameIds = new Map<InputFrame, number>()
+  const saveFrame = (frame: InputFrame): number => {
+    const existing = frameIds.get(frame)
+    if (existing != null) return existing
+    const saved =
+      'source' in frame
+        ? { parent: saveFrame(frame.parent), input: { [frame.source]: saveResult(frame.source, frame.result) } }
+        : { input: Object.fromEntries(Object.entries(frame.values).map(([id, result]) => [id, saveResult(id, result)])) }
+    const id = savedFrames.length
+    savedFrames.push(saved)
+    frameIds.set(frame, id)
+    return id
+  }
+  const nodes = Object.fromEntries(
+    Object.entries(state.nodes).map(([id, current]) => {
+      const { id: execution, status, previous, released, jobId, seeded, output, systemOutputs } = current
+      return [
+        id,
+        {
+          id: execution,
+          status,
+          previous,
+          released,
+          seeded,
+          ...(jobId == null ? {} : { jobId }),
+          input: saveFrame(frames?.get(id) ?? { values: current.input }),
+          ...(output == null
+            ? {}
+            : { output: saveResult(id, { execution: current.id, outputs: output, ...(systemOutputs == null ? {} : { systemOutputs }) }) }),
+        },
+      ]
+    }),
+  )
+  return { nextId: state.nextId, iterations: { ...state.iterations }, nodes, frames: savedFrames, results }
+}
 type Edge = Graph['edges'][number]
 interface Loop {
   readonly header: string
@@ -64,7 +160,7 @@ interface Loop {
 
 /** Dependency completion belongs to an invocation, never to a Run-wide latest-result table. */
 export class Dependencies {
-  readonly state: DependenciesCheckpoint
+  readonly state: DependenciesState
   private readonly forward: Edge[] = []
   private readonly loops = new Map<string, Loop>()
   private readonly innerLoopsFirst: readonly Loop[]
@@ -135,13 +231,38 @@ export class Dependencies {
       this.loops.set(header, { header, feedback: edges, body, continuation: descendants })
     }
     this.innerLoopsFirst = [...this.loops.values()].toSorted((a, b) => a.body.size - b.body.size || a.header.localeCompare(b.header))
-    this.state = saved == null ? { nextId: 0, iterations: {}, nodes: {} } : structuredClone(saved)
+    this.state = { nextId: saved?.nextId ?? 0, iterations: { ...saved?.iterations }, nodes: {} }
     if (saved == null) for (const id of ids) this.state.nodes[id] = this.fresh()
-    else this.validate()
+    else {
+      const frames: InputFrame[] = []
+      for (const frame of saved.frames) {
+        if (frame.parent == null)
+          frames.push({ values: Object.fromEntries(Object.entries(frame.input).map(([id, reference]) => [id, saved.results[reference]!])) })
+        else {
+          const [source, reference] = Object.entries(frame.input)[0]!
+          frames.push({ source, result: saved.results[reference]!, parent: frames[frame.parent]!, cache: new Map() })
+        }
+      }
+      for (const [id, current] of Object.entries(saved.nodes)) {
+        const { input, output, ...node } = current
+        const result = output == null ? undefined : saved.results[output]!
+        const frame = frames[input]!
+        this.frames.set(id, frame)
+        const restored: DependencyState = { ...node, input: {}, ...(result == null ? {} : { output: result.outputs, systemOutputs: result.systemOutputs }) }
+        if (this.loops.size == 0) Object.defineProperty(restored, 'input', { enumerable: true, configurable: true, get: () => this.snapshot(frame) })
+        else restored.input = this.snapshot(frame)
+        this.state.nodes[id] = restored
+      }
+      this.validate()
+    }
     for (const id of ids) {
       if (this.state.nodes[id]!.status == 'pending') this.candidates.add(id)
-      this.frames.set(id, { values: this.state.nodes[id]!.input })
+      if (saved == null) this.frames.set(id, { values: this.state.nodes[id]!.input })
     }
+  }
+
+  checkpoint(): DependenciesCheckpoint {
+    return saveDependencies(this.state, this.loops.size == 0 ? this.frames : undefined)
   }
 
   private fresh(): DependencyState {
@@ -170,11 +291,7 @@ export class Dependencies {
         throw new Error('Checkpoint predecessor does not match the graph.')
       if (state.previous.length != new Set(state.previous).size) throw new Error('Checkpoint predecessors are duplicated.')
       if (state.status == 'completed' && state.output == null) throw new Error('Checkpoint completed dependency has no output.')
-      if (state.previous.some((source) => state.input[source] == null)) throw new Error('Checkpoint predecessor has no input snapshot.')
-      for (const [source, result] of Object.entries(state.input)) {
-        if (nodes[source] == null || result.execution > nodes[source]!.id || result.execution >= nextId)
-          throw new Error('Checkpoint dependency result identity is invalid.')
-      }
+      if (state.previous.some((source) => this.input(id, source) == null)) throw new Error('Checkpoint predecessor has no input snapshot.')
     }
     if (Object.keys(iterations).some((id) => !this.loops.has(id))) throw new Error('Checkpoint loop scope is invalid.')
   }

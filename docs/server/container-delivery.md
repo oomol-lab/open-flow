@@ -103,7 +103,8 @@ After a claim, the data volume stores an irreversible Operator token digest and 
 | `OPEN_FLOW_PUBLIC_ORIGIN`                      | Public Server origin reachable by Wait notification consumers.                                                                                |
 | `OPEN_FLOW_RUN_EVENT_RETENTION_DAYS`           | Detailed event retention for terminal Runs, in days. Default: `30`.                                                                           |
 | `OPEN_FLOW_MAX_PENDING_RUNS`                   | Deployment-wide limit on nonterminal Runs. Default: `1000`.                                                                                   |
-| `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | Deployment-wide concurrent execution limit, with at most one per Flow. Default: `4`.                                                          |
+| `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | Deployment-wide active Run limit. Independent Runs of one Flow may overlap. Default: `4`.                                                     |
+| `OPEN_FLOW_MAX_CONCURRENT_TASKS`               | Deployment-wide active Code and managed Task budget. Default: `16`. Waiting workflow tools lend their slot to child work.                     |
 | `OPEN_FLOW_RUN_TIMEOUT_MS`                     | Maximum milliseconds from Run execution start to terminal state. Default: `1800000`.                                                          |
 | `OPEN_FLOW_TASK_CPU_MS`                        | CPU milliseconds one Code Task invocation may use across all of its callbacks. Default: `10000`.                                              |
 | `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`       | Per-minute request limit for each Webhook/Integration endpoint or Wait capability. Default: `120`.                                            |
@@ -150,6 +151,14 @@ Provide or omit `OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN` and `OPEN_FLOW_INTEGRATION
 Without an environment-managed or persisted Operator credential, health checks, callbacks, and persisted runtime work can still operate. Control API fails closed and Workbench enters setup. Operator login and setup authorization share an instance-wide rate limit. Exceeding `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` returns 429 and `Retry-After`. `POST /auth/setup` requires a valid setup session. Missing, tampered, or expired sessions return 401 without consuming this quota. Authorized claims are exempt and can finish even if setup authorization used the last attempt in the window.
 
 At `OPEN_FLOW_MAX_PENDING_RUNS`, new Run admission returns 429. Idempotent replay of an accepted request still returns its original Run. Cron and Poll retain their scheduling position and retry shortly. Cron also retains its position while its Flow has a nonterminal Run. After that Run ends, Cron admits only the earliest unprocessed occurrence, then advances the next schedule beyond the current time. An unreadable or invalid published Cron Revision stops only that binding’s schedule and records failed health and error activity.
+
+Idle Waits and workflow-call nodes persist their checkpoints immediately and release their Run slots.
+Node execution uses the independent Task budget across all active Runs. Cancellation removes queued
+node admissions and releases held slots. Code and Agent workflow tools release their Task slot while
+waiting for a child and reacquire it before continuing. Same-Flow Run ordering is not guaranteed.
+Trusted graph scheduling, managed Tasks and node event persistence stay in the Server process.
+A lost Code Executor ends affected Code Runs as indeterminate and is rebuilt for later work;
+independent managed Tasks continue.
 
 Other background work continues. Republishing after an upgrade or Draft repair restores scheduling without changing historical Publications. Callback rate limiting creates in-memory windows only for existing Webhook/Integration endpoints or verified Wait capabilities. Exceeding the limit returns 429 and `Retry-After`. Wait `GET`, `HEAD`, `POST`, and different actions share one capability’s quota; capabilities count separately. Invalid capabilities or actions outside the Wait consume no quota. A rate-limited Wait `POST` submits no decision.
 

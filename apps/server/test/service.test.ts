@@ -9,7 +9,7 @@ import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { prepareFlow } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { runFlow, waitRetentionMs } from '@oomol-lab/open-flow/scheduler'
+import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import { TestClock } from 'effect/testing'
@@ -26,7 +26,6 @@ import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
-import { childProcessId } from './processTree.ts'
 import { acceptRun, storeRevision } from './runFixture.ts'
 import { closeOpenServices, closeService, openService, startService } from './serviceFixture.ts'
 
@@ -366,7 +365,7 @@ describe('Server application service', () => {
                 },
               }),
             )
-            for (let step = 0; step < 100 && fiber.pollUnsafe() == null; step++) yield* clock.adjust(waitRetentionMs)
+            for (let step = 0; step < 100 && fiber.pollUnsafe() == null; step++) yield* clock.adjust(1)
             if (fiber.pollUnsafe() == null) return yield* Effect.fail(new Error('The legacy Run did not checkpoint.'))
             return yield* Fiber.join(fiber)
           }),
@@ -489,7 +488,7 @@ describe('Server application service', () => {
     if (wait) {
       await expect.poll(() => service.control.runs.getRun('test', accepted.run.runId).waits.length).toBe(1)
       const waiting = service.control.runs.getRun('test', accepted.run.runId)
-      expect(waiting.status).toBe('running')
+      expect(waiting.status).toBe('waiting')
       if (waiting.waits[0] == null) throw new Error('Expected an active Wait.')
       service.control.runs.resolveRunWait('test', accepted.run.runId, waiting.waits[0].waitId, 'approve')
     }
@@ -704,6 +703,7 @@ describe('Server application service', () => {
     })
     if (accepted.kind != 'accepted') throw new Error('Wait notification Run was not accepted.')
     await expect.poll(() => invocations.length).toBe(1)
+    await service.waitForIdle()
 
     expect(invocations).toHaveLength(1)
     expect(invocations[0]).toMatchObject({
@@ -727,7 +727,7 @@ describe('Server application service', () => {
     expect(service.inspectWaitAction(capability, 'approve', admit)).toEqual({ retryAfter: 30 })
     expect(service.resolveWaitAction(capability, 'reject', admit)).toEqual({ retryAfter: 30 })
     expect(admit).toHaveBeenCalledTimes(2)
-    expect(service.run(accepted.runId)?.status).toBe('running')
+    expect(service.run(accepted.runId)?.status).toBe('waiting')
 
     const app = createServerApp(service)
     const approvePath = new URL(approveUrl).pathname
@@ -749,7 +749,7 @@ describe('Server application service', () => {
     const preview = await app.request(approvePath, { method: 'HEAD', headers: browserHeaders })
     expect(preview.status).toBe(200)
     expect(await preview.text()).toBe('')
-    expect(service.run(accepted.runId)?.status).toBe('running')
+    expect(service.run(accepted.runId)?.status).toBe('waiting')
 
     const inspected = await app.request(approvePath)
     expect(inspected.status).toBe(200)
@@ -758,7 +758,7 @@ describe('Server application service', () => {
     const head = await app.request(approvePath, { method: 'HEAD' })
     expect(head.status).toBe(200)
     expect(await head.text()).toBe('')
-    expect(service.run(accepted.runId)?.status).toBe('running')
+    expect(service.run(accepted.runId)?.status).toBe('waiting')
 
     for (const body of ['{', JSON.stringify({ comment: 42 }), JSON.stringify({ comment: 'x'.repeat(2001) })]) {
       expect((await app.request(approvePath, { method: 'POST', body })).status).toBe(400)
@@ -838,7 +838,7 @@ describe('Server application service', () => {
       expect(limited.headers.get('cache-control')).toBe('no-store')
       expect(limited.headers.get('retry-after')).toBe('60')
       expect(await limited.json()).toMatchObject({ error: { code: 'wait-action.rate-limited' }, version: 1 })
-      expect(runs.map((runId) => service.run(runId)?.status)).toEqual(['running', 'running'])
+      expect(runs.map((runId) => service.run(runId)?.status)).toEqual(['waiting', 'waiting'])
       const head = await app.request(first, { method: 'HEAD' })
       expect(head.status).toBe(429)
       expect(await head.text()).toBe('')
@@ -874,7 +874,7 @@ describe('Server application service', () => {
     expect(service.control.runs.getRun('test', accepted.runId).waits).toEqual([])
   })
 
-  it('keeps a Wait in memory and applies its decision once without a checkpoint', async () => {
+  it('persists an idle Wait and resumes its accepted decision once across restart', async () => {
     const file = await databaseFile()
     let service = await openService(file)
     await startService(service)
@@ -889,19 +889,22 @@ describe('Server application service', () => {
 
     const waiting = service.control.runs.getRun('test', accepted.runId)
     expect(waiting).toMatchObject({
-      status: 'running',
+      status: 'waiting',
       waits: [{ actions: ['approve', 'reject'], nodeId: 'approval', prompt: 'Approve request 1?', waitId: expect.any(String) }],
     })
     if (waiting.waits[0] == null) throw new Error('Waiting projection is missing.')
     expect(service.control.runs.getRunEvents('test', accepted.runId, 0, 100)).toMatchObject({ done: false })
     expect(() => service.control.runs.getRunResult('test', accepted.runId)).toThrow(expect.objectContaining({ code: controlErrorCode.runNotTerminal }))
     const database = new DatabaseSync(file)
-    expect(database.prepare('SELECT * FROM run_checkpoints WHERE run_id = ?').get(accepted.runId)).toBeUndefined()
+    expect(database.prepare('SELECT * FROM run_checkpoints WHERE run_id = ?').get(accepted.runId)).toBeDefined()
     database.close()
+    await closeService(service)
+    service = await openService(file)
+    await startService(service)
     expect(service.control.runs.resolveRunWait('test', accepted.runId, waiting.waits[0].waitId, 'approve')).toMatchObject({
       action: 'approve',
       resolutionAccepted: true,
-      status: 'running',
+      status: 'queued',
     })
     await service.waitForIdle()
 
@@ -921,7 +924,7 @@ describe('Server application service', () => {
     const events = service.events(accepted.runId)
     expect(events.filter(({ kind }) => kind == 'run.started')).toHaveLength(1)
     expect(events.filter(({ kind }) => kind == 'node.started')).toHaveLength(1)
-    expect(events.filter(({ kind }) => kind == 'run.waiting')).toHaveLength(0)
+    expect(events.filter(({ kind }) => kind == 'run.waiting')).toHaveLength(1)
     expect(events.filter(({ kind }) => kind == 'run.resolved')).toHaveLength(1)
     expect(events.filter(({ kind }) => kind == 'node.completed')).toHaveLength(1)
     expect(service.control.runs.resolveRunWait('test', accepted.runId, waiting.waits[0].waitId, 'approve')).toMatchObject({
@@ -1344,7 +1347,7 @@ describe('Server application service', () => {
     await closeService(service)
   })
 
-  it('runs different Flows concurrently without overlapping Runs from one Flow', async () => {
+  it('runs independent Runs from one Flow concurrently within the deployment limit', async () => {
     const releases: (() => void)[] = []
     let invocation = 0
     const service = await openService(await databaseFile(), {
@@ -1366,74 +1369,13 @@ describe('Server application service', () => {
     const other = await acceptRun(service, { flowId: 'main', idempotencyKey: 'revision-b', revision: llmFlow(), revisionId: 'revision-b' })
     if (first.kind != 'accepted' || second.kind != 'accepted' || other.kind != 'accepted') throw new Error('Concurrent Run setup conflicted.')
 
-    await Promise.all([waitForStatus(service, first.runId, 'running'), waitForStatus(service, other.runId, 'running')])
-    expect(service.run(second.runId)?.status).toBe('queued')
+    await Promise.all([waitForStatus(service, first.runId, 'running'), waitForStatus(service, second.runId, 'running')])
+    expect(service.run(other.runId)?.status).toBe('queued')
     await vi.waitFor(() => expect(releases).toHaveLength(2))
 
     for (const release of releases) release()
     await service.waitForIdle()
     expect([first.runId, second.runId, other.runId].map((runId) => service.run(runId)?.status)).toEqual(['completed', 'completed', 'completed'])
-    await closeService(service)
-  })
-
-  it('fails concurrent Flow sessions once on shared Executor loss and rebuilds for later Runs', async () => {
-    let aborted = 0
-    let calls = 0
-    const started = Promise.withResolvers<void>()
-    const service = await openService(await databaseFile(), {
-      capabilities: {
-        llm:
-          () =>
-          async ({ signal }) => {
-            calls += 1
-            if (calls > 2) return { kind: 'completed', value: { answer: 'recovered' }, version: 1 }
-            if (calls == 2) started.resolve()
-            return await new Promise<never>((_resolve, reject) => {
-              signal.addEventListener(
-                'abort',
-                () => {
-                  aborted += 1
-                  reject(signal.reason)
-                },
-                { once: true },
-              )
-            })
-          },
-      },
-      clock: Date.now,
-      runtime: { maxConcurrentRuns: 2 },
-    })
-    await startService(service)
-    const first = await acceptRun(service, { flowId: 'main', idempotencyKey: 'executor-loss-a', revision: llmFlow(), revisionId: 'executor-loss-a' })
-    const second = await acceptRun(service, { flowId: 'main', idempotencyKey: 'executor-loss-b', revision: llmFlow(), revisionId: 'executor-loss-b' })
-    if (first.kind != 'accepted' || second.kind != 'accepted') throw new Error('Concurrent Run setup conflicted.')
-
-    await started.promise
-    process.kill(await childProcessId(process.pid, '--executor'), 'SIGKILL')
-
-    await service.waitForIdle()
-    await vi.waitFor(() => expect(aborted).toBe(2))
-    expect(calls).toBe(2)
-    for (const runId of [first.runId, second.runId]) {
-      expect(service.run(runId)?.status).toBe('failed')
-      expect(
-        service
-          .events(runId)
-          .filter((event) => ['run.canceled', 'run.completed', 'run.failed'].includes(event.kind))
-          .map((event) => event.kind),
-      ).toEqual(['run.failed'])
-    }
-
-    const recovered = await acceptRun(service, {
-      flowId: 'main',
-      idempotencyKey: 'executor-recovered',
-      revision: llmFlow(),
-      revisionId: 'executor-recovered',
-    })
-    if (recovered.kind != 'accepted') throw new Error('Recovery Run setup conflicted.')
-    await service.waitForIdle()
-    expect(service.run(recovered.runId)?.status).toBe('completed')
-    expect(calls).toBe(3)
     await closeService(service)
   })
 

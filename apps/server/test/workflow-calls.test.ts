@@ -76,7 +76,7 @@ async function caller(service: ServerService, flowId: string, timeoutMs?: number
 }
 
 it('calls current Live with one execution slot, preserves separate events and durable origin', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
   const store = (service.control.runs as unknown as { store: Store }).store
@@ -135,7 +135,7 @@ it('calls current Live with one execution slot, preserves separate events and du
 })
 
 it('checks only ready children on recovery and requeues a stale readiness snapshot', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service)
   const task = workflowTask(service.control.flows.getWorkflowContract('operator', child.flowId))
   const parent = await create(service, 'Parallel', [
@@ -166,7 +166,7 @@ it('checks only ready children on recovery and requeues a stale readiness snapsh
 })
 
 it('keeps the parent pending while a child waits for a human and resumes without another child', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   const parent = await caller(service, child.flowId)
   const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'call', { nodeId: 'start', outputs: {} })
@@ -181,7 +181,7 @@ it('keeps the parent pending while a child waits for a human and resumes without
 })
 
 it('cancels a waiting child with its caller and refuses other owners', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   expect(() => service.control.flows.getWorkflowContract('someone-else', child.flowId)).toThrow()
   const parent = await caller(service, child.flowId)
@@ -193,7 +193,7 @@ it('cancels a waiting child with its caller and refuses other owners', async () 
 })
 
 it('enforces the call deadline while the child is waiting', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   const parent = await caller(service, child.flowId, 800)
   const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'timeout', {
@@ -211,7 +211,7 @@ it('resumes a persisted parent after restart without starting another child', as
   const directory = await mkdtemp(path.join(tmpdir(), 'workflow-call-'))
   onTestFinished(() => rm(directory, { recursive: true, force: true }))
   const file = path.join(directory, 'flow.sqlite')
-  const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
   const store = (service.control.runs as unknown as { store: Store }).store
@@ -219,7 +219,11 @@ it('resumes a persisted parent after restart without starting another child', as
   const held = vi
     .spyOn(store.runs, 'claim')
     .mockImplementation((excluded) =>
-      claim(store.runViews.listControlRuns(parent.flowId, 1)[0]?.startedAt != null ? [...(excluded ?? []), parent.flowId] : excluded),
+      claim(
+        store.runViews.listControlRuns(parent.flowId, 1)[0]?.startedAt != null
+          ? [...(excluded ?? []), store.runViews.listControlRuns(parent.flowId, 1)[0]!.runId]
+          : excluded,
+      ),
     )
   const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'restart', {
     nodeId: 'start',
@@ -230,7 +234,7 @@ it('resumes a persisted parent after restart without starting another child', as
   const original = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
   await closeService(service)
   held.mockRestore()
-  const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   await startService(reopened)
   await expect.poll(() => reopened.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
   expect(reopened.control.runs.getRun('operator', accepted.run.runId).calls).toEqual([original])
@@ -241,7 +245,7 @@ it('propagates an unconfirmed child after restart without replaying it', async (
   const directory = await mkdtemp(path.join(tmpdir(), 'workflow-unknown-'))
   onTestFinished(() => rm(directory, { recursive: true, force: true }))
   const file = path.join(directory, 'flow.sqlite')
-  const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   const parent = await caller(service, child.flowId)
   const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'unknown', {
@@ -251,15 +255,21 @@ it('propagates an unconfirmed child after restart without replaying it', async (
   await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.length).toBe(1)
   const call = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
   await expect.poll(() => service.control.runs.getRun('operator', call.runId).waits.length).toBe(1)
+  const store = (service.control.runs as unknown as { store: Store }).store
+  await expect.poll(() => service.control.runs.getRun('operator', call.runId).status).toBe('waiting')
+  const wait = service.control.runs.getRun('operator', call.runId).waits[0]!
+  service.control.runs.resolveRunWait('operator', call.runId, wait.waitId, 'continue')
+  expect(store.runs.claim([accepted.run.runId])?.runId).toBe(call.runId)
+  expect(store.runs.resume(call.runId)).toBe(true)
   await closeService(service)
-  const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   expect(reopened.control.runs.getRun('operator', accepted.run.runId).status).toBe('indeterminate')
   expect(reopened.control.runs.getRun('operator', call.runId).status).toBe('indeterminate')
   expect(reopened.control.runs.getRun('operator', accepted.run.runId).calls).toHaveLength(1)
 })
 
 it('accepts implementation changes without refreshing and requires refresh for interface changes', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
   const original = service.control.drafts.getRevision('operator', parent.flowId, parent.revisionId).content
@@ -314,7 +324,7 @@ it('accepts implementation changes without refreshing and requires refresh for i
 })
 
 it('supports nested calls with one slot and merges Draft and Live definition references', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service)
   const middle = await caller(service, child.flowId)
   const exposed = await service.control.drafts.changeDraft('operator', middle.flowId, middle.revisionId, [
@@ -425,7 +435,7 @@ it('rejects disconnected self-calls through public authoring without saving any 
 })
 
 it('creates separate child runs and matching event identities for each loop invocation', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
   const loop = await service.control.drafts.changeDraft('operator', parent.flowId, parent.revisionId, [
@@ -626,7 +636,7 @@ it('diagnoses each caller of the same invalid dependency while reading each targ
 })
 
 it('protects unfinished child calls and retains origin until both runs are deleted', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   const parent = await caller(service, child.flowId)
   const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'cleanup', {
@@ -751,7 +761,7 @@ async function codeToolCaller(service: ServerService, flowId: string, code: stri
 }
 
 it('calls workflow tools repeatedly and concurrently from public Code authoring with one execution slot', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const invoke = service.control.runs.invokeWorkflowTarget.bind(service.control.runs)
   vi.spyOn(service.control.runs, 'invokeWorkflowTarget').mockImplementation(async (...args) => {
     const [first, repeated] = await Promise.all([invoke(...args), invoke(...args)])
@@ -799,7 +809,7 @@ it('denies undeclared workflow tool aliases before admitting a child', async () 
 })
 
 it('executes a renamed workflow tool after a partial public authoring update', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service)
   const parent = await codeToolCaller(service, child.flowId, 'export default () => ({ answers: [] })')
   const renamed = await service.control.drafts.editAuthoring('operator', parent.flowId, {
@@ -831,7 +841,7 @@ it('executes a renamed workflow tool after a partial public authoring update', a
 })
 
 it('cancels a waiting workflow tool when its calling Run is canceled', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   const parent = await codeToolCaller(
     service,
@@ -853,7 +863,7 @@ it('cancels a waiting workflow tool when its calling Run is canceled', async () 
 })
 
 it('resumes an in-memory workflow tool after child Wait with one execution slot', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   const parent = await codeToolCaller(
     service,
@@ -879,7 +889,7 @@ it('resumes an in-memory workflow tool after child Wait with one execution slot'
 })
 
 it.each(['timeout', 'node-ended'] as const)('cancels unfinished workflow tools on %s', async (reason) => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   const code =
     reason == 'timeout'
@@ -895,7 +905,7 @@ it.each(['timeout', 'node-ended'] as const)('cancels unfinished workflow tools o
 })
 
 it('advances nested tools and multiple parent runs with one execution slot', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const leaf = await target(service)
   const middle = await codeToolCaller(
     service,
@@ -934,7 +944,7 @@ it('does not replay a tool call after interruption and restart', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'workflow-tool-restart-'))
   onTestFinished(() => rm(directory, { recursive: true, force: true }))
   const file = path.join(directory, 'flow.sqlite')
-  const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service, true)
   const parent = await codeToolCaller(
     service,
@@ -953,7 +963,7 @@ it('does not replay a tool call after interruption and restart', async () => {
     .toBe(1)
   const original = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
   await closeService(service)
-  const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   await startService(reopened)
   expect(reopened.control.runs.getRun('operator', accepted.run.runId).status).toBe('indeterminate')
   expect(reopened.control.runs.getRun('operator', accepted.run.runId).calls).toMatchObject([{ callId: original.callId, runId: original.runId }])
@@ -1005,7 +1015,7 @@ it('checks and explicitly refreshes tool interfaces while retaining unavailable 
 })
 
 it('preserves zero, negative, null and omitted workflow arguments and rejects unknown parameters', async () => {
-  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1, maxConcurrentTasks: 1 } })
   const child = await target(service)
   const before = service.control.drafts.getRevision('operator', child.flowId, child.revisionId).content.document.graph.nodes.start!
   const nullable = await service.control.drafts.changeDraft('operator', child.flowId, child.revisionId, [

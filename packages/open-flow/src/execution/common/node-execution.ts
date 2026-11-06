@@ -218,7 +218,11 @@ export function validateOutputs(nodeId: string, node: ExecutableNode, value: unk
             : {}
   const outputs = outputRecord(
     jsonValue(
-      Object.fromEntries(Object.entries(raw).map(([handle, item]) => [handle, Object.hasOwn(ports, handle) && item === undefined ? null : item])),
+      Object.fromEntries(
+        Object.entries(raw)
+          .filter(([handle]) => !discardUndeclared || Object.hasOwn(ports, handle))
+          .map(([handle, item]) => [handle, Object.hasOwn(ports, handle) && item === undefined ? null : item]),
+      ),
       `Node "${nodeId}" outputs`,
     ),
     nodeId,
@@ -228,11 +232,7 @@ export function validateOutputs(nodeId: string, node: ExecutableNode, value: unk
   const validated: [string, JsonValue][] = []
   for (const [handle, output] of Object.entries(complete)) {
     const port = ports[handle]
-    if (port == null) {
-      if (discardUndeclared) continue
-      throw new PortValidationError(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
-    }
-    if (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema))
+    if (port == null || (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema)))
       throw new PortValidationError(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
     validated.push([handle, output])
   }

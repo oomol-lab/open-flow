@@ -161,6 +161,7 @@ export class ServerService {
           if (event.kind == 'run.changed' && event.runId == runId) changed()
         }),
       connectorFailureCodes,
+      runtime.maxConcurrentTasks ?? 16,
     )
     const pollDefinitions = triggerDefinitions.filter((definition): definition is PollDefinition => definition.snapshot.type == 'poll')
     const integrationDefinitions = triggerDefinitions.filter((definition): definition is IntegrationDefinition => definition.snapshot.type == 'integration')

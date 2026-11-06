@@ -148,32 +148,24 @@ it('applies approval while notification is still running in the same graph', asy
   expect(f.events.filter((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toHaveLength(1)
 })
 
-it('retains a quiet graph for two minutes without consuming its execution budget', async () => {
+it('checkpoints a quiet graph immediately without consuming its idle execution budget', async () => {
   const f = await fixture(false)
   vi.useFakeTimers()
-  const run = Effect.runPromise(runFlow(f.prepared, { ...f.options, invokeTask: () => Effect.succeed({}) }))
-  let finished = false
-  void run.then(() => {
-    finished = true
-  })
-  await vi.advanceTimersByTimeAsync(119_999)
-  expect(finished).toBe(false)
-  await vi.advanceTimersByTimeAsync(1)
-  const outcome = await run
+  const outcome = await Effect.runPromise(runFlow(f.prepared, { ...f.options, invokeTask: emptyTask }))
   expect(outcome.kind).toBe('waiting')
   if (outcome.kind != 'waiting') throw new Error('Expected waiting')
   expect(outcome.remainingMs).toBe(1000)
   expect(outcome.checkpoint.waits).toHaveLength(1)
 })
 
-it('continues a quiet graph in its original session before the retention deadline', async () => {
+it('resumes a quiet graph without registering its Wait again', async () => {
   const f = await fixture(false)
-  vi.useFakeTimers()
-  const run = Effect.runPromise(runFlow(f.prepared, { ...f.options, invokeTask: () => Effect.succeed({}) }))
-  await vi.advanceTimersByTimeAsync(119_999)
+  const frozen = await Effect.runPromise(runFlow(f.prepared, { ...f.options, invokeTask: emptyTask }))
+  if (frozen.kind != 'waiting') throw new Error('Expected waiting')
   f.resolve()
-  await vi.advanceTimersByTimeAsync(0)
-  expect((await run).kind).toBe('node-results')
+  const { trigger: _, ...options } = f.options
+  const outcome = await Effect.runPromise(runFlow(f.prepared, { ...options, invokeTask: emptyTask, resume: { checkpoint: frozen.checkpoint } }))
+  expect(outcome.kind).toBe('node-results')
   expect(f.requests).toHaveLength(1)
 })
 
@@ -213,17 +205,23 @@ it('waits for notification and action branches before executing the merge once',
   expect(f.events.filter((event) => event.type == 'node.completed' && event.nodeId == 'join')).toHaveLength(1)
 })
 
-it('does not extend the retention window after a wake without a decision', async () => {
+it('applies a decision accepted during Wait registration before freezing', async () => {
   const f = await fixture(false)
-  vi.useFakeTimers()
-  const run = Effect.runPromise(runFlow(f.prepared, { ...f.options, invokeTask: () => Effect.succeed({}) }))
-  await vi.advanceTimersByTimeAsync(110_000)
-  f.wake()
-  await vi.advanceTimersByTimeAsync(10_000)
-  expect((await run).kind).toBe('waiting')
+  const result = await Effect.runPromise(
+    runFlow(f.prepared, {
+      ...f.options,
+      invokeTask: emptyTask,
+      waits: {
+        ...f.options.waits,
+        create: (wait) => f.options.waits.create(wait).pipe(Effect.tap(() => Effect.sync(() => f.resolve()))),
+      },
+    }),
+  )
+  expect(result.kind).toBe('node-results')
+  expect(f.requests).toHaveLength(1)
 })
 
-it('starts a fresh retention window after a decision advances the graph to another wait', async () => {
+it('checkpoints the next Wait immediately after resuming a decision', async () => {
   const f = await fixture(false)
   const prepared = {
     ...f.prepared,
@@ -233,36 +231,32 @@ it('starts a fresh retention window after a decision advances the graph to anoth
       edges: [...f.prepared.graph.edges, { source: 'after', target: 'second' }],
     },
   }
-  vi.useFakeTimers()
-  const run = Effect.runPromise(runFlow(prepared, { ...f.options, invokeTask: () => Effect.succeed({}) }))
-  let finished = false
-  void run.then(() => {
-    finished = true
-  })
-  await vi.advanceTimersByTimeAsync(110_000)
+  const first = await Effect.runPromise(runFlow(prepared, { ...f.options, invokeTask: emptyTask }))
+  if (first.kind != 'waiting') throw new Error('Expected waiting')
   f.resolve()
-  await vi.advanceTimersByTimeAsync(0)
+  const { trigger: _, ...options } = f.options
+  const second = await Effect.runPromise(runFlow(prepared, { ...options, invokeTask: emptyTask, resume: { checkpoint: first.checkpoint } }))
+  expect(second.kind).toBe('waiting')
+  if (second.kind != 'waiting') throw new Error('Expected waiting')
   expect(f.requests).toHaveLength(2)
-  await vi.advanceTimersByTimeAsync(119_999)
-  expect(finished).toBe(false)
-  await vi.advanceTimersByTimeAsync(1)
-  const outcome = await run
-  expect(outcome.kind).toBe('waiting')
-  if (outcome.kind != 'waiting') throw new Error('Expected waiting')
-  expect(outcome.checkpoint.waits.map((wait) => wait.nodeId)).toEqual(['second'])
+  expect(second.checkpoint.waits.map((wait) => wait.nodeId)).toEqual(['second'])
 })
 
 it.each(['continue', 'approve', 'reject'] as const)('does not notify nullable consumers again when resolving %s', async (action) => {
   const f = await fixture(true, action)
   const sent = deferred<void>()
+  const release = deferred<Record<string, never>>()
   const calls: { nodeId: string; inputs: Readonly<Record<string, unknown>> }[] = []
   const run = Effect.runPromise(
     runFlow(f.prepared, {
       ...f.options,
       invokeTask: (call) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
           calls.push({ nodeId: call.nodeId, inputs: call.input })
-          if (call.nodeId == 'send') sent.resolve()
+          if (call.nodeId == 'send') {
+            sent.resolve()
+            return yield* Effect.promise(() => release.promise)
+          }
           return {}
         }),
     }),
@@ -272,6 +266,7 @@ it.each(['continue', 'approve', 'reject'] as const)('does not notify nullable co
   expect(calls[0]!.inputs.notice).toMatchObject({ prompt: 'Ready?', inputs: { value: null } })
   expect(f.events.some((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toBe(false)
   f.resolve()
+  release.resolve({})
   expect((await run).kind).toBe('node-results')
   expect(calls.map((call) => call.nodeId)).toEqual(['send', 'after'])
   expect(f.requests).toHaveLength(1)
@@ -319,27 +314,24 @@ it('notifies once for each new Wait invocation in a loop', async () => {
     ...f.prepared,
     graph: { ...f.prepared.graph, edges: [...f.prepared.graph.edges, { source: 'after', target: 'wait' }] },
   }
-  const notifications = [deferred<void>(), deferred<void>()]
   const calls: string[] = []
-  const run = Effect.runPromise(
-    runFlow(prepared, {
-      ...f.options,
-      invokeTask: (call) =>
-        Effect.sync(() => {
-          calls.push(call.nodeId)
-          if (call.nodeId == 'send') notifications[calls.filter((nodeId) => nodeId == 'send').length - 1]!.resolve()
-          return {}
-        }),
-    }),
-  )
-  await notifications[0]!.promise
+  const invokeTask = (call: { nodeId: string }) =>
+    Effect.sync(() => {
+      calls.push(call.nodeId)
+      return {}
+    })
+  const first = await Effect.runPromise(runFlow(prepared, { ...f.options, invokeTask }))
+  if (first.kind != 'waiting') throw new Error('Expected waiting')
   f.resolve()
-  await notifications[1]!.promise
+  const { trigger: _, ...options } = f.options
+  const second = await Effect.runPromise(runFlow(prepared, { ...options, invokeTask, resume: { checkpoint: first.checkpoint } }))
+  if (second.kind != 'waiting') throw new Error('Expected waiting')
   expect(f.requests).toHaveLength(2)
   expect(f.requests[0]!.waitId).not.toBe(f.requests[1]!.waitId)
   expect(f.requests[0]!.jobId).not.toBe(f.requests[1]!.jobId)
   f.resolve(1, 'reject')
-  expect((await run).kind).toBe('node-results')
+  const result = await Effect.runPromise(runFlow(prepared, { ...options, invokeTask, resume: { checkpoint: second.checkpoint } }))
+  expect(result.kind).toBe('node-results')
   expect(calls).toEqual(['send', 'after', 'send'])
 })
 

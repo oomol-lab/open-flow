@@ -1,11 +1,10 @@
 import type { TaskCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { RuntimeCapabilityResponse, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOutcome, SchedulerEvent, TaskInvocation, WaitOperation, WaitResolution } from '@oomol-lab/open-flow/scheduler'
+import type { SchedulerEvent, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type * as Scope from 'effect/Scope'
 import type IsolatedVM from 'isolated-vm'
 import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, IsolatedVmLimits, ParentMessage } from './isolated-vm.ts'
 
-import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
 import {
   createActions,
   createArtifacts,
@@ -24,16 +23,15 @@ import {
   nodejsWebModule,
   resolveNodejsModule,
 } from '@oomol-lab/open-flow/runtime-nodejs-compat'
-import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import * as FiberSet from 'effect/FiberSet'
 import { Buffer } from 'node:buffer'
-import { createHash, createHmac, randomUUID } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import * as zlib from 'node:zlib'
-import { IsolatedVmError, isolatedVmEngineDigest, normalizedError, programError, serializedBytes } from './isolated-vm.ts'
+import { IsolatedVmError, normalizedError, programError, serializedBytes } from './isolated-vm.ts'
 
 type CapabilityOutcome = Omit<CapabilityResult, 'executionId'>
 
@@ -653,7 +651,6 @@ async function execute(
   preserveCapabilityFailure = false,
   log?: (logs: readonly Log[]) => Promise<void>,
 ): Promise<JsonValue | undefined> {
-  if (!('program' in request)) throw new IsolatedVmError('invalid-program', 'Runtime module invocation is incomplete.')
   const { program } = request
   const invalid = programError(program)
   if (invalid != null) throw invalid
@@ -737,126 +734,17 @@ function executeEffect(
   })
 }
 
-function executeFlow(
-  request: InvokeRequest,
-  call: (
-    message:
-      | {
-          readonly capabilities?: readonly TaskCapability[]
-          readonly invocationId: string
-          readonly kind: string
-          readonly payload: JsonValue
-          readonly nodeId?: string
-          readonly jobId?: string
-          readonly type: 'capability'
-        }
-      | { readonly event: SchedulerEvent; readonly type: 'event' }
-      | { readonly events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[]; readonly type: 'logs' }
-      | { readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
-      | { readonly operation: WaitOperation; readonly type: 'wait' },
-  ) => Effect.Effect<CapabilityResult, Error>,
-): Effect.Effect<FlowRunOutcome, Error> {
-  if (!('flow' in request)) return Effect.fail(new IsolatedVmError('invalid-program', 'Flow Runtime invocation is incomplete.'))
-  const { prepared, ...flow } = request.flow
-  return runFlow(prepared, {
-    ...flow,
-    createId: randomUUID,
-    waits: {
-      create: (wait) =>
-        remote(call({ operation: { kind: 'create', wait }, type: 'wait' })).pipe(Effect.map((value) => (value == null ? undefined : (value as JsonValue)))),
-      resolutions: (waitIds, block) =>
-        remote(call({ operation: { kind: 'resolutions', waitIds, block }, type: 'wait' })).pipe(
-          Effect.map((value) => {
-            if (value == null || typeof value != 'object' || Array.isArray(value)) throw new Error('Invalid Wait resolutions.')
-            for (const [id, resolution] of Object.entries(value)) {
-              if (
-                !waitIds.includes(id) ||
-                resolution == null ||
-                typeof resolution != 'object' ||
-                Array.isArray(resolution) ||
-                !['approve', 'reject', 'continue'].includes(String(resolution.action)) ||
-                typeof resolution.resolvedAt != 'string' ||
-                !Number.isFinite(Date.parse(resolution.resolvedAt)) ||
-                (resolution.comment !== null && typeof resolution.comment != 'string')
-              )
-                throw new Error('Invalid Wait resolution.')
-            }
-            return value as unknown as Readonly<Record<string, WaitResolution>>
-          }),
-        ),
-    },
-    emit: (event) => remote(call({ event, type: 'event' })).pipe(Effect.asVoid),
-    invokeTask: (invocation) =>
-      Effect.gen(function* () {
-        if ('moduleId' in invocation) {
-          const program = createRuntimeProgram(prepared, invocation.moduleId, isolatedVmEngineDigest)
-          if (program == null) return yield* Effect.fail(new IsolatedVmError('invalid-program', 'Task Module is not part of the fixed Flow closure.'))
-          const input = Object.assign({}, invocation.additionalInputs, invocation.input)
-          // The Scheduler bounds wall time with node and Run deadlines; the CPU watchdog bounds computation.
-          return yield* Effect.scoped(
-            executeEffect(
-              {
-                context: { blockId: invocation.blockId, flowId: invocation.flowId, runId: invocation.runId },
-                executionId: request.executionId,
-                input,
-                invocationId: invocation.invocationId,
-                limits: request.limits,
-                program,
-                type: 'invoke',
-              },
-              (invocationId, capabilities, kind, payload) => {
-                if (kind == 'previous') return Effect.sync(invocation.getPrevious)
-                return remote(call({ capabilities, invocationId, nodeId: invocation.nodeId, jobId: invocation.jobId, kind, payload, type: 'capability' })).pipe(
-                  Effect.map((response) => response as RuntimeCapabilityResponse),
-                )
-              },
-              invocation.capabilities,
-              true,
-              (logs) =>
-                remote(
-                  call({
-                    events: logs.map(({ level, message }) => ({
-                      jobId: invocation.jobId,
-                      level,
-                      message,
-                      nodeId: invocation.nodeId,
-                      runId: invocation.runId,
-                      type: 'node.log' as const,
-                    })),
-                    type: 'logs',
-                  }),
-                ).pipe(Effect.asVoid),
-            ),
-          )
-        }
-        return yield* remote(call({ invocation, type: 'task' }))
-      }),
-    projectFailure: (error) => ({
-      catchable: error instanceof IsolatedVmError ? error.catchable : Reflect.get(Object(error), 'catchable') === true,
-      retryable: error instanceof IsolatedVmError ? error.retryable : Reflect.get(Object(error), 'retryable') === true,
-      code: typeof Reflect.get(Object(error), 'schedulerCode') == 'string' ? (Reflect.get(Object(error), 'schedulerCode') as string) : 'node.failed',
-      message: normalizedError(error).message,
-    }),
-  })
-}
-
 function executeWithCapabilities(request: InvokeRequest, pending: Map<number, PendingCapability>, retire: () => boolean): Effect.Effect<void> {
   let nextId = 0
   const call = (
     message:
       | {
-          readonly capabilities?: readonly TaskCapability[]
           readonly invocationId: string
           readonly kind: string
           readonly payload: JsonValue
-          readonly nodeId?: string
-          readonly jobId?: string
           readonly type: 'capability'
         }
-      | { readonly event: SchedulerEvent; readonly type: 'event' }
-      | { readonly events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[]; readonly type: 'logs' }
-      | { readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
-      | { readonly operation: WaitOperation; readonly type: 'wait' },
+      | { readonly events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[]; readonly type: 'logs' },
   ): Effect.Effect<CapabilityResult, Error> =>
     Effect.gen(function* () {
       const id = ++nextId
@@ -877,22 +765,32 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
 
   return Effect.scoped(
     Effect.gen(function* () {
-      let value: FlowRunOutcome | JsonValue | undefined
-      if ('flow' in request) value = yield* executeFlow(request, call)
-      else {
-        value = yield* executeEffect(
-          request,
-          (invocationId, capabilities, kind, payload) =>
-            Effect.gen(function* () {
-              if (kind == 'previous') return []
-              const response = yield* call({ capabilities, invocationId, kind, payload, type: 'capability' })
-              if (!response.ok)
-                return yield* Effect.fail(Object.assign(new Error(response.error ?? 'Capability call failed.'), { schedulerCode: response.code }))
-              return response.value as RuntimeCapabilityResponse
-            }),
-          request.capabilities,
-        )
-      }
+      const context = request.context
+      const value = yield* executeEffect(
+        request,
+        (invocationId, _capabilities, kind, payload) => {
+          if (kind == 'previous' && context == null) return Effect.succeed([])
+          return remote(call({ invocationId, kind, payload, type: 'capability' })).pipe(Effect.map((response) => response as BridgeResponse))
+        },
+        request.capabilities,
+        context != null,
+        context == null
+          ? undefined
+          : (logs) =>
+              remote(
+                call({
+                  type: 'logs',
+                  events: logs.map(({ level, message }) => ({
+                    type: 'node.log',
+                    runId: context.runId,
+                    nodeId: context.nodeId,
+                    jobId: context.jobId,
+                    level,
+                    message,
+                  })),
+                }),
+              ).pipe(Effect.asVoid),
+      )
       yield* Effect.sync(() => {
         const retiring = retire()
         writeMessage(
@@ -903,14 +801,17 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
     }).pipe(
       Effect.catch((error) =>
         Effect.sync(() => {
-          const failure =
-            error instanceof IsolatedVmError
-              ? error
-              : new IsolatedVmError('flow' in request ? 'task-failed' : 'executor-crashed', normalizedError(error).message)
+          const failure = error instanceof IsolatedVmError ? error : new IsolatedVmError('task-failed', normalizedError(error).message)
           const retiring = retire()
           writeMessage(
             {
               code: failure.code,
+              failure: {
+                code: typeof Reflect.get(Object(error), 'schedulerCode') == 'string' ? (Reflect.get(Object(error), 'schedulerCode') as string) : 'node.failed',
+                message: normalizedError(error).message,
+                catchable: error instanceof IsolatedVmError ? error.catchable : Reflect.get(Object(error), 'catchable') === true,
+                retryable: error instanceof IsolatedVmError ? error.retryable : Reflect.get(Object(error), 'retryable') === true,
+              },
               executionId: request.executionId,
               message: failure.message,
               ok: false,
