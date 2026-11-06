@@ -50,6 +50,8 @@ const workbenchDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowWor
 /** Published declaration paths under `dist/`, keyed by source path under `src/`. A source may publish into several directories. */
 const declarationOutputs: readonly (readonly [source: string, output: string])[] = [
   ['canvas/common/commands', 'common/canvas-commands'],
+  ['canvas/common/direction', 'common/canvas-direction'],
+  ['canvas/common/interactiveMode', 'common/canvas-interactive-mode'],
   ['connector/common/actionSchema', 'common/connector-action'],
   ['connector/common/providerIconSprite', 'common/providerIconSprite'],
   ['connector/common/proxy', 'common/connector-proxy'],

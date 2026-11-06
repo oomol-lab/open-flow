@@ -2,7 +2,7 @@ import styles from './ReactFlowContainer.module.scss'
 import type { ReactNode } from 'react'
 import type { Val } from 'value-enhancer'
 import type { CanvasDirection } from '../../../common/direction.ts'
-import type { InteractiveMode } from '../../stores/canvas/canvas.store.ts'
+import type { InteractiveMode } from '../../../common/interactiveMode.ts'
 
 import { Radio } from '@base-ui/react/radio'
 import { RadioGroup } from '@base-ui/react/radio-group'

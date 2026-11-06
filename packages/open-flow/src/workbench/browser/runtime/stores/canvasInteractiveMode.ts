@@ -1,4 +1,4 @@
-import type { InteractiveMode } from '../../../../canvas/browser/stores/canvas/canvas.store.ts'
+import type { InteractiveMode } from '../../../../canvas/common/interactiveMode.ts'
 import type { WorkbenchPreferences } from '../contract.ts'
 
 export const canvasInteractiveModePreferenceKey = 'open-flow:canvas-interactive-mode'

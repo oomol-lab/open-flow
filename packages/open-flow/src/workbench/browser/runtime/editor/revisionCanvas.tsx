@@ -27,17 +27,31 @@ export function RevisionCanvas({
   presentation,
   theme,
   interactiveMode$,
+  defaultInteractiveMode,
+  defaultDirection,
+  defaultMiniMapExpanded,
+  defaultInspectorOpen = false,
+  defaultSelectedNodeIds,
+  nodesDraggable = true,
+  layoutMotion,
   label,
   background = 'striped',
   showHeader = true,
 }: {
   readonly label?: string
-  readonly background?: 'dotted' | 'striped'
+  readonly background?: 'dotted' | 'striped' | 'none'
   readonly showHeader?: boolean
   readonly draft: Draft
   readonly presentation: Presentation | null
   readonly theme: WorkbenchTheme
   readonly interactiveMode$?: FlowCanvasViewProps['interactiveMode$']
+  readonly defaultInteractiveMode?: FlowCanvasViewProps['defaultInteractiveMode']
+  readonly defaultDirection?: FlowCanvasViewProps['defaultDirection']
+  readonly defaultMiniMapExpanded?: FlowCanvasViewProps['defaultMiniMapExpanded']
+  readonly defaultInspectorOpen?: boolean
+  readonly defaultSelectedNodeIds?: readonly string[]
+  readonly nodesDraggable?: FlowCanvasViewProps['nodesDraggable']
+  readonly layoutMotion?: FlowCanvasViewProps['layoutMotion']
 }) {
   const root = useRef<HTMLElement>(null)
   const t = useTranslate()
@@ -45,8 +59,7 @@ export function RevisionCanvas({
   const revision = useMemo(() => revisionView(draft), [draft])
   const graphId = 'flow'
   const [sessions, setSessions] = useState<RevisionCanvasSession>({})
-  const [selected, setSelected] = useState<readonly string[]>([])
-  const [inspectorOpen, setInspectorOpen] = useState(false)
+  const [inspectorOpen, setInspectorOpen] = useState(defaultInspectorOpen)
   const [focus, setFocus] = useState<FlowCanvasViewProps['focusNodeRequest']>()
   const [catalog, setCatalog] = useState<{ language: string; providers: Readonly<Record<string, ConnectorProvider>> }>()
   const needsProviders = revision.connectorProviderIds.size > 0
@@ -87,6 +100,10 @@ export function RevisionCanvas({
     () => designerGraph(draft, presentation?.value, [], {}, {}, t, undefined, [], providerMetadata),
     [draft, presentation, t, providerMetadata],
   )
+  const [selected, setSelected] = useState<readonly string[]>(() => {
+    const ids = new Set(defaultSelectedNodeIds)
+    return baseline.nodes.filter((node) => ids.has(node.id)).map((node) => node.id)
+  })
   const session = sessions[graphId]
   const model = useMemo(
     () => ({
@@ -136,12 +153,16 @@ export function RevisionCanvas({
             model={model}
             editable={false}
             dottedBackground={background === 'dotted'}
-            nodesDraggable
+            nodesDraggable={nodesDraggable}
+            layoutMotion={layoutMotion}
             fitView={session?.viewport == null}
             className={background === 'striped' ? 'open-flow-canvas-locked' : undefined}
             dark={theme === 'dark'}
             language={language}
             interactiveMode$={interactiveMode$}
+            defaultInteractiveMode={defaultInteractiveMode}
+            defaultDirection={defaultDirection}
+            defaultMiniMapExpanded={defaultMiniMapExpanded}
             selectedNodeIds={selected}
             ignoredNodeIds={[]}
             focusNodeRequest={focus}

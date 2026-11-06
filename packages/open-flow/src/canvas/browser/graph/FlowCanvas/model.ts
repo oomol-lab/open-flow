@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 import type { CanvasDirection } from '../../../common/direction.ts'
+import type { InteractiveMode } from '../../../common/interactiveMode.ts'
 export type { CanvasDirection } from '../../../common/direction.ts'
 import type { Val } from 'value-enhancer'
 import type { GroupDividerDef } from '../../../../schema/index.ts'
 import type { CanvasCommandSubscriber } from '../../../common/commands.ts'
-import type { InteractiveMode } from '../../stores/canvas/canvas.store.ts'
 import type { CanvasAnnotationContext } from '../annotations.tsx'
 
 export interface FlowCanvasViewSource {
@@ -228,6 +228,12 @@ export interface FlowCanvasViewProps {
   readonly autoLayout?: boolean
   readonly className?: string
   readonly dark?: boolean
+  /** Initial direction change, including measured layout. Requires onChangeDirection. */
+  readonly defaultDirection?: CanvasDirection
+  /** Initial local interaction mode. Ignored when interactiveMode$ is supplied. Defaults to touchpad. */
+  readonly defaultInteractiveMode?: InteractiveMode
+  /** Initial mini map expansion. Defaults to collapsed. */
+  readonly defaultMiniMapExpanded?: boolean
   /** Defaults to editable; read-only consumers can opt into the canvas grid. */
   readonly dottedBackground?: boolean
   readonly editable: boolean

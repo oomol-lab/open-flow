@@ -15,7 +15,7 @@ import type { DecisionExecutor } from '@oomol-lab/open-flow/decision'
 import type { SourceConfiguration } from '@oomol-lab/open-flow/event-source'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 import type { OpenApiExecutor } from '@oomol-lab/open-flow/openapi'
-import type { OpenFlowPreviewProps, Draft, Presentation } from '@oomol-lab/open-flow/preview'
+import type { OpenFlowPreviewProps, Draft, Presentation, CanvasDirection, InteractiveMode } from '@oomol-lab/open-flow/preview'
 import type { RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
 import type { HostNavigationActionsProps, OpenFlowLogoProps } from '@oomol-lab/open-flow/ui'
 import type { OpenFlowWorkbenchHandle, WorkbenchImportInput, WorkbenchHost, WorkbenchLocation } from '@oomol-lab/open-flow/workbench'
@@ -63,7 +63,22 @@ export const openApiKind: OpenApiExecutor['kind'] = 'openapi'
 
 declare const previewDraft: Draft
 declare const previewPresentation: Presentation | null
-const previewProps: OpenFlowPreviewProps = { draft: previewDraft, presentation: previewPresentation, language: 'en', theme: 'light' }
+const previewDirection: CanvasDirection = 'vertical'
+const previewInteractiveMode: InteractiveMode = 'mouse'
+const previewProps: OpenFlowPreviewProps = {
+  draft: previewDraft,
+  presentation: previewPresentation,
+  language: 'en',
+  theme: 'light',
+  defaultDirection: previewDirection,
+  defaultInteractiveMode: previewInteractiveMode,
+  defaultMiniMapExpanded: true,
+  defaultInspectorOpen: true,
+  defaultSelectedNodeIds: ['start', 'task'],
+  nodesDraggable: false,
+  dottedBackground: false,
+  layoutMotion: false,
+}
 export const preview = <OpenFlowPreview {...previewProps} />
 
 const logoProps: OpenFlowLogoProps = { theme: 'dark', alt: 'Open Flow', width: 32 }

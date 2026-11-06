@@ -5,6 +5,7 @@ import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { ReactiveMap, ReadonlyReactiveMap } from 'value-enhancer/collections'
 import type { NodeId } from '../../../../schema/index.ts'
 import type { CanvasDirection } from '../../../common/direction.ts'
+import type { InteractiveMode } from '../../../common/interactiveMode.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFEdge, RFNode } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
@@ -37,7 +38,13 @@ import { getNodeMinimap, NodeMiniMapPhase } from './nodeMiniMap.ts'
 import { createRFCommand } from './rfCommand.ts'
 import { FLOW_RUN_STATUS } from './typings.ts'
 
-export type InteractiveMode = 'mouse' | 'touchpad'
+export interface CanvasStoreOptions {
+  readonly autoLayout?: boolean
+  readonly interactiveMode$?: Val<InteractiveMode>
+  readonly defaultInteractiveMode?: InteractiveMode
+  readonly defaultDirection?: CanvasDirection
+  readonly defaultMiniMapExpanded?: boolean
+}
 
 export interface RFGraph {
   readonly nodes: RFNode[]
@@ -149,14 +156,7 @@ export class CanvasStore {
   #runStatus: Val<FlowRunStatus>
   #selectedNodeIds = new Set<string>()
 
-  public constructor(
-    model: FlowCanvasViewModel,
-    editable: boolean,
-    language: string,
-    callbacks: ViewCallbacks,
-    autoLayout = false,
-    interactiveMode$?: Val<InteractiveMode>,
-  ) {
+  public constructor(model: FlowCanvasViewModel, editable: boolean, language: string, callbacks: ViewCallbacks, options: CanvasStoreOptions = {}) {
     this.#callbacks = callbacks
     this.#language = this.dispose.add(val(language))
     this.lang$ = this.#language
@@ -170,7 +170,7 @@ export class CanvasStore {
     const commentNodes = this.dispose.add(reactiveMap<NodeId, CommentNodeStore>(null, { onDeleted: dispose }))
     const viewport = this.dispose.add(val<FlowCanvasViewViewport | undefined>(model.viewport, { equal: isSameViewport }))
     this.rfCommand = this.dispose.add(createRFCommand(nodes))
-    this.layoutComplete = !autoLayout
+    this.layoutComplete = !options.autoLayout
     this.#runStatus = this.dispose.add(val<FlowRunStatus>(model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle))
     this.#connections = this.dispose.add(val<readonly FlowCanvasViewEdge[]>([]))
     const edges = this.dispose.add(deriveEdges(this.#connections, nodes))
@@ -178,9 +178,9 @@ export class CanvasStore {
     this.$$ = {
       initialized: this.dispose.add(val(false)),
       editable: this.dispose.add(val(editable)),
-      miniMapExpanded: this.dispose.add(val<boolean | undefined>()),
+      miniMapExpanded: this.dispose.add(val<boolean | undefined>(options.defaultMiniMapExpanded)),
       viewport: viewport,
-      interactiveMode: interactiveMode$ ?? this.dispose.add(val<InteractiveMode>('touchpad')),
+      interactiveMode: options.interactiveMode$ ?? this.dispose.add(val<InteractiveMode>(options.defaultInteractiveMode ?? 'touchpad')),
       direction: this.dispose.add(val(canvasDirection(model.direction))),
       changingDirection: this.dispose.add(val(false)),
       nodes,
@@ -219,6 +219,7 @@ export class CanvasStore {
       nodeMiniMapPhase: this.dispose.add(compute((get) => getNodeMinimap(get(nodes.$).size + get(commentNodes.$).size, get(viewport)?.zoom ?? 1))),
     }
     this.#syncModel(model)
+    if (options.defaultDirection != null) this.changeDirection(options.defaultDirection)
   }
 
   /** Initializes the shared layout after React Flow has measured the nodes. */

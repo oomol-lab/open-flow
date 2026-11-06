@@ -139,7 +139,7 @@ describe('FlowCanvasView model synchronization', () => {
 
   it('keeps a host-owned interaction mode when the canvas identity changes', () => {
     const interactiveMode$ = val<'mouse' | 'touchpad'>('mouse')
-    const first = renderView(props(model([]), { interactiveMode$ }))
+    const first = renderView(props(model([]), { interactiveMode$, defaultInteractiveMode: 'touchpad' }))
     expect(first.props.flowCanvasStore.$$.interactiveMode).toBe(interactiveMode$)
     const second = renderView(props(model([]), { identity: 'flow:next', interactiveMode$ }))
     expect(second.props.flowCanvasStore.$$.interactiveMode).toBe(interactiveMode$)

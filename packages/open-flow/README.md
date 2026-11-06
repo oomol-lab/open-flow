@@ -217,7 +217,7 @@ import '@oomol-lab/open-flow/preview.css'
 function Example({ draft, presentation }: { draft: Draft; presentation: Presentation | null }) {
   return (
     <div style={{ height: 640 }}>
-      <OpenFlowPreview draft={draft} presentation={presentation} language="en" theme="light" />
+      <OpenFlowPreview draft={draft} presentation={presentation} language="en" theme="light" defaultInteractiveMode="mouse" defaultDirection="vertical" />
     </div>
   )
 }
@@ -230,10 +230,33 @@ existing missing-layout behavior. These are workflow definitions, not React Flow
 
 The preview has no title bar. Its optional `label` names the accessible region; layout restoration appears as canvas controls when needed.
 
+`defaultInteractiveMode` accepts `mouse` or `touchpad` and defaults to `touchpad`.
+`defaultDirection` accepts `horizontal` or `vertical`; omit it to keep the presentation's direction
+(horizontal when no direction is saved). A different initial direction runs the canvas's measured
+layout, including comments. Users can change these settings through the canvas controls.
+The entry also exports their `InteractiveMode` and `CanvasDirection` types.
+
+| Prop                     | Default | Behavior                                                                                                         |
+| ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `defaultMiniMapExpanded` | `false` | Initially expands the mini map. Users can toggle it in the canvas controls.                                      |
+| `defaultInspectorOpen`   | `false` | Initially opens the property panel. Users can close or reopen it.                                                |
+| `defaultSelectedNodeIds` | `[]`    | Initially selects workflow nodes or comments by ID. Missing IDs are ignored; duplicate IDs select the node once. |
+| `nodesDraggable`         | `true`  | Allows temporary node movement. Selection, inspection and direction switching remain available when disabled.    |
+| `dottedBackground`       | `true`  | Shows the canvas dot grid.                                                                                       |
+| `layoutMotion`           | `true`  | Animates layout changes while respecting reduced-motion preferences.                                             |
+
+All `default*` props apply only when the preview mounts. Changing them leaves the current session
+unchanged. `nodesDraggable`, `dottedBackground` and `layoutMotion` update immediately without resetting
+temporary layout or selection.
+
+Combine `defaultSelectedNodeIds={["node-id"]}` with `defaultInspectorOpen` to initially show that
+node's properties. Multiple IDs show the selection in the property panel's node list. These IDs
+are workflow node or presentation comment IDs, without React Flow's internal prefixes.
+
 The host owns container dimensions, language and light/dark theme. Theme and language can change
 without resetting temporary node positions or layout direction. Layout changes never write back to the supplied objects.
 Restore layout returns both direction and positions to the supplied presentation while preserving the current viewport.
-Use a new React `key` when switching examples to reset selection and layout.
+Use a new React `key` when switching examples or applying new defaults to reset the session.
 
 For Shadow DOM, the host creates the shadow root and mounts the React component inside it.
 Load **preview.css inside that root**, for example with a `<link rel="stylesheet">` pointing to

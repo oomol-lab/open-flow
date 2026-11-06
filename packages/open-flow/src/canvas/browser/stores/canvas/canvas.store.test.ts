@@ -35,7 +35,7 @@ function createTestSetup(connections = val<readonly FlowCanvasViewEdge[]>([]), a
       onPaste: () => {},
       onChangeComment: undefined,
     },
-    autoLayout,
+    { autoLayout },
   )
   const nodes = store.$$.nodes
   const createdNodes: NodeStore[] = []

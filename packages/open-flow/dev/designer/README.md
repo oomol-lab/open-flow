@@ -156,7 +156,12 @@ Node and Trigger **Properties** galleries include a **Fixed types · editable va
 
 `?story=preview` and `?story=preview-shadow` use the public `OpenFlowPreview` entry with the
 Publications fixture. Test temporary movement, layout direction switching/restoration, properties, theme/language,
-missing layout, and a narrow host. The Provider example initializes the standard App Catalog
+missing layout, and a narrow host. Story actions initialize interaction mode, direction, mini map,
+inspector and selection (one node, a comment or multiple nodes); changing defaults without resetting
+must preserve the current session. Combine initial selection with an open inspector. Toggle node dragging,
+grid and layout motion without resetting. Disabling dragging keeps selection and inspection available.
+Restore layout returns to the saved presentation even when the initial direction was overridden.
+The Provider example initializes the standard App Catalog
 singleton with deterministic data. Move or select a node before loading metadata to verify that
 Connector icons and Agent tool badges update without resetting the session. The Shadow DOM host is Lab-only and copies the loaded Lab
 stylesheets, including production CSS modules; independent published-CSS verification must use

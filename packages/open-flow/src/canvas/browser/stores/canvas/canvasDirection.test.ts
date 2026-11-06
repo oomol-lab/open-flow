@@ -176,7 +176,7 @@ describe('canvas direction', () => {
       ]),
     }
     const onMoveNodes = vi.fn()
-    const store = new CanvasStore(model, true, 'en', { onMoveNodes, onChangeComment: undefined }, true)
+    const store = new CanvasStore(model, true, 'en', { onMoveNodes, onChangeComment: undefined }, { autoLayout: true })
     stores.push(store)
     for (const node of store.$.nodes.values())
       node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 336, height: node.nodeId === 'condition' ? 180 : 92 } })
