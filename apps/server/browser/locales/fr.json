@@ -90,7 +90,7 @@
     "oomolExpired": "L’autorisation a expiré. Connectez-vous à nouveau.",
     "oomolFailed": "Impossible de connecter OOMOL. Réessayez.",
     "connectorMode": "Type de connexion",
-    "oomolHosted": "Services hébergés officiels",
+    "oomolHosted": "Hébergement officiel",
     "connectorCustom": "Auto-hébergé",
     "services": "Connexion aux services",
     "connectorAddress": "URL du Connector",
@@ -104,7 +104,7 @@
       "required": "Ce champ est obligatoire.",
       "connectorUrl": "Saisissez une URL HTTP ou HTTPS sans identifiants, paramètres ni fragment.",
       "origin": "Saisissez une origine HTTPS sans chemin, identifiants, paramètres ni fragment. HTTP est autorisé en local.",
-      "hosted": "Pour les services OOMOL, utilisez le profil des services hébergés officiels."
+      "hosted": "Pour les services OOMOL, utilisez le profil « Hébergement officiel »."
     },
     "serviceSelectionRequired": "Sélectionnez une connexion de service",
     "serviceIncomplete": "Modifiez le service sélectionné pour compléter sa configuration",
@@ -130,7 +130,7 @@
     "oomolRetrySave": "Réessayer l’enregistrement",
     "llm": "LLM",
     "llmSource": "Source du service",
-    "llmOomol": "Service OOMOL",
+    "llmOomol": "Hébergement officiel",
     "llmCustom": "Service personnalisé",
     "llmOomolHint": "Utilisez la connexion OOMOL existante, sans saisir d’adresse ni de clé.",
     "llmOomolUnavailable": "Connectez votre compte OOMOL pour utiliser son service de modèles.",

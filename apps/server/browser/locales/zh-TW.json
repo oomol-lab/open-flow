@@ -90,7 +90,7 @@
     "oomolExpired": "授權已過期，請重新連接。",
     "oomolFailed": "無法連接 OOMOL，請重試。",
     "connectorMode": "連接方式",
-    "oomolHosted": "官方託管服務",
+    "oomolHosted": "官方託管",
     "connectorCustom": "自部署",
     "services": "服務連線",
     "connectorAddress": "Connector 位址",
@@ -104,7 +104,7 @@
       "required": "請填寫此項。",
       "connectorUrl": "請輸入有效的 HTTP 或 HTTPS 位址，不含使用者名稱、密碼、查詢參數或片段。",
       "origin": "請輸入 HTTPS 網域，不含路徑、使用者名稱、密碼、查詢參數或片段；本機位址可使用 HTTP。",
-      "hosted": "OOMOL 服務請使用「官方託管服務」設定。"
+      "hosted": "OOMOL 服務請使用「官方託管」設定。"
     },
     "serviceSelectionRequired": "請選擇服務連線",
     "serviceIncomplete": "請編輯目前服務，完成設定",
@@ -130,8 +130,8 @@
     "oomolRetrySave": "重試儲存",
     "llm": "LLM",
     "llmSource": "服務來源",
-    "llmOomol": "OOMOL 託管",
-    "llmCustom": "自行設定",
+    "llmOomol": "官方託管",
+    "llmCustom": "自訂服務",
     "llmOomolHint": "已連接 OOMOL，可直接使用，無需填寫位址和金鑰。",
     "llmOomolUnavailable": "由 OOMOL 提供模型服務，連接後即可使用。",
     "oomolConnect": "連接 OOMOL",
