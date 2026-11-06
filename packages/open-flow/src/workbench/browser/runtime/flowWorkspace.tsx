@@ -324,10 +324,11 @@ export function FlowEditor({
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(flowId ?? '')
   const renderPng = useCallback(
     async (options: PngExportSettings) => {
+      const model = store.$.designer.value
       const { flowToPng } = await import('../../../canvas/browser/graph/FlowCanvas/exportPng.ts')
-      return flowToPng(designer, language, { ...options, ignoredNodeIds })
+      return flowToPng(model, language, { ...options, ignoredNodeIds })
     },
-    [designer, language, ignoredNodeIds],
+    [store, language, ignoredNodeIds],
   )
   const panel = useInspectorPanel({
     identity: flowId ?? '',

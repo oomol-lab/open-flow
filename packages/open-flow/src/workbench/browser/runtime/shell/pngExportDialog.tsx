@@ -29,6 +29,7 @@ interface PreviewRequest {
   readonly render: (options: PngExportSettings) => Promise<FlowPngResult>
   readonly options: PngExportSettings
   readonly attempt: number
+  readonly open: boolean
 }
 
 interface Preview {
@@ -73,7 +74,8 @@ export function PngExportDialog({
     () => ({ aspectRatio, dark, frame, layout: direction === 'vertical' ? layout : 'original', title }),
     [aspectRatio, dark, frame, direction, layout, title],
   )
-  const request = useMemo(() => ({ render, options, attempt }), [render, options, attempt])
+  // Reopening starts a fresh snapshot, even when export settings have not changed.
+  const request = useMemo(() => ({ render, options, attempt, open }), [render, options, attempt, open])
   const ready = preview?.request === request
   const error = failed === request
 
