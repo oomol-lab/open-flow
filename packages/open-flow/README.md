@@ -46,7 +46,7 @@ import { flowToPng } from '@oomol-lab/open-flow/render'
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH })
 try {
   const workflow = JSON.parse(await readFile('workflow.openflow.json', 'utf8'))
-  const result = await flowToPng(browser, workflow, { language: 'zh-CN', dark: true, frame: true })
+  const result = await flowToPng(browser, workflow, { language: 'zh-CN', dark: true, frame: true, layout: 'compact', aspectRatio: '4:3' })
   await writeFile('workflow.png', result.buffer)
 } finally {
   await browser.close()
@@ -55,6 +55,17 @@ try {
 
 The result also includes `width`, `height` and `hasImagePlaceholders`. Options default
 to English, light mode and no frame; `title` overrides the file name shown in a frame.
+Layout defaults to `original`, preserving saved positions. Set `layout: 'compact'`
+to bend long vertical dependency paths toward the sides. Each run follows the workflow's
+direction, with a U-shaped return between runs. Branches start near their fork; shared
+joins follow all incoming runs. Vertical nodes retain top inputs and bottom outputs,
+while horizontal workflows always preserve their saved layout. Compact layout preserves node sizes and branch order and does not change
+the input file.
+Set `aspectRatio` to `1:1`, `4:3`, `3:4`, `16:9` or `9:16` to choose the ratio of the
+complete PNG, including its frame. The exporter centers the content with extra canvas
+space and uses the chosen ratio when arranging compact vertical workflows. It never
+crops or stretches nodes. Omit the option or use `auto` to fit the content bounds.
+Pixels outside the rounded frame are transparent; the canvas inside follows the chosen theme.
 Image scale and allocation retries follow the Workbench PNG exporter automatically.
 The function validates the file without changing it or executing nodes, and closes
 its own Context after each call. You own the Browser lifecycle. Rendering resources

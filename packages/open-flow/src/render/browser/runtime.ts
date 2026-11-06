@@ -16,6 +16,8 @@ export async function render({ workflow, options }: RenderRequest): Promise<Rend
   try {
     const model = designerGraph(workflow, workflow.presentation, [], {}, {}, i18n.t)
     const result = await flowToPng(model, language, {
+      layout: options.layout,
+      aspectRatio: options.aspectRatio,
       dark: options.dark,
       frame: options.frame,
       title: options.title ?? workflow.name ?? 'Workflow',

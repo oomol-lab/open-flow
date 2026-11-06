@@ -1,15 +1,21 @@
+import type { ReactFlowInstance } from '@xyflow/react'
+import type { FlowPngAspectRatio, FlowPngLayout } from '../../../../render/common/png.ts'
 import type { FlowCanvasViewModel } from './model.ts'
 
 import { toSvg } from 'html-to-image'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
+import { getFlowPngAspectRatio } from '../../../../render/common/png.ts'
 import { IconImageCrossOriginContext } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { IconifyProvider } from '../../../../ui/browser/icons/iconifyContext.tsx'
 import { openFlowLogoSource } from '../../../../ui/browser/logo.tsx'
 import { CanvasStore } from '../../stores/canvas/canvas.store.ts'
+import { captureStyleProperties } from './captureStyles.ts'
 import { FlowCanvas } from './FlowCanvas.tsx'
 
 export interface FlowPngOptions {
+  readonly layout?: FlowPngLayout
+  readonly aspectRatio?: FlowPngAspectRatio
   readonly dark?: boolean
   readonly frame?: boolean
   readonly title?: string
@@ -36,7 +42,6 @@ interface ImageFrame {
   readonly title: string
   readonly logo: string
   readonly background: string
-  readonly outerBackground: string
   readonly foreground: string
   readonly border: string
   readonly fontFamily: string
@@ -177,10 +182,17 @@ async function renderPng(
   height: number,
   background: string,
   frame?: ImageFrame,
+  aspectRatio?: readonly [number, number],
 ): Promise<Omit<FlowPngResult, 'hasImagePlaceholders'>> {
   const ratio = Math.min(2, maximumDimension / width, maximumDimension / height, Math.sqrt(maximumPixels / (width * height)))
-  let outputWidth = Math.max(1, Math.floor(width * ratio))
-  let outputHeight = Math.max(1, Math.floor(height * ratio))
+  const dimensions = (scale: number) => {
+    if (aspectRatio) {
+      const units = Math.max(1, Math.floor(Math.min((width * scale) / aspectRatio[0], (height * scale) / aspectRatio[1])))
+      return { width: units * aspectRatio[0], height: units * aspectRatio[1] }
+    }
+    return { width: Math.max(1, Math.floor(width * scale)), height: Math.max(1, Math.floor(height * scale)) }
+  }
+  let output = dimensions(ratio)
   const image = new Image()
   const logo = frame ? new Image() : undefined
   image.decoding = 'async'
@@ -194,24 +206,25 @@ async function renderPng(
     for (let attempt = 0; attempt < 3; attempt++) {
       const canvas = document.createElement('canvas')
       try {
-        canvas.width = outputWidth
-        canvas.height = outputHeight
-        const context = canvas.getContext('2d', { alpha: false })
+        canvas.width = output.width
+        canvas.height = output.height
+        const context = canvas.getContext('2d', { alpha: !!frame })
         if (!context) throw new Error('Unable to allocate the workflow image.')
-        context.fillStyle = frame?.outerBackground ?? background
-        context.fillRect(0, 0, outputWidth, outputHeight)
         if (frame && logo) {
-          context.scale(outputWidth / width, outputHeight / height)
+          context.scale(output.width / width, output.height / height)
           drawFrame(context, image, logo, width, height, background, frame)
-        } else context.drawImage(image, 0, 0, outputWidth, outputHeight)
+        } else {
+          context.fillStyle = background
+          context.fillRect(0, 0, output.width, output.height)
+          context.drawImage(image, 0, 0, output.width, output.height)
+        }
         if (context.isContextLost?.()) throw new Error('The workflow image context was lost.')
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
         if (!blob || context.isContextLost?.()) throw new Error('Unable to encode the workflow image.')
-        return { blob, width: outputWidth, height: outputHeight }
+        return { blob, ...output }
       } catch (error) {
-        if (attempt === 2 || (outputWidth === 1 && outputHeight === 1)) throw error
-        outputWidth = Math.max(1, Math.floor(outputWidth / 2))
-        outputHeight = Math.max(1, Math.floor(outputHeight / 2))
+        if (attempt === 2 || (output.width === 1 && output.height === 1)) throw error
+        output = dimensions(ratio / 2 ** (attempt + 1))
       } finally {
         // Release the bitmap before allocating another size or returning its encoded Blob.
         canvas.width = canvas.height = 0
@@ -225,7 +238,7 @@ async function renderPng(
 }
 
 /** Render the real canvas at full detail without moving or changing the user's canvas. */
-async function captureFlowImage(model: FlowCanvasViewModel, language: string, options: FlowPngOptions) {
+async function captureFlowImage(model: FlowCanvasViewModel, language: string, options: FlowPngOptions, aspectRatio?: readonly [number, number]) {
   const contentPadding = options.frame ? padding / 2 : padding
   const positions = model.nodes.map((node) => node.position)
   const minX = Math.min(0, ...positions.map((position) => position.x))
@@ -246,6 +259,7 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
   host.setAttribute('aria-hidden', 'true')
   document.body.append(host)
   const root = createRoot(host)
+  let instance: Pick<ReactFlowInstance, 'getInternalNode'> | undefined
   const store = new CanvasStore(snapshot, false, language, { onMoveNodes: () => {}, onChangeComment: () => {} })
   store.reconcile(snapshot, false, language, [], options.ignoredNodeIds ?? [])
   try {
@@ -262,6 +276,9 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
             fitView: false,
             layoutMotion: false,
             nodesDraggable: false,
+            onInit: (value) => {
+              instance = value
+            },
           }),
         ),
       ),
@@ -270,6 +287,26 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
     await waitFor(() => store.$.initialized.value && store.$.rfNodes.value.every((node) => !!node.measured?.width && !!node.measured.height), deadline)
     let hasImagePlaceholders = await prepareImages(host, deadline)
     await waitFor(() => document.fonts.status === 'loaded', deadline)
+    if (options.layout === 'compact' && store.$.direction.value === 'vertical') {
+      // ResizeObserver and React Flow must see the final resource dimensions first.
+      await nextFrame()
+      await nextFrame()
+      const bounds = store.compactForExport(
+        {
+          width: contentPadding * 2 + (options.frame ? framePadding * 2 + frameInset * 2 : 0),
+          height: contentPadding * 2 + (options.frame ? framePadding * 2 + frameHeaderHeight + frameInset : 0),
+        },
+        instance,
+        aspectRatio ? aspectRatio[0] / aspectRatio[1] : 1,
+      )
+      host.style.width = Math.ceil(bounds.width + contentPadding * 2 + 1000) + 'px'
+      host.style.height = Math.ceil(bounds.height + contentPadding * 2 + 1000) + 'px'
+      store.$$.viewport.set({ x: contentPadding - bounds.x, y: contentPadding - bounds.y, zoom: 1 })
+      await nextFrame()
+      await nextFrame()
+      hasImagePlaceholders = (await prepareImages(host, deadline)) || hasImagePlaceholders
+      await waitFor(() => document.fonts.status === 'loaded', deadline)
+    }
     const viewport = host.querySelector<HTMLElement>('.react-flow__viewport')!
     const origin = viewport.getBoundingClientRect()
     // Node-owned decorations can protrude outside React Flow's layout boxes.
@@ -283,8 +320,13 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
     const top = bounds.length ? Math.min(...bounds.map((rect) => rect.y)) : 0
     const right = bounds.length ? Math.max(...bounds.map((rect) => rect.x + rect.width)) : 320
     const bottom = bounds.length ? Math.max(...bounds.map((rect) => rect.y + rect.height)) : 120
-    const width = Math.ceil(right - left + contentPadding * 2)
-    const height = Math.ceil(bottom - top + contentPadding * 2)
+    const naturalWidth = Math.ceil(right - left + contentPadding * 2)
+    const naturalHeight = Math.ceil(bottom - top + contentPadding * 2)
+    const frameWidth = options.frame ? framePadding * 2 + frameInset * 2 : 0
+    const frameHeight = options.frame ? framePadding * 2 + frameHeaderHeight + frameInset : 0
+    const units = aspectRatio ? Math.ceil(Math.max((naturalWidth + frameWidth) / aspectRatio[0], (naturalHeight + frameHeight) / aspectRatio[1])) : 0
+    const width = aspectRatio ? units * aspectRatio[0] - frameWidth : naturalWidth
+    const height = aspectRatio ? units * aspectRatio[1] - frameHeight : naturalHeight
     const background = getComputedStyle(host.querySelector('.react-flow')!).backgroundColor
     const dataUrl = await toSvg(viewport, {
       width,
@@ -292,7 +334,18 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
       imagePlaceholder,
       preferredFontFormat: 'woff2',
       includeQueryParams: true,
-      style: { transform: `translate(${contentPadding - left}px, ${contentPadding - top}px)`, transformOrigin: '0 0' },
+      // Computed properties already resolve variables; copying every inherited
+      // theme token into every element only inflates the frozen image.
+      includeStyleProperties: captureStyleProperties(viewport),
+      filter: (node) => {
+        if (!(node instanceof HTMLElement)) return true
+        const style = getComputedStyle(node)
+        return style.display !== 'none' && style.opacity !== '0'
+      },
+      style: {
+        transform: `translate(${contentPadding + (width - naturalWidth) / 2 - left}px, ${contentPadding + (height - naturalHeight) / 2 - top}px)`,
+        transformOrigin: '0 0',
+      },
     })
     // Includes failures discovered only when html-to-image fetches cross-origin resources.
     hasImagePlaceholders ||= dataUrl.includes(encodeURIComponent(imagePlaceholder))
@@ -304,13 +357,11 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
       Object.assign(palette.style, { backgroundColor: 'var(--ui-background)', color: 'var(--ui-foreground)', borderColor: 'var(--ui-border)' })
       host.append(palette)
       const style = getComputedStyle(palette)
-      const outerBackground = style.backgroundColor
       if (options.dark) palette.style.backgroundColor = 'var(--ui-card)'
       frame = {
         title: options.title ?? '',
         logo: openFlowLogoSource(options.dark ? 'dark' : 'light'),
         background: getComputedStyle(palette).backgroundColor,
-        outerBackground,
         foreground: style.color,
         border: style.borderColor,
         fontFamily: getComputedStyle(viewport).fontFamily || 'sans-serif',
@@ -318,8 +369,8 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
     }
     return {
       dataUrl,
-      width: width + (frame ? framePadding * 2 + frameInset * 2 : 0),
-      height: height + (frame ? framePadding * 2 + frameHeaderHeight + frameInset : 0),
+      width: width + frameWidth,
+      height: height + frameHeight,
       background,
       frame,
       hasImagePlaceholders,
@@ -332,13 +383,20 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
 }
 
 export async function flowToPng(model: FlowCanvasViewModel, language = 'en', options: FlowPngOptions = {}): Promise<FlowPngResult> {
+  const aspectRatio = getFlowPngAspectRatio(options.aspectRatio)
   // Release the live canvas and its stores before allocating the output bitmap.
-  const { dataUrl, width, height, background, frame, hasImagePlaceholders } = await captureFlowImage(model, language, options)
-  return { ...(await renderPng(dataUrl, width, height, background, frame)), hasImagePlaceholders }
+  const { dataUrl, width, height, background, frame, hasImagePlaceholders } = await captureFlowImage(model, language, options, aspectRatio)
+  return { ...(await renderPng(dataUrl, width, height, background, frame, aspectRatio)), hasImagePlaceholders }
 }
 
 export async function downloadFlowPng(model: FlowCanvasViewModel, title: string, language = 'en', options: FlowPngOptions = {}): Promise<FlowPngResult> {
   const result = await flowToPng(model, language, { ...options, title })
+  downloadPng(result, title)
+  return result
+}
+
+/** Download the exact image already rendered for preview. */
+export function downloadPng(result: FlowPngResult, title: string): void {
   const url = URL.createObjectURL(result.blob)
   const link = document.createElement('a')
   try {
@@ -351,5 +409,4 @@ export async function downloadFlowPng(model: FlowCanvasViewModel, title: string,
     link.remove()
     setTimeout(() => URL.revokeObjectURL(url), 0)
   }
-  return result
 }

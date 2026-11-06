@@ -16,6 +16,7 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const error = useVal(edgeStore?.$.error)
   const canvasStore = useCanvasStore()
   const scale = useVal(canvasStore.$.scale)
+  const routes = useVal(canvasStore.connectionRoutes)
 
   // Leave space between the arrow tip and the target port in every direction.
   const gap = 3
@@ -25,6 +26,7 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const sourceNode = useInternalNode(props.source)
   const targetNode = useInternalNode(props.target)
   const [path, labelX, labelY] = getConnectionPath({
+    waypoints: routes.get(props.id),
     sourceBounds: connectionNodeBounds(sourceNode),
     targetBounds: connectionNodeBounds(targetNode),
     sourceX: props.sourceX,

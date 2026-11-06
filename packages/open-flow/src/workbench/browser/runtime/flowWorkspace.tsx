@@ -4,9 +4,10 @@ import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './editor/addNodeOptions.ts'
 import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
 import type { ConnectorAccountReference } from './revisionView.ts'
+import type { PngExportSettings } from './shell/pngExportDialog.tsx'
 import type { PublishState } from './shell/workspacePublishIsland.tsx'
 
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
@@ -35,6 +36,7 @@ import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunStatusIslandContainer } from './runs/runStatusIsland.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { FlowSettingsButton } from './shell/flowSettings.tsx'
+import { PngExportDialog } from './shell/pngExportDialog.tsx'
 import { WorkflowExportDialog } from './shell/workflowTransfer.tsx'
 import { WorkspaceDiagnosticsIsland } from './shell/workspaceDiagnosticsIsland.tsx'
 import { WorkspaceNavigationIsland } from './shell/workspaceNavigationIsland.tsx'
@@ -257,6 +259,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
 })
 
 export function FlowEditor({
+  portalRoot,
   navigationIsland,
   onRun,
   onRunStarted,
@@ -271,6 +274,7 @@ export function FlowEditor({
   store,
   theme,
 }: {
+  readonly portalRoot?: HTMLElement | null | undefined
   readonly navigationIsland?: ReactNode
   readonly onRun: (triggerId?: string) => void
   readonly onRunStarted: () => void
@@ -292,6 +296,8 @@ export function FlowEditor({
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
   const [stateOpen, setStateOpen] = useState(false)
+  const [pngExportOpen, setPngExportOpen] = useState(false)
+  const currentFlow = useVal(store.workspace.$.flow)
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   useVal(store.runRequests.$.inputsLoaded)
   const busy = useVal(store.$.busy)
@@ -316,6 +322,13 @@ export function FlowEditor({
   const moduleEditor = useVal(store.workspace.$.moduleEditor)
   const initialAddNodeTab = triggers.length == 0 ? 'triggers' : 'nodes'
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(flowId ?? '')
+  const renderPng = useCallback(
+    async (options: PngExportSettings) => {
+      const { flowToPng } = await import('../../../canvas/browser/graph/FlowCanvas/exportPng.ts')
+      return flowToPng(designer, language, { ...options, ignoredNodeIds })
+    },
+    [designer, language, ignoredNodeIds],
+  )
   const panel = useInspectorPanel({
     identity: flowId ?? '',
     preferences: store.preferences,
@@ -368,6 +381,7 @@ export function FlowEditor({
 
   useEffect(() => {
     setStartId(undefined)
+    setPngExportOpen(false)
     focusInspectorOnOpen.current = false
     opener.current = undefined
   }, [flowId])
@@ -458,6 +472,17 @@ export function FlowEditor({
       role="region"
       tabIndex={0}
     >
+      <PngExportDialog
+        container={portalRoot}
+        defaultDark={theme === 'dark'}
+        direction={designer.direction}
+        onDownload={(result) => store.downloadPng(result)}
+        onOpenChange={setPngExportOpen}
+        open={pngExportOpen}
+        preferences={store.preferences}
+        render={renderPng}
+        title={currentFlow?.name ?? flowId ?? 'Workflow'}
+      />
       {flowId != null && stateOpen && (
         <FlowStateButton
           key={flowId}
@@ -506,12 +531,7 @@ export function FlowEditor({
               />
             )}
             <WorkspacePublishIsland
-              onExportPng={
-                connectorAccess.access?.mode != 'selectable' || designer.nodes.length == 0
-                  ? undefined
-                  : (options) => store.exportPng(language, { ...options, ignoredNodeIds })
-              }
-              preferences={store.preferences}
+              onOpenPngExport={connectorAccess.access?.mode != 'selectable' || designer.nodes.length == 0 ? undefined : () => setPngExportOpen(true)}
               onExport={() => {
                 const id = store.workspace.$.flowId.value
                 if (id != null) void store.workspace.exportFlow(id)
@@ -838,6 +858,7 @@ export default function FlowWorkspace({
             </div>
           ) : view == 'design' ? (
             <FlowEditor
+              portalRoot={transferContainer}
               navigationIsland={navigationIsland}
               onRun={(triggerId) => void run(triggerId)}
               onRunStarted={revealRun}

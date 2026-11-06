@@ -56,19 +56,46 @@ const server = createServer((request, response) => {
 })
 let callerPage
 async function verify(name, file, options) {
+  const started = performance.now()
   const result = await flowToPng(browser, file, options)
+  const durationMs = Math.round(performance.now() - started)
   assert.ok(Buffer.isBuffer(result.buffer))
   assert.equal(result.buffer.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
   assert.equal(result.buffer.readUInt32BE(16), result.width)
   assert.equal(result.buffer.readUInt32BE(20), result.height)
   assert.ok(Math.max(result.width, result.height) <= 16384)
   assert.ok(result.width * result.height <= 32_000_000)
+  if (options?.aspectRatio && options.aspectRatio !== 'auto') {
+    const [width, height] = options.aspectRatio.split(':').map(Number)
+    assert.equal(result.width * height, result.height * width)
+  }
   assert.equal(browser.isConnected(), true)
   assert.equal(browser.contexts().length, 1)
   assert.equal(await callerPage.title(), 'Caller-owned page')
-  results.push({ name, width: result.width, height: result.height, hasImagePlaceholders: result.hasImagePlaceholders })
+  results.push({ name, width: result.width, height: result.height, hasImagePlaceholders: result.hasImagePlaceholders, durationMs })
   if (artifacts) await writeFile(path.join(artifacts, `${name}.png`), result.buffer)
   return result
+}
+async function cornerAlpha(result) {
+  return callerPage.evaluate(async (source) => {
+    const image = new Image()
+    image.src = source
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+    try {
+      const context = canvas.getContext('2d')
+      context.drawImage(image, 0, 0)
+      return [
+        context.getImageData(0, 0, 1, 1).data[3],
+        context.getImageData(canvas.width - 1, canvas.height - 1, 1, 1).data[3],
+        context.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data[3],
+      ]
+    } finally {
+      canvas.width = canvas.height = 0
+    }
+  }, 'data:image/png;base64,' + result.buffer.toString('base64'))
 }
 try {
   const callerContext = await browser.newContext()
@@ -83,8 +110,19 @@ try {
   assert.equal(light.width, dark.width)
   assert.equal(light.height, dark.height)
   assert.notDeepEqual(light.buffer, dark.buffer)
+  assert.deepEqual(await cornerAlpha(light), [0, 0, 255])
+  assert.deepEqual(await cornerAlpha(dark), [0, 0, 255])
   const plain = await verify('plain', workflow)
   assert.equal(plain.hasImagePlaceholders, false)
+  assert.deepEqual(await cornerAlpha(plain), [255, 255, 255])
+  for (const direction of ['vertical', 'horizontal']) {
+    const file = structuredClone(workflow)
+    file.presentation.designer.flow.direction = direction
+    const before = structuredClone(file)
+    await verify(direction + '-wide', file, { aspectRatio: '16:9', layout: 'compact', frame: true })
+    await verify(direction + '-portrait', file, { aspectRatio: '9:16', layout: 'compact', dark: true })
+    assert.deepEqual(file, before)
+  }
   const defaults = structuredClone(workflow)
   delete defaults.presentation
   await verify('default-layout', defaults, { language: 'zh-CN' })
@@ -115,6 +153,33 @@ try {
   large.presentation.designer.flow.comments = {}
   const scaled = await verify('large', large, { frame: true })
   assert.ok(scaled.width * scaled.height > 30_000_000)
+  for (const direction of ['vertical', 'horizontal']) {
+    const file = structuredClone(large)
+    file.presentation.designer.flow.direction = direction
+    file.presentation.designer.flow.nodes = Object.fromEntries(Array.from({ length: 50 }, (_, index) => ['n' + index, direction === 'vertical' ? { x: 0, y: index * 180 } : { x: index * 500, y: 0 }]))
+    const before = structuredClone(file)
+    const original = await verify(direction + '-original', file, { frame: true })
+    const compact = await verify(direction + '-compact', file, { frame: true, layout: 'compact' })
+    if (direction === 'vertical') assert.ok(Math.max(compact.width / compact.height, compact.height / compact.width) < Math.max(original.width / original.height, original.height / original.width))
+    else {
+      assert.equal(compact.width, original.width)
+      assert.equal(compact.height, original.height)
+      assert.deepEqual(compact.buffer, original.buffer)
+    }
+    assert.deepEqual(file, before)
+    if (direction === 'vertical') {
+      file.content.document.graph.edges.push({ source: 'n2', target: 'n7' }, { source: 'n4', target: 'n11' }, { source: 'n9', target: 'n14' })
+      await verify(direction + '-compact-branches', file, { frame: true, layout: 'compact', dark: true })
+    }
+  }
+  const bigger = structuredClone(large)
+  bigger.content.document.graph.nodes = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`n${index}`, { ...structuredClone(large.content.document.graph.nodes.n0), name: `节点 ${index + 1}` }]))
+  bigger.content.document.graph.edges = Array.from({ length: 199 }, (_, index) => ({ source: `n${index}`, target: `n${index + 1}` }))
+  bigger.presentation.designer.flow.direction = 'vertical'
+  bigger.presentation.designer.flow.nodes = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`n${index}`, { x: 0, y: index * 180 }]))
+  const biggerBefore = structuredClone(bigger)
+  await verify('vertical-compact-large', bigger, { frame: true, layout: 'compact' })
+  assert.deepEqual(bigger, biggerBefore)
   await assert.rejects(() => flowToPng(browser, { ...workflow, version: 2 }))
   assert.equal(browser.isConnected(), true)
   assert.equal(browser.contexts().length, 1)

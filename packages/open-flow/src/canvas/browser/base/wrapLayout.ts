@@ -1,8 +1,18 @@
-interface LayoutNode {
-  readonly id: string
-  readonly column: number
+import type { CanvasDirection } from '../../common/direction.ts'
+
+export interface LayoutPoint {
   readonly x: number
   readonly y: number
+}
+
+/** Normalize primary/cross coordinates without rotating cards. */
+export function layoutAxes(point: LayoutPoint, direction: CanvasDirection): LayoutPoint {
+  return direction === 'vertical' ? { x: point.y, y: point.x } : point
+}
+
+export interface LayoutNode extends LayoutPoint {
+  readonly id: string
+  readonly column: number
   readonly width: number
   readonly height: number
 }
