@@ -1,3 +1,4 @@
+import '@oomol-lab/open-flow/preview.css'
 import type { ReactNode } from 'react'
 import type { FlowCanvasViewModel, FlowCanvasViewNodeRun } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { TriggerNode, TriggerSchedule } from '../../src/flow/common/change.ts'
@@ -7,6 +8,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import type { TriggerFixture } from './triggerFixtures.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { OpenFlowPreview } from '@oomol-lab/open-flow/preview'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
@@ -23,6 +25,7 @@ import { RunRequestStore } from '../../src/workbench/browser/runtime/runs/runReq
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import { FixedDefinitionSample } from './fixedDefinitionSample.tsx'
 import { InspectorSamplePanel } from './inspectorSamplePanel.tsx'
+import { previewProviderCatalog } from './previewProviderFixture.ts'
 import { useStoryActions } from './storyActions.tsx'
 import { useStorySidebar } from './storySidebar.tsx'
 import { TriggerCatalogStory } from './triggerCatalogStory.tsx'
@@ -176,7 +179,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
     !active ? null : inspected ? (
       <div className="trigger-node-properties">
         <Gallery dark={dark} language={language}>
-          <SidebarSample key={inspected.id} fixture={inspected} dark={dark} language={language} log={log} state="display" framed={false} />
+          <SidebarSample key={inspected.id} fixture={inspected} dark={dark} language={language} log={log} state="read-only" framed={false} />
         </Gallery>
       </div>
     ) : (
@@ -433,6 +436,7 @@ function RunStory(props: StoryProps) {
 }
 
 type SidebarState =
+  | 'read-only'
   | 'response-outputs-missing'
   | 'empty-options'
   | 'missing-status'
@@ -451,7 +455,32 @@ type SidebarState =
   | 'deployment-error'
   | 'retired'
   | 'deployment-failed'
-function SidebarSample({ fixture, dark, language, log, state, framed = true }: StoryProps & { state: SidebarState; framed?: boolean }) {
+function ReadonlySidebarSample({ fixture, dark, language, framed }: StoryProps & { framed: boolean }) {
+  previewProviderCatalog(language).resolve()
+  const { draft } = useMemo(() => triggerDraft(fixture.trigger), [fixture])
+  return (
+    <section className={framed ? 'trigger-case' : 'trigger-case h-full'}>
+      {framed && <h3>read-only</h3>}
+      <div className={framed ? 'trigger-properties-panel' : 'trigger-sidebar-content h-full'}>
+        <OpenFlowPreview
+          draft={draft}
+          presentation={null}
+          language={language}
+          theme={dark ? 'dark' : 'light'}
+          defaultInspectorOpen
+          defaultSelectedNodeIds={['trigger']}
+          nodesDraggable={false}
+        />
+      </div>
+    </section>
+  )
+}
+
+function SidebarSample(props: StoryProps & { state: SidebarState; framed?: boolean }) {
+  return props.state === 'read-only' ? <ReadonlySidebarSample {...props} framed={props.framed ?? true} /> : <EditableSidebarSample {...props} />
+}
+
+function EditableSidebarSample({ fixture, dark, language, log, state, framed = true }: StoryProps & { state: SidebarState; framed?: boolean }) {
   const [session, setSession] = useState<ReturnType<typeof createTriggerSession>>()
   const sidebar = useRef<HTMLDivElement>(null)
   const logRef = useRef(log)
@@ -584,6 +613,7 @@ function SidebarStory(props: StoryProps) {
   const provider = props.fixture.trigger.kind === 'poll' || props.fixture.trigger.kind === 'integration'
   const states: SidebarState[] = provider
     ? [
+        'read-only',
         'display',
         'edit',
         'created-with-default',
@@ -599,8 +629,19 @@ function SidebarStory(props: StoryProps) {
           : []),
       ]
     : props.fixture.trigger.kind === 'webhook'
-      ? ['display', 'edit', 'unconfigured', 'response-outputs-missing', 'paused', 'deployment-loading', 'deployment-error', 'retired', 'deployment-failed']
-      : ['display', 'edit', props.fixture.trigger.kind === 'manual' ? 'description' : 'unconfigured']
+      ? [
+          'read-only',
+          'display',
+          'edit',
+          'unconfigured',
+          'response-outputs-missing',
+          'paused',
+          'deployment-loading',
+          'deployment-error',
+          'retired',
+          'deployment-failed',
+        ]
+      : ['read-only', 'display', 'edit', props.fixture.trigger.kind === 'manual' ? 'description' : 'unconfigured']
   return (
     <Gallery {...props}>
       <div className="trigger-case-grid">
@@ -803,7 +844,7 @@ export const triggerStories: readonly FrontendStory[] = [
           ? 'Provider trigger states and configuration.'
           : view === 'run'
             ? 'Generated test defaults, edited Provider payloads, validation and run states.'
-            : 'Provider properties, permitted default accounts, missing permissions and optional configuration. Compare Gmail, Google Sheets and GitHub: business fields stay visible while technical options start collapsed under Advanced settings. Expand, edit, collapse and reopen to check saved values and keyboard access in editable and read-only panels.',
+            : 'Provider properties with separate public Preview read-only, temporarily disabled and editable samples. Preview uses only the saved snapshot and public Provider metadata. Compare Feishu events and filters, Linear Team/status inspection and Tally forms. Read-only selectors preserve saved IDs without loading account or configuration catalogs; inspect selected Linear statuses without changing them. Compare Gmail, Google Sheets and GitHub: business fields stay visible while technical options start collapsed under Advanced settings.',
       id: `trigger-provider-${view}`,
       title: view === 'nodes' ? 'Node states' : view === 'run' ? 'Run menu states' : 'Properties',
       standalone: true,

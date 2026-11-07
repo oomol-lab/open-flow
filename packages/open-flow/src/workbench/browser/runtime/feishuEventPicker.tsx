@@ -30,11 +30,13 @@ export function FeishuEventPicker({
   value,
   onChange,
   disabled = false,
+  readOnly = false,
   allowedEvents,
 }: {
   readonly value: readonly string[]
   readonly onChange: (value: string[]) => void
   readonly disabled?: boolean
+  readonly readOnly?: boolean
   readonly allowedEvents?: readonly string[]
 }) {
   const t = useTranslate()
@@ -44,7 +46,7 @@ export function FeishuEventPicker({
   const [invalid, setInvalid] = useState(false)
   const entries = [
     ...catalog
-      .filter((entry) => allowedEvents == null || allowedEvents.includes(entry.id))
+      .filter((entry) => (allowedEvents == null || allowedEvents.includes(entry.id)) && (!readOnly || value.includes(entry.id)))
       .map((entry) => ({ id: entry.id, group: entry.group, label: t(`eventSources.eventNames.${entry.id.replaceAll('.', '_')}`) })),
     ...[...new Set([...(allowedEvents ?? []), ...value])]
       .filter((event) => !catalog.some((entry) => entry.id == event))
@@ -66,7 +68,7 @@ export function FeishuEventPicker({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <Label htmlFor={id}>{t('eventSources.events')}</Label>
-      {value.length > 0 && (
+      {!readOnly && value.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {value.map((event) => (
             <Button
@@ -89,7 +91,7 @@ export function FeishuEventPicker({
         id={id}
         type="search"
         value={search}
-        disabled={disabled}
+        disabled={disabled && !readOnly}
         placeholder={t('eventSources.searchEvents')}
         aria-label={t('eventSources.searchEvents')}
         onChange={(event) => setSearch(event.target.value)}
@@ -105,7 +107,7 @@ export function FeishuEventPicker({
                   <Checkbox
                     className="mt-0.5"
                     checked={value.includes(entry.id)}
-                    disabled={disabled || (!value.includes(entry.id) && value.length >= 200)}
+                    disabled={readOnly || disabled || (!value.includes(entry.id) && value.length >= 200)}
                     onCheckedChange={(checked) => onChange(checked === true ? [...value, entry.id] : value.filter((event) => event != entry.id))}
                   />
                   <span className="flex min-w-0 flex-col gap-0.5">
@@ -118,13 +120,13 @@ export function FeishuEventPicker({
         ))}
         {visible.length == 0 && <p className="m-0 p-2 text-sm text-muted-foreground">{t('eventSources.noEventMatches')}</p>}
       </div>
-      {value.length == 0 && <p className="m-0 text-xs text-muted-foreground">{t('eventSources.chooseEvents')}</p>}
+      {!readOnly && value.length == 0 && <p className="m-0 text-xs text-muted-foreground">{t('eventSources.chooseEvents')}</p>}
       {unavailable.length > 0 && (
         <p role="alert" className="m-0 text-xs text-destructive">
           {t('eventSources.eventUnavailable')} {unavailable.join(', ')}
         </p>
       )}
-      {allowedEvents == null && (
+      {!readOnly && allowedEvents == null && (
         <details>
           <summary className="cursor-pointer text-xs text-muted-foreground">{t('eventSources.customEvent')}</summary>
           <div className="mt-2 flex gap-2">

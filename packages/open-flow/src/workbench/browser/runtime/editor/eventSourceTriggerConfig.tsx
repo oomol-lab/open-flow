@@ -76,7 +76,8 @@ export function EventSourceTriggerConfig({
   config: assignments,
   nodeId,
   connectionId,
-  disabled,
+  disabled: temporarilyDisabled,
+  readOnly = false,
   store,
 }: {
   readonly provider?: 'feishu_app_bot' | 'slackbot' | 'intercom' | 'sentry' | 'zoom' | 'fireflies' | 'jira'
@@ -86,19 +87,23 @@ export function EventSourceTriggerConfig({
   readonly nodeId: string
   readonly connectionId?: string
   readonly disabled: boolean
-  readonly store: WorkspaceStore
+  readonly readOnly?: boolean
+  readonly store?: WorkspaceStore
 }) {
+  const disabled = temporarilyDisabled || readOnly
+  const editor = readOnly ? undefined : store
   const config = triggerConfigValues(inputs, assignments)
   const t = useTranslate()
   const [attempt, setAttempt] = useState(0)
   const sourceId = typeof config.sourceId == 'string' ? config.sourceId : ''
-  const flowId = store.$.flowId.value
+  const flowId = editor?.$.flowId.value
   const key = JSON.stringify([flowId, nodeId])
   const [state, setState] = useState<{ key: string; sources?: readonly EventSource[]; teamId?: string | null; failed?: boolean; loading?: boolean }>()
   useEffect(() => {
+    if (editor == null) return
     const controller = new AbortController()
     setState((current) => (current?.key == key ? { ...current, failed: false, loading: true } : { key, loading: true }))
-    void store.loadEventSources(controller.signal).then(
+    void editor.loadEventSources(controller.signal).then(
       (result) => {
         if (!controller.signal.aborted) setState({ key, ...result, loading: false })
       },
@@ -108,15 +113,19 @@ export function EventSourceTriggerConfig({
       },
     )
     return () => controller.abort()
-  }, [store, key, attempt])
+  }, [editor, key, attempt])
   const sources = state?.key == key ? state.sources : undefined
   const matchingSources = sources?.filter((source) => source.provider == provider && source.connectionId == connectionId)
-  const options = matchingSources?.map((source) => ({ value: source.sourceId, label: source.name }))
+  const options = readOnly
+    ? sourceId
+      ? [{ value: sourceId, label: sourceId }]
+      : []
+    : matchingSources?.map((source) => ({ value: source.sourceId, label: source.name }))
   const failed = state?.key == key && state.failed
   const loading = state?.key != key || state.loading == true
   const selectedSource = matchingSources?.find((source) => source.sourceId == sourceId)
-  const eventOptions = selectedSource?.eventTypes.map((type) => ({ value: type, label: type }))
   const selectedEvents = Array.isArray(config.eventTypes) ? config.eventTypes.filter((value): value is string => typeof value == 'string') : []
+  const eventOptions = readOnly ? selectedEvents : selectedSource?.eventTypes
   const visibleInputs = inputs.filter((input) => {
     if ('group' in input || input.handle === 'sourceId' || input.handle === 'eventTypes') return true
     if (!sourceId) return false
@@ -126,15 +135,16 @@ export function EventSourceTriggerConfig({
   })
   return (
     <TriggerConfigEditor
+      readOnly={readOnly}
       onReset={() => {
-        return store.nodes.resetTriggerConfig(nodeId)
+        return editor?.nodes.resetTriggerConfig(nodeId)
       }}
-      onResetValue={(name) => void store.nodes.resetTriggerConfig(nodeId, [name])}
+      onResetValue={(name) => void editor?.nodes.resetTriggerConfig(nodeId, [name])}
       inputs={visibleInputs}
       fieldLabels={fieldLabels}
       config={assignments}
       disabled={disabled}
-      onChange={(name, value) => void store.nodes.saveTriggerConfig(nodeId, name, value)}
+      onChange={(name, value) => void editor?.nodes.saveTriggerConfig(nodeId, name, value)}
       renderEditor={(input) =>
         input.handle === 'sourceId' ? (
           <div className="flex min-w-0 flex-col gap-2">
@@ -142,7 +152,7 @@ export function EventSourceTriggerConfig({
               <div className="flex h-[30px] w-full items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-2 text-xs text-muted-foreground">
                 {t('eventSources.loading')}
               </div>
-            ) : options.length > 0 ? (
+            ) : readOnly || options.length > 0 ? (
               <EventSourceSelect
                 label={fieldLabels?.sourceId ?? t('eventSources.source')}
                 value={sourceId}
@@ -151,25 +161,25 @@ export function EventSourceTriggerConfig({
                 onOpen={() => setAttempt((value) => value + 1)}
                 onChange={(value) => {
                   const source = matchingSources?.find((item) => item.sourceId == value)
-                  if (source != null) void store.nodes.setTriggerEventSource(nodeId, source)
+                  if (source != null) void editor?.nodes.setTriggerEventSource(nodeId, source)
                 }}
               />
-            ) : (
+            ) : editor != null ? (
               <div className="flex h-[30px] w-full items-center overflow-hidden rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))]">
                 <CreateEventSourceDialog
-                  notify={store.notify}
-                  key={JSON.stringify([store.$.flowId.value, nodeId])}
+                  notify={editor.notify}
+                  key={JSON.stringify([editor.$.flowId.value, nodeId])}
                   className="min-w-0 flex-1"
                   trigger={
                     <Button type="button" size="field" variant="ghost" className="h-full w-full justify-start rounded-none border-0 bg-transparent px-2" />
                   }
                   sourceKind={eventSourceKind(provider)}
-                  client={store.eventSourceClient}
+                  client={editor.eventSourceClient}
                   teamId={state?.key == key ? (state.teamId ?? null) : null}
                   existingNames={sources?.map((source) => source.name) ?? []}
                   disabled={disabled || state?.key != key || state.teamId === undefined}
                   onCreated={(source) => setState((current) => (current?.key == key ? { ...current, sources: [...(current.sources ?? []), source] } : current))}
-                  onSelect={async (source) => store.$.flowId.value == flowId && (await store.nodes.setTriggerEventSource(nodeId, source))}
+                  onSelect={async (source) => editor.$.flowId.value == flowId && (await editor.nodes.setTriggerEventSource(nodeId, source))}
                 />
                 <Button
                   type="button"
@@ -184,7 +194,7 @@ export function EventSourceTriggerConfig({
                   <i aria-hidden="true" className={`i-lucide-light:refresh-cw ${loading ? 'animate-spin motion-reduce:animate-none' : ''}`} />
                 </Button>
               </div>
-            )}
+            ) : null}
             {sourceId && options != null && !options.some((option) => option.value == sourceId) && (
               <p role="alert" className="text-sm text-destructive">
                 {t('eventSources.notFound')}
@@ -197,15 +207,16 @@ export function EventSourceTriggerConfig({
             )}
           </div>
         ) : input.handle === 'eventTypes' && provider === 'feishu_app_bot' ? (
-          sourceId ? (
+          sourceId || readOnly ? (
             <div className="flex flex-col gap-2">
               <FeishuEventPicker
+                readOnly={readOnly}
                 value={selectedEvents}
-                allowedEvents={(eventOptions ?? []).map((option) => option.value)}
+                allowedEvents={eventOptions ?? []}
                 disabled={disabled || eventOptions == null}
-                onChange={(value) => void store.nodes.saveTriggerConfig(nodeId, 'eventTypes', value)}
+                onChange={(value) => void editor?.nodes.saveTriggerConfig(nodeId, 'eventTypes', value)}
               />
-              <p className="m-0 text-xs text-muted-foreground">{t('eventSources.sourceEventsHint')}</p>
+              {!readOnly && <p className="m-0 text-xs text-muted-foreground">{t('eventSources.sourceEventsHint')}</p>}
             </div>
           ) : (
             <div className="flex h-[30px] items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-2 text-xs text-muted-foreground">
@@ -214,12 +225,13 @@ export function EventSourceTriggerConfig({
           )
         ) : input.handle === 'chatIds' || input.handle === 'resource' ? (
           <FeishuEventFilters
+            readOnly={readOnly}
             field={input.handle}
             config={config}
             events={selectedEvents}
             managed={selectedSource?.manageSubscriptions ?? false}
             disabled={disabled || selectedSource == null}
-            onChange={(name, value) => void store.nodes.saveTriggerConfig(nodeId, name, value)}
+            onChange={(name, value) => void editor?.nodes.saveTriggerConfig(nodeId, name, value)}
           />
         ) : undefined
       }

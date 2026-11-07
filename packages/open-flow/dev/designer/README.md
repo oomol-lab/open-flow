@@ -171,6 +171,14 @@ Connector icons and Agent tool badges update without resetting the session. The 
 stylesheets, including production CSS modules; independent published-CSS verification must use
 the packaged `preview.css` without Lab styles.
 
+Trigger **Properties** includes separate **Read-only**, **Display**, and **Edit** samples. Read-only
+mounts the public `OpenFlowPreview` from a saved snapshot without Workspace, Connector, or Trigger
+editing Stores. The selected-node sidebar in Trigger **Node states** uses the same snapshot path.
+Display retains the temporarily disabled editor for comparison. Check Feishu event names, search,
+chat and resource filters; Linear's saved Team and inspectable status menu; Tally's saved form;
+and language changes without configuration requests. Workbench **Preview** also covers Agent tool
+badges, no-setup accounts, deferred accounts, and Code capabilities through production read-only controls.
+
 `?story=node-annotations` exercises whole-node browser annotations with production
 canvas components. Use Codex's Annotation mode, collapse nodes, and change zoom;
 the sample actions advance the saved revision or mark code dirty. Its Flow and

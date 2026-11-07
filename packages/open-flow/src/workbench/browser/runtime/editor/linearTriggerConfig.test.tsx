@@ -98,3 +98,22 @@ it('keeps an unavailable selected status removable', async () => {
   await click(document.querySelector<HTMLElement>('[role="menuitemcheckbox"]')!)
   expect(onChange).toHaveBeenCalledWith([])
 })
+
+it('opens saved statuses for read-only inspection without refreshing or changing the selection', async () => {
+  const source = options({ options: undefined })
+  const onChange = vi.fn()
+  const selected = ['saved-status', 'another-status']
+  const { container } = render(<StatusSelect readOnly disabled missing={[]} onChange={onChange} options={source} selected={selected} teamSelected />)
+  const trigger = container.querySelector('button')!
+  expect(trigger.disabled).toBe(false)
+  await click(trigger)
+  const items = [...container.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]')]
+  expect(items.map((item) => item.textContent)).toEqual(selected)
+  for (const item of items) {
+    expect(item.getAttribute('aria-checked')).toBe('true')
+    expect(item.getAttribute('aria-disabled')).toBe('true')
+    await click(item)
+  }
+  expect(source.refresh).not.toHaveBeenCalled()
+  expect(onChange).not.toHaveBeenCalled()
+})

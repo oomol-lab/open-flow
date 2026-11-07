@@ -89,6 +89,7 @@ export function TeamSelect({
 
 export function StatusSelect({
   disabled,
+  readOnly = false,
   missing,
   options,
   selected,
@@ -96,6 +97,7 @@ export function StatusSelect({
   onChange,
 }: {
   readonly disabled: boolean
+  readonly readOnly?: boolean
   readonly missing: readonly string[]
   readonly options: ReturnType<typeof useTriggerConfigOptions>
   readonly selected: readonly string[]
@@ -106,7 +108,9 @@ export function StatusSelect({
   const descriptionId = useId()
   const errorId = useId()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
-  const choices = [...(options.options ?? []), ...missing.map((value) => ({ label: t('linearTrigger.unavailableStatus', { id: value }), value }))]
+  const choices = readOnly
+    ? selected.map((value) => options.options?.find((item) => item.value == value) ?? { label: value, value })
+    : [...(options.options ?? []), ...missing.map((value) => ({ label: t('linearTrigger.unavailableStatus', { id: value }), value }))]
   const selectedLabel = selected.length == 1 ? choices.find((item) => item.value == selected[0])?.label : undefined
   const summary = !teamSelected
     ? t('linearTrigger.selectTeamFirst')
@@ -125,7 +129,7 @@ export function StatusSelect({
       )}
       <DropdownMenu
         onOpenChange={(open) => {
-          if (open) options.refresh()
+          if (open && !readOnly) options.refresh()
         }}
       >
         <DropdownMenuTrigger
@@ -137,7 +141,7 @@ export function StatusSelect({
               className="w-full min-w-0 justify-between"
               data-field-control
               data-field-prompt={missing.length > 0 || undefined}
-              disabled={disabled}
+              disabled={disabled && !readOnly}
               size="field"
               title={missing.length > 0 ? t('linearTrigger.missingStatuses') : t('linearTrigger.statusHint')}
               type="button"
@@ -164,6 +168,7 @@ export function StatusSelect({
                   return (
                     <DropdownMenuCheckboxItem
                       checked={checked}
+                      disabled={readOnly}
                       className={`${selectionMenuItemClass} ${unavailable ? 'text-destructive' : ''}`}
                       key={item.value}
                       onCheckedChange={(next) => onChange(next ? [...selected, item.value] : selected.filter((value) => value != item.value))}
@@ -210,7 +215,8 @@ export function LinearTriggerConfig({
   config: assignments,
   nodeId,
   connectionId,
-  disabled,
+  disabled: temporarilyDisabled,
+  readOnly = false,
   store,
 }: {
   readonly inputs: readonly (InputPort | Group)[]
@@ -219,39 +225,44 @@ export function LinearTriggerConfig({
   readonly nodeId: string
   readonly connectionId?: string
   readonly disabled: boolean
-  readonly store: WorkspaceStore
+  readonly readOnly?: boolean
+  readonly store?: WorkspaceStore
 }) {
+  const disabled = readOnly || temporarilyDisabled
+  const editor = readOnly ? undefined : store
   const config = triggerConfigValues(inputs, assignments)
   const teamId = typeof config.teamId == 'string' ? config.teamId : undefined
   const selected = Array.isArray(config.stateIds) ? config.stateIds.filter((id): id is string => typeof id == 'string') : []
-  const scope = JSON.stringify([store.$.flowId.value, connectionId])
-  const teams = useTriggerConfigOptions(store, nodeId, 'teamId', scope, connectionId != null)
-  const states = useTriggerConfigOptions(store, nodeId, 'stateIds', JSON.stringify([scope, teamId]), connectionId != null && teamId != null)
+  const scope = JSON.stringify([editor?.$.flowId.value, connectionId])
+  const teams = useTriggerConfigOptions(editor, nodeId, 'teamId', scope, connectionId != null)
+  const states = useTriggerConfigOptions(editor, nodeId, 'stateIds', JSON.stringify([scope, teamId]), connectionId != null && teamId != null)
   const missingTeam = teamId != null && teams.options != null && !teams.options.some((item) => item.value == teamId)
   const missingStates = states.options == null ? [] : selected.filter((id) => !states.options!.some((item) => item.value == id))
   return (
     <TriggerConfigEditor
-      onReset={() => store.nodes.resetTriggerConfig(nodeId)}
-      onResetValue={(name) => void store.nodes.resetTriggerConfig(nodeId, [name])}
+      readOnly={readOnly}
+      onReset={() => editor?.nodes.resetTriggerConfig(nodeId)}
+      onResetValue={(name) => void editor?.nodes.resetTriggerConfig(nodeId, [name])}
       inputs={inputs}
       fieldLabels={fieldLabels}
       config={assignments}
       disabled={disabled}
-      onChange={(name, value) => void store.nodes.saveTriggerConfig(nodeId, name, value)}
+      onChange={(name, value) => void editor?.nodes.saveTriggerConfig(nodeId, name, value)}
       renderEditor={(input) =>
         input.handle === 'teamId' ? (
           <TeamSelect
             disabled={disabled || connectionId == null}
             missing={missingTeam}
-            onChange={(value) => void store.nodes.saveTriggerConfig(nodeId, 'teamId', value)}
+            onChange={(value) => void editor?.nodes.saveTriggerConfig(nodeId, 'teamId', value)}
             options={teams}
             value={teamId}
           />
         ) : input.handle === 'stateIds' ? (
           <StatusSelect
+            readOnly={readOnly}
             disabled={disabled || connectionId == null || teamId == null || missingTeam}
             missing={missingStates}
-            onChange={(value) => void store.nodes.saveTriggerConfig(nodeId, 'stateIds', value)}
+            onChange={(value) => void editor?.nodes.saveTriggerConfig(nodeId, 'stateIds', value)}
             options={states}
             selected={selected}
             teamSelected={teamId != null}

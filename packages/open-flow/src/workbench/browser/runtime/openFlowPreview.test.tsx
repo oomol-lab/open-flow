@@ -5,8 +5,12 @@ import type { OpenFlowPreviewProps } from './openFlowPreview.tsx'
 
 import { act } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { previewProviderCatalog } from '../../../../dev/designer/previewProviderFixture.ts'
 import { publicationFixture } from '../../../../dev/designer/publicationFixture.ts'
 import { click, render } from '../../../../test/support/render.tsx'
+import { inputValues } from '../../../flow/common/inputValue.ts'
+import { triggerDefinitions } from '../../../trigger/providers/definitions.ts'
+import { localizeTrigger } from '../../../trigger/providers/localization.ts'
 import { savedPositions, setCanvasLayout } from './canvasPresentation.ts'
 import { OpenFlowPreview } from './openFlowPreview.tsx'
 
@@ -27,6 +31,55 @@ afterEach(() => {
 function previewProps(overrides: Partial<OpenFlowPreviewProps> = {}): OpenFlowPreviewProps {
   return { ...publicationFixture('preview', 'revision'), language: 'en', theme: 'light', ...overrides }
 }
+
+it('localizes saved Provider fields and switches language without loading editable catalogs or changing the snapshot', async () => {
+  previewProviderCatalog('zh-CN').resolve()
+  previewProviderCatalog('en').resolve()
+  const request = vi.fn()
+  vi.stubGlobal('fetch', request)
+  const definition = triggerDefinitions.find((entry) => entry.snapshot.key === 'feishu_app_bot.on_event')!.snapshot
+  if (definition.type !== 'integration') throw new Error('Expected an Integration Trigger snapshot.')
+  const props = previewProps({ language: 'zh-CN', defaultInspectorOpen: true, defaultSelectedNodeIds: ['trigger'] })
+  const draft = {
+    ...props.draft,
+    content: {
+      ...props.draft.content,
+      document: {
+        ...props.draft.content.document,
+        graph: {
+          nodes: {
+            trigger: {
+              name: definition.displayName,
+              kind: 'integration' as const,
+              definition,
+              connectionId: 'saved-account',
+              config: inputValues({ sourceId: 'saved-source', eventTypes: ['im.message.receive_v1'] }),
+            },
+          },
+          edges: [],
+        },
+      },
+    },
+  }
+  const original = structuredClone(draft)
+  const view = render(<OpenFlowPreview {...props} draft={draft} />)
+  const chinese = await localizeTrigger(definition, 'zh-CN')
+  await act(async () => {
+    await localizeTrigger(definition, 'zh-CN')
+  })
+  const names = () => [...view.container.querySelectorAll<HTMLInputElement>('input')].map((input) => input.value)
+  expect(names()).toContain(chinese.configInputLabels.sourceId)
+  expect(names()).toContain(chinese.configInputLabels.eventTypes)
+  view.rerender(<OpenFlowPreview {...props} draft={draft} language="en" />)
+  const english = await localizeTrigger(definition, 'en')
+  await act(async () => {
+    await localizeTrigger(definition, 'en')
+  })
+  expect(names()).toContain(english.configInputLabels.sourceId)
+  expect(names()).not.toContain(chinese.configInputLabels.sourceId)
+  expect(draft).toEqual(original)
+  expect(request).not.toHaveBeenCalled()
+})
 
 function positions(store: CanvasStore) {
   return Object.fromEntries(store.$.rfNodes.value.map((node) => [node.data.store.nodeId, node.position]))

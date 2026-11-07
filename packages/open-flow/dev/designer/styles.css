@@ -302,8 +302,12 @@
   color: var(--ui-foreground);
   background: var(--ui-background);
 }
+.trigger-node-properties,
 .trigger-node-properties > .trigger-gallery {
-  height: auto;
+  height: 100%;
+  min-height: 0;
+}
+.trigger-node-properties > .trigger-gallery {
   overflow: visible;
   padding: 0;
   background: transparent;
@@ -337,9 +341,6 @@
   display: flex;
   justify-content: flex-end;
   padding: 12px 0;
-}
-.trigger-sidebar-content .inspector-scroll {
-  height: auto;
 }
 @media (max-width: 900px) {
   .run-control-story-stage {

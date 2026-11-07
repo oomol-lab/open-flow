@@ -16,7 +16,8 @@ export function TallyTriggerConfig({
   config,
   nodeId,
   connectionId,
-  disabled,
+  disabled: temporarilyDisabled,
+  readOnly = false,
   store,
 }: {
   readonly inputs: readonly (InputPort | Group)[]
@@ -25,12 +26,15 @@ export function TallyTriggerConfig({
   readonly nodeId: string
   readonly connectionId?: string
   readonly disabled: boolean
-  readonly store: WorkspaceStore
+  readonly readOnly?: boolean
+  readonly store?: WorkspaceStore
 }) {
+  const disabled = readOnly || temporarilyDisabled
+  const editor = readOnly ? undefined : store
   const t = useTranslate()
   const values = triggerConfigValues(inputs, config)
   const formId = typeof values.formId == 'string' ? values.formId : undefined
-  const forms = useTriggerConfigOptions(store, nodeId, 'formId', JSON.stringify([store.$.flowId.value, connectionId]), connectionId != null)
+  const forms = useTriggerConfigOptions(editor, nodeId, 'formId', JSON.stringify([editor?.$.flowId.value, connectionId]), connectionId != null)
   const missing = formId != null && forms.options != null && !forms.options.some((item) => item.value == formId)
   const items = [
     ...(forms.options ?? []),
@@ -38,13 +42,14 @@ export function TallyTriggerConfig({
   ]
   return (
     <TriggerConfigEditor
+      readOnly={readOnly}
       inputs={inputs}
       fieldLabels={fieldLabels}
       config={config}
       disabled={disabled}
-      onChange={(name, value) => void store.nodes.saveTriggerConfig(nodeId, name, value)}
-      onReset={() => store.nodes.resetTriggerConfig(nodeId)}
-      onResetValue={(name) => void store.nodes.resetTriggerConfig(nodeId, [name])}
+      onChange={(name, value) => void editor?.nodes.saveTriggerConfig(nodeId, name, value)}
+      onReset={() => editor?.nodes.resetTriggerConfig(nodeId)}
+      onResetValue={(name) => void editor?.nodes.resetTriggerConfig(nodeId, [name])}
       renderEditor={(input) =>
         input.handle == 'formId' ? (
           <div className="min-w-0">
@@ -56,7 +61,7 @@ export function TallyTriggerConfig({
                 if (open) forms.refresh()
               }}
               onValueChange={(value) => {
-                if (typeof value == 'string') void store.nodes.saveTriggerConfig(nodeId, 'formId', value)
+                if (typeof value == 'string') void editor?.nodes.saveTriggerConfig(nodeId, 'formId', value)
               }}
             >
               <SelectTrigger

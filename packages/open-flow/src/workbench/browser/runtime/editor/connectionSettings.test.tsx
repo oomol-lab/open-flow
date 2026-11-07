@@ -5,9 +5,46 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { expect, it, vi } from 'vitest'
 import { createI18n } from '../i18n.ts'
-import { AccountSelect, ConnectorAccount } from './connectionSettings.tsx'
+import { AccountSelect, ConnectorAccount, SavedConnectionReference } from './connectionSettings.tsx'
 
 const i18n = createI18n('zh-CN')
+
+it.each([
+  { connectionId: undefined, label: i18n.t('connectorAccess.noAccountSelected') },
+  { connectionId: '', label: i18n.t('inspector.account.deferred') },
+  { connectionId: 'saved-account', label: 'saved-account' },
+])('preserves the saved account state without inferring live availability: $connectionId', ({ connectionId, label }) => {
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={i18n}>
+      <SavedConnectionReference connectionId={connectionId} />
+    </I18nProvider>,
+  )
+  expect(markup).toContain(label)
+  expect(markup).not.toContain(i18n.t('inspector.account.unavailable'))
+  expect(markup).not.toContain(i18n.t('connectionUsage.stopUsing'))
+  expect(markup).not.toContain(i18n.t('inspector.account.addAccount'))
+})
+
+it('omits snapshot account controls for no-setup providers and virtual no-auth accounts', () => {
+  for (const props of [{ noSetup: true }, { connectionId: 'no_auth:public' }]) {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={i18n}>
+        <SavedConnectionReference {...props} />
+      </I18nProvider>,
+    )
+    expect(markup).toBe('')
+  }
+})
+
+it('keeps an empty read-only account selector from offering account setup', () => {
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={i18n}>
+      <AccountSelect readOnly addWhenEmpty connections={[]} disabled={false} onChange={vi.fn()} onManage={vi.fn()} />
+    </I18nProvider>,
+  )
+  expect(markup).toContain(i18n.t('connectorAccess.noAccountSelected'))
+  expect(markup).not.toContain(i18n.t('inspector.account.addAccount'))
+})
 
 it.each([
   { state: 'cached while loading', cached: true, loading: true, invalid: false },

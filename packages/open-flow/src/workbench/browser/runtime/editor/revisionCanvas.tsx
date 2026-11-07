@@ -1,5 +1,6 @@
 import type { AppCatalogResponse } from '@oomol-lab/resource-cache/oomol'
 import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
+import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
 import type { ConnectorProvider, Draft, Presentation } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { RevisionCanvasSession } from './revisionCanvasSession.ts'
@@ -9,6 +10,8 @@ import { decodeAppCatalogResponse, getAppCatalogCache } from '@oomol-lab/resourc
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
+import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
+import { localizeTrigger } from '../../../../trigger/providers/localization.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { revisionView } from '../revisionView.ts'
 import { provider } from '../stores/proxyCatalog.ts'
@@ -55,13 +58,31 @@ export function RevisionCanvas({
 }) {
   const root = useRef<HTMLElement>(null)
   const t = useTranslate()
-  const language = useLang()
+  const language = resolveUiLanguage([useLang()])
   const revision = useMemo(() => revisionView(draft), [draft])
   const graphId = 'flow'
   const [sessions, setSessions] = useState<RevisionCanvasSession>({})
   const [inspectorOpen, setInspectorOpen] = useState(defaultInspectorOpen)
   const [focus, setFocus] = useState<FlowCanvasViewProps['focusNodeRequest']>()
   const [catalog, setCatalog] = useState<{ language: string; providers: Readonly<Record<string, ConnectorProvider>> }>()
+  const [triggerCopy, setTriggerCopy] = useState<{ revision: typeof revision; language: string; display: Readonly<Record<string, TriggerDisplay>> }>()
+  useEffect(() => {
+    const definitions = Object.values(revision.graph().nodes).flatMap((node) => (node.kind == 'integration' || node.kind == 'poll' ? [node.definition] : []))
+    if (definitions.length === 0) return
+    let active = true
+    void Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, language)] as const)).then(
+      (entries) => {
+        if (active) setTriggerCopy({ revision, language, display: Object.fromEntries(entries) })
+      },
+      (error) => {
+        if (active) console.warn('Could not load Preview Trigger translations.', error)
+      },
+    )
+    return () => {
+      active = false
+    }
+  }, [revision, language])
+  const triggerDisplays = triggerCopy?.revision === revision && triggerCopy.language === language ? triggerCopy.display : undefined
   const needsProviders = revision.connectorProviderIds.size > 0
   useEffect(() => {
     if (!needsProviders) return
@@ -205,6 +226,7 @@ export function RevisionCanvas({
                 selection={selection}
                 theme={theme}
                 connectorProviders={providerMetadata}
+                triggerDisplays={triggerDisplays}
               />
             ) : comment?.kind === 'comment' ? (
               <CommentInspector key={comment.id} title={comment.title} content={comment.content ?? ''} dark={theme === 'dark'} readOnly />

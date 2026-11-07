@@ -388,9 +388,14 @@ export function NodeInspector({
         {selection?.kind === 'trigger' && selection.trigger.kind === 'webhook' && webhookDeployment != null && (
           <WebhookDeployment key={selection.id} {...webhookDeployment} />
         )}
-        {readOnly && connector != null && <SavedConnectionReference action={connector.action} connectionId={connector.connectionId} />}
+        {readOnly && connector != null && (
+          <SavedConnectionReference
+            noSetup={connectorAction?.authenticated === false || connectorProviders?.[connector.action.split('.')[0]!]?.noSetup}
+            connectionId={connector.connectionId}
+          />
+        )}
         {readOnly && selection?.kind === 'trigger' && (selection.trigger.kind === 'poll' || selection.trigger.kind === 'integration') && (
-          <SavedConnectionReference action={selection.trigger.definition.key} connectionId={selection.trigger.connectionId} />
+          <SavedConnectionReference connectionId={selection.trigger.connectionId} />
         )}
         {!readOnly && triggers != null && selection?.kind == 'trigger' && (
           <TriggerConnection
@@ -449,6 +454,7 @@ export function NodeInspector({
         {selection?.kind === 'task' && selection.module != null && (
           <CodeTaskSection
             readOnly={readOnly}
+            providers={connectorProviders}
             connectorAccess={connectorAccess}
             connectorCandidates={connectorCandidates}
             onConfigureAccess={onConfigureConnectorAccess == null ? undefined : () => onConfigureConnectorAccess()}
@@ -464,9 +470,7 @@ export function NodeInspector({
         )}
         {selection?.kind === 'trigger' &&
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
-          (!readOnly &&
-          store != null &&
-          [
+          ([
             'feishu.on_event',
             'feishu_app_bot.on_event',
             'slackbot.on_event',
@@ -477,6 +481,7 @@ export function NodeInspector({
             'jira.on_issue_event',
           ].includes(selection.trigger.definition.key) ? (
             <EventSourceTriggerConfig
+              readOnly={readOnly}
               provider={
                 selection.trigger.definition.provider === 'slackbot'
                   ? 'slackbot'
@@ -500,8 +505,9 @@ export function NodeInspector({
               disabled={disabled}
               store={store}
             />
-          ) : !readOnly && store != null && selection.trigger.definition.key === 'linear.on_issue_changed' ? (
+          ) : selection.trigger.definition.key === 'linear.on_issue_changed' ? (
             <LinearTriggerConfig
+              readOnly={readOnly}
               inputs={providerConfigInputs}
               fieldLabels={providerDisplay?.configInputLabels}
               config={selection.trigger.config}
@@ -510,8 +516,9 @@ export function NodeInspector({
               disabled={disabled}
               store={store}
             />
-          ) : !readOnly && store != null && selection.trigger.definition.key === 'tally.on_form_response' ? (
+          ) : selection.trigger.definition.key === 'tally.on_form_response' ? (
             <TallyTriggerConfig
+              readOnly={readOnly}
               inputs={providerConfigInputs}
               fieldLabels={providerDisplay?.configInputLabels}
               config={selection.trigger.config}

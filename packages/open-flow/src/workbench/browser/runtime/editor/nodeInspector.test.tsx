@@ -1,12 +1,14 @@
 // @vitest-environment happy-dom
 import type { ComponentProps } from 'react'
-import type { GraphEdge, GraphNode } from '../../../../flow/common/change.ts'
+import type { GraphEdge, GraphNode, JsonValue, TaskCapability } from '../../../../flow/common/change.ts'
 
 import { act } from 'react'
 import { val } from 'value-enhancer'
 import { expect, it, vi } from 'vitest'
 import { publicationFixture } from '../../../../../dev/designer/publicationFixture.ts'
 import { click, input as enterInput, render } from '../../../../../test/support/render.tsx'
+import { inputValues } from '../../../../flow/common/inputValue.ts'
+import { triggerDefinitions } from '../../../../trigger/providers/definitions.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { CodeEditor } from './codeEditor.tsx'
@@ -18,7 +20,13 @@ import { OpenApiSection } from './openApiSection.tsx'
 vi.mock('./codeEditor.tsx', () => ({
   CodeEditor: (props: ComponentProps<typeof CodeEditor>) => (
     <>
-      <textarea aria-label={props.ariaLabel} aria-invalid={props.invalid} aria-describedby={props.ariaDescribedBy} defaultValue={props.value} />
+      <textarea
+        aria-label={props.ariaLabel}
+        aria-invalid={props.invalid}
+        aria-describedby={props.ariaDescribedBy}
+        defaultValue={props.value}
+        readOnly={props.disabled}
+      />
       <button
         onClick={async (event) => {
           event.currentTarget.textContent = (await props.prepareCompletion?.()) ?? ''
@@ -297,6 +305,76 @@ function codeFixture(mode: 'shared' | 'independent' | 'missing') {
   return { props, store, actions, data, moduleEditor }
 }
 
+function savedProviderTrigger(key: string, config: Readonly<Record<string, JsonValue>>): GraphNode {
+  const definition = triggerDefinitions.find((item) => item.snapshot.key === key)!.snapshot
+  const base = { name: definition.displayName, config: inputValues(config), connectionId: 'saved-account' }
+  return definition.type === 'poll' ? { ...base, definition, kind: 'poll', pollTimes: [] } : { ...base, definition, kind: 'integration' }
+}
+
+it('uses the Feishu event picker and chat filter for a read-only trigger without loading online configuration', async () => {
+  const request = vi.fn()
+  vi.stubGlobal('fetch', request)
+  const node = savedProviderTrigger('feishu_app_bot.on_event', { sourceId: 'saved-source', eventTypes: ['im.message.receive_v1'], chatIds: ['oc_saved'] })
+  const { container, i18n } = inspector(node, { readOnly: true })
+  const source = container.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t('eventSources.source')}"]`)!
+  expect(source.disabled).toBe(true)
+  expect(source.textContent).toContain('saved-source')
+  expect(container.textContent).toContain(i18n.t('eventSources.eventNames.im_message_receive_v1'))
+  const checked = [
+    ...container.querySelectorAll<HTMLElement>(`[role="group"][aria-label="${i18n.t('eventSources.events')}"] [role="checkbox"][aria-checked="true"]`),
+  ]
+  expect(checked.length).toBeGreaterThan(0)
+  for (const checkbox of checked) expect(checkbox.getAttribute('aria-disabled')).toBe('true')
+  expect([...container.querySelectorAll('button')].some((button) => button.getAttribute('aria-label')?.startsWith(`${i18n.t('eventSources.delete')}:`))).toBe(
+    false,
+  )
+  const chats = [...container.querySelectorAll('textarea')].find((element) => element.value === 'oc_saved')!
+  expect(chats.readOnly).toBe(true)
+  expect(chats.disabled).toBe(false)
+  const search = container.querySelector<HTMLInputElement>('input[type="search"]')!
+  await enterInput(search, 'nonmatching event')
+  expect(container.textContent).toContain(i18n.t('eventSources.noEventMatches'))
+  expect(container.textContent).not.toContain(i18n.t('eventSources.managementRequired'))
+  expect(request).not.toHaveBeenCalled()
+})
+
+it('keeps the saved Feishu resource controls inspectable without asserting subscription management authority', () => {
+  const { container, i18n } = inspector(
+    savedProviderTrigger('feishu_app_bot.on_event', {
+      sourceId: 'saved-source',
+      eventTypes: ['drive.file.edit_v1'],
+      resource: { kind: 'document', id: 'saved-document', documentType: 'docx' },
+    }),
+    { readOnly: true },
+  )
+  const id = [...container.querySelectorAll('input')].find((element) => element.value === 'saved-document')!
+  expect(id.readOnly).toBe(true)
+  expect(id.disabled).toBe(false)
+  expect(container.textContent).not.toContain(i18n.t('eventSources.managementRequired'))
+})
+
+it.each<{ key: string; config: Readonly<Record<string, JsonValue>>; control: string; value: string }>([
+  { key: 'linear.on_issue_changed', config: { teamId: 'saved-team', stateIds: ['saved-status'] }, control: 'linearTrigger.team', value: 'saved-team' },
+  { key: 'tally.on_form_response', config: { formId: 'saved-form' }, control: 'tallyTrigger.form', value: 'saved-form' },
+])('uses the existing saved selection control for read-only $key', ({ key, config, control, value }) => {
+  const request = vi.fn()
+  vi.stubGlobal('fetch', request)
+  const { container, i18n } = inspector(savedProviderTrigger(key, config), { readOnly: true })
+  const select = container.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t(control)}"]`)!
+  expect(select.disabled).toBe(true)
+  expect(select.textContent).toContain(value)
+  expect(select.getAttribute('aria-invalid')).not.toBe('true')
+  expect(request).not.toHaveBeenCalled()
+})
+
+it('omits the account section when snapshot Provider metadata declares no setup', () => {
+  const { container, i18n } = inspector(
+    { kind: 'task', inputs: {}, task: { name: 'Read public data', inputs: [], outputs: [], executor: { kind: 'connector', action: 'public.read' } } },
+    { readOnly: true, connectorProviders: { public: { serviceId: 'public', serviceName: 'Public', noSetup: true } } },
+  )
+  expect([...container.querySelectorAll('h3')].some((heading) => heading.textContent === i18n.t('inspector.account.title'))).toBe(false)
+})
+
 it.each(['shared', 'independent'] as const)('loads %s metadata only when the editor requests completion', async (mode) => {
   const fixture = codeFixture(mode)
   const { container } = render(<CodeTaskSection {...fixture.props} />)
@@ -351,6 +429,78 @@ it.each(['independent', 'shared', 'missing'] as const)('saves selected actions f
   await click(save)
   expect(container.querySelector('[role="dialog"]')).toBeNull()
 })
+
+it('inspects saved Code tools, accounts and HTTP hosts through the read-only node panel', async () => {
+  const request = vi.fn()
+  vi.stubGlobal('fetch', request)
+  const { container, i18n } = inspector(
+    {
+      kind: 'task',
+      name: 'Code',
+      inputs: {},
+      task: {
+        name: 'Code',
+        moduleId: 'main',
+        inputs: [],
+        outputs: [],
+        capabilities: [
+          {
+            kind: 'connector',
+            mode: 'independent',
+            actions: [
+              { action: 'blog.list', connectionId: 'saved-account' },
+              { action: 'blog.read', connectionId: '' },
+            ],
+          },
+          { kind: 'workflow', flowId: 'summary', revisionId: 'r1', name: 'summarize', inputs: [], outputs: [] },
+          { kind: 'http', hosts: ['api.example.com', '*.example.org'] },
+        ],
+      },
+    },
+    { readOnly: true, connectorProviders: { blog: { serviceId: 'blog', serviceName: 'Blog' } } },
+  )
+  expect(container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Source"]')!.readOnly).toBe(true)
+  expect(container.textContent).not.toContain('independent')
+  const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${i18n.t('actionPicker.configureActions')} · 3"]`)!
+  expect(trigger.disabled).toBe(false)
+  await click(trigger)
+  const dialog = container.querySelector<HTMLElement>('[role="dialog"]')!
+  expect(dialog.textContent).toContain('blog.list')
+  expect(dialog.textContent).toContain('Blog')
+  expect(dialog.textContent).toContain('summarize')
+  const account = dialog.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('actionPicker.accountFor', { action: 'blog.list' })}"]`)!
+  expect(account.readOnly).toBe(true)
+  expect(account.value).toBe('saved-account')
+  expect(dialog.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('actionPicker.accountFor', { action: 'blog.read' })}"]`)!.value).toBe(
+    i18n.t('inspector.account.deferred'),
+  )
+  expect(dialog.querySelector('[role="searchbox"], [role="combobox"]')).toBeNull()
+  expect([...dialog.querySelectorAll('button')].some((button) => button.textContent === i18n.t('common.save'))).toBe(false)
+  await click([...dialog.querySelectorAll('button')].find((button) => button.textContent === i18n.t('common.close'))!)
+  const hosts = [...container.querySelectorAll('button')].find((button) => button.textContent === `${i18n.t('inspector.task.httpHosts')} · 2`)!
+  await click(hosts)
+  const hostDialog = container.querySelector<HTMLElement>('[role="dialog"]')!
+  const hostList = hostDialog.querySelector('textarea')!
+  expect(hostList.readOnly).toBe(true)
+  expect(hostList.disabled).toBe(false)
+  expect(hostList.value).toBe('api.example.com\n*.example.org')
+  expect(hostDialog.textContent).not.toContain(i18n.t('inspector.task.httpHostsHint'))
+  expect([...hostDialog.querySelectorAll('button')].some((button) => button.textContent === i18n.t('common.save'))).toBe(false)
+  expect(request).not.toHaveBeenCalled()
+})
+
+it.each<{ capabilities?: readonly TaskCapability[] }>([{}, { capabilities: [] }, { capabilities: [{ kind: 'connector', mode: 'independent', actions: [] }] }])(
+  'omits empty Code capability controls in the read-only inspector ($capabilities)',
+  ({ capabilities }) => {
+    const { container, i18n } = inspector(
+      { kind: 'task', name: 'Code', inputs: {}, task: { name: 'Code', moduleId: 'main', inputs: [], outputs: [], capabilities } },
+      { readOnly: true },
+    )
+    expect(container.querySelector(`[aria-label^="${i18n.t('actionPicker.configureActions')}"]`)).toBeNull()
+    expect(container.textContent).not.toContain(i18n.t('inspector.task.httpHosts'))
+    expect(container.textContent).not.toContain('independent')
+  },
+)
 
 it.each([
   ['node', false],

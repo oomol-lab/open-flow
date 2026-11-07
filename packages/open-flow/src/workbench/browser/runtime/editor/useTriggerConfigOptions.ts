@@ -10,12 +10,13 @@ type OptionsState = {
   readonly options?: readonly TriggerConfigOption[]
 }
 
-export function useTriggerConfigOptions(store: WorkspaceStore, nodeId: string, field: string, scope: string, enabled: boolean) {
+export function useTriggerConfigOptions(store: WorkspaceStore | undefined, nodeId: string, field: string, scope: string, requested: boolean) {
+  const enabled = store != null && requested
   const [attempt, setAttempt] = useState(0)
   const key = JSON.stringify([nodeId, field, scope])
   const [state, setState] = useState<OptionsState>()
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || store == null) return
     const controller = new AbortController()
     setState((current) => ({
       failed: false,

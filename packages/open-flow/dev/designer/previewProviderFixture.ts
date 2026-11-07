@@ -7,8 +7,8 @@ import { sampleSprite } from './fixtures/providerSprite.ts'
 import { publicationFixture } from './publicationFixture.ts'
 
 const previewProviders: readonly ConnectorProvider[] = [
-  { serviceId: 'sample-mail', serviceName: 'Sample Mail', iconSprite: sampleSprite, iconSpritePosition: { x: 2, y: 2 } },
-  { serviceId: 'sample-files', serviceName: 'Sample Files', iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } },
+  { serviceId: 'sample-mail', serviceName: 'Sample Mail', noSetup: true, iconSprite: sampleSprite, iconSpritePosition: { x: 2, y: 2 } },
+  { serviceId: 'sample-files', serviceName: 'Sample Files', noSetup: false, iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } },
 ]
 
 // Lab owns these shared initializers for its browser session, including Strict Mode remounts.
@@ -34,7 +34,7 @@ function createPreviewProviderCatalog(locale: string) {
     data: previewProviders.map((item) => ({
       service: item.serviceId,
       displayName: item.serviceName,
-      authTypes: ['no_auth'],
+      authTypes: [item.noSetup ? 'no_auth' : 'api_key'],
       categories: [],
       searchAliases: [],
       iconUrl: null,
@@ -45,7 +45,7 @@ function createPreviewProviderCatalog(locale: string) {
       status: 'available',
     })),
     meta: {
-      summary: { providerCount: 2, actionCount: 3, categoryCount: 0, oauthProviderCount: 0, apiKeyProviderCount: 0, healthyProviderCount: 2 },
+      summary: { providerCount: 2, actionCount: 3, categoryCount: 0, oauthProviderCount: 0, apiKeyProviderCount: 1, healthyProviderCount: 2 },
       categories: [],
       authTypes: [],
       iconSprite: sampleSprite,
@@ -71,7 +71,14 @@ export function previewProviderFixture() {
       ...base.draft,
       content: {
         ...base.draft.content,
-        modules: {},
+        modules: {
+          compile: {
+            name: 'Compile research',
+            imports: [],
+            source: 'export default async (_, context) => {\n  const messages = await context.actions["sample-mail.search"]({});\n  return { messages };\n}',
+          },
+          ready: { name: 'Ready', imports: [], source: 'export default () => ({ status: "ready" })' },
+        },
         document: {
           bindings: {},
           graph: {
@@ -81,6 +88,12 @@ export function previewProviderFixture() {
                 name: 'Find recent mail',
                 inputs: {},
                 task: { name: 'Search', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'sample-mail.search' } },
+              },
+              deferred: {
+                kind: 'task' as const,
+                name: 'Archive without an account',
+                inputs: {},
+                task: { name: 'Archive', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'sample-files.archive', connectionId: '' } },
               },
               agent: {
                 kind: 'task' as const,
@@ -116,6 +129,41 @@ export function previewProviderFixture() {
                   },
                 },
               },
+              code: {
+                kind: 'task' as const,
+                name: 'Compile research',
+                inputs: {},
+                task: {
+                  name: 'Compile research',
+                  moduleId: 'compile',
+                  inputs: [],
+                  outputs: [],
+                  capabilities: [
+                    {
+                      kind: 'connector' as const,
+                      mode: 'independent' as const,
+                      actions: [
+                        { action: 'sample-mail.search', connectionId: 'saved-mail-account' },
+                        { action: 'sample-files.archive', connectionId: '' },
+                      ],
+                    },
+                    { kind: 'workflow' as const, flowId: 'summarize', revisionId: 'saved-revision', name: 'summarize', inputs: [], outputs: [] },
+                    { kind: 'http' as const, hosts: ['api.example.com', '*.example.org'] },
+                  ],
+                },
+              },
+              emptyCode: {
+                kind: 'task' as const,
+                name: 'Code without tools',
+                inputs: {},
+                task: {
+                  name: 'Code without tools',
+                  moduleId: 'ready',
+                  inputs: [],
+                  outputs: [],
+                  capabilities: [{ kind: 'connector' as const, mode: 'independent' as const, actions: [] }],
+                },
+              },
             },
             edges: [{ source: 'mail', target: 'agent' }],
           },
@@ -124,7 +172,10 @@ export function previewProviderFixture() {
     },
     presentation: {
       ...base.presentation,
-      value: setNodePositions({}, { mail: { x: 0, y: 0 }, agent: { x: 400, y: 0 } }),
+      value: setNodePositions(
+        {},
+        { mail: { x: 0, y: 0 }, agent: { x: 400, y: 0 }, code: { x: 0, y: 350 }, emptyCode: { x: 400, y: 350 }, deferred: { x: 800, y: 0 } },
+      ),
     },
   }
 }

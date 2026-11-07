@@ -10,7 +10,6 @@ import { fieldSelectTriggerClass } from '../../../../form/browser/fieldSelect.ts
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
-import { Input } from '../../../../ui/browser/input.tsx'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
@@ -88,6 +87,7 @@ export function AccountControlButton({
 export function AccountSelect({
   connections,
   disabled,
+  readOnly = false,
   loading = false,
   id,
   invalid,
@@ -103,6 +103,7 @@ export function AccountSelect({
   readonly connections: readonly ConnectorConnection[]
   readonly loading?: boolean
   readonly disabled: boolean
+  readonly readOnly?: boolean
   readonly id?: string
   readonly warning?: boolean
   readonly addWhenEmpty?: boolean
@@ -126,7 +127,9 @@ export function AccountSelect({
       : selected == null
         ? selectedId == null
           ? undefined
-          : `${selectedId} (${t('inspector.account.unavailable')})`
+          : readOnly
+            ? selectedId
+            : `${selectedId} (${t('inspector.account.unavailable')})`
         : `${displayName(selected)}${selected.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}`
   const missingSelected = selectedId != null && selectedId !== '' && !connections.some((candidate) => candidate.connectionId == selectedId)
   const empty = !loading && connections.length == 0
@@ -140,13 +143,13 @@ export function AccountSelect({
     })),
     ...(onManage == null ? [] : [{ value: manageAccountOption, label: t('inspector.account.addAccount') }]),
   ]
-  if (!allowDeferred && !loading && addWhenEmpty && connections.length === 0 && selectedId == null) {
+  if (!readOnly && !allowDeferred && !loading && addWhenEmpty && connections.length === 0 && selectedId == null) {
     return <AccountControlButton disabled={disabled} status="warning" onClick={onManage} label={t('inspector.account.addAccount')} />
   }
   return (
     <div ref={setContainer} className="account-select relative min-w-0">
       <Select
-        disabled={disabled || loading}
+        disabled={readOnly || disabled || loading}
         items={items}
         value={selectedId ?? null}
         onValueChange={(value) => {
@@ -164,7 +167,10 @@ export function AccountSelect({
           data-status={invalid ? 'danger' : warning ? 'warning' : undefined}
           className={`${fieldSelectTriggerClass} account-control`}
         >
-          <SelectValue className={!loading && selectedId != null ? 'mr-5' : undefined} placeholder={t('inspector.account.chooseAccount')}>
+          <SelectValue
+            className={!readOnly && !loading && selectedId != null ? 'mr-5' : undefined}
+            placeholder={t(readOnly ? 'connectorAccess.noAccountSelected' : 'inspector.account.chooseAccount')}
+          >
             {showLoading ? (
               <span role="status" className="flex min-w-0 items-center gap-2 text-muted-foreground">
                 <Spinner />
@@ -214,7 +220,7 @@ export function AccountSelect({
           )}
         </SelectContent>
       </Select>
-      {!loading && selectedId != null && (
+      {!readOnly && !loading && selectedId != null && (
         <Tooltip>
           <TooltipTrigger
             render={
@@ -459,17 +465,15 @@ export function TriggerConnection({
 }
 
 /** A persisted reference has no live account health or authorization state. */
-export function SavedConnectionReference({ action, connectionId }: { readonly action: string; readonly connectionId?: string }) {
+export function SavedConnectionReference({ noSetup, connectionId }: { readonly noSetup?: boolean; readonly connectionId?: string }) {
   const t = useTranslate()
+  if (noSetup || connectionId?.startsWith('no_auth:')) return null
   return (
     <InspectorStatusSection title={t('inspector.account.title')} section="account">
-      <p className="reference-value">{action}</p>
-      {connectionId != null && (
-        <Field>
-          <FieldLabel>{t('inspector.account.connection')}</FieldLabel>
-          <Input aria-label={t('inspector.account.connection')} readOnly value={connectionId} />
-        </Field>
-      )}
+      <Field className="connection-field">
+        <FieldLabel className="sr-only">{t('inspector.account.connection')}</FieldLabel>
+        <AccountSelect readOnly connections={[]} selectedId={connectionId} disabled onChange={() => {}} onManage={undefined} />
+      </Field>
     </InspectorStatusSection>
   )
 }

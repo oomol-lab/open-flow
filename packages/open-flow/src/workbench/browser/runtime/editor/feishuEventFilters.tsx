@@ -17,6 +17,7 @@ export function FeishuEventFilters({
   events,
   managed,
   disabled,
+  readOnly = false,
   onChange,
 }: {
   readonly field?: 'chatIds' | 'resource'
@@ -24,27 +25,33 @@ export function FeishuEventFilters({
   readonly events: readonly string[]
   readonly managed: boolean
   readonly disabled: boolean
+  readonly readOnly?: boolean
   readonly onChange: (name: string, value: JsonValue | undefined) => void
 }) {
   const t = useTranslate()
   const resource = isJsonObject(config.resource) ? config.resource : undefined
   const kind = feishuResourceKind(events)
+  const storedKind = resource?.kind
+  const displayKind = readOnly && (storedKind == 'document' || storedKind == 'calendar' || storedKind == 'approval') ? storedKind : kind
   const chats = Array.isArray(config.chatIds) ? config.chatIds.filter((item): item is string => typeof item == 'string') : []
   const chatSupported = supportsFeishuChatFilter(events)
   return (
     <>
       {field !== 'resource' && (chatSupported || chats.length > 0) && (
         <div className="flex flex-col gap-2">
-          {chatSupported ? (
-            <ChatFilter key={JSON.stringify(chats)} value={chats} disabled={disabled} onChange={(value) => onChange('chatIds', value)} />
-          ) : (
+          {(chatSupported || readOnly) && (
+            <ChatFilter key={JSON.stringify(chats)} value={chats} disabled={disabled} readOnly={readOnly} onChange={(value) => onChange('chatIds', value)} />
+          )}
+          {!chatSupported && (
             <>
               <p role="alert" className="m-0 text-sm text-destructive">
                 {t('eventSources.incompatibleChats')}
               </p>
-              <Button variant="outline" size="sm" className="self-start" disabled={disabled} onClick={() => onChange('chatIds', undefined)}>
-                {t('eventSources.removeFilter')}
-              </Button>
+              {!readOnly && (
+                <Button variant="outline" size="sm" className="self-start" disabled={disabled} onClick={() => onChange('chatIds', undefined)}>
+                  {t('eventSources.removeFilter')}
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -54,7 +61,7 @@ export function FeishuEventFilters({
           <Label className="flex items-center gap-2">
             <Checkbox
               checked={resource != null}
-              disabled={disabled || (resource == null && (!managed || kind == null))}
+              disabled={readOnly || disabled || (resource == null && (!managed || kind == null))}
               onCheckedChange={(checked) =>
                 onChange('resource', checked ? { kind: kind!, id: '', ...(kind == 'document' ? { documentType: 'docx' } : {}) } : undefined)
               }
@@ -62,33 +69,34 @@ export function FeishuEventFilters({
             {t('eventSources.subscribeResource')}
           </Label>
           <p className="m-0 text-xs leading-5 text-muted-foreground">{t('eventSources.subscribeResourceHint')}</p>
-          {!managed && <p className="m-0 text-xs leading-5 text-muted-foreground">{t('eventSources.managementRequired')}</p>}
+          {!readOnly && !managed && <p className="m-0 text-xs leading-5 text-muted-foreground">{t('eventSources.managementRequired')}</p>}
           {resource != null && (kind == null || resource.kind != kind) && (
             <p role="alert" className="m-0 text-sm text-destructive">
               {t('eventSources.incompatibleResource')}
             </p>
           )}
-          {resource != null && kind != null && resource.kind == kind && (
+          {resource != null && displayKind != null && resource.kind == displayKind && (
             <>
-              {kind == 'document' && (
+              {displayKind == 'document' && (
                 <SourceSelect
                   label={t('eventSources.documentType')}
                   value={typeof resource.documentType == 'string' ? resource.documentType : ''}
                   options={['doc', 'docx', 'sheet', 'bitable', 'file', 'folder'].map((value) => ({ value, label: t(`eventSources.documentTypes.${value}`) }))}
-                  disabled={disabled || !managed}
+                  disabled={readOnly || disabled || !managed}
                   onChange={(value) => onChange('resource', { ...resource, documentType: value })}
                 />
               )}
               <Label className="flex flex-col items-stretch gap-2">
-                {t(`eventSources.resourceIds.${kind}`)}
+                {t(`eventSources.resourceIds.${displayKind}`)}
                 <Input
                   value={typeof resource.id == 'string' ? resource.id : ''}
-                  disabled={disabled || !managed}
+                  disabled={!readOnly && (disabled || !managed)}
+                  readOnly={readOnly}
                   required
                   onChange={(event) => onChange('resource', { ...resource, id: event.target.value })}
                 />
               </Label>
-              <p className="m-0 text-xs leading-5 text-muted-foreground">{t(`eventSources.resourceHints.${kind}`)}</p>
+              <p className="m-0 text-xs leading-5 text-muted-foreground">{t(`eventSources.resourceHints.${displayKind}`)}</p>
             </>
           )}
         </div>
@@ -100,10 +108,12 @@ export function FeishuEventFilters({
 function ChatFilter({
   value,
   disabled,
+  readOnly = false,
   onChange,
 }: {
   readonly value: readonly string[]
   readonly disabled: boolean
+  readonly readOnly?: boolean
   readonly onChange: (value: string[] | undefined) => void
 }) {
   const t = useTranslate()
@@ -114,10 +124,12 @@ function ChatFilter({
         {t('eventSources.specifiedChats')}
         <Textarea
           value={text}
-          disabled={disabled}
+          disabled={disabled && !readOnly}
+          readOnly={readOnly}
           rows={3}
           onChange={(event) => setText(event.target.value)}
           onBlur={() => {
+            if (readOnly || disabled) return
             const ids = [
               ...new Set(
                 text

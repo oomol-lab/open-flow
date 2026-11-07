@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { ConnectorPermissionCapability } from '../../../../flow/common/change.ts'
-import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorActionMetadata, Diagnostic } from '../api.ts'
+import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorActionMetadata, ConnectorProvider, Diagnostic } from '../api.ts'
 import type { ConnectorConnection } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
@@ -22,7 +22,6 @@ import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { IconStack } from '../../../../ui/browser/icon-stack.tsx'
-import { JSONViewer } from '../../../../ui/browser/json-viewer/JSONViewer.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { workflowCapability } from '../../../../workflow/common/workflow.ts'
@@ -428,6 +427,7 @@ export function CodeTaskSection(
     readonly readOnly?: boolean
     readonly store?: WorkspaceStore
     readonly connectors?: ConnectorStore
+    readonly providers?: Readonly<Record<string, ConnectorProvider>>
   },
 ) {
   const t = useTranslate()
@@ -436,8 +436,39 @@ export function CodeTaskSection(
   const { selection, theme } = props
   const task = selection.definition
   if (task == null || !('moduleId' in task) || selection.module == null) return null
+  const permission = task.capabilities?.find((capability) => 'mode' in capability)
+  const tools: readonly SelectedTool[] = [
+    ...(permission?.mode == 'independent' ? permission.actions : []),
+    ...(task.capabilities ?? []).filter((item) => item.kind == 'workflow'),
+  ]
+  const summary = actionSummary(tools, {}, Object.values(props.providers ?? {}))
+  const httpHosts = task.capabilities?.find((capability) => capability.kind == 'http')?.hosts ?? []
   return (
-    <CodeTaskFrame>
+    <CodeTaskFrame
+      actions={
+        <>
+          {httpHosts.length > 0 && <CodeHttpHosts readOnly hosts={httpHosts} />}
+          {tools.length > 0 && (
+            <ActionSelectionDialog
+              readOnly
+              title={t('actionPicker.configureActions')}
+              triggerHint={
+                summary.workflows > 0
+                  ? t('toolPicker.summary', { tools: summary.count, workflows: summary.workflows })
+                  : t('actionPicker.selectionSummary', { actions: summary.count, providers: summary.providers.length })
+              }
+              trigger={
+                <Button type="button" variant="ghost" size="sm" className="gap-1.5 font-normal text-muted-foreground">
+                  <IconStack icons={summary.providers} count={summary.count} size="sm" />
+                </Button>
+              }
+              entries={tools}
+              providers={props.providers}
+            />
+          )}
+        </>
+      }
+    >
       <CodeEditor
         ariaLabel={t('inspector.task.source')}
         disabled
@@ -448,7 +479,6 @@ export function CodeTaskSection(
         loadingLabel={t('inspector.task.editorLoading')}
         errorLabel={t('inspector.task.editorUnavailable')}
       />
-      {task.capabilities != null && <JSONViewer data={task.capabilities} />}
     </CodeTaskFrame>
   )
 }

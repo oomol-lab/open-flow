@@ -140,15 +140,21 @@ export function AgentTools(
   const t = useTranslate()
   if (props.editor != null) return <EditableAgentTools config={props.config} disabled={props.disabled} inputs={props.inputs} {...props.editor} />
   if (props.config.tools.length === 0) return null
+  const summary = actionSummary(props.config.tools, {}, Object.values(props.providers ?? {}))
   return (
     <ActionSelectionDialog
       readOnly
       title={t('agent.tools')}
+      triggerHint={
+        summary.workflows > 0
+          ? t('toolPicker.summary', { tools: summary.count, workflows: summary.workflows })
+          : t('actionPicker.selectionSummary', { actions: summary.count, providers: summary.providers.length })
+      }
       entries={props.config.tools}
       providers={props.providers}
       trigger={
-        <Button type="button" variant="ghost" size="sm">
-          {t('agent.tools')}
+        <Button type="button" variant="ghost" size="sm" className="gap-1.5 font-normal text-muted-foreground">
+          <IconStack icons={summary.providers} count={summary.count} size="sm" />
         </Button>
       }
       settings={{ title: t('agent.toolSettings'), render: (settings) => <AgentToolSettings {...settings} inputs={props.inputs} /> }}
