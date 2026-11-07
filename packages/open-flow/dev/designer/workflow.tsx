@@ -499,7 +499,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'workflow-png',
     title: 'PNG export',
     description:
-      'Use the production export panel to compare Auto, square, landscape and portrait canvases. The checkerboard shows transparency outside the rounded frame; downloads reuse the displayed PNG. Compare original and compact vertical layouts, U-shaped returns, short branches and shared joins. Show forest to check complete subgraphs wrapping into rows, including comments and isolated nodes. Horizontal export preserves the canvas layout. Ratio, layout, theme and frame choices are remembered locally. Check Chinese labels, artwork, both themes and large workflows. Simulate a slow export and change settings to check pending previews and disabled downloads.',
+      'Use the production export panel to compare Auto, square, landscape and portrait canvases. The checkerboard shows transparency outside the rounded frame; downloads reuse the displayed PNG. Compare original and compact vertical layouts, U-shaped returns, short branches and shared joins. Show lead capture to check that a five-step pipeline folds without crossing connections on a wide canvas. Show crossing fallback compares unequal branches with a shared join; the long branch should turn near its midpoint with similar heights on both sides of the return. Compact export tries another candidate or unfolds when connections cross. Show forest to check complete subgraphs wrapping into rows, including comments and isolated nodes. Horizontal export preserves the canvas layout. Ratio, layout, theme and frame choices are remembered locally. Check Chinese labels, artwork, both themes and large workflows. Simulate a slow export and change settings to check pending previews and disabled downloads.',
     standalone: true,
     render: (_log, dark, language) => <PngExportStory dark={dark} language={language} />,
   },
@@ -655,15 +655,74 @@ const compactForestWorkflow: FlowCanvasViewModel = {
   ],
 }
 
+const leadCaptureTasks = [
+  { id: 'prepare', title: 'Prepare lead', executorName: 'JavaScript' },
+  { id: 'save', title: 'Save lead', executorName: 'Connector · googlesheets' },
+  { id: 'notify', title: 'Notify team', executorName: 'Connector · telegram' },
+  { id: 'acknowledge', title: 'Acknowledge enquiry', executorName: 'Connector · gmail' },
+]
+const leadCaptureWorkflow: FlowCanvasViewModel = {
+  viewport: workflowViewport,
+  nodes: [
+    {
+      id: 'lead',
+      kind: 'trigger',
+      title: 'New website lead',
+      presentation: { kind: 'webhook', schedules: [] },
+      position: { x: 0, y: 0 },
+      inputs: [],
+      outputs: [],
+    },
+    ...leadCaptureTasks.map((task, index) => ({
+      ...task,
+      kind: 'task' as const,
+      reference: 'lab/task',
+      position: { x: 0, y: (index + 1) * 150 },
+      inputs: [],
+      outputs: [],
+    })),
+  ],
+  edges: leadCaptureTasks.map((task, index) => ({
+    id: 'lead-capture-' + index,
+    source: index === 0 ? 'lead' : leadCaptureTasks[index - 1]!.id,
+    sourceHandle: '$out',
+    target: task.id,
+    targetHandle: '$in',
+  })),
+}
+
+const fallbackPaths = [10, 2].map((length, branch) =>
+  Array.from({ length }, (_, step) => ({
+    id: `fallback-${branch}-${step}`,
+    kind: 'task' as const,
+    title: `${branch === 0 ? 'Enrich lead' : 'Check contact'} ${step + 1}`,
+    executorName: 'JavaScript',
+    reference: 'lab/task',
+    position: { x: branch * 600, y: (step + 1) * 150 },
+    inputs: [],
+    outputs: [],
+  })),
+)
+const crossingFallbackWorkflow: FlowCanvasViewModel = {
+  viewport: workflowViewport,
+  nodes: [leadCaptureWorkflow.nodes[0]!, ...fallbackPaths.flat(), leadCaptureWorkflow.nodes[2]!],
+  edges: fallbackPaths
+    .flatMap((path) =>
+      path.map((node, index) => ({ source: index === 0 ? 'lead' : path[index - 1]!.id, target: node.id })).concat({ source: path.at(-1)!.id, target: 'save' }),
+    )
+    .map((edge) => Object.assign({}, edge, { id: edge.source + '-' + edge.target, sourceHandle: '$out', targetHandle: '$in' })),
+}
+
 function PngExportStory({ dark, language }: { readonly dark: boolean; readonly language: UiLanguage }) {
   const [direction, setDirection] = useState<CanvasDirection>('vertical')
   const [pngExportOpen, setPngExportOpen] = useState(true)
   const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null)
   const [positions, setPositions] = useState<Readonly<Record<string, FlowCanvasViewPosition>>>({})
-  const [branches, setBranches] = useState(false)
+  const [branches, setBranches] = useState<false | 'nested' | 'fallback'>(false)
   const [forest, setForest] = useState(false)
   const [wrapped, setWrapped] = useState(false)
   const [large, setLarge] = useState(false)
+  const [leadCapture, setLeadCapture] = useState(false)
   const [brokenImages, setBrokenImages] = useState(false)
   const [labelKind, setLabelKind] = useState<'normal' | 'short' | 'long'>('normal')
   const [remoteIcons, setRemoteIcons] = useState(false)
@@ -675,12 +734,14 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       ? providerIcon(remoteGithubArtwork)
       : providerIcon({ serviceId: 'google-sheets', serviceName: 'Google Sheets', icon: googleSheetsIcon })
   const i18n = useMemo(() => createI18n(language), [language])
-  const sample = useMemo(
+  const defaultSample = useMemo(
     () =>
       forest
         ? compactForestWorkflow
         : branches
-          ? compactBranchWorkflow
+          ? branches === 'fallback'
+            ? crossingFallbackWorkflow
+            : compactBranchWorkflow
           : large
             ? {
                 viewport: workflowViewport,
@@ -757,19 +818,22 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
                 },
     [forest, branches, large, wrapped, brokenImages, labelKind, remoteIcons, taskKind, providerArtwork],
   )
+  const sample = leadCapture ? leadCaptureWorkflow : defaultSample
   const model = useMemo(
     () => ({ ...sample, direction, nodes: sample.nodes.map((node) => ({ ...node, position: positions[node.id] ?? node.position })) }),
     [sample, direction, positions],
   )
-  const title = forest
-    ? 'Forest workflow'
-    : branches
-      ? 'Branching workflow'
-      : large
-        ? 'Large workflow'
-        : wrapped
-          ? 'Weekly records pipeline'
-          : 'Customer insights'
+  const title = leadCapture
+    ? 'Website Lead Capture'
+    : forest
+      ? 'Forest workflow'
+      : branches
+        ? 'Branching workflow'
+        : large
+          ? 'Large workflow'
+          : wrapped
+            ? 'Weekly records pipeline'
+            : 'Customer insights'
   const layoutReady = model.nodes.every((node) => positions[node.id] != null)
   const [image, setImage] = useState<FlowPngResult>()
   const [imageSrc, setImageSrc] = useState<string>()
@@ -802,21 +866,45 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       },
     },
     {
-      label: branches ? 'Show standard workflow' : 'Show nested branches & shared join',
+      label: branches === 'nested' ? 'Show standard workflow' : 'Show nested branches & shared join',
       onClick: () => {
         setPositions({})
+        setLeadCapture(false)
         setForest(false)
-        setBranches((value) => !value)
+        setBranches((value) => (value === 'nested' ? false : 'nested'))
+      },
+    },
+    {
+      label: branches === 'fallback' ? 'Show standard workflow' : 'Show crossing fallback',
+      onClick: () => {
+        setPositions({})
+        setLeadCapture(false)
+        setForest(false)
+        setLarge(false)
+        setWrapped(false)
+        setBranches((value) => (value === 'fallback' ? false : 'fallback'))
       },
     },
     {
       label: forest ? 'Show standard workflow' : 'Show forest',
       onClick: () => {
         setPositions({})
+        setLeadCapture(false)
         setBranches(false)
         setLarge(false)
         setWrapped(false)
         setForest((value) => !value)
+      },
+    },
+    {
+      label: leadCapture ? 'Show standard workflow' : 'Show lead capture',
+      onClick: () => {
+        setPositions({})
+        setForest(false)
+        setBranches(false)
+        setLarge(false)
+        setWrapped(false)
+        setLeadCapture((value) => !value)
       },
     },
     { label: slowExport ? 'Use normal export speed' : 'Simulate slow export', onClick: () => setSlowExport((value) => !value) },
@@ -824,7 +912,9 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       label: wrapped ? 'Show branches & Chinese titles' : 'Show wrapped pipeline',
       onClick: () => {
         setPositions({})
+        setLeadCapture(false)
         setForest(false)
+        setBranches(false)
         setWrapped((value) => !value)
       },
     },
@@ -832,7 +922,9 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
       label: large ? 'Show normal workflow' : 'Show large workflow',
       onClick: () => {
         setPositions({})
+        setLeadCapture(false)
         setForest(false)
+        setBranches(false)
         setLarge((value) => !value)
       },
     },
@@ -890,7 +982,7 @@ function PngExportStory({ dark, language }: { readonly dark: boolean; readonly l
             <p>Canvas</p>
             <div style={{ height: 620 }}>
               <FlowCanvasView
-                identity={`png-comparison:${direction}:${forest}:${branches}:${wrapped}:${large}`}
+                identity={`png-comparison:${direction}:${leadCapture}:${forest}:${branches}:${wrapped}:${large}`}
                 model={model}
                 dark={dark}
                 language={language}

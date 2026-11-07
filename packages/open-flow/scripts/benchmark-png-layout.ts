@@ -1,5 +1,6 @@
 import { compactLayout } from '../src/canvas/browser/base/compactLayout.ts'
 import { graphLayout } from '../src/canvas/browser/base/graphLayout.ts'
+import { hasRouteCrossings } from '../src/canvas/browser/base/routeCrossings.ts'
 
 const results = []
 for (const count of [50, 200, 1000]) {
@@ -9,16 +10,21 @@ for (const count of [50, 200, 1000]) {
   const graph = graphLayout(nodes, edges, 'vertical')
   const dagre = performance.now() - start
   const samples = []
+  const checks = []
   let result
   for (let attempt = 0; attempt < 3; attempt++) {
     const started = performance.now()
     result = compactLayout(graph)
     samples.push(performance.now() - started)
+    const checking = performance.now()
+    hasRouteCrossings(result.routes)
+    checks.push(performance.now() - checking)
   }
   results.push({
     nodes: count,
     dagreMs: Math.round(dagre),
     compactMs: Math.round(samples.toSorted((a, b) => a - b)[1]!),
+    crossingCheckMs: Number(checks.toSorted((a, b) => a - b)[1]!.toFixed(2)),
     width: Math.ceil(result!.bounds.width),
     height: Math.ceil(result!.bounds.height),
   })

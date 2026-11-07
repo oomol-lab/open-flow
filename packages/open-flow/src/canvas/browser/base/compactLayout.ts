@@ -2,6 +2,7 @@ import type { GraphLayout } from './graphLayout.ts'
 import type { LayoutNode, LayoutPoint } from './wrapLayout.ts'
 
 import { graphlib } from '@dagrejs/dagre'
+import { hasRouteCrossings } from './routeCrossings.ts'
 import { routeLayout } from './routeLayout.ts'
 import { layoutAxes } from './wrapLayout.ts'
 
@@ -150,8 +151,10 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
   const gap = 48
   const pathNodes = normalized.filter((node) => incoming.has(node.id) || outgoing.has(node.id))
   const crossSize = Math.max(...(pathNodes.length ? pathNodes : normalized).map((node) => node.height))
-  const bow = crossSize * 0.75
-  const separation = crossSize + 48
+  const bow = crossSize * 0.5
+  // Keep successive runs beyond the entire bowed envelope, leaving a return lane
+  // between them instead of interleaving their cards and forward connections.
+  const separation = crossSize + bow + gap
   const bucketSize = Math.max(...normalized.map((node) => node.width)) + gap
   const byId = new Map(normalized.map((node) => [node.id, node]))
   // A feedback edge is routed, but does not move an already placed ancestor.
@@ -159,16 +162,17 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
   const parents = Map.groupBy(forwardEdges, (edge) => edge.target)
   const children = Map.groupBy(forwardEdges, (edge) => edge.source)
   const ordered = normalized.toSorted((a, b) => a.column - b.column || a.y - b.y)
-  const remaining = new Map<string, number>()
-  for (const node of ordered.toReversed()) {
-    remaining.set(
-      node.id,
-      1 + Math.max(0, ...(children.get(node.id) ?? []).filter((edge) => parents.get(edge.target)?.length === 1).map((edge) => remaining.get(edge.target)!)),
-    )
-  }
   const rankEnds = new Map(
     [...Map.groupBy(normalized, (node) => node.column)].map(([rank, nodes]) => [rank, Math.max(...nodes.map((node) => node.x + node.width))]),
   )
+  const remaining = new Map<string, { count: number; size: number }>()
+  for (const node of ordered.toReversed()) {
+    const next = (children.get(node.id) ?? []).filter((edge) => parents.get(edge.target)?.length === 1).map((edge) => remaining.get(edge.target)!)
+    remaining.set(node.id, {
+      count: 1 + Math.max(0, ...next.map((path) => path.count)),
+      size: Math.max(node.width, ...next.map((path) => rankEnds.get(node.column)! - node.x + gap + path.size)),
+    })
+  }
   const spans = new Set([Infinity, ...rankEnds.values()])
   interface Placement {
     node: LayoutNode
@@ -177,7 +181,14 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
     start: number
     extent: number
   }
-  let best: { nodes: LayoutNode[]; score: number; area: number; turns: number } | undefined
+  interface Candidate {
+    nodes: LayoutNode[]
+    score: number
+    area: number
+    turns: number
+  }
+  const layouts: Candidate[] = []
+  let unfolded: Candidate | undefined
   for (const span of spans) {
     const placed = new Map<string, Placement>()
     const buckets = new Map<number, Placement[]>()
@@ -204,10 +215,18 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
       } else if (parent) {
         shift = parent.shift
         start = parent.start
+        // Share the remaining path across the runs it needs. Waiting for the
+        // full span would leave a long first run and a much shorter final run.
+        const length = primary - start + remaining.get(original.id)!.size
+        const capacity = Math.max(original.width, span - start)
+        const runs = Math.max(1, Math.ceil((length + gap) / (capacity + gap)))
+        const end = start + (length + gap) / runs - gap
+        // Choose the closer whole-card boundary when the target falls inside a card.
+        const midpoint = (parent.node.x + parent.node.width + primary + original.width) / 2
         if ((children.get(parent.node.id)?.length ?? 0) > 1) {
           shift = parent.node.y - byId.get(parent.node.id)!.y
           start = primary
-        } else if (primary + original.width > span && remaining.get(original.id)! > 2) {
+        } else if (midpoint > end + 1e-6 && remaining.get(original.id)!.count > 2) {
           // Each run keeps the normal port direction. Only the edge between runs
           // returns through a U, rather than reversing every node in a run.
           primary = Math.max(0, start - span / 3)
@@ -242,7 +261,12 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
         order: placed.size,
         shift: node.y - original.y - drift,
         start,
-        extent: Math.max(node.x + node.width, ...upstream.map((entry) => entry.extent)),
+        // Shared joins must also clear the departure lane of every earlier run.
+        extent: Math.max(
+          node.x + node.width,
+          parent && node.x < parent.node.x ? parent.node.x + parent.node.width + gap : 0,
+          ...upstream.map((entry) => entry.extent),
+        ),
       }
       placed.set(node.id, placement)
       for (let bucket = firstBucket; bucket <= lastBucket; bucket++) {
@@ -258,26 +282,35 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
     const height = extent.width + insets.height + 48
     const area = width * height
     const score = Math.max(width / aspectRatio, height)
-    if (!best || score < best.score - 1e-9 || (Math.abs(score - best.score) < 1e-9 && (area < best.area || (area === best.area && turns < best.turns)))) {
-      best = { nodes, score, area, turns }
-    }
+    const candidate = { nodes, score, area, turns }
+    if (span === Infinity) unfolded = candidate
+    layouts.push(candidate)
+    layouts.sort((a, b) => (Math.abs(a.score - b.score) >= 1e-9 ? a.score - b.score : a.area - b.area || a.turns - b.turns))
+    // Keep only two compact candidates; the third attempt is always unfolded.
+    if (layouts.length > 2) layouts.pop()
   }
-  const routes = routeLayout(
-    best!.nodes,
-    graph.edges.map((edge) =>
-      Object.assign({}, edge, {
-        sourceOffset: edge.sourceOffset && layoutAxes(edge.sourceOffset, 'vertical'),
-        targetOffset: edge.targetOffset && layoutAxes(edge.targetOffset, 'vertical'),
-      }),
-    ),
+  const edges = graph.edges.map((edge) =>
+    Object.assign({}, edge, {
+      sourceOffset: edge.sourceOffset && layoutAxes(edge.sourceOffset, 'vertical'),
+      targetOffset: edge.targetOffset && layoutAxes(edge.targetOffset, 'vertical'),
+    }),
   )
+  if (!layouts.includes(unfolded!)) layouts.push(unfolded!)
+  let best: { nodes: LayoutNode[]; routes: ReturnType<typeof routeLayout> } | undefined
+  for (const candidate of layouts) {
+    const routes = routeLayout(candidate.nodes, edges)
+    const crosses = hasRouteCrossings(routes)
+    // Some graphs cross even without folding. Retain compactness if no attempt helps.
+    if (!best || !crosses) best = { nodes: candidate.nodes, routes }
+    if (!crosses) break
+  }
   const physicalNodes = best!.nodes.map((node) =>
     Object.assign({}, node, layoutAxes(node, 'vertical'), {
       width: node.height,
       height: node.width,
     }),
   )
-  const physicalRoutes = new Map([...routes].map(([id, points]) => [id, points.map((point) => layoutAxes(point, 'vertical'))]))
+  const physicalRoutes = new Map([...best!.routes].map(([id, points]) => [id, points.map((point) => layoutAxes(point, 'vertical'))]))
   return {
     positions: Object.fromEntries(physicalNodes.map(({ id, x, y }) => [id, { x, y }])),
     routes: physicalRoutes,

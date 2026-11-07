@@ -5,6 +5,7 @@ import type { LayoutNode, LayoutPoint } from './wrapLayout.ts'
 import { describe, expect, it } from 'vitest'
 import { compactLayout } from './compactLayout.ts'
 import { graphLayout } from './graphLayout.ts'
+import { hasRouteCrossings } from './routeCrossings.ts'
 import { layoutAxes } from './wrapLayout.ts'
 
 function intersects(a: LayoutPoint, b: LayoutPoint, rect: LayoutNode): boolean {
@@ -54,6 +55,43 @@ function branched(direction: CanvasDirection, feedback = false, rightCount = 20)
 
 describe('vertical compact layout', () => {
   const direction = 'vertical' as const
+  it.each([5, 12, 50])('keeps the connections of a folded %s-step pipeline from crossing', (count) => {
+    const graph = graphLayout(
+      Array.from({ length: count }, (_, index) => ({ id: String(index), width: 336, height: 80 })),
+      Array.from({ length: count - 1 }, (_, index) => ({ id: String(index), source: String(index), target: String(index + 1) })),
+      direction,
+    )
+    const result = compactLayout(graph, { width: 104, height: 136 }, 16 / 9)
+    const positions = graph.nodes.map((node) => result.positions[node.id]!)
+    expect(positions.slice(1).some((position, index) => position.y < positions[index]!.y)).toBe(true)
+    const paths = [...result.routes.values()]
+    for (const [index, path] of paths.entries()) {
+      for (const other of paths.slice(index + 1)) {
+        for (let a = 1; a < path.length; a++)
+          for (let b = 1; b < other.length; b++) {
+            const crosses = (['x', 'y'] as const).every(
+              (axis) =>
+                Math.max(Math.min(path[a - 1]![axis], path[a]![axis]), Math.min(other[b - 1]![axis], other[b]![axis])) <=
+                Math.min(Math.max(path[a - 1]![axis], path[a]![axis]), Math.max(other[b - 1]![axis], other[b]![axis])),
+            )
+            expect(crosses, `connections ${index} and ${paths.indexOf(other)} cross`).toBe(false)
+          }
+      }
+    }
+  })
+
+  it('balances whole cards around a taller trigger', () => {
+    const graph = graphLayout(
+      Array.from({ length: 6 }, (_, index) => ({ id: String(index), width: 336, height: index === 0 ? 128 : 92 })),
+      Array.from({ length: 5 }, (_, index) => ({ id: String(index), source: String(index), target: String(index + 1) })),
+      direction,
+    )
+    const result = compactLayout(graph, { width: 104, height: 136 }, 16 / 9)
+    const path = graph.nodes.map((node) => result.positions[node.id]!)
+    expect(path.slice(1).flatMap((point, index) => (point.y < path[index]!.y ? [index + 1] : []))).toEqual([3])
+    expect(hasRouteCrossings(result.routes)).toBe(false)
+  })
+
   it('automatically balances long chains without changing node sizes or the graph', () => {
     const graph = graphLayout(
       Array.from({ length: 50 }, (_, index) => ({ id: String(index), width: 320, height: 120 })),
@@ -111,7 +149,7 @@ describe('vertical compact layout', () => {
     expect(layoutAxes(result.positions.left0!, direction).y).toBeLessThan(layoutAxes(result.positions.right0!, direction).y)
   })
 
-  it('keeps short branches near their fork and folds the long branch before its tail', () => {
+  it('keeps short branches near their fork and the join after all incoming runs', () => {
     const forest = branched(direction, false, 2)
     // Measure this connected tree's folding independently of forest row packing.
     const independent = new Set(['second-root', 'second-leaf', 'note'])
@@ -124,7 +162,6 @@ describe('vertical compact layout', () => {
     }
     const path = Array.from({ length: 20 }, (_, index) => layoutAxes(result.positions['left' + index]!, direction))
     const returns = path.slice(1).filter((point, index) => point.x < path[index]!.x)
-    expect(returns.length).toBeGreaterThan(0)
     expect(returns.length).toBeLessThan(path.length / 2)
     const join = layoutAxes(result.positions.join!, direction)
     expect(join.x).toBeGreaterThan(
@@ -138,7 +175,7 @@ describe('vertical compact layout', () => {
         ),
       ),
     )
-    expect(result.bounds.width * result.bounds.height).toBeLessThan(graph.nodes.reduce((area, node) => area + node.width * node.height, 0) * 6)
+    expect(hasRouteCrossings(result.routes)).toBe(false)
   })
 
   it('keeps the trunk together beside a large annotation and avoids folding a short tail', () => {
@@ -171,11 +208,8 @@ describe('vertical compact layout', () => {
     expect(point('end').x).toBeGreaterThan(point('join').x)
     const path = Array.from({ length: 18 }, (_, index) => point('step' + index))
     const returns = path.slice(1).filter((position, index) => position.x <= path[index]!.x)
-    expect(returns.length).toBeGreaterThan(0)
-    expect(returns[0]!.x).toBeLessThan(path[0]!.x)
     for (const [index, position] of returns.entries()) expect(position.x).toBeLessThanOrEqual((returns[index - 1] ?? path[0])!.x)
-    const originalLength = Math.max(...graph.nodes.map((node) => layoutAxes(node, direction).x + (direction === 'vertical' ? node.height : node.width)))
-    expect(Math.max(result.bounds.width, result.bounds.height)).toBeLessThan(originalLength * 0.75)
+    expect(hasRouteCrossings(result.routes)).toBe(false)
   })
 
   it('handles empty, single-node and unjoined workflows', () => {
