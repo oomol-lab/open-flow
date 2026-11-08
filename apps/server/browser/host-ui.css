@@ -86,6 +86,7 @@
 .host-field,
 .host-field-heading {
   display: grid;
+  min-width: 0;
 }
 
 .host-field {
@@ -125,6 +126,7 @@
 
 .host-card-body {
   display: grid;
+  min-width: 0;
   gap: 8px;
   padding: 16px;
   border-top: 1px solid var(--ui-border);
@@ -145,6 +147,8 @@
 .host-actions,
 .host-form-actions {
   display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -158,8 +162,10 @@
 .host-card-heading-copy {
   display: flex;
   min-width: 0;
+  flex: 1 1 180px;
   flex-direction: column;
   gap: 2px;
+  overflow-wrap: anywhere;
 }
 
 .host-card-heading h2,
@@ -190,6 +196,7 @@
 
 .host-form {
   display: grid;
+  min-width: 0;
   gap: 8px;
   padding: 16px;
   border-top: 1px solid var(--ui-border);

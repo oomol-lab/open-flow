@@ -279,6 +279,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
         open={editor != null}
       >
         <DialogContent
+          className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
           closeLabel={t('variables.cancel')}
           container={portal.current}
           finalFocus={() => (actionTrigger.current?.isConnected ? actionTrigger.current : createTrigger.current)}
