@@ -1,4 +1,5 @@
 import { toPlainObject } from '@wopjs/cast'
+import { propertySchemaWithDefinitions } from '../../base/common/jsonSchema.ts'
 
 export interface ConnectorActionPorts {
   readonly inputs: readonly {
@@ -69,8 +70,9 @@ function inputPorts(schema: unknown): ConnectorActionPorts['inputs'] {
 
 export function connectorOutputMode(schema: unknown): 'fields' | 'value' {
   const root = toPlainObject(schema)
-  const properties = toPlainObject(root?.properties)
-  return (properties != null && Object.keys(properties).length > 0) || (root?.type == 'object' && root.additionalProperties === false) ? 'fields' : 'value'
+  const patterns = toPlainObject(root?.patternProperties)
+  // Only closed objects without dynamic keys can be represented completely by named ports.
+  return root?.type == 'object' && root.additionalProperties === false && (patterns == null || Object.keys(patterns).length == 0) ? 'fields' : 'value'
 }
 
 function outputPorts(schema: unknown): ConnectorActionPorts['outputs'] {
@@ -86,15 +88,6 @@ function outputPorts(schema: unknown): ConnectorActionPorts['outputs'] {
     json_schema: propertySchemaWithDefinitions(root!, propertySchema),
     nullable: !required.has(handle) || schemaAllowsNull(propertySchema, root),
   }))
-}
-
-function propertySchemaWithDefinitions(root: Record<string, unknown>, schema: unknown): unknown {
-  const property = toPlainObject(schema)
-  if (property == null) return schema
-  const result: Record<string, unknown> = Object.assign({}, property)
-  if (result.$defs == null && root.$defs != null) result.$defs = root.$defs
-  if (result.definitions == null && root.definitions != null) result.definitions = root.definitions
-  return result
 }
 
 function schemaDescription(root: unknown, schema: unknown): string | undefined {

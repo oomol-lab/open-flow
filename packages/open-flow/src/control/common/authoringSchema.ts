@@ -317,11 +317,13 @@ export function authoringSchema(kind?: AuthoringType) {
                               ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
                               : kind == 'workflow'
                                 ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
-                                : kind == 'agent'
-                                  ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
-                                  : kind == 'code'
-                                    ? codeGuidance
-                                    : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
+                                : kind == 'connector'
+                                  ? 'Select an Action and account. The platform derives ports from its schema. Open or dynamic response objects expose the complete response as one output; closed objects expose named fields. Read the created node for output names. Bind the whole response for dynamic fields; declared direct properties also support output field selection. Local edits preserve saved ports and response mapping.'
+                                  : kind == 'agent'
+                                    ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
+                                    : kind == 'code'
+                                      ? codeGuidance
+                                      : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
         example: {
           op: 'node.add',
           as: 'step',

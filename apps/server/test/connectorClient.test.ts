@@ -822,7 +822,7 @@ describe('Server Connector client', () => {
         inputs: {
           message: { description: 'Message.', jsonSchema: { default: 'hello', description: 'Message.', type: 'string' }, nullable: true, value: 'hello' },
         },
-        outputs: { message: { jsonSchema: { type: 'string' }, nullable: false } },
+        outputs: { output: { jsonSchema: action.outputSchema, nullable: false } },
         serviceName: 'Example',
       }),
     ])

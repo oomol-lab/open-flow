@@ -138,9 +138,10 @@ bun run lab test start-parameters --mcp
 ## Connector response regression
 
 `connector-responses` creates a workflow through the public authoring interface, consumes a dynamic
-object response and spreadsheet rows containing string, number, boolean and null cells, and archives
-both through a downstream Code node. Acceptance checks empty and mixed rows and preserves an
-`output` property inside the dynamic response. The reference first creates the dynamic-response node with `connectionId: ""`, confirms the public read and check, and restores its real account before the final run. The Connector and accounts are deterministic mocks;
+object response whose schema declares `output` and permits other fields, plus spreadsheet rows
+containing string, number, boolean and null cells. It archives both through a downstream Code node.
+Acceptance checks empty and mixed rows and preserves both the declared `output` property and the
+undeclared `rows` property. The reference first creates the dynamic-response node with `connectionId: ""`, confirms the public read and check, and restores its real account before the final run. The Connector and accounts are deterministic mocks;
 this does not verify production Marketplace authorization.
 
 ```bash

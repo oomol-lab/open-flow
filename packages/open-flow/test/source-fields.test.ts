@@ -10,6 +10,7 @@ import { applyFlowChanges, currentFlowModelVersion, decodeChangeOperations } fro
 import { decodeRevision, encodeRevision, digestBytes } from '../src/flow/common/encoding.ts'
 import { checkInputSource, inputSourceCandidates } from '../src/flow/common/graph.ts'
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
+import { comparePorts, matchesSchema } from '../src/flow/common/schema.ts'
 import { prepareFlow, validateFlow } from '../src/flow/common/semantics.ts'
 import { sourceFields, sourceOutputLabel, sourcePort } from '../src/flow/common/sourceField.ts'
 import { currentEngineContract, findEngineContract } from '../src/runtime/common/runtime.ts'
@@ -116,13 +117,18 @@ describe('Source object fields', () => {
     }
   })
 
-  it('reads only direct properties and leaves child schemas unchanged', () => {
-    const jsonSchema = {
-      properties: { direct: { $ref: '#/$defs/text' } },
-      $defs: { text: { type: 'string' } },
+  it.each(['$defs', 'definitions'])('preserves %s references in direct fields without expanding composition branches', (definitions) => {
+    const jsonSchema: JsonValue = {
+      properties: { direct: { $ref: `#/${definitions}/text` } },
+      [definitions]: { text: { type: 'string' } },
       allOf: [outputSchema],
     }
-    expect(sourceFields({ nullable: false, jsonSchema })).toEqual([{ field: 'direct', port: { jsonSchema: jsonSchema.properties.direct, nullable: true } }])
+    const fields = sourceFields({ nullable: false, jsonSchema })
+    expect(fields.map(({ field }) => field)).toEqual(['direct'])
+    const selected = fields[0]!.port
+    expect(comparePorts(selected, { jsonSchema: { type: 'string' }, nullable: true })).toEqual({ kind: 'compatible' })
+    expect(matchesSchema('Ada', selected.jsonSchema)).toBe(true)
+    expect(matchesSchema(42, selected.jsonSchema)).toBe(false)
   })
 
   it('checks the field independently of the whole object and preserves missing-field diagnostics', async () => {

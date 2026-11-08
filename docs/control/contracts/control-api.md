@@ -496,7 +496,7 @@ Ordinary nodes must omit `sourceHandle`; Condition and Wait require a declared b
 
 `inputs[handle]` uses `{ kind: 'value', value }` or `{ kind: 'sources', sources }`. Node sources use `{ kind: 'node', nodeId, output, field?: string }`. Omit `field` for the whole output; supply it for a direct property declared by the output object schema. Keys are literal, including empty strings, dots, and slashes. Nested paths and array indexes are unsupported. Inputs and Condition operands share field selection.
 
-Candidates come from direct schema `properties`; `$ref` and `allOf`/`anyOf`/`oneOf` are not expanded. Whole-output selection remains available when fields cannot be listed. A null parent or absent own property is unavailable; an explicit null field remains available. Variable binding source syntax is unchanged. Node sources must target ancestors reachable through execution edges, but need not cover every execution path. An invocation waits for all direct predecessors in its iteration to complete or be skipped, then executes once if at least one incoming edge is selected. If all paths are skipped, it propagates that state without creating a job.
+Candidates come from direct schema `properties`; `$ref` and `allOf`/`anyOf`/`oneOf` are not expanded. Selected field schemas inherit root `$defs` and `definitions` tables when absent on the field schema, preserving local definition references. Whole-output selection remains available when fields cannot be listed. A null parent or absent own property is unavailable; an explicit null field remains available. Variable binding source syntax is unchanged. Node sources must target ancestors reachable through execution edges, but need not cover every execution path. An invocation waits for all direct predecessors in its iteration to complete or be skipped, then executes once if at least one incoming edge is selected. If all paths are skipped, it propagates that state without creating a job.
 
 Inputs combine the selected incoming paths and their transitive ancestors. Skipped branches never supply historical results, and the Run-wide latest-result table is not consulted. Separate inputs may read different parallel predecessors; multiple available sources for a single input remain an error. Executable nodes accept optional positive integer `maxExecutions`, default 1000, counted per node within one Flow Run. An invocation that would exceed the limit fails the Run. Wait/Agent decision resumption does not increment it. Scheduling depends only on execution edges and branch state.
 
@@ -1654,9 +1654,13 @@ Deployments call `/v1/systemone` through optional LLM host `decision`, reusing d
 
 ### Connector response ports
 
-Connector object responses with named `properties` expose those properties as output ports.
-An object without named properties that permits additional properties exposes the complete response
-as the single `output` port, as do non-object responses. A closed empty object has no output ports.
+Connector response schemas with `type: "object"`, `additionalProperties: false` and no nonempty
+`patternProperties` expose their named `properties` as output ports. A closed empty object has no
+output ports. Other schemas expose the complete response as the single `output` port. This includes
+open objects with named properties, implicit or schema-valued additional properties, dynamic keys,
+nullable objects and non-object responses. Known properties describe part of an open response;
+they do not remove its other fields. Select declared direct properties through ordinary output
+field sources, or bind the entire response to Code when working with dynamic fields.
 Authoring derives this mapping from Action metadata and saves `outputMode: "value"` on the
 Connector executor when the entire response belongs in `output`. An absent `outputMode` means
 named output fields. Execution uses this saved mapping, including when the response itself has an

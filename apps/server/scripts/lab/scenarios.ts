@@ -95,7 +95,7 @@ export const scenarios = [
     id: 'connector-responses',
     entry: { kind: 'start' },
     name: 'Consume dynamic and spreadsheet Connector responses',
-    version: 3,
+    version: 4,
     task: 'Build a manually triggered workflow. Initially defer the dynamic response account with an empty connectionId, read it back and check the workflow, then select Data test account before the final run. Read the dynamic response and spreadsheet cells from Lab Data using Data test account. Pass both results to a code node, then archive {dynamic, values} using Archive test account. Preserve the complete dynamic response, including its output field, and all spreadsheet cell types, including null. Do not hardcode response data.',
   },
   {

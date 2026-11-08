@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import { createHash } from 'node:crypto'
 import { fulfillmentBatches } from './fulfillment.ts'
 
-const dynamicSchema: JsonValue = { type: 'object', properties: {}, additionalProperties: true }
+const dynamicSchema: JsonValue = { type: 'object', properties: { output: { type: 'string' } }, additionalProperties: true }
 const cellsSchema: JsonValue = {
   type: 'array',
   items: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { const: null }] } },
@@ -206,6 +206,7 @@ export function createMocks() {
           },
           outputSchema: a.outputSchema ?? {
             type: 'object',
+            additionalProperties: false,
             properties: Object.fromEntries(Object.entries(a.outputs).map(([key, port]) => [key, port.jsonSchema])),
             required: Object.keys(a.outputs),
           },

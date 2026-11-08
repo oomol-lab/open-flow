@@ -511,23 +511,66 @@ describe('business configuration authoring contracts', () => {
   })
 })
 
-it.each<{ schema: JsonValue; response: JsonValue; expected: JsonValue }>([
+it.each<{ schema?: JsonValue; response: JsonValue; expected: JsonValue; field?: string }>([
+  { response: { output: 'saved field', records: [] }, expected: 'saved field' },
   {
     schema: { type: 'object', properties: {}, additionalProperties: true },
     response: { output: 'nested', records: [{ id: 1 }], next: null },
     expected: { output: 'nested', records: [{ id: 1 }], next: null },
   },
+  {
+    schema: { type: 'object', properties: { name: { type: 'string' } }, additionalProperties: true },
+    response: { name: 'repository', stars: 0, metrics: { forks: 8 }, output: 'nested' },
+    expected: { name: 'repository', stars: 0, metrics: { forks: 8 }, output: 'nested' },
+  },
+  {
+    schema: { type: 'object', properties: { output: { type: 'string' } } },
+    response: { output: 'nested', records: [] },
+    expected: { output: 'nested', records: [] },
+  },
+  ...['$defs', 'definitions'].map((definitions) => {
+    const schema: JsonValue = {
+      type: 'object',
+      properties: { name: { $ref: `#/${definitions}/name` } },
+      [definitions]: { name: { type: 'string', minLength: 1 } },
+      required: ['name'],
+      additionalProperties: true,
+    }
+    return { schema, response: { name: 'repository', stars: 0 }, expected: 'repository', field: 'name' }
+  }),
+  {
+    schema: { type: 'object', properties: { name: { type: 'string' } }, additionalProperties: { type: 'integer' } },
+    response: { name: 'repository', stars: 0, forks: 8 },
+    expected: { name: 'repository', stars: 0, forks: 8 },
+  },
+  {
+    schema: { type: 'object', properties: { name: { type: 'string' } }, patternProperties: { '^metric_': { type: 'integer' } }, additionalProperties: false },
+    response: { name: 'repository', metric_stars: 0, metric_forks: 8 },
+    expected: { name: 'repository', metric_stars: 0, metric_forks: 8 },
+  },
+  {
+    schema: { type: ['object', 'null'], properties: { name: { type: 'string' } }, additionalProperties: false },
+    response: null,
+    expected: null,
+  },
   { schema: { type: 'array', items: {} }, response: [1, null, false], expected: [1, null, false] },
-  { schema: { type: 'object', properties: { output: { type: 'string' } }, required: ['output'] }, response: { output: 'named' }, expected: 'named' },
-])('binds Connector response schema $schema to a downstream code input', async ({ schema, response: returned, expected }) => {
+  {
+    schema: { type: 'object', properties: { output: { type: 'string' } }, additionalProperties: false, required: ['output'] },
+    response: { output: 'named' },
+    expected: 'named',
+  },
+])('binds Connector response schema $schema field $field to a downstream code input', async ({ schema, response: returned, expected, field }) => {
   const action = async (id: string) => {
     const base = await host.action(id)
-    const ports = connectorActionPorts({ type: 'object' }, schema)
+    const ports = schema === undefined ? undefined : connectorActionPorts({ type: 'object' }, schema)
     return {
       ...base,
       inputs: {},
-      outputSchema: schema as JsonValue,
-      outputs: Object.fromEntries(ports.outputs.map((port) => [port.handle, { jsonSchema: port.json_schema as JsonValue, nullable: port.nullable }])),
+      outputSchema: schema,
+      outputs:
+        ports === undefined
+          ? { output: { jsonSchema: { type: 'string' } as JsonValue, nullable: false } }
+          : Object.fromEntries(ports.outputs.map((port) => [port.handle, { jsonSchema: port.json_schema as JsonValue, nullable: port.nullable }])),
     }
   }
   const created = await edit(
@@ -541,7 +584,8 @@ it.each<{ schema: JsonValue; response: JsonValue; expected: JsonValue }>([
         as: 'consumer',
         name: 'Consumer',
         code: 'export default () => ({})',
-        inputs: { data: { kind: 'output', node: '$source' } },
+        ...(field === undefined ? {} : { config: { inputs: { data: { schema: { type: 'string' }, nullable: false } } } }),
+        inputs: { data: { kind: 'output', node: '$source', ...(field === undefined ? {} : { field }) } },
       },
       { op: 'edge.connect', source: '$start', target: '$source' },
       { op: 'edge.connect', source: '$source', target: '$consumer' },

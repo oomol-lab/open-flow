@@ -1,5 +1,23 @@
 # Public contracts and version evolution
 
+## Complete open-object Connector responses
+
+The npm `next` baseline verified for this change is `0.1.0-beta.85`, gitHead
+`f8f55da1c06410d7f899314750d443ea5d100910`. New Connector nodes now preserve an open or dynamic
+response object as the complete `output` value even when its schema lists known properties.
+Only closed object schemas without dynamic keys are projected into named output ports.
+CLI/MCP authoring and Workbench creation use the same catalog projection. Callers read the node's
+actual outputs and use ordinary field selection for declared properties or pass the whole object
+to Code for dynamic fields. Selected field schemas inherit root `$defs` and `definitions` tables
+when absent on the field schema, using the existing local-reference validation and comparison.
+
+Saved Connector nodes retain their ports and executor mapping, including field-mode nodes created
+with the published baseline. Reads, renames, connection changes and workflow import do not refresh
+those snapshots. Their existing bindings and execution results remain unchanged. New nodes use the
+already supported `outputMode: "value"`; Flow model v13, Engine v10, checkpoint v6 and Control API
+envelope identifiers remain unchanged. Deployments should use the updated public package for
+consistent catalog discovery and node creation. Connector provider definitions require no change.
+
 ## Bounded Flow State reads (beta.79)
 
 The publication baseline is npm `next` beta.78, gitHead

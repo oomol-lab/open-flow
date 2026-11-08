@@ -10,6 +10,7 @@ import { checkInputSource } from '../../../../flow/common/graph.ts'
 import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
 import { resetInputValues, setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
+import { action as catalogAction } from '../stores/proxyCatalog.ts'
 import { designerGraph } from '../workspace.ts'
 import {
   addNode,
@@ -98,6 +99,24 @@ function managedDraft(): Draft {
     },
   }
 }
+
+it('creates an open-object Connector with its complete response schema through the Workbench catalog', () => {
+  const schema = { type: 'object', properties: { name: { type: 'string' } }, additionalProperties: true }
+  const action = catalogAction(
+    { id: 'test.read', service: 'test', name: 'Read', description: '', inputSchema: { type: 'object' }, outputSchema: schema },
+    { success: true, data: [{ service: 'test', displayName: 'Test', authTypes: ['no_auth'] }] },
+  )
+  const current = draft('export default () => ({})\n')
+  const changes = addNode(revisionView(current), 'read', { kind: 'connector', action })
+  if (changes == null) throw new Error('Expected Connector changes')
+  const changed = applyFlowChanges(current, changes)
+  expect(changed.content.document.graph.nodes.read).toMatchObject({
+    task: {
+      executor: { kind: 'connector', action: 'test.read', outputMode: 'value' },
+      outputs: [{ handle: 'output', jsonSchema: schema, nullable: false }],
+    },
+  })
+})
 
 describe('Code task port changes', () => {
   it('does not emit a Draft change when the ports stay the same', () => {

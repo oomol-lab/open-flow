@@ -1,5 +1,6 @@
-import type { NodeSource, PortDefinition } from './change.ts'
+import type { JsonValue, NodeSource, PortDefinition } from './change.ts'
 
+import { propertySchemaWithDefinitions } from '../../base/common/jsonSchema.ts'
 import { schemaObject } from './schema.ts'
 
 /** Only explicitly declared, first-level object properties are selectable. */
@@ -17,7 +18,7 @@ export function sourceFields(output: PortDefinition): readonly { readonly field:
       field,
       port: {
         ...(typeof description == 'string' ? { description } : {}),
-        jsonSchema,
+        jsonSchema: propertySchemaWithDefinitions(schema, jsonSchema) as JsonValue,
         nullable: missingParent || !required.includes(field),
       },
     }
