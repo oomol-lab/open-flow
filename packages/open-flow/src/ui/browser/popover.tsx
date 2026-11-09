@@ -12,6 +12,10 @@ const PopoverTrigger = React.forwardRef<HTMLButtonElement, PopoverPrimitive.Trig
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} ref={ref} />
 })
 
+function PopoverClose(props: PopoverPrimitive.Close.Props) {
+  return <PopoverPrimitive.Close data-slot="popover-close" {...props} />
+}
+
 function PopoverContent({
   className,
   positionerClassName,
@@ -76,7 +80,7 @@ function PopoverDescription({ className, ...props }: PopoverPrimitive.Descriptio
   return <PopoverPrimitive.Description data-slot="popover-description" className={cn('text-muted-foreground', className)} {...props} />
 }
 
-export { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger }
+export { Popover, PopoverClose, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger }
 
 /** Additional property controls, anchored beside their owning field. */
 function PopoverPanelContent({

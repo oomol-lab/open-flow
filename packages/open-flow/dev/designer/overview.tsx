@@ -78,6 +78,14 @@ function ButtonSamples({ log }: { readonly log: LogAction }) {
       <Button disabled size="sm">
         Disabled
       </Button>
+      <div className="flex w-40 flex-col gap-2">
+        <Button multiline variant="outline" size="sm" onClick={() => log('button.click', 'multiline')}>
+          J’ai enregistré le mot de passe
+        </Button>
+        <Button multiline variant="outline" onClick={() => log('button.click', 'unbroken-label')}>
+          ALongUnbrokenActionLabelThatWrapsWithinItsButton
+        </Button>
+      </div>
     </div>
   )
 }

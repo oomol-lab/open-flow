@@ -192,7 +192,7 @@ export function UsersPage({ currentUserId, onUnauthorized }: { readonly currentU
               {t('users.passwordHint')}
             </p>
             <div className="host-form-actions">
-              <Button type="button" variant="outline" size="sm" onClick={() => setCredentials(undefined)}>
+              <Button multiline type="button" variant="outline" size="sm" onClick={() => setCredentials(undefined)}>
                 {t('users.dismiss')}
               </Button>
             </div>
@@ -247,6 +247,7 @@ export function UsersPage({ currentUserId, onUnauthorized }: { readonly currentU
                     <td>
                       <div className="host-actions justify-end">
                         <Button
+                          multiline
                           type="button"
                           variant="outline"
                           size="sm"
@@ -256,6 +257,7 @@ export function UsersPage({ currentUserId, onUnauthorized }: { readonly currentU
                           {t('users.resetPassword')}
                         </Button>
                         <Button
+                          multiline
                           type="button"
                           variant={user.enabled ? 'destructive' : 'outline'}
                           size="sm"

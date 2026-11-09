@@ -453,10 +453,11 @@ function SettingItem({
                 (removing ? (
                   <>
                     <span>{t('settings.deleteConfirm')}</span>
-                    <Button variant="outline" size="sm" disabled={pending} onClick={() => setRemoving(false)} type="button">
+                    <Button multiline variant="outline" size="sm" disabled={pending} onClick={() => setRemoving(false)} type="button">
                       {t('settings.cancel')}
                     </Button>
                     <Button
+                      multiline
                       variant="destructive"
                       size="sm"
                       disabled={pending}
@@ -467,11 +468,11 @@ function SettingItem({
                     </Button>
                   </>
                 ) : (
-                  <Button variant="destructive" size="sm" onClick={() => setRemoving(true)} type="button">
+                  <Button multiline variant="destructive" size="sm" onClick={() => setRemoving(true)} type="button">
                     {t('settings.delete')}
                   </Button>
                 ))}
-              <DialogTrigger render={<Button variant="outline" size="sm" />} onClick={edit} type="button">
+              <DialogTrigger render={<Button multiline variant="outline" size="sm" />} onClick={edit} type="button">
                 {t(configured ? 'settings.edit' : 'settings.configure')}
               </DialogTrigger>
             </div>

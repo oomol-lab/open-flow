@@ -99,7 +99,7 @@ body {
   background: transparent;
   color: var(--ui-muted-foreground);
   font-size: var(--ui-font-size);
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   text-align: center;
   text-decoration: none;
   transition:

@@ -83,7 +83,7 @@ function McpInformation({ onUnauthorized }: { readonly onUnauthorized: () => voi
         {failed && (
           <div className="host-actions" role="alert">
             <span>{t('settings.loadFailed')}</span>
-            <Button variant="outline" type="button" onClick={() => setAttempt((value) => value + 1)}>
+            <Button multiline variant="outline" type="button" onClick={() => setAttempt((value) => value + 1)}>
               {t('settings.retry')}
             </Button>
           </div>
@@ -391,7 +391,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
             {!loadFailed ? (
               <span role="status">{t('settings.loading')}</span>
             ) : (
-              <Button variant="outline" onClick={() => void load()}>
+              <Button multiline variant="outline" onClick={() => void load()}>
                 {t('settings.retry')}
               </Button>
             )}
@@ -407,15 +407,15 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
                   {revoking == token.tokenId ? (
                     <>
                       <span className="text-sm">{t('account.revokeConfirm')}</span>
-                      <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setRevoking(undefined)}>
+                      <Button multiline type="button" variant="outline" size="sm" disabled={pending} onClick={() => setRevoking(undefined)}>
                         {t('settings.cancel')}
                       </Button>
-                      <Button type="button" variant="destructive" size="sm" disabled={pending} onClick={() => void revoke(token.tokenId)}>
+                      <Button multiline type="button" variant="destructive" size="sm" disabled={pending} onClick={() => void revoke(token.tokenId)}>
                         {t('account.revoke')}
                       </Button>
                     </>
                   ) : (
-                    <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setRevoking(token.tokenId)}>
+                    <Button multiline type="button" variant="outline" size="sm" disabled={pending} onClick={() => setRevoking(token.tokenId)}>
                       {t('account.revoke')}
                     </Button>
                   )}

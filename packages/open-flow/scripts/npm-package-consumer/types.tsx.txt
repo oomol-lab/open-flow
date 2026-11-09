@@ -138,7 +138,7 @@ export const hostFields = (
     <Label htmlFor="host-input">Name</Label>
     <Input id="host-input" value="name" onChange={(event) => event.target.value} />
     <Textarea defaultValue="value" />
-    <Button variant="outline" size="sm" type="submit">
+    <Button multiline variant="outline" size="sm" type="submit">
       Save
     </Button>
   </>

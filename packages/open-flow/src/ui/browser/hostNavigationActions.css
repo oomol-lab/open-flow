@@ -1,26 +1,16 @@
 .open-flow-navigation-menu {
-  position: fixed;
-  inset: 48px 16px auto auto;
+  width: max-content;
   max-width: calc(100vw - 16px);
-  margin: 0;
+  max-height: var(--available-height);
+  gap: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--ui-popover);
   color: var(--ui-popover-foreground);
   box-shadow: 0 4px 12px #0002;
-}
-
-.open-flow-navigation-menu:popover-open {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.open-flow-navigation-menu > button {
-  min-height: min-content;
-  overflow-wrap: anywhere;
-  white-space: normal;
 }
 
 .open-flow-navigation-menu button[aria-pressed='true'] {

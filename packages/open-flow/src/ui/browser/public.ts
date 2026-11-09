@@ -31,6 +31,7 @@ import { Tabs as SharedTabs, TabsContent as SharedTabsContent, TabsList as Share
 
 /** Native host button contract; Base UI composition stays internal to the product. */
 export interface ButtonProps extends ComponentPropsWithoutRef<'button'> {
+  multiline?: boolean
   variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'disclosure' | 'destructive' | 'link'
   size?: 'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-xs' | 'icon-sm' | 'icon-lg'
 }
