@@ -153,10 +153,12 @@ Without an environment-managed or persisted Operator credential, health checks, 
 At `OPEN_FLOW_MAX_PENDING_RUNS`, new Run admission returns 429. Idempotent replay of an accepted request still returns its original Run. Cron and Poll retain their scheduling position and retry shortly. Cron also retains its position while its Flow has a nonterminal Run. After that Run ends, Cron admits only the earliest unprocessed occurrence, then advances the next schedule beyond the current time. An unreadable or invalid published Cron Revision stops only that binding’s schedule and records failed health and error activity.
 
 Idle Waits and workflow-call nodes persist their checkpoints immediately and release their Run slots.
-Node execution uses the independent Task budget across all active Runs. Waiting for admission does not
+Node execution uses the independent Task budget across all active Runs. Waiting for initial Task admission does not
 consume a node's `timeoutMs`; it still counts toward the Run deadline. Cancellation removes queued
 node admissions and releases held slots. Code and Agent workflow tools lend their Task slot while any
 child call of that node is waiting, and the last returning call reacquires it before continuing.
+The parent node's timeout keeps running while waiting for the child Run and reacquiring the Task slot,
+so contention during reacquisition can exhaust that timeout.
 Trusted graph scheduling, managed Tasks and node event persistence stay in the Server process.
 A lost Code Executor ends affected Code Runs as indeterminate and is rebuilt for later work;
 independent managed Tasks continue.

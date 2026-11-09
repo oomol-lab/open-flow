@@ -56,9 +56,11 @@ Older deployments cannot resume v7 checkpoints: finish those Runs before downgra
 
 Graph selection, joins, loop iterations and input provenance retain Engine v10 semantics. Active Runs
 of one Flow still execute one at a time. The Scheduler freezes idle Waits immediately, and the Server
-owns a separate global node-execution budget. Scheduler `admitTask` admits Task execution before
-its node timeout starts, so budget queueing never consumes `timeoutMs`. Pending workflow-call status
-checks only read child state and do not request Task admission. The Server therefore reports a
+owns a separate global node-execution budget. Scheduler `admitTask` completes initial Task admission
+before the node timeout starts, so initial admission queueing does not consume `timeoutMs`. A Code or
+Agent workflow tool keeps its node timeout running while waiting for its child Run and reacquiring
+the parent Task slot; contention during reacquisition can therefore exhaust the node timeout.
+Pending workflow-call status checks only read child state and do not request Task admission. The Server therefore reports a
 paused Run as `waiting` and an accepted resolution as `queued` sooner than before. Control API
 conformance accepts both this immediate freeze and in-memory retention (`running`). The obsolete
 Scheduler `waitRetentionMs` export is removed.
