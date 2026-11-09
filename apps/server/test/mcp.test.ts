@@ -615,7 +615,7 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
   await expect
     .poll(async () => (await other.callTool({ name: 'run_get', arguments: { runId: run.runId } })).structuredContent)
     .toMatchObject({
-      status: 'running',
+      status: 'waiting',
       waits: [{ actions: ['approve', 'reject'] }],
     })
   expect((await other.callTool({ name: 'run_result', arguments: { runId: run.runId } })).structuredContent).toMatchObject({
@@ -662,7 +662,7 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
   const args = { runId, waitId: waiting.waitId, action, comment: '  Reviewed through MCP  ' }
   const invalid = await client.callTool({ name: 'run_resolve_wait', arguments: { ...args, action: action == 'continue' ? 'approve' : 'continue' } })
   expect(invalid.structuredContent).toMatchObject({ error: { code: 'run.invalid' } })
-  expect((await control.getRun(runId)).status).toBe('running')
+  await expect.poll(async () => (await control.getRun(runId)).status).toBe('waiting')
   const decision = await call('run_resolve_wait', args)
   expect(decision).toMatchObject({ action, comment: 'Reviewed through MCP', resolutionAccepted: true, runId, waitId: waiting.waitId })
   await expect.poll(async () => (await control.getRun(runId)).status).toBe('completed')

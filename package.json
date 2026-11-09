@@ -11,6 +11,7 @@
   "devDependencies": {
     "@oxc-node/core": "1.0.1",
     "oxfmt": "^0.60.0",
+    "tsrs": "0.22.0-ts7.1.0-beta",
     "wrangler": "4.132.0"
   },
   "scripts": {

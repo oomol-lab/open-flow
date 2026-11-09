@@ -30,8 +30,9 @@ import { HttpTaskError } from '../deployment/http-transport.ts'
 import { executeOpenApi } from '../deployment/openapi.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { errorKind } from '../logger.ts'
-import { supportsIsolatedVmEngine, IsolatedVmHost } from '../runtime/isolated-vm.ts'
+import { supportsIsolatedVmEngine, IsolatedVmError, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 import { checkCodeActions, checkCodePermissions, checkConnectorProxies } from './connector-capabilities.ts'
+import { ExecutionSlots } from './execution-slots.ts'
 import { decodedRevision, preparedRevision } from './revision-cache.ts'
 import { ArtifactHostError, RunArtifacts } from './run-artifacts.ts'
 import { RunState } from './run-state.ts'
@@ -114,6 +115,7 @@ export class RunExecutor {
   readonly #toolCalls = new Map<string, { runId: string; jobId: string; abort: AbortController }>()
   readonly #state: RunState
   readonly #artifacts: RunArtifacts
+  readonly #slots: ExecutionSlots
 
   constructor(
     store: Store,
@@ -129,7 +131,9 @@ export class RunExecutor {
     invokeWorkflowTarget: RunControl['invokeWorkflowTarget'],
     subscribeRun: (flowId: string, runId: string, changed: () => void) => () => void,
     additionalFailureCodes: ReadonlySet<string>,
+    maxConcurrentTasks: number,
   ) {
+    this.#slots = new ExecutionSlots(maxConcurrentTasks)
     this.#invokeWorkflowTarget = invokeWorkflowTarget
     this.#subscribeRun = subscribeRun
     this.#invokeWorkflow = invokeWorkflow
@@ -313,6 +317,7 @@ export class RunExecutor {
       const emit = async (event: Parameters<NonNullable<Parameters<IsolatedVmHost['run']>[1]['emit']>>[0] | ArtifactEvent): Promise<void> => {
         if (event.type == 'run.started' && event.runId == run.runId) return
         if ((event.type == 'node.completed' || event.type == 'node.failed') && 'jobId' in event) {
+          this.#slots.release(run.runId, event.jobId)
           connectors.release(event.jobId)
           if (event.type === 'node.failed') this.#store.state.discardInvocation(run.runId, event.jobId)
           this.#cancelNodeTools(run.runId, event.jobId)
@@ -325,6 +330,7 @@ export class RunExecutor {
         .run(flow, {
           capability: (capabilities, call) => this.#invokeCapability(capabilities, call, this.#connectorContext(run, 'execute'), run, flow, emit),
           emit,
+          admitTask: (admission, signal) => this.#slots.acquire(admission.runId, admission.jobId, signal),
           emitLogs: async (events, signal) => {
             const projected = (await Promise.all(events.map((event) => projectEvent(event).catch(() => undefined)))).filter((event) => event != null)
             if (signal.aborted) return
@@ -362,6 +368,7 @@ export class RunExecutor {
               }
             }
             const output = this.#store.runs.createWait(run.runId, request, this.#resolveWaitPublicOrigin()?.href, notification)
+            this.#slots.release(run.runId, request.jobId)
             this.#runChanged(run.flowId, run.runId)
             this.#wakeMaintenance()
             return output
@@ -405,13 +412,27 @@ export class RunExecutor {
         })
         .pipe(
           Effect.matchEffect({
-            onFailure: (error) => Effect.sync(() => this.#failRun(run, startedAt, error.message.includes('execution deadline'), error, indeterminate)),
+            onFailure: (error) =>
+              Effect.sync(() =>
+                this.#failRun(
+                  run,
+                  startedAt,
+                  error.message.includes('execution deadline'),
+                  error,
+                  indeterminate || (error instanceof IsolatedVmError && error.code == 'executor-crashed'),
+                ),
+              ),
             onSuccess: (output) =>
               Effect.try({ try: () => this.#commitOutcome(run, startedAt, budgetMs, output), catch: (error) => error }).pipe(
                 Effect.catch((error) => Effect.sync(() => this.#failRun(run, startedAt, false, error))),
               ),
           }),
-          Effect.ensuring(Effect.sync(() => this.#artifacts.discard(run.runId))),
+          Effect.ensuring(
+            Effect.sync(() => {
+              this.#slots.releaseRun(run.runId)
+              this.#artifacts.discard(run.runId)
+            }),
+          ),
         )
     })
   }
@@ -432,7 +453,7 @@ export class RunExecutor {
 
   #failRun(run: StoredRun, startedAt: number, timedOut: boolean, error: unknown, indeterminate = false): void {
     const result = indeterminate
-      ? { error: { code: 'execution.terminal-unknown', message: 'A Connector action outcome is unknown.' } }
+      ? { error: { code: 'execution.terminal-unknown', message: 'An execution outcome is unknown.' } }
       : timedOut
         ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
         : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
@@ -473,8 +494,11 @@ export class RunExecutor {
     const task = node.task
     const executor = task.executor
     switch (executor.kind) {
-      case 'workflow':
-        return this.#invokeWorkflow(run, invocation.nodeId, invocation.jobId, invocation.input, node, invocation.workflowRunId)
+      case 'workflow': {
+        const result = await this.#invokeWorkflow(run, invocation.nodeId, invocation.jobId, invocation.input, node, invocation.workflowRunId)
+        if (result.kind == 'calling') this.#slots.release(run.runId, invocation.jobId)
+        return result
+      }
       case 'skip-duplicates': {
         if (run.source == null) throw new StateError('capability.denied', 'State requires a Run source.')
         const items = invocation.input.items!
@@ -757,6 +781,7 @@ export class RunExecutor {
       signal.throwIfAborted()
       this.#pendingWorkflowCalls.set(run.runId, (this.#pendingWorkflowCalls.get(run.runId) ?? 0) + 1)
       this.waitingWorkflows.add(run.runId)
+      this.#slots.suspend(run.runId, jobId)
       this.#wakeMaintenance()
       try {
         return await new Promise<Readonly<Record<string, JsonValue>>>((resolve, reject) => {
@@ -791,6 +816,7 @@ export class RunExecutor {
         if (pending == 0) this.#pendingWorkflowCalls.delete(run.runId)
         else this.#pendingWorkflowCalls.set(run.runId, pending)
         await this.#resumeWorkflowCaller(run.runId, signal)
+        if (!signal.aborted) await this.#slots.resume(run.runId, jobId, signal)
       }
     } finally {
       this.#toolCalls.delete(key)

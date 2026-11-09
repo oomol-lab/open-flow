@@ -877,7 +877,7 @@ describe('revision graph scheduler', () => {
     )
     const prepared = await prepareFlow(source, 'main', engine)
     const result = await runFlow(prepared, {
-      invokeTask: () => Effect.succeed({ exhaustive: true, posts: [] }),
+      invokeTask: () => Effect.succeed({ exhaustive: true, omitted: undefined, posts: [] }),
       runId: 'connector-extra-output',
     })
 
@@ -1181,7 +1181,7 @@ it('validates formed Webhook outputs at launch and checkpoint recovery without p
   const outputs = { headers: { test: 'original' }, query: { tag: ['a', 'b'] }, body: {}, webhookUrl: 'https://example.com/webhook' }
   const first = await runOutcome(prepared, { runId: 'webhook-checkpoint', trigger: { nodeId: 'start', outputs }, invokeTask: () => Effect.succeed({}) })
   if (first.kind !== 'waiting') throw new Error('Expected a checkpoint.')
-  expect(first.checkpoint.version).toBe(6)
+  expect(first.checkpoint.version).toBe(7)
   expect(first.checkpoint.results.start?.outputs).toEqual(outputs)
   expect(() => decodeFlowRunCheckpoint({ ...first.checkpoint, version: 3 })).toThrow(/version/)
   const invalidOutputs: readonly Readonly<Record<string, JsonValue>>[] = [{ payload: outputs }, { ...outputs, webhookUrl: 2 }, { ...outputs, extra: null }]

@@ -1,16 +1,28 @@
 import type { TaskCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RuntimeCapabilityResponse, RuntimeInvocation, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOutcome, RunLaunch, WaitOperation, SchedulerEvent, SchedulerFailure, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOutcome, RunLaunch, WaitOperation, SchedulerEvent, SchedulerFailure, TaskAdmission, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { ChildProcess, ChildProcessByStdio } from 'node:child_process'
 import type { Readable } from 'node:stream'
 
+import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
 import { findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import { spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { z } from 'zod'
+
+const waitResolutionsSchema = z.record(
+  z.string(),
+  z.object({
+    action: z.enum(['continue', 'approve', 'reject']),
+    resolvedAt: z.string().refine((value) => Number.isFinite(Date.parse(value))),
+    comment: z.string().nullable(),
+  }),
+)
 
 export interface IsolatedVmLimits {
   /** CPU time accumulated by one Task invocation across all of its entries into the isolate. */
@@ -45,7 +57,9 @@ const v9EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated
 
 const v10EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1 skip-duplicates/1').digest('hex')}`
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1 skip-duplicates/1 state-batch-read/1').digest('hex')}`
+const v10BatchReadEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1 skip-duplicates/1 state-batch-read/1').digest('hex')}`
+
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/5 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1 http-request/1 artifact/1 nodejs-compat/1 code-fetch/1 state/1 skip-duplicates/1 state-batch-read/1').digest('hex')}`
 
 const v6EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1').digest('hex')}`
 
@@ -60,6 +74,7 @@ export function supportsIsolatedVmEngine(engineContract: string, engineDigest: s
   return (
     findEngineContract(engineContract) != null &&
     (engineDigest === isolatedVmEngineDigest ||
+      engineDigest === v10BatchReadEngineDigest ||
       (engineContract === 'open-flow-engine/v10' && engineDigest === v10EngineDigest) ||
       (engineContract === 'open-flow-engine/v9' && engineDigest === v9EngineDigest) ||
       ((engineContract === 'open-flow-engine/v8' || engineContract === 'open-flow-engine/v8/nodejs-compat-v1') && engineDigest === v8EngineDigest) ||
@@ -76,8 +91,10 @@ export class IsolatedVmError extends Error {
   }
 
   readonly retryable: boolean
-  constructor(code: IsolatedVmError['code'], message: string, retryable = false) {
+  readonly failure: SchedulerFailure | undefined
+  constructor(code: IsolatedVmError['code'], message: string, retryable = false, failure?: SchedulerFailure) {
     super(message)
+    this.failure = failure
     this.code = code
     this.name = 'IsolatedVmError'
     this.retryable = retryable
@@ -85,33 +102,23 @@ export class IsolatedVmError extends Error {
 }
 
 export type InvokeContext = {
-  readonly blockId: string | undefined
-  readonly flowId: string | undefined
-  readonly runId: string | undefined
+  readonly blockId: string
+  readonly flowId: string
+  readonly runId: string
+  readonly nodeId: string
+  readonly jobId: string
 }
 
-export type InvokeRequest =
-  | {
-      readonly capabilities?: readonly TaskCapability[]
-      readonly context?: InvokeContext
-      readonly executionId: number
-      readonly input: JsonValue
-      readonly invocationId: string
-      readonly limits: IsolatedVmLimits
-      readonly program: RuntimeProgram
-      readonly type: 'invoke'
-    }
-  | {
-      readonly executionId: number
-      readonly flow: RunLaunch & {
-        readonly flowId: string
-        readonly prepared: PreparedFlow
-        readonly remainingMs?: number
-        readonly runId: string
-      }
-      readonly limits: IsolatedVmLimits
-      readonly type: 'invoke'
-    }
+export interface InvokeRequest {
+  readonly capabilities?: readonly TaskCapability[]
+  readonly context?: InvokeContext
+  readonly executionId: number
+  readonly input: JsonValue
+  readonly invocationId: string
+  readonly limits: IsolatedVmLimits
+  readonly program: RuntimeProgram
+  readonly type: 'invoke'
+}
 
 export type ParentMessage = InvokeRequest | { readonly executionId: number; readonly type: 'cancel' } | CapabilityResult
 
@@ -128,31 +135,26 @@ export interface CapabilityResult {
 }
 
 export type ExecutorMessage =
-  | { readonly executionId: number; readonly id: number; readonly type: 'wait'; readonly operation: WaitOperation }
   | {
-      readonly capabilities?: readonly TaskCapability[]
       readonly executionId: number
       readonly id: number
       readonly invocationId: string
       readonly kind: string
       readonly payload: JsonValue
-      readonly nodeId?: string
-      readonly jobId?: string
       readonly type: 'capability'
     }
-  | { readonly event: SchedulerEvent; readonly executionId: number; readonly id: number; readonly type: 'event' }
   | {
       readonly events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[]
       readonly executionId: number
       readonly id: number
       readonly type: 'logs'
     }
-  | { readonly executionId: number; readonly id: number; readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
   | { readonly executionId: number; readonly id: number; readonly type: 'call.cancel' }
   | {
       readonly code: IsolatedVmError['code']
       readonly executionId: number
       readonly message: string
+      readonly failure?: SchedulerFailure
       readonly ok: false
       readonly retire?: true
       readonly type: 'result'
@@ -162,22 +164,21 @@ export type ExecutorMessage =
       readonly ok: true
       readonly retire?: true
       readonly type: 'result'
-      readonly value: FlowRunOutcome | JsonValue | undefined
+      readonly value: JsonValue | undefined
     }
 
 interface PendingInvocation {
-  readonly capability: (capabilities: readonly TaskCapability[], call: Parameters<RuntimeInvocation['capability']>[0]) => Promise<RuntimeCapabilityResponse>
+  readonly capability: RuntimeInvocation['capability']
   readonly capabilityCalls: Map<string, number>
   readonly activeCalls: Map<number, Fiber.Fiber<void, never>>
   readonly cancel: () => void
   readonly emit?: (event: SchedulerEvent) => void | Promise<void>
   readonly emitLogs?: (events: readonly Extract<SchedulerEvent, { readonly type: 'node.log' }>[], signal: AbortSignal) => Promise<void>
-  readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
-  readonly invokeTask?: (invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal }) => Promise<unknown>
+  readonly getPrevious?: Extract<TaskInvocation, { readonly moduleId: string }>['getPrevious']
   readonly limits: IsolatedVmLimits
   readonly projectFailure: (error: unknown) => SchedulerFailure
   readonly reject: (error: unknown) => void
-  readonly resolve: (value: FlowRunOutcome | JsonValue | undefined) => void
+  readonly resolve: (value: JsonValue | undefined) => void
   readonly signal?: AbortSignal
 }
 
@@ -215,66 +216,87 @@ export class IsolatedVmHost {
   }
 
   async invoke(invocation: RuntimeInvocation, limits: IsolatedVmLimits = this.limits): Promise<JsonValue | undefined> {
-    return await Effect.runPromise(
-      Effect.suspend(() => {
-        if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
-        const invalid = programError(invocation.program)
-        if (invalid != null) return Effect.fail(invalid)
-        if (serializedBytes(invocation.input) > limits.maxInputBytes) {
-          return Effect.fail(new IsolatedVmError('limit-exceeded', 'Runtime input exceeds the configured byte limit.'))
-        }
-        if (serializedBytes(invocation.program) > limits.maxProgramBytes) {
-          return Effect.fail(new IsolatedVmError('limit-exceeded', 'Runtime program exceeds the configured byte limit.'))
-        }
-        if (invocation.signal?.aborted) return Effect.fail(normalizedError(invocation.signal.reason))
+    return await Effect.runPromise(this.#invoke(invocation, limits))
+  }
 
-        return Effect.callback<JsonValue | undefined, Error>((resume, signal) => {
-          const child = this.#child ?? this.#start()
-          const executionId = ++this.#executionId
-          const cancel = (): void => {
-            this.#send(child, { executionId, type: 'cancel' })
-            this.#finish(executionId, () =>
-              resume(Effect.fail(normalizedError(invocation.signal?.reason ?? new IsolatedVmError('canceled', 'Runtime invocation was canceled.')))),
-            )
-          }
-          const interrupt = (): void => {
-            this.#send(child, { executionId, type: 'cancel' })
-            this.#finish(executionId, () => {})
-          }
-          this.#pending.set(executionId, {
-            capability: (_capabilities, call) => invocation.capability(call),
-            capabilityCalls: new Map(),
-            activeCalls: new Map(),
-            cancel,
-            limits,
-            projectFailure: (error) => ({
+  #invoke(
+    invocation: RuntimeInvocation,
+    limits: IsolatedVmLimits,
+    node?: {
+      readonly context: InvokeContext
+      readonly getPrevious: Extract<TaskInvocation, { readonly moduleId: string }>['getPrevious']
+      readonly emit: PendingInvocation['emit']
+      readonly emitLogs: PendingInvocation['emitLogs']
+      readonly projectFailure: PendingInvocation['projectFailure']
+    },
+  ): Effect.Effect<JsonValue | undefined, Error> {
+    return Effect.suspend(() => {
+      if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
+      const invalid = programError(invocation.program)
+      if (invalid != null) return Effect.fail(invalid)
+      if (serializedBytes(invocation.input) > limits.maxInputBytes) {
+        return Effect.fail(new IsolatedVmError('limit-exceeded', 'Runtime input exceeds the configured byte limit.'))
+      }
+      if (serializedBytes(invocation.program) > limits.maxProgramBytes) {
+        return Effect.fail(new IsolatedVmError('limit-exceeded', 'Runtime program exceeds the configured byte limit.'))
+      }
+      if (invocation.signal?.aborted) return Effect.fail(normalizedError(invocation.signal.reason))
+
+      const execute = Effect.callback<JsonValue | undefined, Error>((resume, signal) => {
+        const child = this.#child ?? this.#start()
+        const executionId = ++this.#executionId
+        const cancel = (): void => {
+          this.#send(child, { executionId, type: 'cancel' })
+          this.#finish(executionId, () =>
+            resume(Effect.fail(normalizedError(invocation.signal?.reason ?? new IsolatedVmError('canceled', 'Runtime invocation was canceled.')))),
+          )
+        }
+        const interrupt = (): void => {
+          this.#send(child, { executionId, type: 'cancel' })
+          this.#finish(executionId, () => {})
+        }
+        this.#pending.set(executionId, {
+          capability: invocation.capability,
+          capabilityCalls: new Map(),
+          activeCalls: new Map(),
+          cancel,
+          limits,
+          emit: node?.emit,
+          emitLogs: node?.emitLogs,
+          getPrevious: node?.getPrevious,
+          projectFailure:
+            node?.projectFailure ??
+            ((error) => ({
               code: typeof Reflect.get(Object(error), 'code') == 'string' ? (Reflect.get(Object(error), 'code') as string) : 'node.failed',
               message: normalizedError(error).message,
+            })),
+          reject: (error) => resume(Effect.fail(normalizedError(error))),
+          resolve: (value) => resume(Effect.succeed(value)),
+          signal: invocation.signal,
+        })
+        invocation.signal?.addEventListener('abort', cancel, { once: true })
+        signal.addEventListener('abort', interrupt, { once: true })
+        this.#send(child, {
+          executionId,
+          capabilities: invocation.capabilities,
+          context: node?.context,
+          input: invocation.input,
+          invocationId: invocation.invocationId,
+          limits,
+          program: invocation.program,
+          type: 'invoke',
+        })
+        return Effect.sync(() => signal.removeEventListener('abort', interrupt))
+      })
+      return node != null
+        ? execute
+        : execute.pipe(
+            Effect.timeoutOrElse({
+              duration: limits.wallMs,
+              orElse: () => Effect.fail(new IsolatedVmError('limit-exceeded', 'Runtime invocation exceeded its wall-clock limit.')),
             }),
-            reject: (error) => resume(Effect.fail(normalizedError(error))),
-            resolve: (value) => resume(Effect.succeed(value as JsonValue | undefined)),
-            signal: invocation.signal,
-          })
-          invocation.signal?.addEventListener('abort', cancel, { once: true })
-          signal.addEventListener('abort', interrupt, { once: true })
-          this.#send(child, {
-            executionId,
-            capabilities: invocation.capabilities,
-            input: invocation.input,
-            invocationId: invocation.invocationId,
-            limits,
-            program: invocation.program,
-            type: 'invoke',
-          })
-          return Effect.sync(() => signal.removeEventListener('abort', interrupt))
-        }).pipe(
-          Effect.timeoutOrElse({
-            duration: limits.wallMs,
-            orElse: () => Effect.fail(new IsolatedVmError('limit-exceeded', 'Runtime invocation exceeded its wall-clock limit.')),
-          }),
-        )
-      }),
-    )
+          )
+    })
   }
 
   run(
@@ -287,46 +309,70 @@ export class IsolatedVmHost {
       readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
       readonly remainingMs?: number
       readonly invokeTask: (invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal }) => Promise<unknown>
+      readonly admitTask?: (admission: TaskAdmission, signal: AbortSignal) => Promise<void>
       readonly projectFailure: (error: unknown) => SchedulerFailure
       readonly runId: string
     },
     limits: IsolatedVmLimits = this.limits,
   ): Effect.Effect<FlowRunOutcome, Error> {
-    const { capability, emit, emitLogs, invokeTask, projectFailure, wait, ...flow } = options
     return Effect.suspend(() => {
       if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
-      if (serializedBytes(prepared) > limits.maxProgramBytes) {
+      if (serializedBytes(prepared) > limits.maxProgramBytes)
         return Effect.fail(new IsolatedVmError('limit-exceeded', 'Fixed Flow exceeds the configured byte limit.'))
-      }
-      return Effect.callback<FlowRunOutcome, Error>((resume, signal) => {
-        const child = this.#child ?? this.#start()
-        const executionId = ++this.#executionId
-        const interrupt = (): void => {
-          this.#send(child, { executionId, type: 'cancel' })
-          this.#finish(executionId, () => {})
-        }
-        this.#pending.set(executionId, {
-          capability,
-          capabilityCalls: new Map(),
-          activeCalls: new Map(),
-          cancel: interrupt,
-          emit,
-          emitLogs,
-          wait,
-          invokeTask,
-          limits,
-          projectFailure,
-          reject: (error) => resume(Effect.fail(normalizedError(error))),
-          resolve: (value) => resume(Effect.succeed(value as FlowRunOutcome)),
-        })
-        signal.addEventListener('abort', interrupt, { once: true })
-        this.#send(child, {
-          executionId,
-          flow: { ...flow, prepared },
-          limits,
-          type: 'invoke',
-        })
-        return Effect.sync(() => signal.removeEventListener('abort', interrupt))
+      const { wait, admitTask } = options
+      return runFlow(prepared, {
+        ...options,
+        createId: randomUUID,
+        admitTask: admitTask == null ? undefined : (admission) => Effect.tryPromise({ try: (signal) => admitTask(admission, signal), catch: normalizedError }),
+        emit: (event) => Effect.tryPromise({ try: async () => options.emit?.(event), catch: normalizedError }),
+        waits:
+          wait == null
+            ? undefined
+            : {
+                create: (request) =>
+                  Effect.tryPromise({ try: (signal) => wait({ kind: 'create', wait: request }, signal), catch: normalizedError }).pipe(
+                    Effect.map((value) => (value == null ? undefined : (value as JsonValue))),
+                  ),
+                resolutions: (waitIds, block) =>
+                  Effect.tryPromise({ try: (signal) => wait({ kind: 'resolutions', waitIds, block }, signal), catch: normalizedError }).pipe(
+                    Effect.flatMap((value) =>
+                      Effect.try({
+                        try: () => {
+                          const resolutions = waitResolutionsSchema.parse(value)
+                          if (Object.keys(resolutions).some((id) => !waitIds.includes(id))) throw new Error('Invalid Wait resolution.')
+                          return resolutions
+                        },
+                        catch: normalizedError,
+                      }),
+                    ),
+                  ),
+              },
+        invokeTask: (invocation) => {
+          if ('kind' in invocation) return Effect.tryPromise({ try: (signal) => options.invokeTask({ ...invocation, signal }), catch: normalizedError })
+          const program = createRuntimeProgram(prepared, invocation.moduleId, isolatedVmEngineDigest)
+          if (program == null) return Effect.fail(new IsolatedVmError('invalid-program', 'Task Module is not part of the fixed Flow closure.'))
+          return this.#invoke(
+            {
+              capability: (call) => options.capability(invocation.capabilities, { ...call, nodeId: invocation.nodeId, jobId: invocation.jobId }),
+              capabilities: invocation.capabilities,
+              input: Object.assign({}, invocation.additionalInputs, invocation.input),
+              invocationId: invocation.invocationId,
+              program,
+            },
+            limits,
+            {
+              context: { blockId: invocation.blockId, flowId: invocation.flowId, runId: invocation.runId, nodeId: invocation.nodeId, jobId: invocation.jobId },
+              getPrevious: invocation.getPrevious,
+              emit: options.emit,
+              emitLogs: options.emitLogs,
+              projectFailure: options.projectFailure,
+            },
+          )
+        },
+        projectFailure: (error) =>
+          error instanceof IsolatedVmError
+            ? (error.failure ?? { code: 'node.failed', message: error.message, catchable: error.catchable, retryable: error.retryable })
+            : options.projectFailure(error),
       })
     })
   }
@@ -386,7 +432,7 @@ export class IsolatedVmHost {
       }
       this.#finish(message.executionId, () => {
         if (message.ok) pending.resolve(message.value)
-        else pending.reject(new IsolatedVmError(message.code, message.message))
+        else pending.reject(new IsolatedVmError(message.code, message.message, message.failure?.retryable, message.failure))
       })
       return
     }
@@ -409,39 +455,8 @@ export class IsolatedVmHost {
       })
       return
     }
-    if (message.type == 'event') {
-      this.#call(child, message.executionId, message.id, pending, () => {
-        if (pending.emit == null) throw new IsolatedVmError('executor-crashed', 'Runtime Executor emitted an event outside a Flow Run.')
-        return pending.emit(message.event)
-      })
-      return
-    }
-    if (message.type == 'wait') {
-      this.#call(
-        child,
-        message.executionId,
-        message.id,
-        pending,
-        (signal) => {
-          if (pending.wait == null) throw new Error('Wait host is unavailable.')
-          return pending.wait(message.operation, signal)
-        },
-        16 * 1024 * 1024,
-      )
-      return
-    }
-    if (message.type == 'task') {
-      this.#call(
-        child,
-        message.executionId,
-        message.id,
-        pending,
-        (signal) => {
-          if (pending.invokeTask == null) throw new IsolatedVmError('executor-crashed', 'Runtime Executor requested a Task outside a Flow Run.')
-          return pending.invokeTask({ ...message.invocation, signal })
-        },
-        pending.limits.maxResultBytes,
-      )
+    if (message.kind == 'previous') {
+      this.#call(child, message.executionId, message.id, pending, () => pending.getPrevious?.() ?? [])
       return
     }
     const calls = (pending.capabilityCalls.get(message.invocationId) ?? 0) + 1
@@ -463,9 +478,7 @@ export class IsolatedVmHost {
       message.id,
       pending,
       (signal) =>
-        pending.capability(message.capabilities ?? [], {
-          nodeId: message.nodeId,
-          jobId: message.jobId,
+        pending.capability({
           callId: JSON.stringify([message.invocationId, message.id]),
           invocationId: message.invocationId,
           kind: message.kind,

@@ -149,6 +149,9 @@ Full-graph checks and Publish validate the complete Flow.
 Admission, execution, and recovery use the same fixed scope and version. Clients must not block an entry test because of full-graph diagnostics on unrelated branches.
 
 The Engine Contract defines public execution semantics. The deployment owns the isolation environment, resource limits, and recovery coordination.
+In Server, trusted graph scheduling and managed Tasks execute in the application process. User Code
+executes in a separate Executor process, with a fresh isolate for each invocation. Node lifecycle
+events and persistence stay with the application; Code capabilities and logs cross the isolation boundary.
 Recovery must validate the execution contract, runtime environment, and checkpoint compatibility. It must not guess or replay from damaged or incomplete state.
 
 ### Graph execution and side effects
@@ -171,7 +174,9 @@ Node execution, events, and capability calls share cancellation and deadlines. C
 The deployment owns the Run's sole execution authority and terminal state. Admission fixes the version, execution scope, and runtime identity.
 Retries must not duplicate accepted execution. If side-effect outcomes cannot be confirmed, execution ends as indeterminate and is not automatically replayed, except for the subscribed-notification policy below.
 Cancellation and completion races must produce one authoritative terminal state.
-The deployment limits concurrency and execution budgets and owns queuing and recovery. Clients must not take ownership of scheduling facts.
+The deployment limits active Runs and actual node execution independently and owns queuing and recovery.
+Active Runs of one Flow execute one at a time, so Flow State read-modify-write sequences do not
+interleave. Idle Waits release execution resources after persisting a complete checkpoint. Clients must not take ownership of scheduling facts.
 
 Direct Leina subscription notification Tasks use a success/failure delivery contract as an explicit exception.
 Direct Connector Tasks may retry unknown delivery outcomes with the same event identity within the notification budget, according to Connector retryability.

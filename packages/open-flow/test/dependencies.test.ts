@@ -60,7 +60,7 @@ it('restores partial releases and preserves the input snapshot of an admitted co
   expect(first.ready()).toEqual(['early'])
   first.begin('early', 'early')
   first.release('early', {}, [], true)
-  const restored = new Dependencies(source, JSON.parse(JSON.stringify(first.state)))
+  const restored = new Dependencies(source, JSON.parse(JSON.stringify(first.checkpoint())))
   expect(restored.ready()).toEqual([])
   restored.release('producer', { done: 'approved' }, ['done'], true)
   expect(restored.ready()).toEqual(['late'])
@@ -109,7 +109,7 @@ it('resolves distant ancestors in a long chain and restores the same checkpoint 
     dependencies.release(id, { value: id }, ['value'], true)
   }
   expect(dependencies.ready()).toEqual([])
-  const saved = JSON.parse(JSON.stringify(dependencies.state))
+  const saved = JSON.parse(JSON.stringify(dependencies.checkpoint()))
   const restored = new Dependencies(source, saved)
   expect(restored.ready()).toEqual([])
   expect(restored.incomplete).toBe(false)

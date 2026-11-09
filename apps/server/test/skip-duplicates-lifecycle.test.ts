@@ -88,7 +88,7 @@ function pauseRun(store: Store, runId: string) {
   const wait = { jobId: 'wait-job', nodeId: 'wait', waitId: 'wait' }
   store.runs.createWait(runId, { ...wait, value: null, actions: ['continue'], prompt: 'Continue', notify: false }, undefined)
   const checkpoint: FlowRunCheckpoint = {
-    version: 6,
+    version: 7,
     bindingValues: {},
     inputs: {},
     results: {},
@@ -97,7 +97,9 @@ function pauseRun(store: Store, runId: string) {
     dependencies: {
       nextId: 1,
       iterations: {},
-      nodes: { wait: { id: 0, status: 'running', jobId: wait.jobId, input: {}, previous: [], released: [], seeded: false } },
+      frames: [{ input: {} }],
+      results: [],
+      nodes: { wait: { id: 0, status: 'running', jobId: wait.jobId, input: 0, previous: [], released: [], seeded: false } },
     },
     waits: [{ ...wait, value: null }],
   }

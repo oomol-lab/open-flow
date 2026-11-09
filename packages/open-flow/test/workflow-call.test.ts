@@ -79,7 +79,7 @@ it('preserves the saved contract during local edits and explicitly refreshes wit
   )
   expect(refreshed.content.document.graph.nodes[ref]).toMatchObject({ inputs: {}, task: { executor: { revisionId: 'r2' }, outputs: [] } })
 })
-it('checkpoints a child call immediately and resumes its execution identity with ordinary output validation', async () => {
+it('resumes a checkpointed child call without Task capacity or repeating its start event', async () => {
   const created = await create()
   const prepared = await prepareFlow(created.content, currentEngineContract, created.nodes.start)
   if (prepared.kind != 'prepared') throw new Error('Invalid fixture')
@@ -110,18 +110,24 @@ it('checkpoints a child call immediately and resumes its execution identity with
     runFlow(prepared.flow, {
       ...options,
       resume: { checkpoint },
+      admitTask: () => Effect.never,
       invokeTask: (call) => {
         expect(call.workflowRunId).toBe('child')
         expect(call.jobId).toBe(checkpoint.calls![0]!.jobId)
         return Effect.succeed({ kind: 'completed', outputs: { answer: 42, extra: 'ignored' } })
       },
-    }),
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: 1000,
+        orElse: () => Effect.fail(new Error('Workflow recovery blocked on Task admission.')),
+      }),
+    ),
   )
   expect(result).toMatchObject({ nodes: [{ outputs: { answer: 42 } }] })
   expect(events.filter((event) => event.type == 'node.started')).toHaveLength(1)
 })
 
-it.each(['completed', 'failed'] as const)('polls after an empty recovery hint despite sibling activity (%s)', async (outcome) => {
+it.each(['completed', 'failed'] as const)('polls without Task capacity after an empty recovery hint despite sibling activity (%s)', async (outcome) => {
   const created = await create()
   const edited = await compileAuthoring(
     created.content,
@@ -173,8 +179,14 @@ it.each(['completed', 'failed'] as const)('polls after an empty recovery hint de
     runFlow(prepared.flow, {
       ...options,
       resume: { checkpoint: pending.checkpoint, readyWorkflowRunIds: [] },
+      admitTask: ({ nodeId }) => (nodeId == created.nodes.call ? Effect.never : Effect.void),
       waits: waitHost({ [pending.checkpoint.waits[0]!.waitId]: 'continue' }),
-    }),
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: 4000,
+        orElse: () => Effect.fail(new Error('Workflow polling blocked on Task admission.')),
+      }),
+    ),
   )
   if (outcome == 'completed') {
     expect(await result).toMatchObject({ kind: 'node-results' })

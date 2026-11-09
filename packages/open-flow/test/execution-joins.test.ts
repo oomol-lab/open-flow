@@ -260,7 +260,7 @@ it('restores a partial join without replaying its finished branch and preserves 
       value.dependencies.nodes.wait!.jobId = 'wrong'
     },
     (value: typeof first.checkpoint) => {
-      value.dependencies.nodes.a!.input.start = { execution: 100000, outputs: {} }
+      value.dependencies.nodes.a!.input = 100000
     },
   ]) {
     const checkpoint = structuredClone(first.checkpoint)

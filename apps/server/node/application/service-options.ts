@@ -9,6 +9,7 @@ import type { IntegrationOptions } from '../runtime/integration-runtime.ts'
 export interface ServerRuntime {
   readonly stateLimits?: Partial<typeof import('../storage/state-store.ts').stateLimits>
   readonly maxConcurrentRuns?: number
+  readonly maxConcurrentTasks?: number
   readonly maxPendingRuns?: number
   readonly runEventRetentionMs?: number
   readonly runTimeoutMs?: number
@@ -56,6 +57,7 @@ export function validateRuntime(runtime: ServerRuntime): void {
   validatePositiveInteger(runtime.runEventRetentionMs, 'Run event retention must be a positive safe integer number of milliseconds.')
   validatePositiveInteger(runtime.maxPendingRuns, 'Maximum pending Runs must be a positive safe integer.')
   validatePositiveInteger(runtime.maxConcurrentRuns, 'Maximum concurrent Runs must be a positive safe integer.')
+  validatePositiveInteger(runtime.maxConcurrentTasks, 'Maximum concurrent Tasks must be a positive safe integer.')
   validatePositiveInteger(runtime.runTimeoutMs, 'Run timeout must be a positive safe integer number of milliseconds.')
   validatePositiveInteger(runtime.taskCpuMs, 'Task CPU limit must be a positive safe integer number of milliseconds.')
 }

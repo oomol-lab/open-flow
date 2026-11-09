@@ -158,8 +158,6 @@ export interface WaitHost {
   readonly resolutions: (waitIds: readonly string[], block: boolean) => Effect.Effect<Readonly<Record<string, WaitResolution>>, Error>
 }
 
-export const waitRetentionMs = 120_000
-
 export type FlowRunOutcome =
   | FlowRunResult
   | {
@@ -200,11 +198,19 @@ export interface SchedulerFailure {
   readonly message: string
 }
 
+export interface TaskAdmission {
+  readonly runId: string
+  readonly nodeId: string
+  readonly jobId: string
+}
+
 export type FlowRunOptions = {
   readonly createId: () => string
   readonly emit?: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly flowId: string
   readonly invokeTask: (invocation: TaskInvocation) => Effect.Effect<unknown, Error>
+  /** Deployment admission for each Task invocation; it completes before the node timeout starts. */
+  readonly admitTask?: (admission: TaskAdmission) => Effect.Effect<void, Error>
   readonly projectFailure?: (error: unknown) => SchedulerFailure
   readonly runId: string
   readonly waits?: WaitHost
@@ -240,6 +246,7 @@ interface RunContext {
   readonly createId: FlowRunOptions['createId']
   readonly emit: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly invokeTask: FlowRunOptions['invokeTask']
+  readonly admitTask: FlowRunOptions['admitTask']
   readonly prepared: PreparedFlow
   readonly projectFailure: FlowRunOptions['projectFailure']
   readonly waits: WaitHost | undefined
@@ -296,7 +303,6 @@ function runGraph(
       let measuredAt = yield* Clock.currentTimeMillis
       let nextCallCheckAt = measuredAt + (resume == null ? 1000 : 0)
       let readyWorkflowRunIds = resume?.readyWorkflowRunIds
-      let idleSince: number | undefined
       const agents: Record<string, FlowRunCheckpoint['agents'][string]> = { ...resume?.checkpoint.agents }
       const resolveInputs = (nodeId: string, node: ExecutableNode) => resolveNodeInputs(nodeId, node, dependencies, context.bindingValues, launch[nodeId])
       const commit = (
@@ -480,7 +486,7 @@ function runGraph(
       }
       if (resume != null) {
         yield* Effect.try({
-          try: () => validateCheckpoint(target, resume.checkpoint, resolveInputs),
+          try: () => validateCheckpoint(target, resume.checkpoint, dependencies, resolveInputs),
           catch: (error) => (error instanceof Error ? error : new Error(String(error))),
         })
       }
@@ -488,15 +494,11 @@ function runGraph(
         if (trigger != null) dependencies.start(trigger.nodeId, trigger.outputs)
       }
 
-      const applyResolutions = (resolutions: Readonly<Record<string, WaitResolution>>, now: number) => {
+      const applyResolutions = (resolutions: Readonly<Record<string, WaitResolution>>) => {
         for (const saved of pendingWaits.values()) {
           const resolution = resolutions[saved.waitId]
           if (resolution == null) continue
           const { action, resolvedAt, comment } = resolution
-          if (idleSince != null) {
-            idleSince = undefined
-            measuredAt = now
-          }
           pendingWaits.delete(saved.jobId)
           const node = target.graph.nodes[saved.nodeId] as ExecutableNode
           runNode(
@@ -527,7 +529,7 @@ function runGraph(
       }
       while (true) {
         const now = yield* Clock.currentTimeMillis
-        if (idleSince == null && remainingMs != null) remainingMs -= now - measuredAt
+        if (remainingMs != null) remainingMs -= now - measuredAt
         measuredAt = now
         if (remainingMs != null && remainingMs <= 0) return yield* Effect.fail(new Error('Run exceeded its execution deadline.'))
         if (firstCause != null) {
@@ -548,7 +550,6 @@ function runGraph(
               [...pendingWaits.values()].map((wait) => wait.waitId),
               false,
             ),
-            now,
           )
         if (pendingCalls.size > 0 && now >= nextCallCheckAt) {
           for (const call of pendingCalls.values()) {
@@ -573,17 +574,14 @@ function runGraph(
           if (dependencies.incomplete) return yield* Effect.fail(new Error('Execution graph contains unresolved dependencies.'))
           break
         }
-        if (running > 0 || ready.length > 0) idleSince = undefined
-        else idleSince ??= now
-        const left = idleSince == null ? remainingMs : waitRetentionMs - (now - idleSince)
-        if (idleSince != null && (left! <= 0 || pendingCalls.size > 0)) {
+        if (running == 0 && ready.length == 0) {
           const checkpoint: FlowRunCheckpoint = {
             bindingValues: context.bindingValues,
             inputs: launch,
             results: Object.fromEntries(completed),
             counts: context.counts,
-            dependencies: dependencies.state,
-            version: 6,
+            dependencies: dependencies.checkpoint(),
+            version: 7,
             agents,
             waits: [...pendingWaits.values()],
             ...(pendingCalls.size == 0 ? {} : { calls: [...pendingCalls.values()] }),
@@ -603,9 +601,9 @@ function runGraph(
         let next = Effect.raceFirst(activity, decision)
         if (pendingCalls.size > 0)
           next = Effect.raceFirst(next, Effect.sleep(Math.max(0, nextCallCheckAt - (yield* Clock.currentTimeMillis))).pipe(Effect.as({})))
-        if (left != null) next = Effect.raceFirst(next, Effect.sleep(Math.max(0, left)).pipe(Effect.as({})))
+        if (remainingMs != null) next = Effect.raceFirst(next, Effect.sleep(Math.max(0, remainingMs)).pipe(Effect.as({})))
         const resolutions = yield* next
-        applyResolutions(resolutions, yield* Clock.currentTimeMillis)
+        applyResolutions(resolutions)
       }
       yield* context.emit({ progress: 100, runId, type: 'run.progress' })
       const outputNodeId = order.find((nodeId) => target.graph.nodes[nodeId]?.kind == 'outputs')
@@ -656,18 +654,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
             results: Object.fromEntries(Object.entries(decoded.results).map(([id, result]) => [id, { ...result, outputs: outputs(id, result.outputs) }])),
             dependencies: {
               ...decoded.dependencies,
-              nodes: Object.fromEntries(
-                Object.entries(decoded.dependencies.nodes).map(([id, state]) => [
-                  id,
-                  {
-                    ...state,
-                    ...(state.output == null ? {} : { output: outputs(id, state.output) }),
-                    input: Object.fromEntries(
-                      Object.entries(state.input).map(([source, result]) => [source, { ...result, outputs: outputs(source, result.outputs) }]),
-                    ),
-                  },
-                ]),
-              ),
+              results: decoded.dependencies.results.map((result) => ({ ...result, outputs: outputs(result.nodeId, result.outputs) })),
             },
             waits: decoded.waits.map((wait) => (wait.pending == null ? wait : Object.assign({}, wait, { pending: withWaitNotificationMessage(wait.pending) }))),
           }
@@ -692,6 +679,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
         createId: options.createId,
         emit,
         invokeTask: options.invokeTask,
+        admitTask: options.admitTask,
         prepared,
         projectFailure: options.projectFailure,
         waits: options.waits,

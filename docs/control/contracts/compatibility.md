@@ -20,8 +20,8 @@ Older model envelopes reject this executor. Engine `open-flow-engine/v11` advert
 reads and existing Engine v10 Publications and Runs remain supported without rewriting their bytes.
 
 The node invokes the existing Connector Proxy transport on the Server. It adds no isolated Code
-or Agent capability. Checkpoint v6, the database schema, isolation protocol and runtime digest
-remain unchanged. Proxy response headers and optional base64 encoding are now preserved by the
+or Agent capability. The Proxy addition requires no checkpoint, database schema, isolation protocol
+or runtime digest change. Proxy response headers and optional base64 encoding are now preserved by the
 shared adapter. Existing consumers returning only `data` and `status` remain valid. Proxy account
 references participate in the existing version 2 authorization snapshot and are rechecked for
 independent Proxy permission before dispatch. Deployments must upgrade before publishing or
@@ -44,6 +44,34 @@ those snapshots. Their existing bindings and execution results remain unchanged.
 already supported `outputMode: "value"`; Flow model v13, Engine v10, checkpoint v6 and Control API
 envelope identifiers remain unchanged. Deployments should use the updated public package for
 consistent catalog discovery and node creation. Connector provider definitions require no change.
+
+## Compact checkpoints and execution admission
+
+The npm `next` publication baseline is `0.1.0-beta.85`, gitHead
+`f8f55da1c06410d7f899314750d443ea5d100910`, with Engine v10 and checkpoint v6.
+Checkpoint v7 stores shared input frames and invocation-result references. The decoder retains
+published v6 recovery and normalizes it in memory; persisted historical bytes and their integrity
+hashes are unchanged until execution writes a new checkpoint. Formats older than v6 remain rejected.
+Older deployments cannot resume v7 checkpoints: finish those Runs before downgrading.
+
+Graph selection, joins, loop iterations and input provenance retain Engine v10 semantics. Active Runs
+of one Flow still execute one at a time. The Scheduler freezes idle Waits immediately, and the Server
+owns a separate global node-execution budget. Scheduler `admitTask` completes initial Task admission
+before the node timeout starts, so initial admission queueing does not consume `timeoutMs`. A Code or
+Agent workflow tool keeps its node timeout running while waiting for its child Run and reacquiring
+the parent Task slot; contention during reacquisition can therefore exhaust the node timeout.
+Pending workflow-call status checks only read child state and do not request Task admission. The Server therefore reports a
+paused Run as `waiting` and an accepted resolution as `queued` sooner than before. Control API
+conformance accepts both this immediate freeze and in-memory retention (`running`). The obsolete
+Scheduler `waitRetentionMs` export is removed.
+
+Executor loss after the start barrier ends affected Runs as indeterminate, without automatic replay.
+Trusted graph scheduling and managed Tasks now execute in the Server process. Only Code
+invocations, their declared capabilities and logs cross the isolated IPC boundary; node lifecycle
+events no longer cross it. The runtime identity advances to `open-flow-isolated-vm/5`. The previous
+Server runtime digest remains accepted for every supported Engine contract; older published runtime
+digests retain their original Engine restrictions. Guest capability contracts are unchanged.
+Upgrade the Server and public package together.
 
 ## Bounded Flow State reads (beta.79)
 
@@ -331,7 +359,7 @@ Engine v4 separated execution scheduling from input sources. A node is skipped o
 
 Removing historical graph semantics labels from the digest previously changed isolated runtime identity once. Runs pinned to the old digest use the existing mismatch rejection path. Historical Run identities are not rewritten, and old identity aliases are not added. Subsequent Scheduler-only changes do not change the isolated runtime digest.
 
-The Trigger output protocol uses ordered output definitions. Provider definitionVersion and Webhook revision are 2, and the definition digest protocol version is 2. That upgrade used Scheduler checkpoint version 4. The current version is 6 and rejects recovery from older versions. SQLite migration 19 only renames output storage columns; it does not convert old content to the new contract.
+The Trigger output protocol uses ordered output definitions. Provider definitionVersion and Webhook revision are 2, and the definition digest protocol version is 2. That upgrade used Scheduler checkpoint version 4. The current version is 7, retains published v6 recovery, and rejects older development versions. SQLite migration 19 only renames output storage columns; it does not convert old content to the new contract.
 
 ## Unreleased Wait pending revision
 

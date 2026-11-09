@@ -1,6 +1,6 @@
 import type { Graph, JsonValue } from '../../flow/common/change.ts'
 import type { AgentCheckpoint } from '../../runtime/common/runtime.ts'
-import type { DependenciesCheckpoint } from './dependencies.ts'
+import type { Dependencies, DependenciesCheckpoint } from './dependencies.ts'
 import type { ExecutableNode } from './node-execution.ts'
 
 import { z } from 'zod'
@@ -9,7 +9,7 @@ import { nodeErrorSchema, nodeSystemOutputPorts } from '../../flow/common/errorH
 import { nodeInputPorts as nodePorts, isResolutionNode, resolutionActions } from '../../flow/common/graph.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
-import { dependenciesSchema, dependencyValues } from './dependencies.ts'
+import { decodeDependenciesCheckpoint } from './dependencies.ts'
 import { agentCheckpointSchema, agentConfig, agentApproval, jsonEqual, jsonValue, outputRecord, usesPending, validateOutputs } from './node-execution.ts'
 
 export interface PendingWait {
@@ -44,7 +44,7 @@ export interface FlowRunCheckpoint {
   >
   readonly counts: Readonly<Record<string, Readonly<Record<string, number>>>>
   readonly dependencies: DependenciesCheckpoint
-  readonly version: 6
+  readonly version: 7
   readonly waits: readonly PendingWait[]
   readonly agents: Readonly<
     Record<
@@ -81,7 +81,8 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
     ['agents', 'bindingValues', 'counts', 'dependencies', 'inputs', 'results', 'version', 'waits', ...(source.calls === undefined ? [] : ['calls'])],
     'Flow Run checkpoint',
   )
-  if (source.version != 6) throw new Error('Flow Run checkpoint version is unsupported.')
+  const version = source.version
+  if (version !== 6 && version !== 7) throw new Error('Flow Run checkpoint version is unsupported.')
   const bindingValues = Object.fromEntries(
     Object.entries(checkpointRecord(source.bindingValues, 'Checkpoint bindings')).map(([id, value]) => {
       if (typeof value != 'string') throw new Error('Checkpoint binding must be a string.')
@@ -119,7 +120,7 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
     }),
   )
   const counts = z.record(z.string(), z.record(z.string(), z.number().int().positive().max(Number.MAX_SAFE_INTEGER))).parse(source.counts)
-  const dependencies = dependenciesSchema.parse(source.dependencies)
+  const dependencies = decodeDependenciesCheckpoint(source.dependencies, version)
   const savedWaitFields = {
     jobId: z.string().min(1),
     nodeId: z.string().min(1),
@@ -171,12 +172,13 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
   if (Object.values(dependencies.nodes).some((state) => state.status == 'running' && !jobs.has(state.jobId!)))
     throw new Error('Checkpoint dependency has no waiting execution.')
   if (Object.keys(agents).some((id) => !jobs.has(id))) throw new Error('Checkpoint Agent has no waiting execution.')
-  return { agents, bindingValues, counts, dependencies, inputs, results, version: 6, waits: pendingWaits, ...(source.calls === undefined ? {} : { calls }) }
+  return { agents, bindingValues, counts, dependencies, inputs, results, version: 7, waits: pendingWaits, ...(source.calls === undefined ? {} : { calls }) }
 }
 
 export function validateCheckpoint(
   target: { readonly graph: Graph },
   checkpoint: FlowRunCheckpoint,
+  dependencies: Dependencies,
   resolveInputs: (nodeId: string, node: ExecutableNode) => Readonly<Record<string, JsonValue>>,
 ): void {
   const launch = checkpoint.inputs
@@ -249,12 +251,16 @@ export function validateCheckpoint(
       throw new Error('Checkpoint launch inputs do not match the prepared graph.')
   }
 
-  for (const [nodeId, state] of Object.entries(checkpoint.dependencies.nodes)) {
-    const frame = dependencyValues(state.input)
-    validateResults(frame, true, state.input)
+  for (const result of checkpoint.dependencies.results) validateResults({ [result.nodeId]: result.outputs }, true, { [result.nodeId]: result })
+  const graphTriggers = Object.keys(target.graph.nodes).filter((id) => isTriggerNode(target.graph.nodes[id]!))
+  for (const [nodeId, state] of Object.entries(dependencies.state.nodes)) {
     if (!isTriggerNode(target.graph.nodes[nodeId]!) && (state.status == 'running' || state.status == 'completed')) {
-      const triggers = Object.keys(frame).filter((id) => isTriggerNode(target.graph.nodes[id]!))
-      if (triggers.length != 1 || triggers[0] != triggerIds[0] || !jsonEqual(frame[triggers[0]!]!, checkpoint.results[triggers[0]!]!.outputs))
+      const triggers = graphTriggers.filter((id) => dependencies.input(nodeId, id) != null)
+      if (
+        triggers.length != 1 ||
+        triggers[0] != triggerIds[0] ||
+        !jsonEqual(dependencies.input(nodeId, triggers[0]!)!.outputs, checkpoint.results[triggers[0]!]!.outputs)
+      )
         throw new Error('Checkpoint input Trigger does not match the Run.')
     }
     if (state.output != null) validateResults({ [nodeId]: state.output }, state.status == 'running')
@@ -284,7 +290,7 @@ export function validateCheckpoint(
   for (const waiting of checkpoint.waits) {
     const node = target.graph.nodes[waiting.nodeId]
     if (node == null || isTriggerNode(node)) throw new Error('Checkpoint waiting node is missing.')
-    const state = checkpoint.dependencies.nodes[waiting.nodeId]!
+    const state = dependencies.state.nodes[waiting.nodeId]!
     const expectedOutput = waiting.pending == null ? undefined : { pending: waiting.pending }
     if ((state.output == null) != (expectedOutput == null) || (state.output != null && !jsonEqual(state.output, expectedOutput!)))
       throw new Error('Checkpoint waiting dependency output is inconsistent.')

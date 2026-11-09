@@ -52,6 +52,10 @@ function main(): Effect.Effect<void> {
       if (!Number.isSafeInteger(maxConcurrentRuns) || maxConcurrentRuns <= 0) {
         throw new Error('OPEN_FLOW_MAX_CONCURRENT_RUNS must be a positive safe integer.')
       }
+      const maxConcurrentTasks = Number(process.env.OPEN_FLOW_MAX_CONCURRENT_TASKS ?? '16')
+      if (!Number.isSafeInteger(maxConcurrentTasks) || maxConcurrentTasks <= 0) {
+        throw new Error('OPEN_FLOW_MAX_CONCURRENT_TASKS must be a positive safe integer.')
+      }
       const runTimeoutMs = Number(process.env.OPEN_FLOW_RUN_TIMEOUT_MS ?? '1800000')
       if (!Number.isSafeInteger(runTimeoutMs) || runTimeoutMs <= 0) {
         throw new Error('OPEN_FLOW_RUN_TIMEOUT_MS must be a positive safe integer.')
@@ -127,6 +131,7 @@ function main(): Effect.Effect<void> {
         logger,
         runtime: {
           maxConcurrentRuns,
+          maxConcurrentTasks,
           maxPendingRuns,
           runEventRetentionMs,
           runTimeoutMs,

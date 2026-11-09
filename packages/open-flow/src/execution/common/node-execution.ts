@@ -20,6 +20,7 @@ interface NodeExecutionContext {
   readonly createId: FlowRunOptions['createId']
   readonly emit: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly invokeTask: FlowRunOptions['invokeTask']
+  readonly admitTask?: FlowRunOptions['admitTask']
   readonly projectFailure: FlowRunOptions['projectFailure']
 }
 
@@ -218,7 +219,11 @@ export function validateOutputs(nodeId: string, node: ExecutableNode, value: unk
             : {}
   const outputs = outputRecord(
     jsonValue(
-      Object.fromEntries(Object.entries(raw).map(([handle, item]) => [handle, Object.hasOwn(ports, handle) && item === undefined ? null : item])),
+      Object.fromEntries(
+        Object.entries(raw)
+          .filter(([handle]) => !discardUndeclared || Object.hasOwn(ports, handle))
+          .map(([handle, item]) => [handle, Object.hasOwn(ports, handle) && item === undefined ? null : item]),
+      ),
       `Node "${nodeId}" outputs`,
     ),
     nodeId,
@@ -228,11 +233,7 @@ export function validateOutputs(nodeId: string, node: ExecutableNode, value: unk
   const validated: [string, JsonValue][] = []
   for (const [handle, output] of Object.entries(complete)) {
     const port = ports[handle]
-    if (port == null) {
-      if (discardUndeclared) continue
-      throw new PortValidationError(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
-    }
-    if (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema))
+    if (port == null || (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema)))
       throw new PortValidationError(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
     validated.push([handle, output])
   }
@@ -317,8 +318,9 @@ export function executeNode(
   const { nodeId, node, jobId, nodeInputs, flowId, runId, graph, dependencies, previousIds, saved, workflowRunId, resolution } = input
   const config = agentConfig(node)
   const nodeRemainingMs = saved?.remainingMs ?? node.timeoutMs
-  const startedAt = performance.now()
+  let startedAt = 0
   const execution = Effect.gen(function* () {
+    startedAt = performance.now()
     const kind = nodeKind(node)
     const title = nodeTitle(node)
     const projectedInputs = Object.fromEntries(
@@ -462,12 +464,16 @@ export function executeNode(
       catch: (error) => new NodeValidationError('node.output-invalid', error),
     })
   })
-  return nodeRemainingMs == null
-    ? execution
-    : execution.pipe(
-        Effect.timeoutOrElse({
-          duration: nodeRemainingMs,
-          orElse: () => Effect.fail(new Error(`Node "${nodeId}" timed out.`)),
-        }),
-      )
+  const timed =
+    nodeRemainingMs == null
+      ? execution
+      : execution.pipe(
+          Effect.timeoutOrElse({
+            duration: nodeRemainingMs,
+            orElse: () => Effect.fail(new Error(`Node "${nodeId}" timed out.`)),
+          }),
+        )
+  // Waiting for deployment admission is queueing, not node execution time.
+  // Pending workflow calls only read child state and do not consume Task capacity.
+  return node.kind == 'task' && workflowRunId == null && context.admitTask != null ? Effect.andThen(context.admitTask({ runId, nodeId, jobId }), timed) : timed
 }

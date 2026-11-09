@@ -45,6 +45,31 @@ async function executorPid(): Promise<number> {
 }
 
 describe('isolated-vm runtime conformance', () => {
+  it.each([
+    'open-flow-engine/v6',
+    'open-flow-engine/v6/nodejs-compat-v1',
+    'open-flow-engine/v7',
+    'open-flow-engine/v7/nodejs-compat-v1',
+    'open-flow-engine/v8',
+    'open-flow-engine/v8/nodejs-compat-v1',
+    'open-flow-engine/v9',
+    'open-flow-engine/v10',
+    currentEngineContract,
+  ])('executes the previous Server runtime digest with %s', async (engineContract) => {
+    await expect(
+      host.invoke({
+        capability: async () => ({ body: null, status: 403 }),
+        input: null,
+        invocationId: 'previous-server-digest',
+        program: {
+          ...program("import { engineContract } from 'open-flow:platform'; export default () => ({ engineContract })"),
+          engineContract,
+          engineDigest: 'sha256:a039a4ec33673575d01177f8c3dd82ad5f9ca62bc3edce6efee5f637abe83a73',
+        },
+      }),
+    ).resolves.toEqual({ engineContract })
+  })
+
   it('executes single-key State reads with the published v10 runtime digest', async () => {
     const calls: unknown[] = []
     await expect(
