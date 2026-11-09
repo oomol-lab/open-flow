@@ -56,8 +56,9 @@ Older deployments cannot resume v7 checkpoints: finish those Runs before downgra
 
 Graph selection, joins, loop iterations and input provenance retain Engine v10 semantics. Active Runs
 of one Flow still execute one at a time. The Scheduler freezes idle Waits immediately, and the Server
-owns a separate global node-execution budget. Scheduler `admitTask` admits each Task invocation before
-its node timeout starts, so budget queueing never consumes `timeoutMs`. The Server therefore reports a
+owns a separate global node-execution budget. Scheduler `admitTask` admits Task execution before
+its node timeout starts, so budget queueing never consumes `timeoutMs`. Pending workflow-call status
+checks only read child state and do not request Task admission. The Server therefore reports a
 paused Run as `waiting` and an accepted resolution as `queued` sooner than before. Control API
 conformance accepts both this immediate freeze and in-memory retention (`running`). The obsolete
 Scheduler `waitRetentionMs` export is removed.
@@ -65,8 +66,10 @@ Scheduler `waitRetentionMs` export is removed.
 Executor loss after the start barrier ends affected Runs as indeterminate, without automatic replay.
 Trusted graph scheduling and managed Tasks now execute in the Server process. Only Code
 invocations, their declared capabilities and logs cross the isolated IPC boundary; node lifecycle
-events no longer cross it. The runtime identity advances to `open-flow-isolated-vm/5`. Published v10 runtime digests remain accepted; their guest
-capability contracts are unchanged. Upgrade the Server and public package together.
+events no longer cross it. The runtime identity advances to `open-flow-isolated-vm/5`. The previous
+Server runtime digest remains accepted for every supported Engine contract; older published runtime
+digests retain their original Engine restrictions. Guest capability contracts are unchanged.
+Upgrade the Server and public package together.
 
 ## Bounded Flow State reads (beta.79)
 

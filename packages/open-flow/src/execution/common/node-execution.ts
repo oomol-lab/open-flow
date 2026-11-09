@@ -474,5 +474,6 @@ export function executeNode(
           }),
         )
   // Waiting for deployment admission is queueing, not node execution time.
-  return node.kind == 'task' && context.admitTask != null ? Effect.andThen(context.admitTask({ runId, nodeId, jobId }), timed) : timed
+  // Pending workflow calls only read child state and do not consume Task capacity.
+  return node.kind == 'task' && workflowRunId == null && context.admitTask != null ? Effect.andThen(context.admitTask({ runId, nodeId, jobId }), timed) : timed
 }

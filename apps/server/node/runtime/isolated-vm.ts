@@ -74,7 +74,8 @@ export function supportsIsolatedVmEngine(engineContract: string, engineDigest: s
   return (
     findEngineContract(engineContract) != null &&
     (engineDigest === isolatedVmEngineDigest ||
-      (engineContract === 'open-flow-engine/v10' && (engineDigest === v10EngineDigest || engineDigest === v10BatchReadEngineDigest)) ||
+      engineDigest === v10BatchReadEngineDigest ||
+      (engineContract === 'open-flow-engine/v10' && engineDigest === v10EngineDigest) ||
       (engineContract === 'open-flow-engine/v9' && engineDigest === v9EngineDigest) ||
       ((engineContract === 'open-flow-engine/v8' || engineContract === 'open-flow-engine/v8/nodejs-compat-v1') && engineDigest === v8EngineDigest) ||
       ((engineContract === 'open-flow-engine/v7' || engineContract === 'open-flow-engine/v7/nodejs-compat-v1') && engineDigest === v7EngineDigest) ||
