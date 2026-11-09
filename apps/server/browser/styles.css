@@ -88,7 +88,9 @@ body {
 
 .server-nav nav a {
   display: inline-flex;
-  height: 30px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 30px;
   align-items: center;
   justify-content: center;
   padding: 0 10px;
@@ -97,8 +99,9 @@ body {
   background: transparent;
   color: var(--ui-muted-foreground);
   font-size: var(--ui-font-size);
+  overflow-wrap: break-word;
+  text-align: center;
   text-decoration: none;
-  white-space: nowrap;
   transition:
     color 150ms ease,
     background-color 150ms ease,
@@ -122,18 +125,22 @@ body {
 }
 
 .server-nav-actions {
-  display: flex;
   min-width: 0;
+  max-width: 100%;
   flex-shrink: 0;
-  align-items: center;
-  gap: 4px;
+  flex-wrap: wrap;
   margin-left: auto;
 }
 
 @media (width <= 520px) {
   .server-nav {
+    flex-wrap: wrap;
     gap: 4px;
     padding: 0 8px;
+  }
+
+  .server-nav nav {
+    flex-basis: min-content;
   }
 
   .server-nav-title {

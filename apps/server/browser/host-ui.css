@@ -94,6 +94,7 @@
 }
 .host-field-heading {
   gap: 4px;
+  overflow-wrap: anywhere;
 }
 
 .host-field label {
@@ -151,6 +152,15 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.host-actions > button,
+.host-form-actions > button {
+  max-width: 100%;
+  min-height: min-content;
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
 }
 
 .host-card-heading {
