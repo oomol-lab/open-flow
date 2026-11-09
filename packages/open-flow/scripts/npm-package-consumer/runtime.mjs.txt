@@ -28,6 +28,39 @@ if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error
 const api = await import('@oomol-lab/open-flow/control-api')
 if (typeof api.ControlClient !== 'function') throw new Error('Missing Control API client.')
 const encoding = await import('@oomol-lab/open-flow/flow-encoding')
+const { createWorkflowAuthoring } = await import('@oomol-lab/open-flow/control-requests')
+const catalogRecords = new Map()
+const cacheDelegate = {
+  get: async key => catalogRecords.get(key),
+  set: async (key, value) => { catalogRecords.set(key, value) },
+  delete: async key => { catalogRecords.delete(key) },
+}
+const metadataResponse = {
+  version: 1,
+  action: {
+    actionId: 'consumer.read', name: 'Read', serviceId: 'consumer', serviceName: 'Consumer', description: '', authenticated: true,
+    inputSchema: { type: 'object', properties: {} }, outputSchema: { type: 'object', additionalProperties: true },
+    inputs: {}, outputs: { output: { jsonSchema: { type: 'object', additionalProperties: true }, nullable: false } },
+  },
+  extension: [0, false, null],
+}
+const metadataClient = new api.ControlClient(async path => {
+  assert.equal(path, '/v1/connector/action-metadata/consumer.read?locale=en')
+  return Response.json(metadataResponse, { headers: { etag: '"consumer"' } })
+}, 'api', { cache: { delegate: cacheDelegate, scope: 'consumer' } })
+await metadataClient.getConnectorActionMetadata('consumer.read', undefined, undefined, 'en')
+assert.deepEqual([...catalogRecords.values()][0].body, metadataResponse)
+const cachedClient = new api.ControlClient(async () => { throw new Error('Unexpected network request') }, 'api', { cache: { delegate: cacheDelegate, scope: 'consumer', mode: 'offline' } })
+const fileAuthoring = createWorkflowAuthoring({ client: cachedClient })
+const localFile = fileAuthoring.create({ name: 'Packaged SDK' })
+const localEdit = await fileAuthoring.edit(localFile, {
+  baseRevision: (await fileAuthoring.read(localFile)).revision,
+  requestId: 'create',
+  edits: [{ op: 'node.add', as: 'read', type: 'connector', name: 'Read', config: { action: 'consumer.read', connectionId: 'local-account' } }],
+})
+assert.equal(localEdit.file.content.document.graph.nodes[localEdit.nodes.read].task.executor.outputMode, 'value')
+assert.deepEqual(encoding.parseWorkflowFile(encoding.encodeWorkflowFile(localEdit.file, { clean: false })), localEdit.file)
+assert.ok(!encoding.encodeWorkflowFile(localEdit.file).includes('local-account'))
 const portable = { kind: 'open-flow-workflow', version: 1, content: { modelVersion: 6, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] } } } }
 const bundle = { kind: 'open-flow-workflow-bundle', version: 1, entryFlowId: 'root', workflows: [{ flowId: 'root', file: portable }] }
 assert.deepEqual(encoding.parseWorkflowImportFile(encoding.encodeWorkflowBundle(bundle)), bundle)

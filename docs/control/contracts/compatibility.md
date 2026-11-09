@@ -1,5 +1,15 @@
 # Public contracts and version evolution
 
+## Local WorkflowFile authoring and delegated Flow response caching
+
+The npm `next` baseline is beta.85. These changes add public local file authoring and optional
+delegated metadata caching. Existing `ControlClient` constructors and portable encoding
+keep their behavior. Explicit `encodeWorkflowFile(file, { clean: false })` saves a full local
+document; the default remains portable export cleanup. Metadata caching preserves complete
+Flow API responses and does not require Connector catalog adaptation in clients. HTTP schemas,
+workflow file version, Model v14 / Engine v11, and checkpoint v6 are unchanged by this SDK addition.
+Existing Connector snapshots are not refreshed. CLI host integration is outside this change.
+
 ## Provider API requests: Flow model v14 and Engine v11
 
 The published baseline is npm `next` `0.1.0-beta.85`, gitHead

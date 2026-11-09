@@ -131,6 +131,14 @@ function fixture(): WorkflowFile {
 }
 
 describe('shareable workflow files', () => {
+  it('preserves accounts, Variables and Trigger resource configuration when saving a local document', () => {
+    const file = fixture()
+    const saved = parseWorkflowFile(encodeWorkflowFile(file, { clean: false }))
+    expect(saved).toEqual(decodeWorkflowFile(file))
+    expect(saved.content.document.bindings).toEqual(file.content.document.bindings)
+    expect(saved.content.document.graph.nodes.connector).toMatchObject({ task: { executor: { connectionId: 'account' } } })
+    expect(parseWorkflowFile(encodeWorkflowFile(saved))).toEqual(cleanWorkflowFile(file).file)
+  })
   it('clears structured resources, preserves internal identities and values, and is pure and idempotent', () => {
     const original = fixture()
     const before = structuredClone(original)

@@ -11,7 +11,7 @@ import '@oomol-lab/open-flow/theme.css'
 import type { Task } from '@oomol-lab/open-flow'
 import type { ConnectorProxy } from '@oomol-lab/open-flow/connector-proxy'
 import { connectorProxyConfigSchema, connectorProxyTask } from '@oomol-lab/open-flow/connector-proxy'
-import type { ConnectorAction, ControlErrorCode, LiveDetails, LiveEntry } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAction, ControlCacheDelegate, ControlErrorCode, LiveDetails, LiveEntry } from '@oomol-lab/open-flow/control-api'
 import type { DecisionExecutor } from '@oomol-lab/open-flow/decision'
 import type { SourceConfiguration } from '@oomol-lab/open-flow/event-source'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
@@ -22,7 +22,7 @@ import type { HostNavigationActionsProps, OpenFlowLogoProps } from '@oomol-lab/o
 import type { OpenFlowWorkbenchHandle, WorkbenchImportInput, WorkbenchHost, WorkbenchLocation } from '@oomol-lab/open-flow/workbench'
 
 import { ControlClient, liveEntries } from '@oomol-lab/open-flow/control-api'
-import { controlRequests } from '@oomol-lab/open-flow/control-requests'
+import { controlRequests, createWorkflowAuthoring } from '@oomol-lab/open-flow/control-requests'
 import { eventSourceDefinition, sourceReady, sourceResultSchema, preparedSourceSchema, sourceReceiptSchema } from '@oomol-lab/open-flow/event-source'
 import { encodeWorkflowFile, decodeWorkflowFile, cleanWorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '@oomol-lab/open-flow/flow-semantics'
@@ -57,6 +57,17 @@ import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/wor
 import { createElement, createRef } from 'react'
 
 // Concrete consumer assignments and calls verify the published type signatures.
+export async function authorLocalFile(delegate: ControlCacheDelegate) {
+  const client = new ControlClient(async () => Response.json({}), 'api', { cache: { scope: 'consumer', delegate } })
+  const authoring = createWorkflowAuthoring({ client })
+  const file = authoring.create({ name: 'Local' })
+  const read = await authoring.read(file)
+  await client.listConnectorActionMetadata()
+  await client.searchConnectorActionMetadata('send')
+  await client.getConnectorActionMetadata('example.send')
+  const result = await authoring.edit(file, { baseRevision: read.revision, requestId: 'create', edits: [{ op: 'node.add', as: 'start', type: 'start', name: 'Start' }] })
+  return encodeWorkflowFile(result.file, { clean: false })
+}
 export const details: Promise<LiveDetails> = new ControlClient(async () => Response.json({})).getLiveDetails('flow')
 export const projectEntries: readonly LiveEntry[] = liveEntries({} as never, {} as never, [])
 export const decisionKind: DecisionExecutor['kind'] = 'decision'

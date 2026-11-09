@@ -86,8 +86,8 @@ export function cleanWorkflowFile(value: unknown): { readonly file: WorkflowFile
   }
 }
 
-export function encodeWorkflowFile(file: WorkflowFile): string {
-  return `${JSON.stringify(cleanWorkflowFile(file).file, null, 2)}\n`
+export function encodeWorkflowFile(file: WorkflowFile, options: { readonly clean?: boolean } = {}): string {
+  return `${JSON.stringify(options.clean === false ? decodeWorkflowFile(file) : cleanWorkflowFile(file).file, null, 2)}\n`
 }
 
 export function workflowFileName(name: string): string {

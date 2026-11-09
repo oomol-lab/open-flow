@@ -64,10 +64,27 @@ export type { WorkflowFile, WorkflowCleanupSummary } from '../../flow/common/wor
 export type { WorkflowBundle, WorkflowExportPreview } from '../../flow/common/workflowBundle.ts'
 import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 import type { FlowResourceReferences } from '../../flow/common/semantics.ts'
+import type { ControlCacheOptions } from './catalogCache.ts'
 
+import { ControlCatalogCache } from './catalogCache.ts'
 import { flowCheck } from './checkDecoders.ts'
-import { connection, connectorAccess, connectorAccessSnapshot, connectorAccessCandidatesBatch, connectorAction, leinaBots } from './connectorDecoders.ts'
-import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
+import {
+  connection,
+  connectorAccess,
+  connectorAccessSnapshot,
+  connectorAccessCandidatesBatch,
+  connectorAction,
+  connectorActionMetadata,
+  leinaBots,
+} from './connectorDecoders.ts'
+import {
+  allConnectorConnectionsQuery,
+  connectorActionQuery,
+  connectorActionMetadataQuery,
+  connectorConnectionsQuery,
+  connectorProvidersQuery,
+} from './connectorQueries.ts'
+export type { ControlCacheDelegate, ControlCacheOptions, ControlCacheRead } from './catalogCache.ts'
 import { requiredFields, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { errorListener, flow, flowPage, variable, variableListItem, variableReferences } from './flowDecoders.ts'
 import { live, publication, publicationPage, publishOperation } from './publicationDecoders.ts'
@@ -851,10 +868,14 @@ export type ConditionalResult<T> =
 export class ControlClient {
   private readonly requestControl: ControlRequest
   private readonly channel: 'workbench' | 'cli' | 'api'
+  private readonly catalogCache?: ControlCatalogCache
+  private readonly options: { readonly cache?: ControlCacheOptions }
 
-  constructor(requestControl: ControlRequest, channel: 'workbench' | 'cli' | 'api' = 'api') {
+  constructor(requestControl: ControlRequest, channel: 'workbench' | 'cli' | 'api' = 'api', options: { readonly cache?: ControlCacheOptions } = {}) {
+    this.options = options
     this.channel = channel
     this.requestControl = requestControl
+    if (options.cache != null) this.catalogCache = new ControlCatalogCache(options.cache)
   }
 
   async loadOpenApiDocument(url: string, signal?: AbortSignal): Promise<JsonValue> {
@@ -1141,6 +1162,14 @@ export class ControlClient {
   }
 
   async getTriggerCatalog(locale: string, cached?: TriggerCatalogCache, signal?: AbortSignal): Promise<TriggerCatalogCache> {
+    if (this.catalogCache != null) {
+      const result = await this.catalogResponse(
+        { path: `/v1/trigger-keys/catalog?locale=${encodeURIComponent(locale)}`, decode: decodeTriggerCatalog },
+        300_000,
+        signal,
+      )
+      return { data: result.data, etag: result.etag }
+    }
     const headers = new Headers()
     if (cached?.etag) headers.set('if-none-match', cached.etag)
     const response = await this.response(`/v1/trigger-keys/catalog?locale=${encodeURIComponent(locale)}`, { headers, signal }, true)
@@ -1152,6 +1181,23 @@ export class ControlClient {
   }
 
   async getTriggerKey(key: string, signal?: AbortSignal): Promise<TriggerKeySnapshot> {
+    if (this.catalogCache != null)
+      return (
+        await this.catalogResponse(
+          {
+            path: `/v1/trigger-keys/${segment(key)}`,
+            decode: (value) => {
+              const source = record(value)
+              if (source.version != 1) return invalidResponse()
+              const definition = triggerKey(source.definition)
+              if (definition.key != key) return invalidResponse('Trigger key does not match the requested definition.')
+              return definition
+            },
+          },
+          300_000,
+          signal,
+        )
+      ).data
     const source = record(await this.request(`/v1/trigger-keys/${segment(key)}`, { signal }))
     if (source.version != 1) return invalidResponse()
     return triggerKey(source.definition)
@@ -1266,6 +1312,7 @@ export class ControlClient {
 
   async listConnectorProviders(signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorProvider[]> {
     const query = connectorProvidersQuery(flowId, locale)
+    if (this.catalogCache != null) return (await this.catalogResponse(query, 300_000, signal)).data
     return this.connectorRequest(query.path, 'providers', signal, query.decode)
   }
 
@@ -1349,6 +1396,21 @@ export class ControlClient {
   async getConnectorAction(actionId: string, signal?: AbortSignal, flowId?: string, locale?: string, fresh = false): Promise<ConnectorAction> {
     const query = connectorActionQuery(actionId, flowId, locale)
     return this.connectorRequest(query.path, 'actions', signal, query.decode, fresh)
+  }
+
+  async listConnectorActionMetadata(serviceId?: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
+    return this.connectorMetadata(
+      { ...(serviceId == null ? {} : { service: serviceId }), ...(flowId == null ? {} : { flowId }), ...(locale == null ? {} : { locale }) },
+      signal,
+    )
+  }
+
+  async searchConnectorActionMetadata(query: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
+    return this.connectorMetadata({ q: query.trim(), ...(flowId == null ? {} : { flowId }), ...(locale == null ? {} : { locale }) }, signal)
+  }
+
+  async getConnectorActionMetadata(actionId: string, signal?: AbortSignal, flowId?: string, locale?: string, fresh = false): Promise<ConnectorActionMetadata> {
+    return (await this.catalogResponse(connectorActionMetadataQuery(actionId, flowId, locale), 30_000, signal, fresh)).data
   }
 
   async listAllConnectorConnections(signal?: AbortSignal, flowId?: string, fresh = false): Promise<readonly ConnectorConnection[]> {
@@ -1619,6 +1681,38 @@ export class ControlClient {
     )
   }
 
+  private async catalogResponse<Value>(
+    query: { readonly path: string; readonly decode: (value: unknown) => Value },
+    maxAgeMs: number,
+    signal?: AbortSignal,
+    fresh = false,
+  ) {
+    if (this.catalogCache != null)
+      return this.catalogCache.read(query, (etag) => this.readCatalog({ path: query.path, decode: jsonValue }, etag), maxAgeMs, signal, fresh)
+    const response = await this.readCatalog(query, null, signal)
+    if (!response.modified) return invalidResponse()
+    return { data: response.data, etag: response.etag }
+  }
+
+  private async connectorMetadata(parameters: Readonly<Record<string, string>>, signal?: AbortSignal): Promise<readonly ConnectorActionMetadata[]> {
+    const query = new URLSearchParams(parameters).toString()
+    return (
+      await this.catalogResponse(
+        {
+          path: `/v1/connector/action-metadata${query ? `?${query}` : ''}`,
+          decode: (value) => {
+            const source = record(value)
+            requiredFields(source, ['actions', 'version'])
+            if (source.version != 1 || !Array.isArray(source.actions)) return invalidResponse()
+            return source.actions.map(connectorActionMetadata)
+          },
+        },
+        30_000,
+        signal,
+      )
+    ).data
+  }
+
   private async connectorActions(parameters: Readonly<Record<string, string>>, signal?: AbortSignal): Promise<readonly ConnectorAction[]> {
     const query = Object.entries(parameters)
       .map(([key, value]) => `${segment(key)}=${segment(value)}`)
@@ -1643,6 +1737,7 @@ export class ControlClient {
   }
 
   protected async response(path: string, init: RequestInit, allowNotModified = false): Promise<Response> {
+    if (this.options.cache?.mode == 'offline') throw new ApiError(503, 'control.offline', 'Network requests are disabled for this Control client.')
     const headers = new Headers(init.headers)
     if (init.body != null) headers.set('content-type', 'application/json')
     const response = await this.requestControl(path, { ...init, headers })
