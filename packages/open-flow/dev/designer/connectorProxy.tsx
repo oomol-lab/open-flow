@@ -64,6 +64,12 @@ function content(): RevisionContent {
             },
           },
           public: { kind: 'task', name: 'Public API', task: task({ providerId: 'public-api' }), inputs: { endpoint: { kind: 'value', value: '/items' } } },
+          missing: {
+            kind: 'task',
+            name: 'Unavailable Provider',
+            task: task({ providerId: 'retired-provider' }),
+            inputs: { endpoint: { kind: 'value', value: '/items' } },
+          },
         },
       },
     },
@@ -96,7 +102,7 @@ function ProxyStory({ dark, language, log }: { dark: boolean; language: UiLangua
     return () => next.dispose()
   }, [language])
   useStoryActions([
-    ...['get', 'post', 'object', 'public'].map((id) => ({
+    ...['get', 'post', 'object', 'public', 'missing'].map((id) => ({
       label: id,
       onClick: () => {
         setSelected(id)
@@ -160,6 +166,6 @@ export const connectorProxyStory: FrontendStory = {
   title: 'Provider API Request',
   standalone: true,
   description:
-    'Edit endpoint, scalar Query and Headers using fixed values, variables or Request data. Compare an unconfigured account, selected account, explicitly deferred account and public Provider. Check JSON null, whole-object bindings, read-only preview, and Undo/Redo. HTTP Request has its own regression story for the shared parameter editor.',
+    'Edit endpoint, scalar Query and Headers using fixed values, variables or Request data. Compare an unconfigured account, selected account, explicitly deferred account, public Provider and missing Provider. The missing Provider shows an error with Retry. Check JSON null, whole-object bindings, read-only preview, and Undo/Redo. HTTP Request has its own regression story for the shared parameter editor.',
   render: (log, dark, language) => <ProxyStory dark={dark} language={language} log={log} />,
 }

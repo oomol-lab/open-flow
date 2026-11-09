@@ -273,7 +273,12 @@ export class ConnectorStore {
         const connectionFailure = provider?.noSetup === true ? undefined : get(this.data.connections.get(target.providerId, flowId)).error
         return {
           provider,
-          actionError: providerState.error == null ? undefined : { message: errorNotice(providerState.error, this.#i18n.t).message },
+          actionError:
+            providerState.error != null
+              ? { message: errorNotice(providerState.error, this.#i18n.t).message }
+              : providerState.data != null && provider == null
+                ? { message: this.#i18n.t('inspector.account.statusUnavailable', { action: target.providerId }) }
+                : undefined,
           activeConnections: catalog?.active,
           authorizationPending: state.authorizationServiceId === target.providerId,
           connection: target.connectionId == null ? undefined : catalog?.byId.get(target.connectionId),
@@ -387,7 +392,7 @@ export class ConnectorStore {
       return {
         ...state,
         data:
-          provider == null && state.data == null
+          state.data == null && (provider == null || state.error == null)
             ? undefined
             : [
                 ...(state.data ?? []).map((action) =>

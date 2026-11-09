@@ -28,9 +28,11 @@ export function ConnectorProxySection({
   const t = useTranslate()
   const id = useId()
   const taskRef = useRef(task)
-  taskRef.current = task
   const saveRef = useRef(onSave)
-  saveRef.current = onSave
+  useEffect(() => {
+    taskRef.current = task
+    saveRef.current = onSave
+  }, [task, onSave])
   const [changes] = useState(
     () =>
       new TaskExecutorChanges(task.executor, (before, next) => {
