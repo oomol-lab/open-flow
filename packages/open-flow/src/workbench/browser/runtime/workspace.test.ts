@@ -6,6 +6,7 @@ import type { Draft } from './api.ts'
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
+import { connectorProxyConfigSchema, connectorProxyTask } from '../../../connector/common/proxy.ts'
 import { setNodeContentHidden, flowPresentation } from './canvasPresentation.ts'
 import { setComment, setFlowViewport, setNodePositions } from './canvasPresentation.ts'
 import { createI18n } from './i18n.ts'
@@ -366,6 +367,55 @@ describe('Designer port projection', () => {
       connectionRequired: false,
     })
     expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'Connector · Hacker News', connectionRequired: true })
+  })
+
+  it('projects Provider requests with Connector identity and preserves authored node names', () => {
+    const file: WorkflowFile = {
+      kind: 'open-flow-workflow',
+      version: 1,
+      name: 'Provider requests',
+      content: {
+        modelVersion: currentFlowModelVersion,
+        modules: {},
+        document: {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: {
+              request: {
+                kind: 'task',
+                inputs: {},
+                task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'feishu-app-bot' }), '自定义 API 请求'),
+              },
+              renamed: {
+                kind: 'task',
+                name: '读取应用信息',
+                inputs: { endpoint: { kind: 'value', value: '/open-apis/application/v6/applications' } },
+                task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'feishu-app-bot', method: 'POST' })),
+              },
+            },
+          },
+        },
+      },
+    }
+    const provider = { serviceId: 'feishu-app-bot', serviceName: '飞书应用机器人' }
+    const i18n = createI18n('zh-CN')
+    try {
+      expect(designerGraph(file, {}, [], {}, {}, i18n.t, undefined, [], { [provider.serviceId]: provider }).nodes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'request', title: '自定义 API 请求', executorName: '连接器 · 飞书应用机器人' }),
+          expect.objectContaining({ id: 'renamed', title: '读取应用信息', executorName: '连接器 · 飞书应用机器人' }),
+        ]),
+      )
+      expect(designerGraph(file).nodes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'request', title: '自定义 API 请求', executorName: 'Connector · feishu-app-bot' }),
+          expect.objectContaining({ id: 'renamed', title: '读取应用信息', executorName: 'Connector · feishu-app-bot' }),
+        ]),
+      )
+    } finally {
+      i18n.dispose()
+    }
   })
 
   it.each([

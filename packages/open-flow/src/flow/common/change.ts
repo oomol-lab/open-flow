@@ -166,6 +166,7 @@ export interface ConditionNode extends GraphNodeBase {
 }
 
 export type ManagedTaskExecutor =
+  | import('../../connector/common/proxy.ts').ConnectorProxyExecutor
   | import('../../http/common/httpRequest.ts').HttpRequestExecutor
   | import('../../state/common/state.ts').SkipDuplicatesExecutor
   | WorkflowExecutor
@@ -398,7 +399,7 @@ export interface FlowDocument {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 

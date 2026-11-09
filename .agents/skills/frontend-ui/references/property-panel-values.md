@@ -18,6 +18,8 @@ collections, definitions, and field, node, or group settings. Also read the
   display both undefined and null as null and expose no clear action in either state. Non-nullable
   fields display undefined as unset and null as a stored value, with validation and a clear action.
   Empty strings and collections keep their own presentation. Display never writes a normalized value.
+  Fields with an explicit unset policy show its prompt for undefined and allow an explicit null to
+  be cleared back to unset. This policy stays local to that field.
 - Clear in an array-item Multiline text editor sets the value to an empty string and keeps the
   editor open and editable. Other Clear actions set the value to undefined. Allow null permits null; it does not convert a clear
   action into null. Node input persistence stores an explicit `kind: unset` mapping when cleared;
@@ -49,6 +51,10 @@ collections, definitions, and field, node, or group settings. Also read the
   change the saved JSON format. Concrete choices close raw JSON mode and collapse collection previews.
   When the field's Schema type is editable, an unconstrained Schema retains the established generic
   JSON editor and does not add a second data-type selector inside Value.
+- Provider request bodies prefer the shared Object value editor. Creating an unset body produces
+  an empty object, while viewing or clearing it never creates a body. Existing values keep their
+  stored type and selected sources remain intact. This preference does not change the declared
+  Schema or the default text presentation of other Any fields.
 - JSON fields using Object and Array subtypes use the structured collection editors and retain their JSON-mode
   action. Empty top-level collections follow the normal collapsed-empty rule, including automatic
   expansion for an initial validation error. Explicit recognized widgets retain their own editor.

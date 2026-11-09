@@ -2,6 +2,7 @@ import type { Diagnostic } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
+import { connectorProxyConfigSchema, connectorProxyTask } from '../../../../connector/common/proxy.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { deriveInspectorDiagnostics, diagnosticItems, diagnosticMessage } from './diagnostics.ts'
@@ -13,6 +14,52 @@ const base = {
 } as const
 
 describe('Workbench Diagnostic messages', () => {
+  it('locates Provider request data and account errors in their visible sections', () => {
+    const revision = revisionView({
+      actorId: 'actor',
+      createdAt: '2026-11-08T00:00:00Z',
+      digest: 'digest',
+      flowId: 'flow',
+      modelVersion: currentFlowModelVersion,
+      parentRevisionId: null,
+      revisionId: 'revision',
+      version: 1,
+      content: {
+        modelVersion: currentFlowModelVersion,
+        modules: {},
+        document: {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: {
+              request: { kind: 'task', inputs: {}, task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'example' })) },
+            },
+          },
+        },
+      },
+    })
+    const diagnostics = [
+      { ...base, code: 'connector-proxy.endpoint-invalid', message: 'An endpoint is required.', path: '/document/graph/nodes/request/inputs/endpoint' },
+      { ...base, code: 'connector.connection-required', message: 'Choose an account.', path: '/document/graph/nodes/request/task/executor/connectionId' },
+      { ...base, code: 'connector-proxy.config-invalid', message: 'Invalid query.', path: '/document/graph/nodes/request/task/executor/query' },
+    ]
+    const check = {
+      closureDigest: 'closure',
+      diagnostics,
+      engineContract: 'open-flow-engine/v11',
+      flowId: 'flow',
+      modelVersion: currentFlowModelVersion,
+      revisionDigest: 'digest',
+      revisionId: 'revision',
+      valid: false,
+      version: 1 as const,
+    }
+    expect(diagnosticItems(revision, check).map((item) => item.location)).toEqual([
+      { nodeId: 'request', section: 'task' },
+      { nodeId: 'request', section: 'account' },
+      { nodeId: 'request', section: 'task' },
+    ])
+  })
   it('resolves structured node references to user-facing titles', () => {
     const i18n = createI18n('zh-CN')
     const diagnostic: Diagnostic = {

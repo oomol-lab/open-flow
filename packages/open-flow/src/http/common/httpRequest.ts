@@ -1,17 +1,24 @@
-import type { InputMapping, InputPort, JsonValue, ManagedTaskDefinitionOf, TaskDefinitionBase, TaskExecutor } from '../../flow/common/model.ts'
+import type { InputMapping, InputPort, JsonValue, ManagedTaskDefinitionOf, TaskDefinitionBase } from '../../flow/common/model.ts'
+import type { RequestTaskNode } from '../../flow/common/requestParameters.ts'
 
-import { dequal } from 'dequal/lite'
 import { z } from 'zod'
-import { remapInputMappings, renamedPort } from '../../flow/common/portChanges.ts'
+import {
+  requestParameterSchema,
+  requestParameterPorts,
+  requestParameterIssues,
+  requestInputMappings,
+  retainRequestPorts,
+  withRequestParameterFields,
+  withRequestParameterSource,
+} from '../../flow/common/requestParameters.ts'
 import { httpHeaderNameIssue } from './headers.ts'
 
 export { httpHostAllowed, isHttpHost, maxHttpHosts } from './hosts.ts'
 
-const parameterSchema = z.strictObject({ mode: z.enum(['fields', 'object']).default('fields'), names: z.array(z.string()).default([]) })
 export const httpRequestConfigSchema = z.strictObject({
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']).default('GET'),
-  query: parameterSchema.default({ mode: 'fields', names: [] }),
-  headers: parameterSchema.default({ mode: 'fields', names: [] }),
+  query: requestParameterSchema.default({ mode: 'fields', names: [] }),
+  headers: requestParameterSchema.default({ mode: 'fields', names: [] }),
   bodyFormat: z.enum(['none', 'json', 'text', 'form']).default('none'),
   authentication: z
     .union([
@@ -36,36 +43,15 @@ export const httpQuerySchema = { type: 'object', additionalProperties: queryValu
 export function httpAuthHandles(config: HttpRequestConfig): string[] {
   return config.authentication.type == 'none' ? [] : config.authentication.type == 'basic' ? ['auth.username', 'auth.password'] : ['auth.token']
 }
-// Preserve metadata on ports whose contracts did not change.
-function retain(ports: readonly InputPort[], old: TaskDefinitionBase['inputs']): TaskDefinitionBase['inputs'] {
-  const remaining = new Map(ports.map((port) => [port.handle, port]))
-  return [
-    ...old.flatMap((item): TaskDefinitionBase['inputs'] => {
-      if ('group' in item) return [item]
-      const next = remaining.get(item.handle)
-      if (next == null) return []
-      remaining.delete(item.handle)
-      return [dequal(item.jsonSchema, next.jsonSchema) && item.nullable == next.nullable ? item : next]
-    }),
-    ...remaining.values(),
-  ]
-}
 export function httpRequestTask(
   config: HttpRequestConfig = httpRequestConfigSchema.parse({}),
   name = 'HTTP Request',
   previous?: TaskDefinitionBase,
 ): ManagedTaskDefinitionOf<HttpRequestExecutor> {
-  const inputs: InputPort[] = [{ handle: 'url', jsonSchema: { type: 'string' }, nullable: false }]
-  for (const group of ['query', 'headers'] as const) {
-    if (config[group].mode == 'object') inputs.push({ handle: group, jsonSchema: group == 'query' ? httpQuerySchema : httpHeaderSchema, nullable: true })
-    else
-      for (const parameterName of config[group].names.filter((value) => value.trim()))
-        inputs.push({
-          handle: `${group == 'query' ? 'query' : 'header'}.${parameterName}`,
-          jsonSchema: group == 'query' ? queryValueSchema : { type: 'string' },
-          nullable: true,
-        })
-  }
+  const inputs: InputPort[] = [
+    { handle: 'url', jsonSchema: { type: 'string' }, nullable: false },
+    ...requestParameterPorts(config, httpQuerySchema, queryValueSchema, httpHeaderSchema),
+  ]
   if (config.bodyFormat != 'none')
     inputs.push({
       handle: 'body',
@@ -82,8 +68,8 @@ export function httpRequestTask(
   return {
     name,
     executor: { ...config, kind: 'http-request' },
-    inputs: retain(inputs, previous?.inputs ?? []),
-    outputs: retain(outputs, previous?.outputs ?? []),
+    inputs: retainRequestPorts(inputs, previous?.inputs),
+    outputs: retainRequestPorts(outputs, previous?.outputs),
   }
 }
 export interface HttpRequestIssue {
@@ -96,18 +82,7 @@ export function httpRequestIssues(config: HttpRequestConfig): HttpRequestIssue[]
   const issues: HttpRequestIssue[] = []
   if (['GET', 'HEAD'].includes(config.method) && config.bodyFormat != 'none')
     issues.push({ field: 'bodyFormat', code: 'bodyUnsupported', message: 'GET and HEAD do not support a request body.' })
-  for (const group of ['query', 'headers'] as const) {
-    if (config[group].mode != 'fields') continue
-    const seen = new Set<string>()
-    for (const [index, name] of config[group].names.entries()) {
-      const key = group == 'headers' ? name.toLowerCase() : name
-      if (!name.trim() || seen.has(key))
-        issues.push({ field: group, index, code: 'parameterNamesInvalid', message: 'Parameter names must be nonempty and unique.' })
-      seen.add(key)
-      if (group == 'headers' && httpHeaderNameIssue(name, []) === 'invalid')
-        issues.push({ field: group, index, code: 'headerNameInvalid', message: 'Invalid HTTP header name.' })
-    }
-  }
+  issues.push(...requestParameterIssues(config))
   const auth = config.authentication
   if (auth.type != 'none') {
     const group = auth.type == 'apiKey' && auth.in == 'query' ? 'query' : 'headers'
@@ -218,49 +193,24 @@ export function parseHttpResponse(config: HttpRequestConfig, status: number, hea
 }
 
 /** Only a named parameter rename carries a value; changing source modes is not a rename. */
-export function httpRequestInputs(
-  mappings: Readonly<Record<string, InputMapping>>,
-  previous: TaskDefinitionBase,
-  next: TaskDefinitionBase,
-): Record<string, InputMapping> {
-  const candidate = renamedPort(previous.inputs, next.inputs)
-  const rename = candidate != null && ['query.', 'header.'].some((prefix) => candidate.every((name) => name.startsWith(prefix))) ? candidate : undefined
-  return remapInputMappings(mappings, next.inputs, rename)
-}
+export const httpRequestInputs = requestInputMappings
 
-/** A Task node as HTTP helpers read it; inline Tasks have no executor. */
-interface HttpTaskNode {
-  readonly inputs: Readonly<Record<string, InputMapping>>
-  readonly task: TaskDefinitionBase & { readonly executor?: TaskExecutor }
-}
-
-function httpRequestExecutor(node: HttpTaskNode): HttpRequestExecutor | undefined {
+function httpRequestExecutor(node: RequestTaskNode): HttpRequestExecutor | undefined {
   const executor = node.task.executor
   return executor?.kind === 'http-request' ? (executor as HttpRequestExecutor) : undefined
 }
 
 /** The object editor assembles named inputs without changing unrelated request settings. */
-export function withHttpParameterFields<Node extends HttpTaskNode>(node: Node, group: 'query' | 'headers', values: Record<string, JsonValue>): Node {
+export function withHttpParameterFields<Node extends RequestTaskNode>(node: Node, group: 'query' | 'headers', values: Record<string, JsonValue>): Node {
   const config = httpRequestExecutor(node)
   if (config == null) return node
-  const task = httpRequestTask({ ...config, [group]: { mode: 'fields', names: Object.keys(values) } }, node.task.name, node.task)
-  const inputs = httpRequestInputs(node.inputs, node.task, task)
-  const rename = renamedPort(node.task.inputs, task.inputs)
-  for (const [name, value] of Object.entries(values)) {
-    const handle = `${group === 'query' ? 'query' : 'header'}.${name}`
-    const existing = config[group].mode === 'fields' && (config[group].names.includes(name) || rename?.[1] === handle)
-    if (inputs[handle] == null && !existing) inputs[handle] = { kind: 'value', value }
-  }
-  // Only the HTTP Task and its input mappings change, so the node keeps its own type.
-  return { ...node, task, inputs } as Node
+  return withRequestParameterFields(node, group, values, config[group], (parameters) =>
+    httpRequestTask({ ...config, [group]: parameters }, node.task.name, node.task),
+  )
 }
 
-export function withHttpParameterSource<Node extends HttpTaskNode>(node: Node, group: 'query' | 'headers', mapping?: InputMapping): Node {
+export function withHttpParameterSource<Node extends RequestTaskNode>(node: Node, group: 'query' | 'headers', mapping?: InputMapping): Node {
   const config = httpRequestExecutor(node)
   if (config == null) return node
-  const task = httpRequestTask({ ...config, [group]: { mode: 'object', names: [] } }, node.task.name, node.task)
-  const inputs = httpRequestInputs(node.inputs, node.task, task)
-  if (mapping == null) delete inputs[group]
-  else inputs[group] = mapping
-  return { ...node, task, inputs } as Node
+  return withRequestParameterSource(node, group, mapping, (parameters) => httpRequestTask({ ...config, [group]: parameters }, node.task.name, node.task))
 }

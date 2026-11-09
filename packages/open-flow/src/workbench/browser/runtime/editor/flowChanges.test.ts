@@ -6,6 +6,7 @@ import type { Draft } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
+import { connectorProxyConfigSchema, connectorProxyTask } from '../../../../connector/common/proxy.ts'
 import { checkInputSource } from '../../../../flow/common/graph.ts'
 import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
 import { resetInputValues, setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
@@ -27,9 +28,51 @@ import {
   updateCondition,
   updateTaskAdditionalInputs,
   updateResolution,
+  updateRequestParameters,
 } from './flowChanges.ts'
 import { copyNodes, pasteNodes } from './nodeClipboard.ts'
 import { movePort } from './portOrder.ts'
+
+it('edits, undoes and copies Provider request bindings through the ordinary editor history', () => {
+  const original = draft('export default () => ({ result: { page: 0 } })')
+  const current = applyFlowChanges(original, [
+    {
+      kind: 'graph.node.create',
+      nodeId: 'proxy',
+      node: {
+        kind: 'task',
+        name: 'Request',
+        task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'example', connectionId: '', query: { names: ['page'] } })),
+        inputs: {
+          'endpoint': { kind: 'value', value: '/unlisted' },
+          'query.page': { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] },
+        },
+      },
+    },
+  ])
+  const mapping = { kind: 'sources' as const, sources: [{ kind: 'node' as const, nodeId: 'task', output: 'result' }] }
+  const changes = updateRequestParameters(
+    revisionView(current),
+    'proxy',
+    'query',
+    { kind: 'source', source: mapping.sources[0]!, fields: {} },
+    'unused-binding',
+  )!
+  const changed = applyFlowChanges(current, changes)
+  expect(changed.content.document.graph.nodes.proxy).toMatchObject({
+    inputs: { endpoint: { value: '/unlisted' }, query: mapping },
+    task: { executor: { connectionId: '', query: { mode: 'object' } } },
+  })
+  expect(changed.content.document.graph.nodes.proxy).not.toHaveProperty(['inputs', 'query.page'])
+  expect(applyFlowChanges(changed, inverseFlowChanges(current.content, changes)).content).toEqual(current.content)
+  let sequence = 0
+  const copied = pasteNodes(revisionView(changed), copyNodes(revisionView(changed), ['task', 'proxy']), () => `proxy-copy-${++sequence}`)
+  const saved = applyFlowChanges(changed, copied.changes)
+  expect(saved.content.document.graph.nodes['proxy-copy-2']).toMatchObject({
+    task: { executor: { kind: 'connector-proxy', connectionId: '' } },
+    inputs: { query: { sources: [{ nodeId: 'proxy-copy-1' }] } },
+  })
+})
 
 function draft(source: string): Draft {
   return {

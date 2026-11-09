@@ -4,7 +4,7 @@ import type { WaitAutoContinue } from '../../../../flow/common/change.ts'
 import type { TaskCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { GraphNode, InputPort, Port, JsonValue, TriggerSchedule } from '../api.ts'
-import type { HttpParameterEdit, ConditionSettings, TaskPorts, FlowChanges, TaskSettings, ValueSettings, WebhookSettings } from '../editor/flowChanges.ts'
+import type { RequestParameterEdit, ConditionSettings, TaskPorts, FlowChanges, TaskSettings, ValueSettings, WebhookSettings } from '../editor/flowChanges.ts'
 import type { PropertyDeletion } from '../editor/propertyDeletion.ts'
 import type { RevisionView } from '../revisionView.ts'
 
@@ -19,7 +19,7 @@ import {
   setCodeActions as changeCodeActions,
 } from '../../../../flow/common/nodeChanges.ts'
 import {
-  updateHttpParameters,
+  updateRequestParameters,
   updateOutputPorts,
   updateCondition,
   updateTaskPorts,
@@ -177,10 +177,10 @@ export class NodeEdits {
     return changes != null && (await this.save(changes, deletion))
   }
 
-  public async saveHttpParameters(nodeId: string, group: 'query' | 'headers', edit: HttpParameterEdit, deletion?: PropertyDeletion): Promise<boolean> {
+  public async saveRequestParameters(nodeId: string, group: 'query' | 'headers', edit: RequestParameterEdit, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.revision.value
     if (revision == null) return false
-    const changes = updateHttpParameters(revision, nodeId, group, edit, this.identity())
+    const changes = updateRequestParameters(revision, nodeId, group, edit, this.identity())
     return changes != null && this.save(changes, deletion)
   }
 

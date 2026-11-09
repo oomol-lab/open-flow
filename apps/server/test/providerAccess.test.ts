@@ -1,3 +1,4 @@
+import { connectorProxyConfigSchema, connectorProxyTask } from '@oomol-lab/open-flow/connector-proxy'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -35,6 +36,71 @@ async function openDatabase(): Promise<Database> {
 function success(data: unknown): unknown {
   return { data, message: 'OK', meta: {}, success: true }
 }
+
+it('captures independent Proxy permission and rechecks its revocation before dispatch', async () => {
+  let grant: object = { actions: ['echo'] }
+  let calls = 0
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/v1/me/teams')) return Response.json({ teams: [{ id: 'team-1', role: 'member', status: 'normal', deleted: false }] })
+      if (url.endsWith('/v1/users/profile')) return Response.json({ uid: 'member' })
+      if (url.endsWith('/app-access'))
+        return Response.json({
+          'role::connector-app:account': {
+            connector: [{ method: 'POST', provider: 'example', permissionRules: { assignments: {}, rules: [], teamDefault: grant } }],
+          },
+        })
+      if (url.endsWith('/v1/apps') || url.endsWith('/v1/apps/services/example'))
+        return Response.json(success([{ id: 'account', service: 'example', displayName: 'Work', status: 'active', isDefault: true }]))
+      if (url.endsWith('/v1/proxy/example')) {
+        calls++
+        return Response.json(success({ data: {}, status: 200 }))
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }),
+  )
+  const storage = await openDatabase()
+  const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
+  const access = new ConfiguredConnectorAccessHost(storage, new ConnectorTeamStore(storage.connection), () => connector)
+  const document = {
+    bindings: {},
+    graph: {
+      edges: [],
+      nodes: {
+        proxy: {
+          kind: 'task' as const,
+          task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'example', connectionId: 'account' })),
+          inputs: { endpoint: { kind: 'value' as const, value: '/unlisted' } },
+        },
+      },
+    },
+  }
+  await expect(captureConnectorAccess(access, 'flow-1', document, access.current('flow-1'))).rejects.toMatchObject({ code: 'connector.access-invalid' })
+  grant = {}
+  const refreshed = new ConnectorClient('https://connector.oomol.dev', 'token')
+  const refreshedAccess = new ConfiguredConnectorAccessHost(storage, new ConnectorTeamStore(storage.connection), () => refreshed)
+  const snapshot = await captureConnectorAccess(refreshedAccess, 'flow-1', document, refreshedAccess.current('flow-1'))
+  expect(snapshot.selectedBindings).toMatchObject([{ providerId: 'example', connectionId: 'account' }])
+  expect(snapshot.sharedBindings).toEqual([])
+  const context = {
+    scope: 'proxy' as const,
+    purpose: 'proxy' as const,
+    source: 'run' as const,
+    teamId: 'team-1',
+    providerId: 'example',
+    connectionId: 'account',
+    providerAccess: snapshot,
+  }
+  const signal = new AbortController().signal
+  await refreshed.checkProxy('example', 'account', signal, context)
+  grant = { actions: ['echo'] }
+  await expect(refreshed.proxy('example', 'account', 'request', { method: 'POST', endpoint: '/unlisted' }, signal, context)).rejects.toMatchObject({
+    code: 'connector.access-invalid',
+  })
+  expect(calls).toBe(0)
+})
 
 describe('configured Connector access', () => {
   it.each(['creator', 'member'])('retains authorized account health in the %s catalog without making inactive accounts assignable', async (role) => {

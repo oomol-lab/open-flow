@@ -105,6 +105,7 @@ function nodeKind(
   | 'approval'
   | 'condition'
   | 'connector'
+  | 'connector-proxy'
   | 'decision'
   | 'javascript'
   | 'openapi'

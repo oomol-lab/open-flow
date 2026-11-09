@@ -83,7 +83,12 @@ export function semanticNodeIcon(
   providers: Readonly<Record<string, ConnectorProvider>> = {},
 ): string | undefined {
   if (node.node.icon != null) return node.node.icon
-  if (node.kind != 'task' || node.definition == null || !('executor' in node.definition) || node.definition.executor.kind != 'connector') return nodeIcon(node)
+  if (node.kind != 'task' || node.definition == null || !('executor' in node.definition)) return nodeIcon(node)
+  if (node.definition.executor.kind === 'connector-proxy') {
+    const provider = providers[node.definition.executor.providerId]
+    return provider == null ? nodeIcon(node) : providerIcon(provider)
+  }
+  if (node.definition.executor.kind !== 'connector') return nodeIcon(node)
   const actionId = node.definition.executor.action
   const provider = connectorActions[actionId] ?? providers[actionId.split('.')[0]!]
   return provider == null ? nodeIcon(node) : providerIcon(provider)
@@ -137,7 +142,7 @@ export function nodeIcon(node: ResolvedNode): string | undefined {
       if (task.executor.kind == 'http-request') return ':lucide-light:globe:'
       if (task.executor.kind == 'skip-duplicates') return ':lucide-light:list-filter:'
       if (task.executor.kind == 'openapi') return ':logos:openapi-icon:'
-      return task.executor.kind == 'connector' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
+      return task.executor.kind == 'connector' || task.executor.kind === 'connector-proxy' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
     }
   }
 }
@@ -378,7 +383,8 @@ function executorName(task: TaskDefinition | undefined, providerName: string | u
   if (task.executor.kind == 'openapi') return 'OpenAPI'
   if (task.executor.kind == 'skip-duplicates') return t?.('flowState.nodeTitle') ?? 'Skip Duplicates'
   if (task.executor.kind == 'llm') return t?.('designer.executorLlm') ?? 'LLM'
-  return `${t?.('designer.executorConnector') ?? 'Connector'} · ${providerName ?? task.executor.action.split('.')[0]}`
+  const providerId = task.executor.kind === 'connector-proxy' ? task.executor.providerId : task.executor.action.split('.')[0]
+  return `${t?.('designer.executorConnector') ?? 'Connector'} · ${providerName ?? providerId}`
 }
 
 function triggerIcon(trigger: TriggerNode): string {
@@ -590,15 +596,17 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const inputs = groupedInputs(resolved, designerInputs(nodeId, node, ports, context.revision))
   const outputs = groupedOutputs(resolved, designerOutputs(ports))
   const task = resolved.kind == 'task' ? resolved.definition : undefined
-  const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
-  const connectorAction = connector == null ? undefined : context.connectorActions[connector.action]
-  const connectorProvider = connector == null ? undefined : context.providers[connector.action.split('.')[0]!]
-  const connections = connectorAction == null ? undefined : context.connectionCatalogs[connectorAction.serviceId]
+  const connector =
+    task != null && 'executor' in task && (task.executor.kind == 'connector' || task.executor.kind === 'connector-proxy') ? task.executor : undefined
+  const connectorAction = connector?.kind !== 'connector' ? undefined : context.connectorActions[connector.action]
+  const providerId = connector?.kind === 'connector-proxy' ? connector.providerId : connector?.action.split('.')[0]
+  const connectorProvider = providerId == null ? undefined : context.providers[providerId]
+  const connections = providerId == null ? undefined : context.connectionCatalogs[providerId]
   const connectionId = connector?.connectionId
   const selectedConnection = connectionId == null ? undefined : connections?.byId.get(connectionId)
   const connectionRequired =
     (connectionId !== '' &&
-      connectorAction?.authenticated == true &&
+      (connector?.kind === 'connector-proxy' ? connectorProvider != null && !connectorProvider.noSetup : connectorAction?.authenticated == true) &&
       (connector?.connectionId == null || (connections != null && selectedConnection?.status != 'active'))) ||
     nodeDiagnosticCount(
       resolved,

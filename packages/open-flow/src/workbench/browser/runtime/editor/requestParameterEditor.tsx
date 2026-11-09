@@ -1,21 +1,22 @@
-import type { InputPort, JsonValue, TaskDefinition } from '../api.ts'
-import type { HttpParameterEdit } from './flowChanges.ts'
+import type { RequestParameters } from '../../../../flow/common/requestParameters.ts'
+import type { InputPort, JsonValue } from '../api.ts'
+import type { RequestParameterEdit } from './flowChanges.ts'
 import type { NodeInputField } from './nodeInputs.tsx'
 import type { InputVariables, NodeInputUpstreamSources } from './sourceValueEditor.tsx'
 
 import { useTranslate } from 'val-i18n-react'
 import { FieldTable } from '../../../../form/browser/fieldTable.tsx'
 import { httpHeaderNameIssue } from '../../../../http/common/headers.ts'
-import { httpHeaderSchema, httpQuerySchema } from '../../../../http/common/httpRequest.ts'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { NodeInputValue } from './nodeInputValue.tsx'
 
 const expanded = () => true
 const object = (value: JsonValue | undefined): Record<string, JsonValue> =>
   value != null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, JsonValue>) : {}
-export function HttpParameterEditor({
+export function RequestParameterEditor({
   group,
-  task,
+  parameters,
+  schema,
   entries,
   disabled,
   readOnly,
@@ -24,20 +25,18 @@ export function HttpParameterEditor({
   onEdit,
 }: {
   group: 'query' | 'headers'
-  task: Extract<TaskDefinition, { executor: unknown }>
+  parameters: RequestParameters
+  schema: JsonValue
   entries: Readonly<Record<string, Pick<NodeInputField, 'value' | 'connected' | 'variableName'>>>
   disabled: boolean
   readOnly: boolean
   variables: InputVariables
   renderSource: (handle: string, port: InputPort) => NodeInputUpstreamSources | undefined
-  onEdit: (edit: HttpParameterEdit) => void
+  onEdit: (edit: RequestParameterEdit) => void
 }) {
   const t = useTranslate()
-  if (task.executor.kind !== 'http-request') return null
-  const parameters = task.executor[group]
   const root = parameters.mode === 'object' ? entries[group] : undefined
   const label = t(`httpRequest.${group}`)
-  const schema = group === 'query' ? httpQuerySchema : httpHeaderSchema
   const handle = (name: string) => `${group === 'query' ? 'query' : 'header'}.${name}`
   const values: Record<string, JsonValue> =
     parameters.mode === 'fields'

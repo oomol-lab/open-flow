@@ -26,7 +26,9 @@ export const nodeErrorSchema = {
 } as const
 
 export function supportsNodeErrorHandling(node: GraphNode): boolean {
-  return supportsNodeRetry(node) || (node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'skip-duplicates')
+  return (
+    supportsNodeRetry(node) || (node.kind === 'task' && 'executor' in node.task && ['skip-duplicates', 'connector-proxy'].includes(node.task.executor.kind))
+  )
 }
 
 export function nodeSystemOutputPorts(node: GraphNode): Readonly<Record<string, PortDefinition>> {

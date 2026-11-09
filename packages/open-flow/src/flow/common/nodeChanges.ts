@@ -22,6 +22,7 @@ import type {
 } from './change.ts'
 
 import { dequal } from 'dequal/lite'
+import { connectorProxyHasBody, connectorProxyTask } from '../../connector/common/proxy.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
 import { isTriggerNode, applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 import { codeSharedPermissionsEnabled } from './codePermissions.ts'
@@ -402,12 +403,36 @@ export function setInputValues(
   nodeId: string,
   values: Readonly<Record<string, JsonValue | undefined>>,
 ): readonly ChangeOperation[] | undefined {
+  return setInputMappings(content, nodeId, Object.fromEntries(Object.entries(values).map(([handle, value]) => [handle, fixedInputValue(value)])))
+}
+
+/** Input sources own whether a Provider request includes a body and its generated port. */
+export function setInputMappings(
+  content: RevisionContent,
+  nodeId: string,
+  mappings: Readonly<Record<string, InputMapping | undefined>>,
+): readonly ChangeOperation[] | undefined {
   const node = content.document.graph?.nodes[nodeId]
   if (node == null || isTriggerNode(node)) return
   const operations: ChangeOperation[] = []
-  for (const [handle, value] of Object.entries(values)) {
+  const task = node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'connector-proxy' ? node.task : undefined
+  let bodyUndeclared = false
+  if (task?.executor.kind === 'connector-proxy' && Object.hasOwn(mappings, 'body')) {
+    const port = task.inputs.find((input): input is InputPort => 'handle' in input && input.handle === 'body')
+    const hasBody = connectorProxyHasBody(mappings.body, port?.value)
+    bodyUndeclared = !hasBody && task.executor.bodyFormat === 'none'
+    if (hasBody && task.executor.bodyFormat === 'none') {
+      operations.push({
+        kind: 'graph.node.task.set',
+        nodeId,
+        before: task,
+        value: connectorProxyTask({ ...task.executor, bodyFormat: 'json' }, task.name, task),
+      })
+    }
+  }
+  for (const [handle, value] of Object.entries(mappings)) {
     const before = nodeInputMappings(node)[handle]
-    const next = fixedInputValue(value)
+    const next = handle === 'body' && bodyUndeclared ? undefined : value
     if (dequal(before, next)) continue
     operations.push({ before, handle, kind: 'graph.node.input.set', nodeId, value: next })
   }
@@ -418,13 +443,7 @@ export function setInputValues(
 export function resetInputValues(content: RevisionContent, nodeId: string, handles: readonly string[]): readonly ChangeOperation[] {
   const node = content.document.graph?.nodes[nodeId]
   if (node == null || isTriggerNode(node)) return []
-  const mappings = nodeInputMappings(node)
-  return cleanVariableBindings(
-    content,
-    [...new Set(handles)].flatMap((handle): ChangeOperation[] =>
-      mappings[handle] == null ? [] : [{ kind: 'graph.node.input.set', nodeId, handle, before: mappings[handle], value: undefined }],
-    ),
-  )
+  return setInputMappings(content, nodeId, Object.fromEntries(handles.map((handle) => [handle, undefined]))) ?? []
 }
 
 export function setInputSources(
@@ -435,9 +454,7 @@ export function setInputSources(
 ): readonly ChangeOperation[] {
   const node = content.document.graph?.nodes[nodeId]
   if (node == null || isTriggerNode(node)) return []
-  return cleanVariableBindings(content, [
-    { kind: 'graph.node.input.set', nodeId, handle, before: nodeInputMappings(node)[handle], value: { kind: 'sources', sources } },
-  ])
+  return setInputMappings(content, nodeId, { [handle]: { kind: 'sources', sources } }) ?? []
 }
 
 export function setInputVariable(
@@ -459,10 +476,7 @@ export function setInputVariable(
     return [{ before: current.target, bindingId: currentId, kind: 'binding.target.set', value: name }]
   }
   const next: InputMapping = { kind: 'sources', sources: [{ bindingId, kind: 'binding' }] }
-  return [
-    { binding: { kind: 'variable', target: name }, bindingId, kind: 'binding.create' },
-    ...cleanVariableBindings(content, [{ before: mapping, handle, kind: 'graph.node.input.set', nodeId, value: next }]),
-  ]
+  return [{ binding: { kind: 'variable', target: name }, bindingId, kind: 'binding.create' }, ...(setInputMappings(content, nodeId, { [handle]: next }) ?? [])]
 }
 
 export function cleanVariableBindings(content: RevisionContent, operations: readonly ChangeOperation[]): readonly ChangeOperation[] {
@@ -495,9 +509,9 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
 
 export function setConnectorConnection(content: RevisionContent, nodeId: string, connectionId: string | undefined): readonly ChangeOperation[] | undefined {
   const node = content.document.graph.nodes[nodeId]
-  if (node?.kind != 'task' || !('executor' in node.task) || node.task.executor.kind != 'connector') return
+  if (node?.kind != 'task' || !('executor' in node.task) || (node.task.executor.kind != 'connector' && node.task.executor.kind != 'connector-proxy')) return
   const task = node.task
-  if (task.executor.kind != 'connector') return
+  if (task.executor.kind != 'connector' && task.executor.kind != 'connector-proxy') return
   if (task.executor.connectionId == connectionId) return []
   const { connectionId: _, ...executor } = task.executor
   return [
@@ -542,6 +556,9 @@ export function setServiceConnections(
       if (capabilities != null) operations.push(...(setCodeActions(content, nodeId, capabilities) ?? []))
     } else if (task.executor.kind == 'connector') {
       if (assign(task.executor) !== task.executor) operations.push(...(setConnectorConnection(content, nodeId, connectionId) ?? []))
+    } else if (task.executor.kind === 'connector-proxy') {
+      if (task.executor.providerId === providerId && task.executor.connectionId === previousConnectionId)
+        operations.push(...(setConnectorConnection(content, nodeId, connectionId) ?? []))
     } else if (task.executor.kind == 'agent') {
       const executor = {
         ...task.executor,

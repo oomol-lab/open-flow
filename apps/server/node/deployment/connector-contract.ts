@@ -22,9 +22,10 @@ export interface ConnectorHost {
   listAllConnections(signal?: AbortSignal, access?: ConnectorAccessContext): Promise<readonly ConnectorConnection[]>
   listConnections(serviceId: string, signal?: AbortSignal, access?: ConnectorAccessContext): Promise<readonly ConnectorConnection[]>
   listProviders(signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorProvider[]>
+  checkProxy(provider: string, connectionId: string | undefined, signal?: AbortSignal, access?: ConnectorAccessContext): Promise<void>
   proxy(
     provider: string,
-    connectionId: string,
+    connectionId: string | undefined,
     rateLimitId: string,
     request: ConnectorProxyRequest,
     signal: AbortSignal,
@@ -63,7 +64,7 @@ export type ConnectorAccessContext = ConnectorContext &
         readonly providerId: string
         readonly connectionId: string
       }
-    | { readonly scope: 'proxy'; readonly providerAccess: ConnectorAccessSnapshot; readonly providerId: string; readonly connectionId: string }
+    | { readonly scope: 'proxy'; readonly providerAccess: ConnectorAccessSnapshot; readonly providerId: string; readonly connectionId?: string }
   )
 
 export type ConnectorErrorCode =

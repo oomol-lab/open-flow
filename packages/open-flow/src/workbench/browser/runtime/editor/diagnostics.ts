@@ -95,8 +95,13 @@ function scope(path: string): DiagnosticScope {
 function nodeSection(node: GraphNode, suffix: string): InspectorSection {
   if (node.kind == 'outputs' && (suffix.startsWith('/outputDefs') || suffix.startsWith('/outputMappings'))) return 'inputs'
   if (node.kind == 'start' && suffix.startsWith('/inputDefs')) return 'outputs'
-  if (suffix.startsWith('/inputs/')) return node.kind === 'condition' ? 'condition' : 'inputs'
+  if (suffix.startsWith('/inputs/')) {
+    if (node.kind === 'condition') return 'condition'
+    if (node.kind === 'task' && 'executor' in node.task && ['http-request', 'connector-proxy'].includes(node.task.executor.kind)) return 'task'
+    return 'inputs'
+  }
   if (node.kind == 'task' && suffix.startsWith('/task')) {
+    if ('executor' in node.task && node.task.executor.kind === 'connector-proxy' && suffix.startsWith('/task/executor/connectionId')) return 'account'
     if ('executor' in node.task && node.task.executor.kind == 'connector' && suffix.startsWith('/task/executor')) return 'account'
     return 'task'
   }

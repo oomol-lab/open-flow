@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/toolti
 import { valueForEditor } from '../common/editorComponent.ts'
 import { fieldValueState, setArrayItem } from '../common/fieldValue.ts'
 import { objectFieldNames, renameFieldDefinition, removeFieldDefinition } from '../common/objectFields.ts'
+import { isUnconstrainedSchema } from '../common/schemaWidget.ts'
 import { initialValue, jsonDataTypes, objectValue, renameObjectField, setObjectField, valueType } from '../common/value.ts'
 import { ArrayFieldList } from './arrayFieldList.tsx'
 import { collectionCreateAction, objectFieldAdder } from './collectionActions.ts'
@@ -49,6 +50,7 @@ function childFields(props: FieldValueEditorProps) {
       hideValueTools: props.hideValueTools,
       expansionPolicy: props.expansionPolicy,
       schema: childSchema,
+      nullable: isUnconstrainedSchema(childSchema),
       value: childValue,
       onChange: change,
       valueEditable,

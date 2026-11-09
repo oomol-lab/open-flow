@@ -83,6 +83,23 @@ describe('Editor component selection', () => {
 })
 
 describe('Default JSON value editor', () => {
+  it.each([
+    [undefined, 'object'],
+    [null, 'object'],
+    [{ message: 'hello' }, 'object'],
+    [[], 'array'],
+    ['', 'string'],
+    [42, 'number'],
+    [false, 'boolean'],
+  ] as const)('prefers Object for an untyped %j while preserving the stored type', (value, component) => {
+    expect(editorComponent(defaultValueEditorSchema({}, { component: 'object', value }))).toBe(component)
+  })
+
+  it('keeps schema hints authoritative over an explicit fallback editor', () => {
+    const schema = { type: 'number', minimum: 0 }
+    expect(defaultValueEditorSchema(schema, { component: 'object', value: undefined })).toEqual(schema)
+  })
+
   it.each([true, {}, { type: [] }, { 'ui:widget': 'any' }, { anyOf: [{ type: 'number' }, { type: 'string' }] }, { $ref: '#/unknown' }])(
     'falls back to single-line text for %j without resolving the schema',
     (schema) => {

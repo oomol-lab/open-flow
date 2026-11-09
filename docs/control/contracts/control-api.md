@@ -1048,7 +1048,7 @@ Monotonic `expectedAccessRevision` prevents concurrent overwrites; conflicts use
 
 Self-hosted Server selects mode by Connector endpoint. OpenConnector uses `implicit`, revision `0`, empty bindings, digest `implicit`, and empty candidates. PUT/DELETE return `connector.access-unsupported`. `connector.oomol.com` and `connector.oomol.dev` use `selectable`. Hosted mode obtains the current UID from `api.oomol.{com|dev}/v1/users/profile` with the configured OOMOL user token, reads Flow Team app-access from relation-control, verifies assignable candidates, and stores only opaque bindings. App-access projections cache for five minutes. Action, Connection, catalog, execute, and proxy all fail closed under the same binding.
 
-Action account selection distinguishes an omitted `connectionId` (unconfigured) from `connectionId: ""` (explicitly deferred). Connector Tasks, independent Code Actions, Agent tools, and Agent notifications preserve this value through authoring, reads, exports and history. Explicitly deferred references do not block account eligibility checks and are excluded from real account resource references and access snapshots. Calling a deferred Action fails with `connector.connection-required` before external execution, without selecting a default account. Agent tools with this value are omitted from the callable tool set. Other validation remains in force. Provider Triggers require a nonempty account ID and do not support deferral. Clearing `config.connectionId` restores the unconfigured state; omitted update fields preserve the current value.
+Action account selection distinguishes an omitted `connectionId` (unconfigured) from `connectionId: ""` (explicitly deferred). Connector Tasks, Provider API requests, independent Code Actions, Agent tools, and Agent notifications preserve this value through authoring, reads, exports and history. Explicitly deferred references do not block account eligibility checks and are excluded from real account resource references and access snapshots. Calling a deferred Action or Provider API request fails with `connector.connection-required` before external execution, without selecting a default account. Agent tools with this value are omitted from the callable tool set. Other validation remains in force. Provider Triggers require a nonempty account ID and do not support deferral. Clearing `config.connectionId` restores the unconfigured state; omitted update fields preserve the current value.
 
 Connection catalogs retain visible non-active accounts and health for display and reauthorization; assignable candidates and execution still require active accounts. Without `role::connector-app:<connectionId>`, Team defaults permit all Actions with `source: { kind: 'policy', ruleId: null }`. Configured accounts strictly follow their rules. Empty Action lists disable access; malformed rules must not fall back to full access. Later execution resolves current rules again; deleted named groups cannot fall back to Team defaults.
 
@@ -1627,6 +1627,51 @@ remain terminal. Requests use deployment networking, never forward Operator cred
 follow redirects, and retain TLS verification. The total request/read timeout is 30 seconds bounded
 by shorter node/Run deadlines; responses are capped at 4 MiB. There is no file, streaming, pagination,
 batching, proxy or connection-credential feature in this version.
+
+## Provider API request Tasks
+
+Public type and managed executor kind are `connector-proxy`. The platform generates its ports;
+CLI/MCP callers supply business configuration and input sources. Every Provider offers a Custom
+API Request entry in Workbench without a synthetic Action or a local support list. Connector
+determines support and enforces endpoint/origin restrictions at execution.
+
+Configuration contains required `providerId`, optional `connectionId`, `method` (GET, POST, PUT,
+PATCH or DELETE; default GET), `query` and `headers` parameter settings, and
+`bodyFormat: "none" | "json"` (default none). Parameter settings follow HTTP Request:
+`{ mode: "fields" | "object", names: string[] }`, default empty fields. Generated inputs are
+`query.<name>` / `header.<name>` or whole-object `query` / `headers`. Named renames preserve
+sources; mode switches remove obsolete sources. Query values accept string, number, boolean or
+null, without arrays or nested objects. Headers accept strings. Unconfigured named inputs are
+omitted; explicit query null is preserved.
+
+`endpoint` is a required string data input supporting fixed values, variables and upstream outputs.
+Setting or binding `body` generates its nullable input and automatically selects JSON internally;
+callers need not configure `bodyFormat`. The input accepts any JSON value, including strings and
+explicit null. Clearing it stores an explicit unset mapping and preserves the field definition and
+its default; resetting the input restores inheritance. An absent input without a default or an unset
+input omits the body entirely; JSON null sends an explicit null body. Workbench exposes a single
+optional Request body field without a format selector. GET bodies are invalid. The node does not
+inject credentials; Connector uses the selected account. Providers
+advertising no authentication may omit `connectionId`.
+
+Workbench hides Request body for GET. Updating another method to GET unsets any existing body,
+including an inherited default, while preserving its definition and unrelated inputs. The method
+and body change share one undo entry. Existing invalid GET drafts show a clear action instead of a
+body editor; read-only previews show the diagnostic without a mutation action.
+
+Fixed outputs are nullable `body`, integer `statusCode`, string-object `headers` and nullable
+`bodyEncoding` (`"base64"` when returned, otherwise null). Preserve complete response data and
+headers without inferring business output fields. A successful Connector proxy envelope completes
+the node even when the upstream status is 4xx or 5xx. Connector failures fail the node with an
+explicit permission, connection, input/support or availability error. Ordinary `onError` is
+supported, defaulting to stop; retries are unavailable. An unconfirmed write is indeterminate,
+cannot be handled as an ordinary error and must not be replayed automatically.
+
+Proxy uses independent Proxy permission. Action permission alone does not authorize it. Connection
+usage, publication checks, Run admission and authorization snapshots include these nodes; runtime
+dispatch rechecks the account/Provider match, active status and current Proxy grant. Credentials
+remain in Connector. Model v14 / Engine v11 gate the executor. Code, Agent, checkpoint and database
+contracts are unchanged.
 
 ## OpenAPI documents and Tasks
 

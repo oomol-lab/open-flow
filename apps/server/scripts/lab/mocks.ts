@@ -1,9 +1,11 @@
+import type { ConnectorProxyRequest } from '@oomol-lab/open-flow/connector-proxy'
 import type { ConnectorActionMetadata, ConnectorConnection } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorHost } from '../../node/deployment/connector-contract.ts'
 
 import { Hono } from 'hono'
 import { createHash } from 'node:crypto'
+import { ConnectorTaskError } from '../../node/deployment/connector-contract.ts'
 import { fulfillmentBatches } from './fulfillment.ts'
 
 const dynamicSchema: JsonValue = { type: 'object', properties: { output: { type: 'string' } }, additionalProperties: true }
@@ -135,12 +137,17 @@ export type MockModelCall = {
 export function createMocks() {
   const calls: { action: string; connection: string | undefined; input: Readonly<Record<string, JsonValue>>; invocationId: string }[] = []
   const modelCalls: MockModelCall[] = []
+  const proxyCalls: { provider: string; connection: string | undefined; request: ConnectorProxyRequest }[] = []
   const sample: { orders: JsonValue; order: JsonValue } = {
     orders: [{ amount: null }],
     order: { orderId: 'O-17', total: 125, email: 'buyer@example.test', phone: '555-0100', internalCost: 47 },
   }
   const providers = [...new Map(actions.map((a) => [a.serviceId, { serviceId: a.serviceId, serviceName: a.serviceName }])).values()]
   const connector: ConnectorHost = {
+    checkProxy: async (provider, connection) => {
+      if (!accounts.some((account) => account.serviceId === provider && account.connectionId === connection && account.status === 'active'))
+        throw new ConnectorTaskError('connector.connection-required', 'Select an active Provider account.')
+    },
     ready: async () => true,
     listProviders: async () => providers,
     listActions: async (service) => actions.filter((a) => service == null || a.serviceId == service),
@@ -163,7 +170,15 @@ export function createMocks() {
       if (id == 'lab-orders.customers') return { customers: [] }
       return {}
     },
-    proxy: async () => unknown(),
+    proxy: async (provider, connection, _rateLimitId, request) => {
+      if (provider !== 'lab-data' || connection !== 'marketplace:oomol:lab-data' || request.endpoint !== '/unlisted/reports') return unknown()
+      proxyCalls.push({ provider, connection, request: structuredClone(request) })
+      return {
+        data: { output: 'unlisted', payload: request.body, rows: [{ id: 0, extra: { enabled: false, note: null } }] },
+        status: 422,
+        headers: { 'content-type': 'application/json', 'x-request-id': 'proxy-lab' },
+      }
+    },
     trigger: async () => unknown(),
   }
   const model = new Hono()
@@ -286,5 +301,5 @@ export function createMocks() {
       choices: [{ index: 0, message: { role: 'assistant', content: completion }, finish_reason: 'stop' }],
     })
   })
-  return { connector, calls, modelCalls, model, sample }
+  return { connector, calls, proxyCalls, modelCalls, model, sample }
 }

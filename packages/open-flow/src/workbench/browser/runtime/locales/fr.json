@@ -1288,6 +1288,7 @@
     "missingStatuses": "Certains statuts sélectionnés ne sont plus disponibles. Supprimez-les ou remplacez-les."
   },
   "nodePicker": {
+    "custom": "Personnalisé",
     "actionGroups": {
       "read": "Actions de lecture",
       "write": "Actions d’écriture",
@@ -1702,6 +1703,12 @@
     "aliasInvalid": "Utilisez un nom d’appel unique de 1 à 64 caractères, commençant par une lettre et contenant uniquement des lettres ASCII, chiffres, tirets ou traits de soulignement.",
     "connector": "Connecteur",
     "workflow": "Workflow"
+  },
+  "connectorProxy": {
+    "bodyUnsupported": "Les requêtes GET ne prennent pas en charge de corps.",
+    "title": "Requête API personnalisée",
+    "description": "Appeler une API du fournisseur avec le compte connecté.",
+    "endpoint": "Point de terminaison"
   },
   "httpRequest": {
     "title": "Requête HTTP",

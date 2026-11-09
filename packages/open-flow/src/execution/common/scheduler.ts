@@ -67,6 +67,7 @@ export type SchedulerEvent =
         | 'approval'
         | 'condition'
         | 'connector'
+        | 'connector-proxy'
         | 'decision'
         | 'javascript'
         | 'openapi'

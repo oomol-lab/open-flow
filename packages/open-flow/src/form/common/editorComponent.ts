@@ -19,8 +19,8 @@ export function editorComponent(schema: unknown): EditorComponent {
   return Object.values(editorGroups).some((group) => (group as readonly string[]).includes(type)) ? (type as EditorComponent) : 'json'
 }
 
-/** Choose a starting editor from simple schema hints; unresolved JSON defaults to single-line text. */
-export function defaultValueEditorSchema(schema: unknown): Record<string, unknown> {
+/** Prefer schema hints; an explicit fallback respects the stored value's type without converting it. */
+export function defaultValueEditorSchema(schema: unknown, fallback?: { component: EditorComponent; value?: unknown }): Record<string, unknown> {
   const hints = { ...objectValue(schema) }
   if (hints['ui:widget'] === 'any') delete hints['ui:widget']
   // Presentation does not need to solve compound schemas. Validation still uses the original schema.
@@ -32,7 +32,8 @@ export function defaultValueEditorSchema(schema: unknown): Record<string, unknow
     if (hints.properties != null) hints.type = 'object'
     else if (hints.items != null) hints.type = 'array'
   }
-  return editorComponent(hints) === 'json' ? schemaForEditor('string', schema) : hints
+  const component = fallback == null ? 'string' : fallback.value == null ? fallback.component : valueType({}, fallback.value)
+  return editorComponent(hints) === 'json' ? schemaForEditor(component, schema) : hints
 }
 
 /** Changing the editor replaces incompatible constraints, retaining descriptive metadata. */

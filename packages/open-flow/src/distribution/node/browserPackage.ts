@@ -102,6 +102,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['flow/common/json', 'common/flow-json'],
   ['flow/common/moduleChanges', 'common/flow-authoring-module'],
   ['flow/common/model', 'common/flow-model'],
+  ['flow/common/requestParameters', 'common/flow-requestParameters'],
   ['flow/common/modules', 'common/flow-modules'],
   ['flow/common/nodeChanges', 'common/flow-authoring-node'],
   ['flow/common/promptTemplate', 'common/flow-promptTemplate'],

@@ -2,6 +2,7 @@ import type { Draft, Flow } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
+import { connectorProxyConfigSchema, connectorProxyTask } from '../../../../connector/common/proxy.ts'
 import { WorkbenchClient } from '../api.ts'
 import { addNodeIntent } from '../editor/addNodeOptions.ts'
 import { createI18n } from '../i18n.ts'
@@ -26,13 +27,13 @@ const flows: readonly Flow[] = ['flow-a', 'flow-b'].map((flowId, index) => ({
   version: 1,
 }))
 
-function draft(flowId: string, revisionId: string): Draft {
+function draft(flowId: string, revisionId: string, nodes: Draft['content']['document']['graph']['nodes'] = {}): Draft {
   return {
     actorId: 'actor-1',
     content: {
       document: {
         bindings: {},
-        graph: { edges: [], nodes: {} },
+        graph: { edges: [], nodes },
       },
       modelVersion: currentFlowModelVersion,
       modules: {},
@@ -48,6 +49,135 @@ function draft(flowId: string, revisionId: string): Draft {
 }
 
 describe('ConnectorStore', () => {
+  it.each(['missing', 'failed'] as const)('reports a %s Provider after loading, and clears the error after a successful retry', async (result) => {
+    const catalog = Promise.withResolvers<Response>()
+    let recovered = false
+    const request = vi.fn(async (path: string) => {
+      if (path.includes('/proxy/providers'))
+        return recovered ? Response.json({ success: true, data: [{ service: 'example', displayName: 'Example', authTypes: ['no_auth'] }] }) : catalog.promise
+      if (path.includes('/connector/connections')) return Response.json({ version: 1, connections: [] })
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(request)
+    const saved = draft('flow-a', 'revision-1', {
+      request: {
+        kind: 'task',
+        task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'example' })),
+        inputs: { endpoint: { kind: 'value', value: '/items' } },
+      },
+    })
+    vi.spyOn(client, 'listFlows').mockResolvedValue({ version: 1, flows: flows.map((flow) => ({ ...flow, referenceCount: 0 })) })
+    vi.spyOn(client, 'getEditor').mockResolvedValue({
+      version: 1,
+      flow: flows[0]!,
+      draft: saved,
+      live: { version: 1, flowId: 'flow-a', hasUnpublishedChanges: false, publication: null, revision: 0, status: 'not-published' },
+      presentation: { version: 1, revision: 1, updatedAt: timestamp, value: {} },
+    })
+    const i18n = createI18n('en')
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const connectors = new ConnectorStore(client, workspace, vi.fn(), { openExternalPage: async () => false }, i18n)
+    try {
+      await workspace.start('flow-a')
+      workspace.selectNodes(['request'])
+      expect(connectors.$.selectedProvider.value).toBeUndefined()
+      expect(connectors.$.selectedActionError.value).toBeUndefined()
+      if (result === 'missing') catalog.resolve(Response.json({ success: true, data: [] }))
+      else catalog.reject(new Error('Provider catalog failed'))
+      const message = result === 'missing' ? i18n.t('inspector.account.statusUnavailable', { action: 'example' }) : 'Provider catalog failed'
+      await vi.waitFor(() => expect(connectors.$.selectedActionError.value).toEqual({ message }))
+      recovered = true
+      await connectors.refresh(true)
+      await vi.waitFor(() => expect(connectors.$.selectedProvider.value).toMatchObject({ serviceId: 'example' }))
+      expect(connectors.$.selectedActionError.value).toBeUndefined()
+    } finally {
+      catalog.resolve(Response.json({ success: true, data: [] }))
+      connectors.dispose()
+      workspace.dispose()
+      i18n.dispose()
+    }
+  })
+
+  it('waits for Actions before returning the first Provider choice list', async () => {
+    const actions = Promise.withResolvers<Response>()
+    const request = vi.fn(async (path: string) => {
+      if (path.includes('/proxy/providers')) return Response.json({ success: true, data: [{ service: 'mail', displayName: 'Mail', authTypes: ['no_auth'] }] })
+      if (path.includes('/proxy/actions')) return actions.promise
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(request)
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const connectors = new ConnectorStore(client, workspace, vi.fn(), { openExternalPage: async () => false })
+    const controller = new AbortController()
+    try {
+      await resourceValue(connectors.browseAddNodeOptions(controller.signal))
+      const options = connectors.provideAddNodeOptionChoices('connector-provider:mail', controller.signal)
+      await vi.waitFor(() => expect(request.mock.calls.some(([path]) => path.includes('/proxy/actions'))).toBe(true))
+      expect(options.value.data).toBeUndefined()
+      const firstChoices = resourceValue(options, controller.signal)
+      actions.resolve(
+        Response.json({
+          success: true,
+          data: [{ id: 'mail.send', service: 'mail', name: 'Send', description: '', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }],
+        }),
+      )
+      await expect(firstChoices).resolves.toMatchObject([
+        { kind: 'connector', connector: { actionId: 'mail.send' } },
+        { kind: 'connector-proxy', provider: { serviceId: 'mail' } },
+      ])
+    } finally {
+      actions.resolve(Response.json({ success: true, data: [] }))
+      controller.abort()
+      connectors.dispose()
+      workspace.dispose()
+    }
+  })
+
+  it('keeps the Provider request choice available when Actions fail to load', async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path.includes('/proxy/providers')) return Response.json({ success: true, data: [{ service: 'mail', displayName: 'Mail', authTypes: ['no_auth'] }] })
+      if (path.includes('/proxy/actions')) throw new Error('Actions unavailable')
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(request)
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const connectors = new ConnectorStore(client, workspace, vi.fn(), { openExternalPage: async () => false })
+    const controller = new AbortController()
+    try {
+      await resourceValue(connectors.browseAddNodeOptions(controller.signal))
+      const options = connectors.provideAddNodeOptionChoices('connector-provider:mail', controller.signal)
+      await vi.waitFor(() => expect(options.value.error).toBeDefined())
+      await expect(resourceValue(options, controller.signal)).resolves.toMatchObject([{ kind: 'connector-proxy', provider: { serviceId: 'mail' } }])
+    } finally {
+      controller.abort()
+      connectors.dispose()
+      workspace.dispose()
+    }
+  })
+
+  it('offers a Provider request even when the Provider has no Actions', async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path.includes('/proxy/providers'))
+        return Response.json({ success: true, data: [{ service: 'public', displayName: 'Public API', authTypes: ['no_auth'] }] })
+      if (path.includes('/proxy/actions')) return Response.json({ success: true, data: [] })
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(request)
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const connectors = new ConnectorStore(client, workspace, vi.fn(), { openExternalPage: async () => false })
+    const controller = new AbortController()
+    try {
+      await resourceValue(connectors.browseAddNodeOptions(controller.signal))
+      const choices = await resourceValue(connectors.provideAddNodeOptionChoices('connector-provider:public', controller.signal))
+      expect(choices).toMatchObject([{ kind: 'connector-proxy', provider: { serviceId: 'public', serviceName: 'Public API', noSetup: true } }])
+      expect(choices?.[0]).not.toHaveProperty('connector')
+      expect(connectors.$.actions.value).toEqual({})
+    } finally {
+      controller.abort()
+      connectors.dispose()
+      workspace.dispose()
+    }
+  })
   it.each(['providers', 'actions', 'connections', 'missing action'] as const)('retries %s immediately in the selected Flow', async (failure) => {
     let failing = true
     const account = { connectionId: 'account', serviceId: 'mail', displayName: 'Mail', status: 'active', isDefault: true }

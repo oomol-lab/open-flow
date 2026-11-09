@@ -3,6 +3,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import type { DestinationStream, Logger } from 'pino'
 import type { ConnectorAccessContext } from '../node/deployment/connector-contract.ts'
 
+import { connectorProxyConfigSchema, connectorProxyTask } from '@oomol-lab/open-flow/connector-proxy'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -63,6 +64,27 @@ function connectorFlow(options: { readonly action?: string; readonly connectionI
     },
     modelVersion: currentFlowModelVersion,
     modules: {},
+  }
+}
+
+function proxyFlow(config: object = {}, inputs: Record<string, JsonValue> = { endpoint: '/unlisted' }, handled = false): RevisionContent {
+  return {
+    modelVersion: currentFlowModelVersion,
+    modules: {},
+    document: {
+      bindings: {},
+      graph: {
+        edges: [],
+        nodes: {
+          proxy: {
+            kind: 'task',
+            task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'example', connectionId: 'connection-work', ...config })),
+            inputs: Object.fromEntries(Object.entries(inputs).map(([key, value]) => [key, { kind: 'value', value }])),
+            ...(handled ? { onError: 'error' as const } : {}),
+          },
+        },
+      },
+    },
   }
 }
 
@@ -1386,6 +1408,198 @@ describe('Server Connector client', () => {
     ])
   })
 
+  it.each([400, 503])('returns upstream HTTP %s with the complete response instead of failing the node', async (status) => {
+    const requests: unknown[] = []
+    const data = { output: 'preserved', nested: { future: [null, false, { value: 0 }] } }
+    const origin = await startConnector(async (request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([app]))
+      requests.push(await readBody(request))
+      send(response, 200, success({ data, status, headers: { 'x-request-id': 'test', 'content-type': 'application/json' } }))
+    })
+    const { service } = await startService(origin)
+    const runId = await run(
+      service,
+      proxyFlow(
+        { method: 'POST', bodyFormat: 'json', query: { mode: 'object' }, headers: { names: ['X-Test'] } },
+        {
+          'endpoint': '/unlisted',
+          'body': null,
+          'query': { page: 0, enabled: false, optional: null },
+          'header.X-Test': 'lab',
+        },
+      ),
+    )
+    expect(requests).toEqual([
+      { endpoint: '/unlisted', method: 'POST', body: null, query: { page: 0, enabled: false, optional: null }, headers: { 'X-Test': 'lab' } },
+    ])
+    expect(service.run(runId)).toMatchObject({
+      status: 'completed',
+      result: {
+        kind: 'node-results',
+        nodes: [
+          {
+            nodeId: 'proxy',
+            outputs: { body: data, statusCode: status, headers: { 'x-request-id': 'test', 'content-type': 'application/json' }, bodyEncoding: null },
+          },
+        ],
+      },
+    })
+  })
+
+  it('preserves binary body encoding and permits a no-auth Provider without an account', async () => {
+    const accounts: (string | undefined)[] = []
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/providers') return send(response, 200, success([{ service: 'public', displayName: 'Public', authTypes: ['no_auth'] }]))
+      accounts.push(request.headers['x-oo-connector-app-id'] as string | undefined)
+      send(response, 200, success({ data: 'AAEC/w==', status: 200, headers: { 'content-type': 'application/octet-stream' }, bodyEncoding: 'base64' }))
+    })
+    const { service } = await startService(origin)
+    const runId = await run(service, proxyFlow({ providerId: 'public', connectionId: undefined }))
+    expect(accounts).toEqual([undefined])
+    expect(service.run(runId)).toMatchObject({
+      status: 'completed',
+      result: { nodes: [{ outputs: { body: 'AAEC/w==', bodyEncoding: 'base64', statusCode: 200 } }] },
+    })
+  })
+
+  it.each([
+    ['omitted', undefined],
+    ['unset', undefined],
+    ['null', null],
+    ['empty object', {}],
+    ['string', 'message'],
+  ] as const)('uses input presence when forwarding a %s request body', async (state, body) => {
+    const requests: unknown[] = []
+    const origin = await startConnector(async (request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([app]))
+      requests.push(await readBody(request))
+      send(response, 200, success({ data: {}, status: 200 }))
+    })
+    const { service } = await startService(origin)
+    let content = proxyFlow({ method: 'POST', bodyFormat: 'json' }, { endpoint: '/items', ...(body === undefined ? {} : { body }) })
+    if (state === 'unset') {
+      const node = content.document.graph.nodes.proxy!
+      if (node.kind !== 'task') throw new Error('Expected a Provider request.')
+      content = {
+        ...content,
+        document: {
+          ...content.document,
+          graph: { ...content.document.graph, nodes: { proxy: { ...node, inputs: { ...node.inputs, body: { kind: 'unset' } } } } },
+        },
+      }
+    }
+    expect(service.run(await run(service, content))?.status).toBe('completed')
+    expect(requests).toEqual([{ endpoint: '/items', method: 'POST', query: {}, headers: {}, ...(body === undefined ? {} : { body }) }])
+  })
+
+  it('executes GET with a cleared body without sending its resolved null or an inherited default', async () => {
+    const requests: unknown[] = []
+    const origin = await startConnector(async (request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([app]))
+      requests.push(await readBody(request))
+      send(response, 200, success({ data: {}, status: 200 }))
+    })
+    const { service } = await startService(origin)
+    const content = proxyFlow({ method: 'GET', bodyFormat: 'json' }, { endpoint: '/items' })
+    const node = content.document.graph.nodes.proxy!
+    if (node.kind !== 'task') throw new Error('Expected a Provider request.')
+    const revision: RevisionContent = {
+      ...content,
+      document: {
+        ...content.document,
+        graph: {
+          ...content.document.graph,
+          nodes: {
+            proxy: {
+              ...node,
+              task: {
+                ...node.task,
+                inputs: node.task.inputs.map((inputPort) =>
+                  'handle' in inputPort && inputPort.handle === 'body' ? Object.assign({}, inputPort, { value: 'saved default' }) : inputPort,
+                ),
+              },
+              inputs: { ...node.inputs, body: { kind: 'unset' } },
+            },
+          },
+        },
+      },
+    }
+    expect(service.run(await run(service, revision))?.status).toBe('completed')
+    expect(requests).toEqual([{ endpoint: '/items', method: 'GET', query: {}, headers: {} }])
+  })
+
+  it('checks Proxy account eligibility before publication without sending a business request', async () => {
+    let active = false
+    let proxyCalls = 0
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([{ ...app, status: active ? 'active' : 'disconnected' }]))
+      proxyCalls++
+      send(response, 200, success({ data: {}, status: 200 }))
+    })
+    const { service } = await startService(origin)
+    const input = { flowId: 'main', revision: proxyFlow(), revisionId: 'proxy-publication', expectedLivePublicationId: null, idempotencyKey: 'proxy-publish' }
+    await expect(service.publisher.publish(input)).rejects.toMatchObject({ code: 'connector.connection-required' })
+    active = true
+    await expect(service.publisher.publish(input)).resolves.toMatchObject({ kind: 'published' })
+    expect(proxyCalls).toBe(0)
+  })
+
+  it.each(['', 'wrong-provider'])('rejects the invalid account %j without sending a Proxy request', async (connectionId) => {
+    let proxyCalls = 0
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([{ ...app, service: 'other', id: 'wrong-provider' }]))
+      proxyCalls++
+      send(response, 200, success({ data: {}, status: 200 }))
+    })
+    const { service } = await startService(origin)
+    if (connectionId === '') expect(service.run(await run(service, proxyFlow({ connectionId })))?.status).toBe('failed')
+    else await expect(run(service, proxyFlow({ connectionId }))).rejects.toMatchObject({ code: 'connector.connection-required' })
+    expect(proxyCalls).toBe(0)
+  })
+
+  it.each(['proxy_not_supported', 'proxy_forbidden', 'credential_expired'])('fails on Connector %s and supports ordinary error output', async (errorCode) => {
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([app]))
+      send(response, 400, { success: false, errorCode, message: errorCode })
+    })
+    const { service } = await startService(origin)
+    expect(service.run(await run(service, proxyFlow()))?.status).toBe('failed')
+    const handled = await run(service, proxyFlow({}, { endpoint: '/unlisted' }, true))
+    expect(service.run(handled)?.status).toBe('completed')
+    expect(service.events(handled).find((event) => event.kind == 'node.failed')).toMatchObject({
+      payload: {
+        handled: true,
+        error: {
+          code:
+            errorCode === 'proxy_not_supported'
+              ? 'connector.input-invalid'
+              : errorCode === 'credential_expired'
+                ? 'connector.connection-required'
+                : 'connector.access-invalid',
+        },
+      },
+    })
+  })
+
+  it.each(['network', 'invalid-json'])('keeps a write indeterminate after %s, without handling or replaying it', async (failure) => {
+    let calls = 0
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([app]))
+      calls++
+      if (failure === 'network') {
+        request.socket.destroy()
+        return
+      }
+      response.writeHead(502)
+      response.end('invalid JSON')
+    })
+    const { service } = await startService(origin)
+    const runId = await run(service, proxyFlow({ method: 'POST' }, { endpoint: '/unlisted' }, true))
+    expect(service.run(runId)?.status).toBe('indeterminate')
+    expect(calls).toBe(1)
+    expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({ payload: { error: { code: 'connector.indeterminate' } } })
+  })
+
   it.each([
     [{ errorCode: 'proxy_forbidden', message: 'Proxy access is disabled for this team.' }, ' [proxy_forbidden]: Proxy access is disabled for this team.'],
     [{ errorCode: 42, message: { detail: 'invalid' } }, '.'],
@@ -1400,7 +1614,10 @@ describe('Server Connector client', () => {
     const connector = new ConnectorClient(origin, 'runtime-token-private', 30_000, captured.logger)
     await expect(
       connector.proxy('example', 'connection-work', 'binding-main', { endpoint: '/items', method: 'GET' }, new AbortController().signal),
-    ).rejects.toMatchObject({ code: 'connector.unavailable', message: `Connector proxy request failed (HTTP 403)${suffix}` })
+    ).rejects.toMatchObject({
+      code: failure.errorCode === 'proxy_forbidden' ? 'connector.access-invalid' : 'connector.unavailable',
+      message: `Connector proxy request failed (HTTP 403)${suffix}`,
+    })
     const log = JSON.parse(captured.output().trim())
     expect(log).toMatchObject({ category: 'connector.request.failed', status: 403, operation: 'proxy.execute' })
     if (typeof failure.errorCode == 'string') expect(log.upstreamErrorCode).toBe(failure.errorCode)

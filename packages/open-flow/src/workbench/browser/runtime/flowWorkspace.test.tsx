@@ -164,6 +164,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
         actionLoading: value(undefined),
         connectionLoading: value(undefined),
         selectedAction: value(undefined),
+        selectedProvider: value(undefined),
         selectedActionError: value(undefined),
         selectedActiveConnections: value([]),
         selectedAuthorizationPending: value(false),

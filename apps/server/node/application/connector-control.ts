@@ -340,11 +340,34 @@ export class ConnectorControl {
   async accountDiagnostics(actorId: string, flowId: string, content: RevisionContent, dependencies: { readonly nodes: Iterable<string> }) {
     this.access.authorize(actorId, { flowId })
     const connector = this.resolveConnector()
-    return actionAccountDiagnostics(content, dependencies, async (actionId) => {
-      if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-      const teamId = await this.resolveConnectorScope(actorId, flowId)
-      return connector.getAction(actionId, undefined, this.#connectorContext(flowId, teamId))
-    })
+    const diagnostics = [
+      ...(await actionAccountDiagnostics(content, dependencies, async (actionId) => {
+        if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+        const teamId = await this.resolveConnectorScope(actorId, flowId)
+        return connector.getAction(actionId, undefined, this.#connectorContext(flowId, teamId))
+      })),
+    ]
+    for (const id of dependencies.nodes) {
+      const node = content.document.graph.nodes[id]
+      if (node?.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'connector-proxy' || node.task.executor.connectionId === '')
+        continue
+      try {
+        if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+        const teamId = await this.resolveConnectorScope(actorId, flowId)
+        await connector.checkProxy(node.task.executor.providerId, node.task.executor.connectionId, undefined, this.#connectorContext(flowId, teamId, actorId))
+      } catch (error) {
+        if (!(error instanceof ConnectorTaskError)) throw error
+        diagnostics.push({
+          code: error.code,
+          message: error.message,
+          path: `/document/graph/nodes/${id}/task/executor/connectionId`,
+          line: 0,
+          column: 0,
+          values: { providerId: node.task.executor.providerId },
+        })
+      }
+    }
+    return diagnostics
   }
 }
 function actionWithDefaultConnection(action: ConnectorActionMetadata, connections: readonly ConnectorConnection[]): ConnectorAction {

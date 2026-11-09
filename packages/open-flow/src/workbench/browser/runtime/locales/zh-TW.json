@@ -1288,6 +1288,7 @@
     "missingStatuses": "部分已選狀態不再可用，請移除或重新選擇。"
   },
   "nodePicker": {
+    "custom": "自訂",
     "actionGroups": {
       "read": "讀取介面",
       "write": "寫入介面",
@@ -1702,6 +1703,12 @@
     "aliasInvalid": "呼叫名稱不能重複，長度為 1–64 個字元，以英文字母開頭，僅包含英文字母、數字、底線或連字號。",
     "connector": "連接器",
     "workflow": "工作流程"
+  },
+  "connectorProxy": {
+    "bodyUnsupported": "GET 請求不支援請求本文。",
+    "title": "自訂 API 請求",
+    "description": "使用已連線帳號呼叫 Provider API。",
+    "endpoint": "介面路徑"
   },
   "httpRequest": {
     "title": "HTTP 請求",

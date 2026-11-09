@@ -17,6 +17,7 @@ import type { AuthoringAgentTool, AuthoringCapability } from './authoringTools.t
 
 import { dequal } from 'dequal/lite'
 import { connectorOutputMode } from '../../connector/common/actionSchema.ts'
+import { connectorProxyConfigSchema, connectorProxyInputs, connectorProxyTask } from '../../connector/common/proxy.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
 import { supportsNodeRetry, isTriggerNode, applyFlowChanges, decodeChangeOperations, upgradeRevisionContent } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
@@ -40,6 +41,7 @@ import {
   updateStartInputDefs,
   updateOutputsDefs,
   renameFlowOutputSources,
+  setInputMappings,
 } from '../../flow/common/nodeChanges.ts'
 import { retryConfigurationSchema } from '../../flow/common/retry.ts'
 import { httpRequestTask, httpRequestConfigSchema, httpRequestInputs } from '../../http/common/httpRequest.ts'
@@ -147,7 +149,7 @@ export function authoringNode(content: RevisionContent, ref: string) {
         ),
       }
     else if (task.executor.kind == 'workflow') config = { flowId: task.executor.flowId }
-    else if (task.executor.kind == 'http-request' || task.executor.kind == 'skip-duplicates') {
+    else if (task.executor.kind == 'http-request' || task.executor.kind == 'skip-duplicates' || task.executor.kind == 'connector-proxy') {
       const { kind: _kind, ...settings } = task.executor
       config = settings
     } else if (task.executor.kind == 'openapi') {
@@ -524,7 +526,10 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       } else if (type == 'decision') task = decisionTask(config.questions as Parameters<typeof decisionTask>[0], String(update.name))
       else if (type == 'skip-duplicates')
         task = { ...before, name: String(update.name), executor: { kind: 'skip-duplicates', ...skipDuplicatesConfigSchema.parse(config) } }
-      else if (type == 'http-request') {
+      else if (type == 'connector-proxy') {
+        task = connectorProxyTask(connectorProxyConfigSchema.parse(config), String(update.name), before)
+        next = { ...next, inputs: connectorProxyInputs(node.inputs, before, task) } as GraphNode
+      } else if (type == 'http-request') {
         task = httpRequestTask(httpRequestConfigSchema.parse(config), String(update.name), before)
         next = { ...next, inputs: httpRequestInputs(node.inputs, before, task) } as GraphNode
       } else if (type == 'openapi') {
@@ -677,7 +682,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       replace(ref, { ...node, config })
       return
     }
-    if (!Object.hasOwn(inputDefinitions(node), input)) {
+    if (!Object.hasOwn(inputDefinitions(node), input) && !(typeOf(node) === 'connector-proxy' && input === 'body')) {
       const type = typeOf(node)
       if (!['agent', 'code', 'llm', 'wait', 'approval'].includes(type))
         fail('input.not-found', `Unknown input ${input}.`, { node: ref, input, choices: Object.keys(inputDefinitions(node)) })
@@ -691,8 +696,8 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
         : value.kind == 'value' || value.kind == 'unset'
           ? value
           : { kind: 'sources', sources: (value.kind == 'sources' ? value.sources : [value]).map(source) }
-    const before = nodeInputMappings(nodeAt(content, ref))[input]
-    if (!dequal(before, mapping)) apply([{ kind: 'graph.node.input.set', nodeId: ref, handle: input, before, ...(mapping == null ? {} : { value: mapping }) }])
+    const changes = setInputMappings(content, ref, { [input]: mapping }) ?? []
+    if (changes.length > 0) apply(changes)
   }
   for (const edit of parsed.edits) {
     try {
@@ -776,6 +781,9 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
               break
             case 'connector':
               changes = createManagedTask(identity, await connectorTask(config, name))
+              break
+            case 'connector-proxy':
+              changes = createManagedTask(identity, connectorProxyTask(connectorProxyConfigSchema.parse(config), name))
               break
             case 'skip-duplicates':
               changes = createManagedTask(identity, skipDuplicatesTask(skipDuplicatesConfigSchema.parse(config), name))

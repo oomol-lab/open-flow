@@ -142,7 +142,7 @@ Report script results and real Agent trials separately.
 Leina notification nodes require a nonblank robot identifier (`leinaId`) or an input source binding.
 Drafts may retain an unselected robot for editing, but `flow_check` reports `leina.robot-required` until configured.
 
-Action account selections use an omitted `connectionId` for unconfigured, a nonempty ID for selected, and `""` for explicitly deferred. Deferral is supported by Connector Tasks, independent Code Actions, Agent tools and notifications, but not Provider Triggers. It bypasses only account readiness checks. A deferred Action fails if called; deferred Agent tools are excluded from the callable tool set. Preserve this distinction in public reads, edits and exports.
+Action account selections use an omitted `connectionId` for unconfigured, a nonempty ID for selected, and `""` for explicitly deferred. Deferral is supported by Connector Tasks, Provider API requests, independent Code Actions, Agent tools and notifications, but not Provider Triggers. It bypasses only account readiness checks. A deferred Action or API request fails if called; deferred Agent tools are excluded from the callable tool set. Preserve this distinction in public reads, edits and exports.
 
 ## Webhook HTTP responses
 
@@ -270,6 +270,33 @@ Outputs are always `body`, `statusCode`, and `headers`. JSON arrays remain a sin
 The node supports ordinary `retry` and `onError`; it has no separate error execution edge.
 Use `statusPolicy: "all"` to inspect non-2xx responses with a Condition node. Network and parsing
 failures still fail. See the Control API HTTP Request contract for wire formats and limits.
+
+## Provider API requests
+
+Public type `connector-proxy` calls Provider endpoints not packaged as Actions through the existing
+Connector Proxy. Configure `providerId`, optional `connectionId`, `method` and Query/Header modes.
+Bind the required `endpoint` and optional request body through ordinary input
+sources. Query/Header editing shares HTTP Request's parameter implementation, with Proxy's scalar
+query contract: string, number, boolean or null; no arrays. JSON bodies accept strings and null.
+No body and an explicit null body remain distinct. Setting or binding `body` automatically selects
+JSON internally; clearing it omits the body. Workbench exposes the ordinary optional input without
+a separate format choice, preferring the shared Object editor for new request bodies. Existing
+non-object values and whole-body sources keep their stored semantics. Public callers can omit
+`bodyFormat` when supplying `inputs.body`.
+GET hides the body input. Changing another method to GET explicitly unsets an existing body in the
+same edit, including inherited defaults; undo restores the previous method and body together.
+Existing invalid GET bodies remain diagnosable and can be cleared without exposing a body editor.
+
+The platform owns fixed `body`, `statusCode`, `headers` and `bodyEncoding` outputs. Responses are
+complete dynamic values; upstream 4xx/5xx statuses remain successful outputs when Connector returns
+a proxy result. Connector errors fail the node. `onError` is supported; retry configuration is not.
+Unconfirmed writes are indeterminate and cannot be replayed. Connector owns credential injection,
+endpoint restrictions and unsupported-Provider errors. No-auth Providers may omit the account.
+
+Use independent Proxy permission in connection usage, snapshots, publication and runtime checks.
+Do not infer it from an Action grant or add Proxy to Code/Agent capabilities. The node requires
+Model v14 / Engine v11; existing Model v13 / Engine v10 content remains supported. See the
+[Provider API request contract](../control/contracts/control-api.md#provider-api-request-tasks).
 
 ## Skip Duplicates
 

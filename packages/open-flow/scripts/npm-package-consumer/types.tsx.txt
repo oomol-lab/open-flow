@@ -10,6 +10,7 @@ import '@oomol-lab/open-flow/ui.css'
 import '@oomol-lab/open-flow/theme.css'
 import type { Task } from '@oomol-lab/open-flow'
 import type { ConnectorProxy } from '@oomol-lab/open-flow/connector-proxy'
+import { connectorProxyConfigSchema, connectorProxyTask } from '@oomol-lab/open-flow/connector-proxy'
 import type { ConnectorAction, ControlErrorCode, LiveDetails, LiveEntry } from '@oomol-lab/open-flow/control-api'
 import type { DecisionExecutor } from '@oomol-lab/open-flow/decision'
 import type { SourceConfiguration } from '@oomol-lab/open-flow/event-source'
@@ -132,6 +133,7 @@ export const hostFields = (
   </>
 )
 export const connector: ConnectorProxy = { execute: async () => ({ data: {}, status: 200 }) }
+export const proxyNode = connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'example' }))
 export const connectorAction: ConnectorAction = {
   actionId: 'mail.send',
   authenticated: true,

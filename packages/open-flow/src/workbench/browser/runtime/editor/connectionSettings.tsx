@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { ConnectorAction, ConnectorConnection } from '../api.ts'
+import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '../api.ts'
 import type { ResolvedSelection } from '../revisionView.ts'
 import type { ConnectorActionError, ConnectorStore } from '../stores/connectorStore.ts'
 import type { TriggerStore } from '../stores/triggerStore.ts'
@@ -252,7 +252,7 @@ export function AccountSelect({
 export function ConnectorAccount({
   accessError,
   onConfigureAccess,
-  action,
+  resource,
   actionError,
   actionId,
   activeConnections,
@@ -268,7 +268,7 @@ export function ConnectorAccount({
 }: {
   readonly onConfigureAccess?: (() => void) | undefined
   readonly accessError?: string | undefined
-  readonly action: ConnectorAction | undefined
+  readonly resource: ConnectorAction | ConnectorProvider | undefined
   readonly actionError: ConnectorActionError | undefined
   readonly actionId: string
   readonly activeConnections: readonly ConnectorConnection[] | undefined
@@ -284,20 +284,21 @@ export function ConnectorAccount({
 }): ReactElement {
   const t = useTranslate()
   const available = activeConnections ?? []
+  const authenticated = resource == null ? undefined : 'authenticated' in resource ? resource.authenticated : !resource.noSetup
   const accessIssue =
     accessError ?? (actionError?.code == 'connector.access-required' || actionError?.code == 'connector.access-invalid' ? actionError.message : undefined)
-  const pending = loading || (accessIssue == null && actionError == null && (action == null || (activeConnections == null && connectionError == null)))
+  const pending = loading || (accessIssue == null && actionError == null && (resource == null || (activeConnections == null && connectionError == null)))
   const required =
     !pending &&
     (accessIssue != null ||
-      (connectionId !== '' && action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active'))))
+      (connectionId !== '' && authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active'))))
   let onManage: (() => void) | undefined
   let content: ReactElement
   if (pending) {
     content = <p>{t('inspector.account.loading')}</p>
   } else if (accessIssue != null) {
     content = <p>{accessIssue}</p>
-  } else if (actionError != null || action == null) {
+  } else if (actionError != null || resource == null) {
     const canRetry = actionError?.code != 'authorization.denied' && actionError?.code != 'connector.action-not-found'
     content = (
       <ConnectionAlert

@@ -20,6 +20,13 @@ import type { RevisionView } from '../revisionView.ts'
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../../../base/common/json.ts'
 import { connectorOutputMode } from '../../../../connector/common/actionSchema.ts'
+import {
+  connectorProxyConfigSchema,
+  connectorProxyInputs,
+  connectorProxyTask,
+  withConnectorProxyParameterFields,
+  withConnectorProxyParameterSource,
+} from '../../../../connector/common/proxy.ts'
 import catalog from '../../../../event-source/common/catalog.generated.json' with { type: 'json' }
 import { isTriggerNode, nextNodeName, normalizeNodeName, applyFlowChanges as reduceFlowChanges } from '../../../../flow/common/change.ts'
 import { otherwiseOutput } from '../../../../flow/common/condition.ts'
@@ -49,8 +56,9 @@ import {
 } from '../../../../flow/common/nodeChanges.ts'
 import { remapInputMappings, renamedPort, renameOutputMapping } from '../../../../flow/common/portChanges.ts'
 import { renamePromptInput } from '../../../../flow/common/promptTemplate.ts'
+import { requestInputMappings } from '../../../../flow/common/requestParameters.ts'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
-import { httpRequestTask, httpRequestInputs, withHttpParameterFields, withHttpParameterSource } from '../../../../http/common/httpRequest.ts'
+import { httpRequestTask, withHttpParameterFields, withHttpParameterSource } from '../../../../http/common/httpRequest.ts'
 import { skipDuplicatesTask } from '../../../../state/common/state.ts'
 import { withWorkflowTask } from '../../../../workflow/common/workflow.ts'
 import { feishuResourceKind, supportsFeishuChatFilter } from './feishuEventConfig.ts'
@@ -132,6 +140,7 @@ interface TaskSettingsBase {
 }
 
 export type TaskSettings =
+  | (TaskSettingsBase & { readonly kind: 'connector-proxy'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'workflow'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'decision'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'skip-duplicates'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
@@ -145,6 +154,7 @@ export type TaskSettings =
 export type TaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 
 export type AddNodeIntent =
+  | { readonly kind: 'connector-proxy'; readonly providerId: string; readonly name: string }
   | { readonly kind: 'webhook-response'; readonly name: string }
   | { readonly kind: 'outputs'; readonly name: string }
   | { readonly kind: 'decision'; readonly name: string }
@@ -222,6 +232,9 @@ export function addNode(revision: RevisionView, nodeId: string, intent: AddNodeI
       break
     case 'http-request':
       changes = createManagedTask({ nodeId }, httpRequestTask(undefined, intent.name))
+      break
+    case 'connector-proxy':
+      changes = createManagedTask({ nodeId }, connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: intent.providerId }), intent.name))
       break
     case 'openapi':
       changes = createManagedTask(
@@ -431,6 +444,7 @@ export function updateTask(revision: RevisionView, nodeId: string, settings: Tas
     case 'decision':
     case 'skip-duplicates':
     case 'http-request':
+    case 'connector-proxy':
     case 'openapi':
     case 'agent': {
       if (!dequal(node.task, settings.before)) return
@@ -606,8 +620,10 @@ function replaceTaskPorts(
     if (isTriggerNode(node)) continue
     const inputs =
       currentNodeId == nodeId
-        ? 'executor' in task && task.executor.kind == 'http-request' && 'executor' in previous
-          ? httpRequestInputs(revision.inputMappings(node), previous, task)
+        ? 'executor' in task && (task.executor.kind == 'http-request' || task.executor.kind == 'connector-proxy') && 'executor' in previous
+          ? task.executor.kind === 'connector-proxy'
+            ? connectorProxyInputs(revision.inputMappings(node), previous, task)
+            : requestInputMappings(revision.inputMappings(node), previous, task)
           : updatedInputMappings(revision.inputMappings(node), previous.inputs, task.inputs, inputRename, values)
         : { ...revision.inputMappings(node) }
 
@@ -678,27 +694,30 @@ export function updateOutputPorts(
   return updateOutputsDefs(content, nodeId, ports, next)
 }
 
-export type HttpParameterEdit = (
+export type RequestParameterEdit = (
   | { kind: 'fields'; value: Record<string, JsonValue> }
   | { kind: 'source'; source: import('../../../../flow/common/change.ts').NodeSource; fields: Record<string, JsonValue> }
   | { kind: 'variable'; name: string; fields: Record<string, JsonValue> }
 ) & { field?: string }
-export function updateHttpParameters(
+export function updateRequestParameters(
   revision: RevisionView,
   nodeId: string,
   group: 'query' | 'headers',
-  edit: HttpParameterEdit,
+  edit: RequestParameterEdit,
   bindingId: string,
 ): FlowChanges | undefined {
   const node = revision.graph().nodes[nodeId]
-  if (node?.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'http-request') return
+  if (node?.kind !== 'task' || !('executor' in node.task) || (node.task.executor.kind !== 'http-request' && node.task.executor.kind !== 'connector-proxy'))
+    return
+  const withFields = node.task.executor.kind === 'connector-proxy' ? withConnectorProxyParameterFields : withHttpParameterFields
+  const withSource = node.task.executor.kind === 'connector-proxy' ? withConnectorProxyParameterSource : withHttpParameterSource
   const handle = edit.field == null ? group : `${group === 'query' ? 'query' : 'header'}.${edit.field}`
   let next =
     edit.kind === 'fields'
-      ? withHttpParameterFields(node, group, edit.value)
+      ? withFields(node, group, edit.value)
       : edit.field != null
-        ? withHttpParameterFields(node, group, edit.fields)
-        : withHttpParameterSource(node, group, edit.kind === 'source' ? { kind: 'sources', sources: [edit.source] } : undefined)
+        ? withFields(node, group, edit.fields)
+        : withSource(node, group, edit.kind === 'source' ? { kind: 'sources', sources: [edit.source] } : undefined)
   if (edit.field != null && edit.kind !== 'variable')
     next = {
       ...next,

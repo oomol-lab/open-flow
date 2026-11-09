@@ -33,6 +33,9 @@ const scope = await Effect.runPromise(Scope.make())
 try {
   let callbackCalls = 0
   const connector: ConnectorHost = {
+    checkProxy: async () => {
+      throw new Error('Proxy is unavailable in the trigger source check.')
+    },
     execute: unexpected,
     getAction: unexpected,
     listActions: unexpected,

@@ -1288,6 +1288,7 @@
     "missingStatuses": "部分已选状态不再可用，请移除或重新选择。"
   },
   "nodePicker": {
+    "custom": "自定义",
     "actionGroups": {
       "read": "读取接口",
       "write": "写入接口",
@@ -1702,6 +1703,12 @@
     "aliasInvalid": "调用名称不能重复，长度为 1–64 个字符，以英文字母开头，仅包含英文字母、数字、下划线或连字符。",
     "connector": "连接器",
     "workflow": "工作流"
+  },
+  "connectorProxy": {
+    "bodyUnsupported": "GET 请求不支持请求体。",
+    "title": "自定义 API 请求",
+    "description": "使用已连接账号调用 Provider API。",
+    "endpoint": "接口路径"
   },
   "httpRequest": {
     "title": "HTTP 请求",
