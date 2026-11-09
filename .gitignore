@@ -3,6 +3,7 @@ dist/
 coverage/
 *.log
 .DS_Store
+/.claude/
 .open-flow-dev/
 .wrangler/
 

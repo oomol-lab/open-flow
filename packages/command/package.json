@@ -16,7 +16,7 @@
     "@oomol-lab/open-flow": "workspace:*",
     "@wopjs/cast": "^0.1.16",
     "val-i18n": "^0.1.14",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
