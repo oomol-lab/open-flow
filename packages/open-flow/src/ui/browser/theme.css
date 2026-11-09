@@ -6,7 +6,8 @@
 /* Public --open-flow-* inputs inherit from the host; defaults resolve at each theme root. */
 .open-flow-theme {
   --_open-flow-theme: light;
-  color-scheme: var(--_open-flow-theme);
+  /* Literal schemes let the production CSS compiler preserve light-dark() fallbacks. */
+  color-scheme: light;
   --_open-flow-background: var(--open-flow-background, light-dark(#fdfdfd, #1c1c1c));
   --_open-flow-foreground: var(--open-flow-foreground, light-dark(#242424, #eeeeee));
   --_open-flow-card: var(--open-flow-card, light-dark(#fefefe, #242424));
@@ -39,6 +40,7 @@
 
 .open-flow-theme[data-theme='dark'] {
   --_open-flow-theme: dark;
+  color-scheme: dark;
 }
 
 /* Product roles are shared by theme roots and explicit canvas control scopes. */

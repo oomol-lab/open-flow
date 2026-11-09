@@ -465,21 +465,20 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                 {t(administrator ? 'shell.settings' : 'shell.memberSettings')}
               </a>
             </nav>
-            <div className="server-nav-actions">
-              <HostNavigationActions
-                language={language}
-                onLanguageChange={onLanguageChange}
-                theme={themeMode}
-                onThemeChange={onThemeModeChange}
-                labels={{
-                  theme: t('shell.theme', { mode: t(`shell.${themeMode}`) }),
-                  language: t('shell.language'),
-                  light: t('shell.light'),
-                  dark: t('shell.dark'),
-                  auto: t('shell.auto'),
-                }}
-              />
-            </div>
+            <HostNavigationActions
+              className="server-nav-actions"
+              language={language}
+              onLanguageChange={onLanguageChange}
+              theme={themeMode}
+              onThemeChange={onThemeModeChange}
+              labels={{
+                theme: t('shell.theme', { mode: t(`shell.${themeMode}`) }),
+                language: t('shell.language'),
+                light: t('shell.light'),
+                dark: t('shell.dark'),
+                auto: t('shell.auto'),
+              }}
+            />
           </header>
           <div className="workbench-frame">
             {(usersOpen || eventSourcesOpen) && !administrator ? (

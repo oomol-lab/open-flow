@@ -120,7 +120,7 @@ export function UsersPage({ currentUserId, onUnauthorized }: { readonly currentU
         }}
       >
         <header className="host-page-header">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <h1>{t('users.title')}</h1>
             <DialogTrigger render={<Button />} disabled={pending || users == null} type="button">
               {t('users.create')}
