@@ -891,12 +891,17 @@ it.each(['timeout', 'node-ended'] as const)('cancels unfinished workflow tools o
     reason == 'timeout'
       ? `export default async (_, context) => { await context.workflows.call('echo', { answer: 1 }); return { answers: [] } }`
       : `export default async (_, context) => { context.workflows.call('echo', { answer: 1 }).catch(() => {}); await new Promise(resolve => setTimeout(resolve, 200)); return { answers: [] } }`
-  const parent = await codeToolCaller(service, child.flowId, code, 'end-tool', reason == 'timeout' ? 500 : undefined)
+  const parent = await codeToolCaller(service, child.flowId, code, 'end-tool', reason == 'timeout' ? 3000 : undefined)
   const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, 'end-tool', {
     nodeId: parent.nodes.start!,
     outputs: {},
   })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.length).toBe(1)
   await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe(reason == 'timeout' ? 'failed' : 'completed')
+  if (reason == 'timeout')
+    expect(service.control.runs.getRunEvents('operator', accepted.run.runId, 0, 100).events.find((event) => event.kind == 'node.failed')).toMatchObject({
+      payload: { nodeId: parent.nodes.code!, error: { message: expect.stringContaining('timed out') } },
+    })
   await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.[0]?.status).toBe('canceled')
 })
 
