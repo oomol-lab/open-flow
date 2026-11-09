@@ -380,11 +380,11 @@ function executorName(task: TaskDefinition | undefined, providerName: string | u
   if (task.executor.kind == 'decision') return t?.('addNode.decision') ?? 'AI Decision'
   if (task.executor.kind == 'workflow') return t?.('addNode.workflow') ?? 'Call Workflow'
   if (task.executor.kind == 'http-request') return `${t?.('httpRequest.title') ?? 'HTTP Request'} · ${task.executor.method}`
-  if (task.executor.kind === 'connector-proxy') return `${t?.('connectorProxy.title') ?? 'Custom API Request'} · ${task.executor.method}`
   if (task.executor.kind == 'openapi') return 'OpenAPI'
   if (task.executor.kind == 'skip-duplicates') return t?.('flowState.nodeTitle') ?? 'Skip Duplicates'
   if (task.executor.kind == 'llm') return t?.('designer.executorLlm') ?? 'LLM'
-  return `${t?.('designer.executorConnector') ?? 'Connector'} · ${providerName ?? task.executor.action.split('.')[0]}`
+  const providerId = task.executor.kind === 'connector-proxy' ? task.executor.providerId : task.executor.action.split('.')[0]
+  return `${t?.('designer.executorConnector') ?? 'Connector'} · ${providerName ?? providerId}`
 }
 
 function triggerIcon(trigger: TriggerNode): string {

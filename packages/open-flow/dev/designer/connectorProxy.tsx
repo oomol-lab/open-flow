@@ -245,6 +245,6 @@ export const connectorProxyCreationStory: FrontendStory = {
   title: 'Create Provider API Request',
   standalone: true,
   description:
-    'Use the production Add node panel to open GitHub or Public API and select Custom API Request from the bottom Custom group. GitHub also has an Action; Public API has none. Create a node, edit its endpoint and account, then undo, redo and reload saved data. The real Workbench saves the graph and presentation through the fixture transport.',
+    'Use the production Add node panel to open GitHub or Public API and select Custom API Request from the bottom Custom group. GitHub also has an Action; Public API has none. New cards show Custom API Request above Connector · Provider, matching Action cards. Rename a node, edit its endpoint and account, then undo, redo and reload saved data. The real Workbench saves the graph and presentation through the fixture transport.',
   render: (log, dark, language) => <ProxyCreationStory dark={dark} language={language} log={log} />,
 }

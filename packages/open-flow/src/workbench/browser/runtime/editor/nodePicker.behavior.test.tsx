@@ -86,7 +86,11 @@ it.each([true, false])('creates a Provider request from the actual picker and pr
     const id = await add.mock.results[0]!.value
     expect(id).toBeDefined()
     const node = session.store.$.draft.value?.content.document.graph.nodes[id!]
-    expect(node).toMatchObject({ kind: 'task', task: { executor: { kind: 'connector-proxy', providerId: 'github', method: 'GET' } } })
+    expect(node).toMatchObject({
+      kind: 'task',
+      name: 'Custom API Request',
+      task: { name: 'Custom API Request', executor: { kind: 'connector-proxy', providerId: 'github', method: 'GET' } },
+    })
     await act(async () => session.store.undo())
     expect(session.store.$.draft.value?.content.document.graph.nodes[id!]).toBeUndefined()
     await act(async () => session.store.redo())

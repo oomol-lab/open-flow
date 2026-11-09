@@ -330,7 +330,7 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, t: 
     case 'connector':
       return { action: option.connector, kind: 'connector' }
     case 'connector-proxy':
-      return { kind: 'connector-proxy', providerId: option.provider.serviceId, name: `${option.provider.serviceName} · ${t('connectorProxy.title')}` }
+      return { kind: 'connector-proxy', providerId: option.provider.serviceId, name: t('connectorProxy.title') }
     case 'connector-group':
       return
     case 'trigger': {
