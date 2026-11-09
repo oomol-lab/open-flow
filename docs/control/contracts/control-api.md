@@ -137,6 +137,71 @@ existing empty Presentation. The SDK exposes it as the final optional `createFlo
 
 ### Shareable workflow files
 
+The public SDK also supports local file authoring through `createWorkflowAuthoring` from
+`@oomol-lab/open-flow/control-requests`. It accepts an optional `ControlClient`, locale,
+Engine contract and deterministic ID generator. `create(metadata)` returns a standard
+`WorkflowFile`. `read(file, query)` and `search(file, query)` return `{ revision, data }`;
+`schema(query)` uses the existing node schema contract or reads normalized Action metadata.
+`edit(file, request)` accepts the existing `AuthoringRequest` and returns
+`{ file, revision, nodes, validation }`. `check(file)` returns `{ revision, valid, diagnostics }`.
+
+Local revisions are canonical file digests, including metadata and presentation. Reads with a
+revision and edits with `baseRevision` reject another file version with
+`AuthoringError.code: "flow.revision-conflict"`. Edits are pure and atomic; they reuse the
+shared node compiler and preserve unrelated definitions and snapshots. Local checks perform
+semantic validation, without deployment account, permission or service-readiness checks.
+The caller owns persistence; a returned file has not been saved to disk or uploaded.
+
+`encodeWorkflowFile(file, { clean: false })` structurally validates and serializes a full local
+document, preserving accounts, Variables and Trigger selections. Omission of this option
+retains portable export cleanup. No new file format or model revision is introduced.
+
+#### Delegated metadata caching
+
+`ControlClient(request, channel, { cache })` accepts optional `ControlCacheOptions`.
+The host supplies `scope` and a `delegate` with async `get(key)`, `set(key, record)` and
+`delete(key)`. Missing entries return `undefined`; keys and records are opaque. Scope must
+identify the deployment and effective identity/resource context without storing credentials.
+Existing two-argument clients retain uncached behavior.
+
+The cache stores complete validated Flow API response bodies, ETags and validation times.
+Identity includes the scope, exact request path/query and decoding contract version. Data from
+one response is not used to synthesize another request's result. Only normalized Action
+metadata, Provider metadata and Trigger definitions/catalogs use this cache. Connections,
+account-combined Action reads, authorization, draft edits and Runs remain uncached.
+
+The SDK exposes `listConnectorActionMetadata`, `searchConnectorActionMetadata` and
+`getConnectorActionMetadata` for the existing `/v1/connector/action-metadata` endpoints.
+These definitions do not select accounts. Connector-to-Action adaptation stays on the Server.
+Node compilation follows the returned ports: a complete `output` carries the root response
+schema; named ports carry their field schemas. A newer SDK does not reinterpret an older
+Server's advertised projection solely from its open-object schema.
+
+Default freshness is 30 seconds for Action metadata and five minutes for Providers and
+Triggers; `maxAgeMs` overrides it. Fresh entries avoid network requests. Expired entries use
+`If-None-Match`; 304 preserves the complete body. `mode: "refresh"` forces validation;
+`mode: "offline"` uses compatible cached entries regardless of age and rejects a miss with
+`catalog.cache-miss`. Offline clients reject all other network requests with `control.offline`.
+Corrupt records are evicted. Loading errors preserve the previous record and propagate;
+storage failures do not discard a successful response. Concurrent reads share a request,
+while cancellation affects only the individual waiter. Optional `onRead` receives the path,
+complete body, ETag, validation time, source and stale status for provenance reporting.
+
+```ts
+const client = new ControlClient(request, 'api', {
+  cache: { scope: 'deployment/identity', delegate },
+})
+const authoring = createWorkflowAuthoring({ client })
+const file = authoring.create({ name: 'Repository report' })
+const { revision } = await authoring.read(file)
+const result = await authoring.edit(file, {
+  baseRevision: revision,
+  requestId: 'add-reader',
+  edits: [{ op: 'node.add', as: 'repository', type: 'connector', name: 'Read repository', config: { action: 'github.get_repository' } }],
+})
+const text = encodeWorkflowFile(result.file)
+```
+
 `GET /v1/flows/:flowId/export` returns the current persisted Draft as a UTF-8 JSON file
 with two-space indentation. `POST /v1/flows/import` accepts
 `{ file: WorkflowFile, name?: string, teamId?: string, version: 1 }` and requires

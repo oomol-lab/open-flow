@@ -16,7 +16,6 @@ import type { AuthoringRead, AuthoringRequest, AuthoringSearch, AuthoringSource,
 import type { AuthoringAgentTool, AuthoringCapability } from './authoringTools.ts'
 
 import { dequal } from 'dequal/lite'
-import { connectorOutputMode } from '../../connector/common/actionSchema.ts'
 import { connectorProxyConfigSchema, connectorProxyInputs, connectorProxyTask } from '../../connector/common/proxy.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
 import { supportsNodeRetry, isTriggerNode, applyFlowChanges, decodeChangeOperations, upgradeRevisionContent } from '../../flow/common/change.ts'
@@ -321,7 +320,7 @@ export interface AuthoringHost {
   workflow?(flowId: string): Promise<WorkflowContract | WorkflowCandidate>
   id(label: string): string
   action(id: string): Promise<ConnectorAction>
-  trigger(key: string): TriggerKeySnapshot
+  trigger(key: string): TriggerKeySnapshot | Promise<TriggerKeySnapshot>
   openapi(url: string): Promise<JsonValue>
 }
 function merge(base: unknown, patch: unknown): unknown {
@@ -409,13 +408,20 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
 
   async function connectorTask(config: Record<string, unknown>, name: string): Promise<ManagedTaskDefinition> {
     const action = await host.action(String(config.action))
+    // The source owns projection. A whole-response port carries the root schema;
+    // named ports carry their field schemas, including a field named "output".
+    const wholeResponse =
+      action.outputSchema !== undefined &&
+      Object.keys(action.outputs).length == 1 &&
+      Object.hasOwn(action.outputs, 'output') &&
+      dequal(action.outputs.output!.jsonSchema, action.outputSchema)
     return {
       name,
       executor: {
         kind: 'connector',
         action: action.actionId,
         ...(config.connectionId == null ? {} : { connectionId: String(config.connectionId) }),
-        ...(action.outputSchema !== undefined && connectorOutputMode(action.outputSchema) == 'value' ? { outputMode: 'value' as const } : {}),
+        ...(wholeResponse ? { outputMode: 'value' as const } : {}),
       },
       inputs: Object.entries(action.inputs).map(([handle, port]) => Object.assign({ handle }, port)),
       outputs: Object.entries(action.outputs).map(([handle, port]) => Object.assign({ handle }, port)),
@@ -811,7 +817,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
               break
             case 'poll':
             case 'integration': {
-              const definition = host.trigger(String(config.key))
+              const definition = await host.trigger(String(config.key))
               if (definition.type != edit.type) fail('trigger.type-mismatch', 'Trigger key has a different type.')
               changes = createProviderTrigger(nodeId, definition, { name, config: {} })
               break

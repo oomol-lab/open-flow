@@ -1,6 +1,6 @@
-import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from './api.ts'
+import type { ConnectorAction, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from './api.ts'
 
-import { connection, connectorAction, connectorProvider } from './connectorDecoders.ts'
+import { connection, connectorAction, connectorActionMetadata, connectorProvider } from './connectorDecoders.ts'
 import { requiredFields, invalidResponse, record, string } from './decoding.ts'
 
 export interface RequestQuery<Value> {
@@ -32,6 +32,21 @@ export function connectorActionQuery(actionId: string, flowId?: string, locale?:
       requiredFields(source, ['action', 'version'])
       if (source.version != 1) return invalidResponse()
       return connectorAction(source.action)
+    },
+  }
+}
+
+export function connectorActionMetadataQuery(actionId: string, flowId?: string, locale?: string): RequestQuery<ConnectorActionMetadata> {
+  const parameters = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), ...(locale == null ? {} : { locale }) }).toString()
+  return {
+    path: `/v1/connector/action-metadata/${encodeURIComponent(actionId)}${parameters ? `?${parameters}` : ''}`,
+    decode: (value) => {
+      const source = record(value)
+      requiredFields(source, ['action', 'version'])
+      if (source.version != 1) return invalidResponse()
+      const action = connectorActionMetadata(source.action)
+      if (action.actionId != actionId) return invalidResponse('action.actionId: does not match the requested Action.')
+      return action
     },
   }
 }

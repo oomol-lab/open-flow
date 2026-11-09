@@ -2,6 +2,7 @@ import { canvasCommandSchema } from '../../canvas/common/commands.ts'
 export { canvasCommandSchema } from '../../canvas/common/commands.ts'
 import { authoringRequestSchema, authoringReadSchema, authoringSearchSchema, authoringSchemaQuery, authoringCheckSchema } from './authoringSchema.ts'
 export * from './authoring.ts'
+export { createWorkflowAuthoring, type WorkflowAuthoringOptions } from './workflowAuthoring.ts'
 import type { JsonValue } from '../../flow/common/change.ts'
 import type { DraftOperation } from './draftOperations.ts'
 
