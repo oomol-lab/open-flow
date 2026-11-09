@@ -1703,6 +1703,11 @@
     "connector": "コネクター",
     "workflow": "ワークフロー"
   },
+  "connectorProxy": {
+    "title": "カスタム API リクエスト",
+    "description": "接続済みアカウントで Provider API を呼び出します。",
+    "endpoint": "エンドポイント"
+  },
   "httpRequest": {
     "title": "HTTP リクエスト",
     "description": "HTTP リクエストを送信し、ワークフローでレスポンスを使用します。",

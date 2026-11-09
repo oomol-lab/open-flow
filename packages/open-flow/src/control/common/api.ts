@@ -726,6 +726,7 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'approval' &&
             nodeKind !== 'condition' &&
             nodeKind !== 'connector' &&
+            nodeKind !== 'connector-proxy' &&
             nodeKind !== 'javascript' &&
             nodeKind !== 'decision' &&
             nodeKind !== 'openapi' &&

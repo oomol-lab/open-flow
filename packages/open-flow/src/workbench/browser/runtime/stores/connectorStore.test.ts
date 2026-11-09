@@ -48,6 +48,29 @@ function draft(flowId: string, revisionId: string): Draft {
 }
 
 describe('ConnectorStore', () => {
+  it('offers a Provider request even when the Provider has no Actions', async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path.includes('/proxy/providers'))
+        return Response.json({ success: true, data: [{ service: 'public', displayName: 'Public API', authTypes: ['no_auth'] }] })
+      if (path.includes('/proxy/actions')) return Response.json({ success: true, data: [] })
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(request)
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const connectors = new ConnectorStore(client, workspace, vi.fn(), { openExternalPage: async () => false })
+    const controller = new AbortController()
+    try {
+      await resourceValue(connectors.browseAddNodeOptions(controller.signal))
+      const choices = await resourceValue(connectors.provideAddNodeOptionChoices('connector-provider:public', controller.signal))
+      expect(choices).toMatchObject([{ kind: 'connector-proxy', provider: { serviceId: 'public', serviceName: 'Public API', noSetup: true } }])
+      expect(choices?.[0]).not.toHaveProperty('connector')
+      expect(connectors.$.actions.value).toEqual({})
+    } finally {
+      controller.abort()
+      connectors.dispose()
+      workspace.dispose()
+    }
+  })
   it.each(['providers', 'actions', 'connections', 'missing action'] as const)('retries %s immediately in the selected Flow', async (failure) => {
     let failing = true
     const account = { connectionId: 'account', serviceId: 'mail', displayName: 'Mail', status: 'active', isDefault: true }

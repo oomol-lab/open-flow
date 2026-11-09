@@ -8,6 +8,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'connector-proxy',
+    entry: { kind: 'start' },
+    name: 'Call an unlisted Provider API',
+    version: 1,
+    task: 'Discover Lab Data and its Data test account. Create Start with endpoint, nullable JSON payload, query and headers objects. Add a Custom API Request using connector-proxy, Lab Data, POST and JSON body. Initially defer the account and configure a named query page=0; bind endpoint, body and whole-object headers from Start. Create a downstream Code node that collects body, statusCode, headers and bodyEncoding into payload, then archive payload using Lab Archive and return it through Outputs. In a later edit select Data test account, rename the request to Provider request updated and replace its query with a whole-object binding from Start. Preserve other inputs and settings. Read and check the Flow. Verification calls the unlisted /unlisted/reports endpoint and preserves its HTTP 422 response as data.',
+  },
+  {
     id: 'flow-state',
     entry: { kind: 'cron' },
     name: 'Fetch only new HTTP items',
@@ -217,6 +224,7 @@ export function initialOperations(id: string): ChangeOperation[] {
   if (
     id == 'flow-state' ||
     id == 'http-request' ||
+    id == 'connector-proxy' ||
     id == 'poll-batch' ||
     id == 'wait-auto-continue' ||
     id == 'node-errors' ||
@@ -428,6 +436,13 @@ export function samples(id: string, stage = 0): Sample[] {
       order,
       outputs: { url: '', token: 'lab-token', payload },
     }))
+  if (id === 'connector-proxy')
+    return [null, {}, 'message'].map((payload, index) => ({
+      name: ['null-body', 'empty-object', 'string-body'][index]!,
+      orders: [],
+      order,
+      outputs: { endpoint: '/unlisted/reports', payload, query: { page: 0, enabled: false, optional: null }, headers: { 'X-Test': 'lab' } },
+    }))
   if (id == 'node-errors') return [{ name: 'handled-and-successful', orders: [], order }]
   if (id == 'node-retries') return [{ name: 'configured-and-cleared', orders: [], order }]
   if (id == 'workflow-call' || id == 'workflow-tools')
@@ -550,6 +565,22 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
       requestNode.task.executor.authentication.type == 'bearer'
       ? []
       : ['Preserve HTTP configuration when renaming and changing response format.']
+  }
+  if (id === 'connector-proxy') {
+    const request = Object.values(current.document.graph.nodes).find((candidate) => candidate.name === 'Provider request updated')
+    return request?.kind === 'task' &&
+      'executor' in request.task &&
+      request.task.executor.kind === 'connector-proxy' &&
+      request.task.executor.providerId === 'lab-data' &&
+      request.task.executor.connectionId === 'marketplace:oomol:lab-data' &&
+      request.task.executor.method === 'POST' &&
+      request.task.executor.bodyFormat === 'json' &&
+      request.task.executor.query.mode === 'object' &&
+      request.inputs.endpoint?.kind === 'sources' &&
+      request.inputs.body?.kind === 'sources' &&
+      request.inputs.headers?.kind === 'sources'
+      ? []
+      : ['Preserve Provider, account, body and input bindings while changing query mode and name.']
   }
   if (id == 'node-errors') {
     const tasks = Object.values(current.document.graph.nodes).filter((candidate) => candidate.kind == 'task')

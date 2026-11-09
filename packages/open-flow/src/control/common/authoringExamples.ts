@@ -1,5 +1,6 @@
 import type { DraftOperation } from './draftOperations.ts'
 
+import { connectorProxyConfigSchema, connectorProxyTask } from '../../connector/common/proxy.ts'
 import {
   createApproval,
   createBuiltinTrigger,
@@ -27,6 +28,8 @@ const descriptions = {
   'skip-duplicates':
     'Skip items already recorded by successful Runs. Configure identity fields; an empty list uses each string or numeric item. History is private to the node and only commits after Run success.',
   'http-request': 'A single HTTP request. Bind url and request inputs; outputs are body, statusCode and headers.',
+  'connector-proxy':
+    'A Provider API request through Connector Proxy. Select a Provider and account, then bind endpoint. Outputs preserve body, statusCode, headers and bodyEncoding.',
   'openapi': 'A fixed JSON API operation. Replace the example document and URL before running.',
   'connector':
     'A Connector Task and its node. Replace ACTION_ID, CONNECTION_ID and port definitions using connector_get / connector show. Set connectionId to an empty string to defer account configuration; execution will require an account.',
@@ -70,6 +73,12 @@ export function authoringExample(name: string): { version: 1; operations: readon
       operations = [
         ...createManagedTask({ nodeId: 'http' }, httpRequestTask()),
         { kind: 'graph.node.input.set', nodeId: 'http', handle: 'url', value: { kind: 'value', value: 'https://example.com' } },
+      ]
+      break
+    case 'connector-proxy':
+      operations = [
+        ...createManagedTask({ nodeId: 'request' }, connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'github', connectionId: '' }))),
+        { kind: 'graph.node.input.set', nodeId: 'request', handle: 'endpoint', value: { kind: 'value', value: '/user' } },
       ]
       break
     case 'openapi': {

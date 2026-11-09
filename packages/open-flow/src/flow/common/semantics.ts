@@ -1,5 +1,6 @@
 import { dequal } from 'dequal/lite'
 import { connectorActionContracts } from '../../connector/common/actionContract.ts'
+import { connectorProxyIssues, connectorProxyTask } from '../../connector/common/proxy.ts'
 import { decisionTaskIssues } from '../../decision/common/decision.ts'
 import { httpRequestIssues, httpAuthHandles, httpRequestTask, httpRequestUrl } from '../../http/common/httpRequest.ts'
 import { openApiIssues, authHandles } from '../../openapi/common/openapi.ts'
@@ -289,6 +290,37 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
           path: `/document/graph/nodes/${nodeId}/task`,
         })
     }
+    if (task.executor.kind === 'connector-proxy') {
+      const endpoint = node.inputs.endpoint
+      if (endpoint?.kind === 'value' && (typeof endpoint.value !== 'string' || !endpoint.value.trim()))
+        checked.diagnostics.push({
+          code: 'connector-proxy.endpoint-invalid',
+          column: 0,
+          line: 0,
+          message: 'A nonempty endpoint is required.',
+          path: `/document/graph/nodes/${nodeId}/inputs/endpoint`,
+        })
+      for (const issue of connectorProxyIssues(task.executor))
+        checked.diagnostics.push({
+          code: 'connector-proxy.config-invalid',
+          column: 0,
+          line: 0,
+          message: issue.message,
+          path: `/document/graph/nodes/${nodeId}/task/executor/${issue.field}`,
+        })
+      const expected = connectorProxyTask(task.executor)
+      if (
+        !dequal(httpPortContracts(task.inputs), httpPortContracts(expected.inputs)) ||
+        !dequal(httpPortContracts(task.outputs), httpPortContracts(expected.outputs))
+      )
+        checked.diagnostics.push({
+          code: 'connector-proxy.ports-invalid',
+          column: 0,
+          line: 0,
+          message: 'Provider API request ports do not match their configuration.',
+          path: `/document/graph/nodes/${nodeId}/task`,
+        })
+    }
     if (task.executor.kind == 'http-request') {
       for (const issue of httpRequestIssues(task.executor))
         checked.diagnostics.push({
@@ -458,6 +490,13 @@ const httpPortContracts = (ports: import('./change.ts').ManagedTaskDefinition['i
 export async function prepareFlow(revision: RevisionContent, engineContract: string, triggerId?: string): Promise<PrepareFlowResult> {
   const engine = findEngineContract(engineContract)
   if (engine == null) return { kind: 'engine-unsupported' }
+  if (
+    !engine.connectorProxy &&
+    Object.values(revision.document.graph.nodes).some(
+      (node) => node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'connector-proxy',
+    )
+  )
+    return { kind: 'engine-unsupported' }
   if (
     !engine.flowState &&
     Object.values(revision.document.graph.nodes).some(

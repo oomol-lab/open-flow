@@ -14,6 +14,7 @@ export function runtimeAssertions(
   modelCalls: unknown[],
   events: readonly RunEvent[],
   content: RevisionContent,
+  proxyCalls: ReturnType<typeof createMocks>['proxyCalls'] = [],
 ): string[] {
   const errors: string[] = []
   if (sample.failure) {
@@ -35,6 +36,40 @@ export function runtimeAssertions(
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id === 'connector-proxy') {
+    const expected = {
+      body: { output: 'unlisted', payload: sample.outputs?.payload, rows: [{ id: 0, extra: { enabled: false, note: null } }] },
+      statusCode: 422,
+      headers: { 'content-type': 'application/json', 'x-request-id': 'proxy-lab' },
+      bodyEncoding: null,
+    }
+    const result = events.find((event) => event.kind === 'run.completed')?.payload.result
+    if (result == null || typeof result !== 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, { payload: expected }))
+      errors.push('Return the complete unlisted API response, including upstream HTTP errors, headers and the absent encoding marker.')
+    if (
+      proxyCalls.length !== 1 ||
+      !isDeepStrictEqual(proxyCalls[0], {
+        provider: 'lab-data',
+        connection: 'marketplace:oomol:lab-data',
+        request: {
+          endpoint: '/unlisted/reports',
+          method: 'POST',
+          body: sample.outputs?.payload,
+          query: { page: 0, enabled: false, optional: null },
+          headers: { 'X-Test': 'lab' },
+        },
+      })
+    )
+      errors.push('Send the configured Provider request once with its account, JSON body and whole-object parameters.')
+    if (
+      calls.length !== 1 ||
+      calls[0]?.action !== 'lab-archive.save' ||
+      calls[0]?.connection !== 'archive-test' ||
+      !isDeepStrictEqual(calls[0]?.input.payload, expected)
+    )
+      errors.push('Archive the complete response through a downstream node.')
+    return errors
+  }
   if (id === 'flow-state') {
     const result = events.find((event) => event.kind === 'run.completed')?.payload.result
     const items = [

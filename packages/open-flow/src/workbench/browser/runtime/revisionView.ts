@@ -90,6 +90,8 @@ export class RevisionView<Source extends RevisionSource = Draft> {
     }
     for (const node of Object.values(this.#document.graph.nodes)) {
       if (node.kind == 'integration' || node.kind == 'poll') connectorProviderIds.add(node.definition.provider)
+      if (node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'connector-proxy')
+        connectorProviderIds.add(node.task.executor.providerId)
     }
     this.connectorProviderIds = connectorProviderIds
   }
@@ -230,7 +232,7 @@ export function revisionView<Source extends RevisionSource>(revision: Source): R
 }
 
 export interface ConnectorAccountReference {
-  readonly kind?: 'connector' | 'agent' | 'trigger' | 'notification' | 'code'
+  readonly kind?: 'connector' | 'connector-proxy' | 'agent' | 'trigger' | 'notification' | 'code'
   readonly providerId: string
   readonly connectionId?: string
   readonly nodeId: string

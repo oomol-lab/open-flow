@@ -110,7 +110,7 @@ it.each(['empty', 'invalid'] as const)('routes %s account authorization to the s
   const configure = vi.fn()
   await render(
     <ConnectorAccount
-      action={action}
+      resource={action}
       actionId={action.actionId}
       actionError={undefined}
       accessError={state === 'invalid' ? 'Access required' : undefined}

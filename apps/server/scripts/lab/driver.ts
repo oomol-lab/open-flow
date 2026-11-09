@@ -42,6 +42,9 @@ export function driver(lab: LabSession, transport: 'cli' | 'mcp'): ToolCall {
           case 'connector_search':
             argv = ['connector', 'search', String(args.query), '--flow', String(args.flowId), '--json']
             break
+          case 'connector_providers':
+            argv = ['connector', 'providers', '--flow', String(args.flowId), '--json']
+            break
           case 'connector_connections':
             argv = ['connector', 'connections', String(args.serviceId), '--flow', String(args.flowId), '--json']
             break

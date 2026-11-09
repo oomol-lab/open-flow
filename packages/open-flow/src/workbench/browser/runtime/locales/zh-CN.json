@@ -1703,6 +1703,11 @@
     "connector": "连接器",
     "workflow": "工作流"
   },
+  "connectorProxy": {
+    "title": "自定义 API 请求",
+    "description": "使用已连接账号调用 Provider API。",
+    "endpoint": "接口路径"
+  },
   "httpRequest": {
     "title": "HTTP 请求",
     "description": "发送 HTTP 请求，在工作流中使用响应数据。",

@@ -28,7 +28,7 @@ import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/
 import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
-import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
+import { checkCodeActions, checkCodePermissions, checkConnectorProxies } from './connector-capabilities.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
 import { decodedRevision, preparedRevision } from './revision-cache.ts'
 import { requireWorkflowCalls, workflowCallCompatibility, workflowTarget, workflowToolCompatibility, workflowRunOutcome } from './workflow.ts'
@@ -513,6 +513,14 @@ export class RunControl {
     )
       throw new ControlError(controlErrorCode.flowInvalid, 'AI Decision requires a configured decision host.')
     const teamId = this.store.connectorTeams.get(flowId)
+    await checkConnectorProxies(prepared, this.resolveConnector(), {
+      flowId,
+      providerAccess,
+      purpose: 'eligibility',
+      scope: 'selected',
+      source,
+      ...(teamId == null ? {} : { teamId }),
+    })
     await checkCodeActions(agentActions(prepared), this.resolveConnector(), {
       flowId,
       providerAccess,

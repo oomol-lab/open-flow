@@ -26,10 +26,12 @@ import type { WebhookDeploymentProps } from './webhookDeployment.tsx'
 
 import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { connectorProxyQuerySchema, connectorProxyHeaderSchema } from '../../../../connector/common/proxy.ts'
 import { decisionModel } from '../../../../decision/common/decision.ts'
 import { executionReachableNodes, webhookResponseDiagnostics, inputSourceCandidates } from '../../../../flow/common/graph.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { webhookResponseInputs } from '../../../../flow/common/webhookResponse.ts'
+import { httpQuerySchema, httpHeaderSchema } from '../../../../http/common/httpRequest.ts'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
@@ -47,13 +49,13 @@ import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { ConnectorAccount, TriggerConnection, SavedConnectionReference } from './connectionSettings.tsx'
 import { connectorActionPresentation } from './connectorActionPresentation.tsx'
 import { presentConnectorInputs } from './connectorInputPresentation.ts'
+import { ConnectorProxySection } from './connectorProxySection.tsx'
 import { DecisionSection } from './decisionSection.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { EventSourceTriggerConfig } from './eventSourceTriggerConfig.tsx'
 import { FlowStateButton } from './flowStatePanel.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
-import { HttpParameterEditor } from './httpParameterEditor.tsx'
 import { HttpRequestSection } from './httpRequestSection.tsx'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { LlmTaskSection } from './llmTaskSection.tsx'
@@ -63,6 +65,7 @@ import { NodeInputValue } from './nodeInputValue.tsx'
 import { OpenApiSection } from './openApiSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { presentProviderOutputDescription, presentProviderSourceCandidates, presentProviderTriggerConfig } from './providerTriggerPresentation.ts'
+import { RequestParameterEditor } from './requestParameterEditor.tsx'
 import { ResolutionDefinition } from './resolutionDefinition.tsx'
 import { SkipDuplicatesSection } from './skipDuplicatesSection.tsx'
 import { TallyTriggerConfig } from './tallyTriggerConfig.tsx'
@@ -87,7 +90,7 @@ export function inspectorIcon(node: ResolvedSelection | undefined): IconName {
     if (node.definition.executor.kind == 'workflow') return 'flow'
     if (node.definition.executor.kind == 'openapi' || node.definition.executor.kind == 'http-request' || node.definition.executor.kind == 'skip-duplicates')
       return 'task'
-    return node.definition.executor.kind == 'connector' ? 'connection' : 'llm'
+    return node.definition.executor.kind == 'connector' || node.definition.executor.kind === 'connector-proxy' ? 'connection' : 'llm'
   }
   return 'task'
 }
@@ -144,6 +147,8 @@ function nodePurposePlaceholder(
           return undefined
         case 'http-request':
           return t('httpRequest.description')
+        case 'connector-proxy':
+          return t('connectorProxy.description')
         case 'openapi':
           return t('openapi.description')
         case 'connector':
@@ -231,6 +236,7 @@ interface Props {
   readonly readOnly?: boolean
   readonly variables?: InputVariables
   readonly connectorAction?: ConnectorAction
+  readonly connectorProvider?: ConnectorProvider
   readonly connectorActionError?: ConnectorActionError
   readonly connectorAccessError?: string
   readonly connectorAuthorizationPending?: boolean
@@ -283,6 +289,7 @@ export function NodeInspector({
   variables = { enabled: false, loaded: false, loading: false, names: [], onOpen: undefined },
   readOnly = false,
   connectorAction,
+  connectorProvider,
   connectorActionError,
   connectorAccessError,
   connectorAuthorizationPending = false,
@@ -342,6 +349,8 @@ export function NodeInspector({
   const isAgent = task != null && 'executor' in task && task.executor.kind == 'agent'
   const isDecision = task != null && 'executor' in task && task.executor.kind == 'decision'
   const isHttpRequest = task != null && 'executor' in task && task.executor.kind == 'http-request'
+  const proxy = task != null && 'executor' in task && task.executor.kind === 'connector-proxy' ? task.executor : undefined
+  const proxyProvider = proxy == null ? undefined : (connectorProvider ?? connectorProviders?.[proxy.providerId])
   const isOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi'
   const unconfiguredWorkflow = task != null && 'executor' in task && task.executor.kind == 'workflow' && !task.executor.flowId
   const unconfiguredOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi' && !task.executor.path
@@ -382,6 +391,76 @@ export function NodeInspector({
     return () => globalThis.clearTimeout(timer)
   }, [focus, selection?.id, selection?.kind])
 
+  const requestInput = (handle: string, label: string) => {
+    if (selection?.kind !== 'task' || task == null) return null
+    const definition = task.inputs.find((port): port is InputPort => 'handle' in port && port.handle === handle)
+    if (definition == null) return null
+    const mapping = revision.inputMappings(selection.node)[handle]
+    const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
+    const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+    return (
+      <Field key={handle}>
+        <FieldLabel>{label}</FieldLabel>
+        <NodeInputValue
+          embedded
+          definition={definition}
+          label={label}
+          presentation={{ compact: true, hideOptions: true }}
+          sourceOnly={handle.startsWith('auth.')}
+          readOnly={readOnly}
+          disabled={disabled}
+          value={inputValue(mapping, definition.value)}
+          connected={mapping?.kind === 'sources' && binding?.kind !== 'variable'}
+          variableName={binding?.kind === 'variable' ? binding.target : undefined}
+          upstream={inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
+          variables={variables}
+          onValue={(value, deletion) => {
+            void store?.nodes.setInputValue(selection.id, handle, value, deletion)
+          }}
+          onVariable={(name) => {
+            void store?.nodes.setInputVariable(selection.id, handle, name)
+          }}
+        />
+      </Field>
+    )
+  }
+  const requestExecutor =
+    task != null && 'executor' in task && (task.executor.kind === 'http-request' || task.executor.kind === 'connector-proxy') ? task.executor : undefined
+  const requestParameters =
+    requestExecutor != null &&
+    selection?.kind === 'task' &&
+    (['query', 'headers'] as const).map((group) => (
+      <RequestParameterEditor
+        key={group}
+        group={group}
+        parameters={requestExecutor[group]}
+        schema={
+          proxy != null ? (group === 'query' ? connectorProxyQuerySchema : connectorProxyHeaderSchema) : group === 'query' ? httpQuerySchema : httpHeaderSchema
+        }
+        entries={Object.fromEntries(
+          Object.entries(revision.inputMappings(selection.node)).map(([handle, mapping]) => {
+            const source = mapping.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
+            const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+            return [
+              handle,
+              {
+                value: inputValue(mapping, undefined),
+                connected: mapping.kind === 'sources' && binding?.kind !== 'variable',
+                variableName: binding?.kind === 'variable' ? binding.target : undefined,
+              },
+            ]
+          }),
+        )}
+        variables={variables}
+        disabled={disabled}
+        readOnly={readOnly}
+        renderSource={(handleName, port) => inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName, port, t, triggerDisplays })}
+        onEdit={(edit) => {
+          void store?.nodes.saveRequestParameters(selection.id, group, edit)
+        }}
+      />
+    ))
+
   const panel = (
     <ScrollArea className="inspector-scroll" tabIndex={-1}>
       <div className="inspector-content" ref={content}>
@@ -391,9 +470,10 @@ export function NodeInspector({
         {readOnly && connector != null && (
           <SavedConnectionReference
             noSetup={connectorAction?.authenticated === false || connectorProviders?.[connector.action.split('.')[0]!]?.noSetup}
-            connectionId={connector.connectionId}
+            connectionId={proxy?.connectionId ?? connector?.connectionId}
           />
         )}
+        {readOnly && proxy != null && <SavedConnectionReference noSetup={proxyProvider?.noSetup} connectionId={proxy.connectionId} />}
         {readOnly && selection?.kind === 'trigger' && (selection.trigger.kind === 'poll' || selection.trigger.kind === 'integration') && (
           <SavedConnectionReference connectionId={selection.trigger.connectionId} />
         )}
@@ -410,25 +490,29 @@ export function NodeInspector({
             onConfigureAccess={(providerId) => void triggers.connect(providerId)}
           />
         )}
-        {!readOnly && connectors != null && connector != null && nodeId != null && connectorAction?.authenticated !== false && (
-          <ConnectorAccount
-            action={connectorAction}
-            actionError={connectorActionError}
-            accessError={connectorAccessError}
-            actionId={connector.action}
-            onConfigureAccess={() => void connectors.connect(connectorAction?.serviceId ?? connector.action.split('.')[0]!)}
-            activeConnections={activeConnectorConnections}
-            authorizationPending={connectorAuthorizationPending}
-            connection={connectorConnection}
-            connectionError={connectorConnectionError}
-            connectionId={connector.connectionId}
-            connectors={connectors}
-            disabled={disabled}
-            fieldIdPrefix={`task-${selection?.id}`}
-            loading={connectorLoading}
-            nodeId={nodeId}
-          />
-        )}
+        {!readOnly &&
+          connectors != null &&
+          (connector != null || proxy != null) &&
+          nodeId != null &&
+          (proxy != null ? proxyProvider?.noSetup !== true : connectorAction?.authenticated !== false) && (
+            <ConnectorAccount
+              resource={proxy != null ? proxyProvider : connectorAction}
+              actionError={connectorActionError}
+              accessError={connectorAccessError}
+              actionId={proxy?.providerId ?? connector!.action}
+              onConfigureAccess={() => void connectors.connect(proxy?.providerId ?? connectorAction?.serviceId ?? connector!.action.split('.')[0]!)}
+              activeConnections={activeConnectorConnections}
+              authorizationPending={connectorAuthorizationPending}
+              connection={connectorConnection}
+              connectionError={connectorConnectionError}
+              connectionId={proxy?.connectionId ?? connector?.connectionId}
+              connectors={connectors}
+              disabled={disabled}
+              fieldIdPrefix={`task-${selection?.id}`}
+              loading={connectorLoading}
+              nodeId={nodeId}
+            />
+          )}
         {!readOnly && workflowSettings != null && (workflowIssue != null || workflowActions.error != null) && (
           <WorkflowInterfaceAlert
             key={`workflow-alert:${selection?.id}`}
@@ -672,74 +756,22 @@ export function NodeInspector({
             key={`http:${selection?.id}`}
             task={task}
             disabled={disabled}
-            input={(handle, label) => {
-              if (selection?.kind !== 'task') return null
-              const definition = task.inputs.find((port): port is InputPort => 'handle' in port && port.handle === handle)
-              if (definition == null) return null
-              const mapping = revision.inputMappings(selection.node)[handle]
-              const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
-              const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
-              return (
-                <Field key={handle}>
-                  <FieldLabel>{label}</FieldLabel>
-                  <NodeInputValue
-                    embedded
-                    definition={definition}
-                    label={label}
-                    presentation={{ compact: true, hideOptions: true }}
-                    sourceOnly={handle.startsWith('auth.')}
-                    readOnly={readOnly}
-                    disabled={disabled}
-                    value={inputValue(mapping, definition.value)}
-                    connected={mapping?.kind === 'sources' && binding?.kind !== 'variable'}
-                    variableName={binding?.kind === 'variable' ? binding.target : undefined}
-                    upstream={inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
-                    variables={variables}
-                    onValue={(value, deletion) => {
-                      void store?.nodes.setInputValue(selection.id, handle, value, deletion)
-                    }}
-                    onVariable={(name) => {
-                      void store?.nodes.setInputVariable(selection.id, handle, name)
-                    }}
-                  />
-                </Field>
-              )
-            }}
-            parameters={
-              selection?.kind === 'task' &&
-              (['query', 'headers'] as const).map((group) => (
-                <HttpParameterEditor
-                  key={group}
-                  group={group}
-                  task={task}
-                  entries={Object.fromEntries(
-                    Object.entries(revision.inputMappings(selection.node)).map(([handle, mapping]) => {
-                      const source = mapping.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
-                      const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
-                      return [
-                        handle,
-                        {
-                          value: inputValue(mapping, undefined),
-                          connected: mapping.kind === 'sources' && binding?.kind !== 'variable',
-                          variableName: binding?.kind === 'variable' ? binding.target : undefined,
-                        },
-                      ]
-                    }),
-                  )}
-                  variables={variables}
-                  disabled={disabled}
-                  readOnly={readOnly}
-                  renderSource={(handleName, port) =>
-                    inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName, port, t, triggerDisplays })
-                  }
-                  onEdit={(edit) => {
-                    void store?.nodes.saveHttpParameters(selection.id, group, edit)
-                  }}
-                />
-              ))
-            }
+            input={requestInput}
+            parameters={requestParameters}
             onSave={(before, value) =>
               store?.nodes.saveTaskSettings(selection!.id, { kind: 'http-request', name: task.name, before, task: value }) ?? Promise.resolve(false)
+            }
+          />
+        )}
+        {proxy != null && task != null && 'executor' in task && (
+          <ConnectorProxySection
+            key={`proxy:${selection?.id}`}
+            task={task}
+            disabled={disabled}
+            input={requestInput}
+            parameters={requestParameters}
+            onSave={(before, value) =>
+              store?.nodes.saveTaskSettings(selection!.id, { kind: 'connector-proxy', name: task.name, before, task: value }) ?? Promise.resolve(false)
             }
           />
         )}
@@ -808,6 +840,7 @@ export function NodeInspector({
           />
         )}
         {!isHttpRequest &&
+          proxy == null &&
           !unconfiguredOpenApi &&
           !unconfiguredWorkflow &&
           (selection?.kind === 'outputs' || selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'task') &&
@@ -1003,7 +1036,7 @@ export function NodeInspector({
               readOnly={readOnly}
               groups
               layout="ports"
-              title={t(isHttpRequest ? 'httpRequest.responseOutputs' : 'inspector.ports.outputsTitle')}
+              title={t(isHttpRequest || proxy != null ? 'httpRequest.responseOutputs' : 'inspector.ports.outputsTitle')}
               output
               values={presentDecisionOutputs(selection.definition, t)}
               disabled={disabled || !('moduleId' in selection.node.task || isAgent)}

@@ -495,9 +495,9 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
 
 export function setConnectorConnection(content: RevisionContent, nodeId: string, connectionId: string | undefined): readonly ChangeOperation[] | undefined {
   const node = content.document.graph.nodes[nodeId]
-  if (node?.kind != 'task' || !('executor' in node.task) || node.task.executor.kind != 'connector') return
+  if (node?.kind != 'task' || !('executor' in node.task) || (node.task.executor.kind != 'connector' && node.task.executor.kind != 'connector-proxy')) return
   const task = node.task
-  if (task.executor.kind != 'connector') return
+  if (task.executor.kind != 'connector' && task.executor.kind != 'connector-proxy') return
   if (task.executor.connectionId == connectionId) return []
   const { connectionId: _, ...executor } = task.executor
   return [
@@ -542,6 +542,9 @@ export function setServiceConnections(
       if (capabilities != null) operations.push(...(setCodeActions(content, nodeId, capabilities) ?? []))
     } else if (task.executor.kind == 'connector') {
       if (assign(task.executor) !== task.executor) operations.push(...(setConnectorConnection(content, nodeId, connectionId) ?? []))
+    } else if (task.executor.kind === 'connector-proxy') {
+      if (task.executor.providerId === providerId && task.executor.connectionId === previousConnectionId)
+        operations.push(...(setConnectorConnection(content, nodeId, connectionId) ?? []))
     } else if (task.executor.kind == 'agent') {
       const executor = {
         ...task.executor,

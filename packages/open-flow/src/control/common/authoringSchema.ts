@@ -1,6 +1,7 @@
 import type { JsonValue } from '../../types/index.ts'
 
 import { z } from 'zod'
+import { connectorProxyConfigSchema } from '../../connector/common/proxy.ts'
 import {
   agentToolFields,
   connectorAgentToolSchema,
@@ -31,6 +32,7 @@ export const authoringTypes = [
   'integration',
   'code',
   'connector',
+  'connector-proxy',
   'agent',
   'llm',
   'decision',
@@ -118,6 +120,7 @@ export const authoringConfigurations = {
   'integration': z.strictObject({ key: id, connectionId: id.optional() }),
   'code': z.strictObject({ inputs: inputFields, outputs: outputFields, capabilities: authoringCapabilities.optional() }),
   'connector': definitions.connector.omit({ outputMode: true }).strict(),
+  'connector-proxy': connectorProxyConfigSchema,
   'openapi': authoringOpenApiSchema,
   'http-request': httpRequestConfigSchema,
   'skip-duplicates': skipDuplicatesConfigSchema,
@@ -286,7 +289,8 @@ export function authoringSchema(kind?: AuthoringType) {
       }
     : {
         type: kind,
-        onError: kind == 'skip-duplicates' || retryNodeTypes.some((nodeType) => nodeType == kind) ? { enum: ['stop', 'error'] } : false,
+        onError:
+          kind == 'skip-duplicates' || kind == 'connector-proxy' || retryNodeTypes.some((nodeType) => nodeType == kind) ? { enum: ['stop', 'error'] } : false,
         retry: retryNodeTypes.some((nodeType) => nodeType == kind) ? z.toJSONSchema(retryConfigurationSchema) : false,
         inputSources: ['poll', 'integration'].includes(kind)
           ? ['value', 'unset', 'default']
@@ -311,19 +315,21 @@ export function authoringSchema(kind?: AuthoringType) {
                         ? 'Configure model settings, message templates and history as defaults. Input bindings with the same names override these defaults; named business inputs can be bound directly. Template strings interpolate {{name}}.'
                         : kind == 'skip-duplicates'
                           ? 'Bind an items array. Configure fields as dot-separated identity paths; an empty list uses each scalar item. Outputs are items and duplicates. History belongs to this node and commits only when the Run completes successfully. Fields accept strings or finite numbers; missing or complex values reject the batch.'
-                          : kind == 'http-request'
-                            ? 'Configure method, query/headers modes and names, bodyFormat, authentication, responseFormat and statusPolicy. Bind url, query.<name>/header.<name> or whole query/headers objects, body and auth.token (Basic: auth.username/auth.password). Credentials accept variables or upstream outputs only. Outputs: body, statusCode, headers. Authentication is replaced as a complete choice.'
-                            : kind == 'openapi'
-                              ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
-                              : kind == 'workflow'
-                                ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
-                                : kind == 'connector'
-                                  ? 'Select an Action and account. The platform derives ports from its schema. Open or dynamic response objects expose the complete response as one output; closed objects expose named fields. Read the created node for output names. Bind the whole response for dynamic fields; declared direct properties also support output field selection. Local edits preserve saved ports and response mapping.'
-                                  : kind == 'agent'
-                                    ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
-                                    : kind == 'code'
-                                      ? codeGuidance
-                                      : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
+                          : kind == 'connector-proxy'
+                            ? 'Call a Provider API using its Connector account. Configure providerId, connectionId, method, query/headers modes and names, and bodyFormat (none or json). Bind endpoint, query.<name>/header.<name> or complete query/headers objects, and body. Outputs: body, statusCode, headers, bodyEncoding. Proxy permissions are independent of Action permissions. Upstream HTTP errors remain response data when Connector returns a successful proxy result. Unsupported Providers fail at execution. Use connectionId: "" to defer account configuration. Retries are not supported.'
+                            : kind == 'http-request'
+                              ? 'Configure method, query/headers modes and names, bodyFormat, authentication, responseFormat and statusPolicy. Bind url, query.<name>/header.<name> or whole query/headers objects, body and auth.token (Basic: auth.username/auth.password). Credentials accept variables or upstream outputs only. Outputs: body, statusCode, headers. Authentication is replaced as a complete choice.'
+                              : kind == 'openapi'
+                                ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
+                                : kind == 'workflow'
+                                  ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
+                                  : kind == 'connector'
+                                    ? 'Select an Action and account. The platform derives ports from its schema. Open or dynamic response objects expose the complete response as one output; closed objects expose named fields. Read the created node for output names. Bind the whole response for dynamic fields; declared direct properties also support output field selection. Local edits preserve saved ports and response mapping.'
+                                    : kind == 'agent'
+                                      ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
+                                      : kind == 'code'
+                                        ? codeGuidance
+                                        : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
         example: {
           op: 'node.add',
           as: 'step',
@@ -335,6 +341,7 @@ export function authoringSchema(kind?: AuthoringType) {
               'outputs': { config: { outputDefs: {} } },
               'workflow': { config: { flowId: '<Flow ID>' } },
               'connector': { config: { action: '<Action ID>', connectionId: '<Connection ID>' } },
+              'connector-proxy': { config: { providerId: 'github', connectionId: '' }, inputs: { endpoint: { kind: 'value', value: '/user' } } },
               'poll': { config: { key: '<Trigger key>', schedule: [{ type: 'every', unit: 'minute', value: 5 }] } },
               'integration': { config: { key: '<Trigger key>' } },
               'skip-duplicates': { config: { fields: ['id'] }, inputs: { items: { kind: 'value', value: [{ id: 'a' }, { id: 'b' }] } } },

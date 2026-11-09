@@ -128,9 +128,15 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const variableNamesLoading = useVal(store.$.variableNamesLoading)
   const connectorSetupPending = useVal(store.$.connectorSetupPending)
   const connectorAction = useVal(store.connectors.$.selectedAction)
+  const connectorProvider = useVal(store.connectors.$.selectedProvider)
   const accessState = useVal(store.connectorAccess.$)
   const connectorAccess = accessState.access
-  const providerId = connectorAction?.authenticated ? connectorAction.serviceId : undefined
+  const providerId =
+    connectorProvider != null && !connectorProvider.noSetup
+      ? connectorProvider.serviceId
+      : connectorAction?.authenticated
+        ? connectorAction.serviceId
+        : undefined
   const triggerId =
     selection?.kind == 'trigger' && (selection.trigger.kind == 'poll' || selection.trigger.kind == 'integration') ? selection.trigger.definition.key : undefined
   const triggerProviderId =
@@ -152,7 +158,11 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const triggerCandidates = triggerProviderId == null ? undefined : store.connectorAccess.allowedTriggerCandidates(triggerProviderId, triggerId!)
   const candidates = providerId == null ? undefined : accessState.candidates[providerId]?.candidates
   const allowedCandidates = candidates?.filter(
-    (candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(connectorAction!.actionId),
+    (candidate) =>
+      candidate.permissions == null ||
+      (connectorProvider != null
+        ? candidate.permissions.proxy
+        : candidate.permissions.allActions || candidate.permissions.actionIds.includes(connectorAction!.actionId)),
   )
   const connectorActionError = useVal(store.connectors.$.selectedActionError)
   const connectorActionLoading = useVal(store.connectors.$.actionLoading)
@@ -211,6 +221,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
         },
       }}
       connectorAction={connectorAction}
+      connectorProvider={connectorProvider}
       connectorAccess={connectorAccess}
       connectorCandidates={accessState.candidates}
       connectorAccessError={accessError}

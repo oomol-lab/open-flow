@@ -20,7 +20,7 @@ import { publishedWorkflowInterface } from '@oomol-lab/open-flow/workflow'
 import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { AcceptanceError, ControlError } from '../error.ts'
-import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
+import { checkCodeActions, checkCodePermissions, checkConnectorProxies } from './connector-capabilities.ts'
 import { requireWorkflowCalls } from './workflow.ts'
 
 const batchSize = 100
@@ -175,6 +175,7 @@ export class Publisher {
       ...(this.#store.connectorTeams.get(input.flowId) == null ? {} : { teamId: this.#store.connectorTeams.get(input.flowId) }),
     }
     await checkCodeActions(agentActions(fixed.prepared), this.#resolveConnector(), connectorAccess)
+    await checkConnectorProxies(fixed.prepared, this.#resolveConnector(), connectorAccess)
     await checkCodePermissions(codeActions(fixed.prepared), this.#resolveConnector(), { ...connectorAccess, scope: 'shared' })
     const engineContract = input.engineContract ?? currentEngineContract
     if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {

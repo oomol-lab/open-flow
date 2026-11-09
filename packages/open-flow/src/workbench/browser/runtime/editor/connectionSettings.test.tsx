@@ -85,7 +85,7 @@ function renderAccount(overrides: Partial<ComponentProps<typeof ConnectorAccount
   return renderToStaticMarkup(
     <I18nProvider i18n={i18n}>
       <ConnectorAccount
-        action={{
+        resource={{
           actionId: 'gmail.fetch_emails',
           authenticated: true,
           description: 'Read mail',
@@ -135,7 +135,7 @@ it('describes an unavailable account without claiming that it was deleted', () =
 
 it.each(['metadata', 'connections'] as const)('shows loading while waiting for %s without a refresh call', (pending) => {
   const markup = renderAccount({
-    ...(pending == 'metadata' ? { action: undefined } : {}),
+    ...(pending == 'metadata' ? { resource: undefined } : {}),
     accessError: undefined,
     activeConnections: undefined,
   })
@@ -157,20 +157,20 @@ it.each([undefined, { message: 'Earlier request failed.' }])('directs missing ac
 })
 
 it('offers retry for a metadata failure without presenting unrelated access configuration', () => {
-  const markup = renderAccount({ action: undefined, accessError: undefined, actionError: { message: '服务暂时不可用。' } })
+  const markup = renderAccount({ resource: undefined, accessError: undefined, actionError: { message: '服务暂时不可用。' } })
   expect(markup).toContain('服务暂时不可用。')
   expect(markup).toContain('重试')
   expect(markup).not.toContain('选择可用账号')
 })
 
 it.each(['connector.access-required', 'connector.access-invalid'])('offers access configuration when metadata returns %s', (code) => {
-  const markup = renderAccount({ action: undefined, accessError: undefined, actionError: { code, message: '需要选择可用账号。' } })
+  const markup = renderAccount({ resource: undefined, accessError: undefined, actionError: { code, message: '需要选择可用账号。' } })
   expect(markup).toContain('选择可用账号')
   expect(markup).not.toContain('重试')
 })
 
 it('asks an administrator for help when the current user is denied permission', () => {
-  const markup = renderAccount({ action: undefined, accessError: undefined, actionError: { code: 'authorization.denied', message: 'Denied.' } })
+  const markup = renderAccount({ resource: undefined, accessError: undefined, actionError: { code: 'authorization.denied', message: 'Denied.' } })
   expect(markup).toContain('请联系管理员')
   expect(markup).not.toContain('重试')
   expect(markup).not.toContain('选择可用账号')
@@ -212,7 +212,7 @@ it('keeps an explicitly deferred account visible without treating it as missing 
   const markup = renderAccount({
     accessError: undefined,
     connectionId: '',
-    action: {
+    resource: {
       actionId: 'gmail.fetch_emails',
       authenticated: true,
       description: '',

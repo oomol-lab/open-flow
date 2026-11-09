@@ -1,5 +1,22 @@
 # Public contracts and version evolution
 
+## Provider API requests: Flow model v14 and Engine v11
+
+The published baseline is npm `next` `0.1.0-beta.85`, gitHead
+`f8f55da1c06410d7f899314750d443ea5d100910`, with Model v13 and Engine v10.
+Model v14 adds the `connector-proxy` managed Task and its public authoring configuration.
+Older model envelopes reject this executor. Engine `open-flow-engine/v11` advertises the
+`connectorProxy` capability; older Engines reject preparation of Flows containing it. Model v13
+reads and existing Engine v10 Publications and Runs remain supported without rewriting their bytes.
+
+The node invokes the existing Connector Proxy transport on the Server. It adds no isolated Code
+or Agent capability. Checkpoint v6, the database schema, isolation protocol and runtime digest
+remain unchanged. Proxy response headers and optional base64 encoding are now preserved by the
+shared adapter. Existing consumers returning only `data` and `status` remain valid. Proxy account
+references participate in the existing version 2 authorization snapshot and are rechecked for
+independent Proxy permission before dispatch. Deployments must upgrade before publishing or
+executing Model v14 Proxy nodes; Provider support is determined by Connector execution.
+
 ## Complete open-object Connector responses
 
 The npm `next` baseline verified for this change is `0.1.0-beta.85`, gitHead

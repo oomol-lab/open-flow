@@ -12,6 +12,7 @@ import type { ArtifactEvent } from './run-artifacts.ts'
 import type { RunControl } from './run-control.ts'
 
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
+import { buildConnectorProxyRequest } from '@oomol-lab/open-flow/connector-proxy'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
@@ -30,7 +31,7 @@ import { executeOpenApi } from '../deployment/openapi.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { errorKind } from '../logger.ts'
 import { supportsIsolatedVmEngine, IsolatedVmHost } from '../runtime/isolated-vm.ts'
-import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
+import { checkCodeActions, checkCodePermissions, checkConnectorProxies } from './connector-capabilities.ts'
 import { decodedRevision, preparedRevision } from './revision-cache.ts'
 import { ArtifactHostError, RunArtifacts } from './run-artifacts.ts'
 import { RunState } from './run-state.ts'
@@ -191,6 +192,10 @@ export class RunExecutor {
       })
       yield* Effect.tryPromise({
         try: (signal) => checkCodePermissions(codeActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility'), signal),
+        catch: (error) => error,
+      })
+      yield* Effect.tryPromise({
+        try: (signal) => checkConnectorProxies(prepared.flow, this.#resolveConnector(), this.#connectorContext(run, 'eligibility', 'selected'), signal),
         catch: (error) => error,
       })
       const projectEvent = createEventProjector(run.runId, this.#nodeFailureCodes)
@@ -491,6 +496,25 @@ export class RunExecutor {
       }
       case 'http-request':
         return executeHttpRequest(executor, invocation.input, invocation.signal)
+      case 'connector-proxy': {
+        const connector = this.#resolveConnector()
+        if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+        assertConnectionNotDeferred(executor.connectionId)
+        let request
+        try {
+          request = buildConnectorProxyRequest(executor, invocation.input, node.inputs)
+        } catch {
+          throw new ConnectorTaskError('connector.input-invalid', 'The Provider API request configuration or inputs are invalid.')
+        }
+        const response = await connector.proxy(executor.providerId, executor.connectionId, `${run.flowId}:${invocation.nodeId}`, request, invocation.signal, {
+          ...access,
+          scope: 'proxy',
+          purpose: 'proxy',
+          providerId: executor.providerId,
+          connectionId: executor.connectionId,
+        })
+        return { body: response.data, statusCode: response.status, headers: response.headers ?? {}, bodyEncoding: response.bodyEncoding ?? null }
+      }
       case 'openapi':
         return executeOpenApi(executor, invocation.input, invocation.signal)
       case 'agent': {

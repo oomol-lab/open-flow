@@ -10,10 +10,11 @@ export interface EngineContract {
   /** Code may call `context.fetch` for hosts declared by its `http` Capability. */
   readonly codeFetch?: boolean
   readonly flowState?: boolean
+  readonly connectorProxy?: boolean
 }
 
-/** v10 adds persistent Flow State to the published v9 Node compatibility and fetch contract. */
-export const currentEngineContract = 'open-flow-engine/v10'
+/** v11 adds Provider API requests through Connector Proxy. */
+export const currentEngineContract = 'open-flow-engine/v11'
 /** The published v8 Node compatibility contract, retained for existing Publications and Runs. */
 export const nodejsEngineContract = 'open-flow-engine/v8/nodejs-compat-v1'
 
@@ -65,10 +66,12 @@ const nodejsContract: EngineContract = {
 }
 
 const v9Contract: EngineContract = { ...nodejsContract, codeFetch: true, platformSource: platformSource('open-flow-engine/v9') }
-const currentContract: EngineContract = { ...v9Contract, flowState: true, platformSource: platformSource(currentEngineContract) }
+const v10Contract: EngineContract = { ...v9Contract, flowState: true, platformSource: platformSource('open-flow-engine/v10') }
+const currentContract: EngineContract = { ...v10Contract, connectorProxy: true, platformSource: platformSource(currentEngineContract) }
 
 export function findEngineContract(contract: string): EngineContract | undefined {
   if (contract == currentEngineContract) return currentContract
+  if (contract == 'open-flow-engine/v10') return v10Contract
   if (contract == 'open-flow-engine/v9') return v9Contract
   if (contract == 'open-flow-engine/v8') return v8Contract
   if (contract == nodejsEngineContract) return nodejsContract

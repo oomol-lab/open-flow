@@ -1703,6 +1703,11 @@
     "connector": "Connecteur",
     "workflow": "Workflow"
   },
+  "connectorProxy": {
+    "title": "Requête API personnalisée",
+    "description": "Appeler une API du fournisseur avec le compte connecté.",
+    "endpoint": "Point de terminaison"
+  },
   "httpRequest": {
     "title": "Requête HTTP",
     "description": "Envoyer une requête HTTP et utiliser sa réponse dans le workflow.",

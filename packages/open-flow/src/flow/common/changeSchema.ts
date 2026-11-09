@@ -2,6 +2,7 @@ import type { ChangeOperation, FlowDocument, JsonValue, RevisionContent } from '
 
 import { dequal } from 'dequal/lite'
 import { z } from 'zod'
+import { connectorProxyExecutorSchema } from '../../connector/common/proxy.ts'
 import { limitDecisionTask } from '../../decision/common/decision.ts'
 import { assertHttpAuthBindings } from '../../http/common/authBindings.ts'
 import { isHttpHost, maxHttpHosts } from '../../http/common/hosts.ts'
@@ -14,7 +15,7 @@ import { waitAutoContinueDraftSchema, waitAutoContinueSchema } from './wait.ts'
 import { webhookMethods } from './webhookMethod.ts'
 import { webhookResponseTimeout } from './webhookResponse.ts'
 
-export const currentFlowModelVersion = 13
+export const currentFlowModelVersion = 14
 const text = z.string()
 const actionConnection = text.describe(
   'Account selection: omit while unconfigured; use an account ID to select it; use "" to explicitly defer configuration. Deferred Actions fail if called; deferred Agent tools are excluded from the callable tool set. Not supported by Triggers.',
@@ -131,6 +132,7 @@ const managedFields = z.object({
     z.strictObject({ kind: z.literal('workflow'), flowId: text, revisionId: text }),
     httpRequestExecutorSchema,
     skipDuplicatesExecutorSchema,
+    connectorProxyExecutorSchema,
   ]),
 })
 
@@ -321,6 +323,7 @@ const revision = z.object({
     z.literal(10),
     z.literal(11),
     z.literal(12),
+    z.literal(13),
     z.literal(currentFlowModelVersion),
   ]),
   document,
@@ -726,6 +729,13 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 }
 
 function checkModelVersion(content: RevisionContent): void {
+  if (
+    content.modelVersion < 14 &&
+    Object.values(content.document.graph.nodes).some(
+      (candidateNode) => candidateNode.kind === 'task' && 'executor' in candidateNode.task && candidateNode.task.executor.kind === 'connector-proxy',
+    )
+  )
+    throw new TypeError('Custom API Request requires Flow model v14.')
   if (
     content.modelVersion < 13 &&
     Object.values(content.document.graph.nodes).some(

@@ -341,7 +341,7 @@ function Sample({
             {store != null && (noCandidates || accountPending != null || connectionStatus != null) && (
               <div className="p-3">
                 <ConnectorAccount
-                  action={
+                  resource={
                     accountPending == 'metadata'
                       ? undefined
                       : {

@@ -1,8 +1,29 @@
 import type { ConnectorActionMetadata, ConnectorConnection } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorActionCapability, ConnectorCapability } from '@oomol-lab/open-flow/flow-change'
+import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector-contract.ts'
 
 import { accessInvalid, connectionRequired, ConnectorTaskError } from '../deployment/connector-contract.ts'
+
+export async function checkConnectorProxies(
+  flow: Pick<PreparedFlow, 'graph'>,
+  connector: ConnectorHost | undefined,
+  access: ConnectorAccessContext,
+  signal?: AbortSignal,
+): Promise<void> {
+  for (const node of Object.values(flow.graph.nodes)) {
+    if (node.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'connector-proxy') continue
+    const config = node.task.executor
+    if (config.connectionId === '') continue
+    if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+    await connector.checkProxy(
+      config.providerId,
+      config.connectionId,
+      signal,
+      access.scope === 'catalog' ? access : { ...access, scope: 'proxy', providerId: config.providerId, connectionId: config.connectionId },
+    )
+  }
+}
 
 export async function checkCodeActions(
   declarations: readonly ConnectorActionCapability[],

@@ -31,6 +31,91 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   }
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
+  if (id === 'connector-proxy') {
+    await call('connector_providers', { flowId })
+    await call('flow_schema', { type: 'connector-proxy' })
+    const connections = await call('connector_connections', { flowId, serviceId: 'lab-data' })
+    const archive = await call('connector_connections', { flowId, serviceId: 'lab-archive' })
+    const before = await read()
+    const created = await submit(before.revision, [
+      {
+        op: 'node.add',
+        type: 'start',
+        as: 'start',
+        name: 'Start',
+        config: {
+          inputDefs: {
+            endpoint: stringPort,
+            payload: dataPort,
+            query: { schema: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean', 'null'] } }, nullable: false },
+            headers: { schema: { type: 'object', additionalProperties: { type: 'string' } }, nullable: false },
+          },
+        },
+      },
+      {
+        op: 'node.add',
+        type: 'connector-proxy',
+        as: 'proxy',
+        name: 'Provider request',
+        config: { providerId: 'lab-data', connectionId: '', method: 'POST', bodyFormat: 'json', query: { names: ['page'] }, headers: { mode: 'object' } },
+        inputs: {
+          'endpoint': { kind: 'output', node: '$start', port: 'endpoint' },
+          'body': { kind: 'output', node: '$start', port: 'payload' },
+          'query.page': { kind: 'value', value: 0 },
+          'headers': { kind: 'output', node: '$start', port: 'headers' },
+        },
+      },
+      {
+        op: 'node.add',
+        type: 'code',
+        as: 'collect',
+        name: 'Collect response',
+        code: 'export default ({body, statusCode, headers, bodyEncoding}) => ({payload: {body, statusCode, headers, bodyEncoding}})',
+        config: { outputs: { payload: dataPort } },
+        inputs: {
+          body: { kind: 'output', node: '$proxy', port: 'body' },
+          statusCode: { kind: 'output', node: '$proxy', port: 'statusCode' },
+          headers: { kind: 'output', node: '$proxy', port: 'headers' },
+          bodyEncoding: { kind: 'output', node: '$proxy', port: 'bodyEncoding' },
+        },
+      },
+      {
+        op: 'node.add',
+        type: 'connector',
+        as: 'archive',
+        name: 'Archive response',
+        config: { action: 'lab-archive.save', connectionId: account(archive, 'Archive test account') },
+        inputs: { payload: { kind: 'output', node: '$collect', port: 'payload' } },
+      },
+      {
+        op: 'node.add',
+        type: 'outputs',
+        as: 'out',
+        name: 'Outputs',
+        config: { outputDefs: { payload: dataPort } },
+        inputs: { payload: { kind: 'output', node: '$collect', port: 'payload' } },
+      },
+      { op: 'edge.connect', source: '$start', target: '$proxy' },
+      { op: 'edge.connect', source: '$proxy', target: '$collect' },
+      { op: 'edge.connect', source: '$collect', target: '$archive' },
+      { op: 'edge.connect', source: '$archive', target: '$out' },
+    ])
+    const refs = created.nodes as Record<string, string>
+    await read([refs.proxy!])
+    await call('flow_check', { flowId, revisionId: created.revision })
+    await submit(created.revision, [
+      {
+        op: 'node.update',
+        node: refs.proxy!,
+        set: { name: 'Provider request updated', config: { connectionId: account(connections, 'Data test account'), query: { mode: 'object' } } },
+      },
+      { op: 'input.set', node: refs.proxy!, input: 'query', source: { kind: 'output', node: refs.start!, port: 'query' } },
+    ])
+    await read([refs.proxy!])
+    await call('flow_search', { flowId, query: 'Provider request updated' })
+    await call('flow_check', { flowId, revisionId: savedRevision })
+    return
+  }
   if (id === 'flow-state') {
     await call('flow_schema', { type: 'skip-duplicates' })
     const before = await read()

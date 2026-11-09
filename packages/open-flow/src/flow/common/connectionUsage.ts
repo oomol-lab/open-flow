@@ -8,7 +8,7 @@ export interface ConnectionUsage {
   readonly nodeId: string
   readonly name: string
 
-  readonly kind: 'connector' | 'agent' | 'trigger' | 'notification' | 'code'
+  readonly kind: 'connector' | 'connector-proxy' | 'agent' | 'trigger' | 'notification' | 'code'
 }
 
 export function connectionUsage(document: FlowDocument): readonly ConnectionUsage[] {
@@ -31,6 +31,8 @@ export function connectionUsage(document: FlowDocument): readonly ConnectionUsag
       })
     }
     if (task?.executor.kind == 'connector') add('connector', task.executor.action, task.executor.connectionId)
+    if (task?.executor.kind == 'connector-proxy')
+      uses.push({ kind: 'connector-proxy', providerId: task.executor.providerId, connectionId: task.executor.connectionId, nodeId, name })
     if (node.kind == 'task' && 'moduleId' in node.task) {
       for (const capability of node.task.capabilities ?? []) {
         if ('mode' in capability && capability.mode == 'independent') for (const action of capability.actions) add('code', action.action, action.connectionId)
@@ -74,7 +76,7 @@ export function clearNodeConnections(graph: FlowDocument['graph'], connectionId?
             const { connectionId: _, ...rest } = value
             return rest as T
           }
-          if (executor.kind == 'connector') return [id, { ...node, task: { ...node.task, executor: clear(executor) } }]
+          if (executor.kind == 'connector' || executor.kind == 'connector-proxy') return [id, { ...node, task: { ...node.task, executor: clear(executor) } }]
           if (executor.kind == 'agent')
             return [
               id,

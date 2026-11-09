@@ -44,7 +44,11 @@ const liveClient = new api.ControlClient(async (url) => {
 assert.deepEqual((await liveClient.getLiveDetails('flow')).entries, [])
 if (api.controlErrorMetadata[api.controlErrorCode.runNotFound].status !== 404) throw new Error('Missing Control API errors.')
 const proxy = await import('@oomol-lab/open-flow/connector-proxy')
-if (Object.keys(proxy).length !== 0) throw new Error('Connector Proxy should be type-only.')
+const proxyConfig = proxy.connectorProxyConfigSchema.parse({ providerId: 'example', method: 'POST', bodyFormat: 'json' })
+const proxyTask = proxy.connectorProxyTask(proxyConfig)
+assert.equal(proxyTask.executor.kind, 'connector-proxy')
+assert.deepEqual(proxyTask.outputs.map(port => port.handle), ['body', 'statusCode', 'headers', 'bodyEncoding'])
+assert.deepEqual(proxy.buildConnectorProxyRequest(proxyConfig, { endpoint: '/unlisted', body: null }), { endpoint: '/unlisted', method: 'POST', body: null, query: {}, headers: {} })
 const control = await import('@oomol-lab/open-flow/control-api-conformance')
 for (const name of [
   'controlApiConformanceCases',

@@ -1,5 +1,5 @@
 import type { TFunction } from 'val-i18n'
-import type { Draft, JsonValue, TriggerKeySnapshot } from '../api.ts'
+import type { ConnectorProvider, Draft, JsonValue, TriggerKeySnapshot } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { AddNodeIntent } from './flowChanges.ts'
@@ -49,6 +49,7 @@ export type AddNodeOption = AddNodeOptionBase &
     | { readonly kind: 'approval' }
     | { readonly kind: 'condition' }
     | { readonly connector: ConnectorActionView; readonly kind: 'connector' }
+    | { readonly provider: ConnectorProvider; readonly kind: 'connector-proxy' }
     | {
         readonly choices: NonNullable<AddNodeOptionBase['choices']>
         readonly kind: 'connector-group'
@@ -328,6 +329,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, t: 
     }
     case 'connector':
       return { action: option.connector, kind: 'connector' }
+    case 'connector-proxy':
+      return { kind: 'connector-proxy', providerId: option.provider.serviceId, name: `${option.provider.serviceName} · ${t('connectorProxy.title')}` }
     case 'connector-group':
       return
     case 'trigger': {

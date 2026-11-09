@@ -395,6 +395,12 @@ object to a local HTTP fixture and checks authentication, encoding and credentia
 HTTP node start event. Run `bun run lab test http-request` and
 `bun run lab test http-request --mcp`. These are deterministic reference runs, not model trials.
 
+`connector-proxy` discovers a Provider and account, creates a request to an unlisted endpoint,
+changes a named query to a whole-object binding, and consumes and archives all four response
+outputs downstream. It verifies JSON null, an empty object and a string body, independent account
+selection, and upstream HTTP 422 as successful output. Run `bun run lab test connector-proxy` and
+`bun run lab test connector-proxy --mcp`. These deterministic references use no paid Connector calls.
+
 ## Flow State reference scenario
 
 `flow-state` builds an hourly Cron → HTTP Request → Code array validation → Skip Duplicates →

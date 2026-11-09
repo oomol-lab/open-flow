@@ -11,6 +11,7 @@ import type { SetNotice } from './workbenchNotice.ts'
 import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
+import { connectorProxyConfigSchema, connectorProxyTask } from '../../../../connector/common/proxy.ts'
 import { ApiError } from '../api.ts'
 import { connectionCatalog, actionWithConnections } from '../connectionCatalog.ts'
 import { connectorActionPresentation } from '../editor/connectorActionPresentation.tsx'
@@ -35,6 +36,7 @@ export interface ConnectorActionError {
 }
 
 interface Selection {
+  readonly provider?: ConnectorProvider
   readonly action?: ConnectorActionView
   readonly actionError?: ConnectorActionError
   readonly activeConnections?: readonly ConnectorConnection[]
@@ -44,7 +46,8 @@ interface Selection {
 }
 
 interface ConnectorTarget {
-  readonly actionId: string
+  readonly actionId?: string
+  readonly providerId?: string
   readonly connectionId?: string
   readonly nodeId: string
 }
@@ -58,6 +61,7 @@ export interface Connector$ {
   readonly connectionLoading: ReadonlyVal<string | undefined>
   readonly diagnostics: ReadonlyVal<readonly Diagnostic[]>
   readonly selectedAction: ReadonlyVal<ConnectorActionView | undefined>
+  readonly selectedProvider: ReadonlyVal<ConnectorProvider | undefined>
   readonly selectedActionError: ReadonlyVal<ConnectorActionError | undefined>
   readonly selectedActiveConnections: ReadonlyVal<readonly ConnectorConnection[] | undefined>
   readonly selectedAuthorizationPending: ReadonlyVal<boolean>
@@ -90,6 +94,21 @@ function option(action: ConnectorActionView, t: TFunction): AddNodeOption {
   }
 }
 
+function proxyOption(provider: ConnectorProvider, t: TFunction): AddNodeOption {
+  const task = connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: provider.serviceId }))
+  return {
+    kind: 'connector-proxy',
+    provider,
+    id: `connector-proxy:${provider.serviceId}`,
+    label: t('connectorProxy.title'),
+    description: t('connectorProxy.description'),
+    group: t('addNode.connectorActions'),
+    icon: providerIcon(provider),
+    inputs: task.inputs.flatMap((port) => ('handle' in port ? [port] : [])),
+    outputs: task.outputs.flatMap((port) => ('handle' in port ? [port] : [])),
+  }
+}
+
 function providerOptions(actions: readonly ConnectorActionView[], t: TFunction): readonly AddNodeOption[] {
   const providers = new Map<string, ConnectorActionView[]>()
   for (const action of actions) {
@@ -105,6 +124,17 @@ function providerOptions(actions: readonly ConnectorActionView[], t: TFunction):
         const child = option(action, t)
         return { description: child.description, label: child.label, option: child }
       })
+      const proxy = proxyOption(
+        {
+          serviceId: first.serviceId,
+          serviceName: first.serviceName,
+          icon: first.icon,
+          iconSprite: first.iconSprite,
+          iconSpritePosition: first.iconSpritePosition,
+        },
+        t,
+      )
+      choices.push({ description: proxy.description, label: proxy.label, option: proxy })
       return {
         choices,
         description: t(choices.length == 1 ? 'addNode.connectorActionCountOne' : 'addNode.connectorActionCount', { count: choices.length }),
@@ -139,7 +169,9 @@ function providerOption(provider: ConnectorProvider, t: TFunction): AddNodeOptio
 function connectorTarget(selection: ResolvedSelection | undefined): ConnectorTarget | undefined {
   if (selection == null) return
   const task = selection.kind == 'task' ? selection.definition : undefined
-  if (task == null || !('executor' in task) || task.executor.kind != 'connector') return
+  if (task == null || !('executor' in task)) return
+  if (task.executor.kind === 'connector-proxy') return { providerId: task.executor.providerId, connectionId: task.executor.connectionId, nodeId: selection.id }
+  if (task.executor.kind !== 'connector') return
   return {
     actionId: task.executor.action,
     connectionId: task.executor.connectionId,
@@ -233,9 +265,24 @@ export class ConnectorStore {
       const target = connectorTarget(get(workspace.$.selection))
       const state = get(this.#state)
       if (target == null) return { authorizationPending: false }
-      const action = get(actions)[target.actionId]
+      if (target.providerId != null) {
+        const flowId = get(workspace.$.flowId)
+        const providerState = get(this.data.providers.get(flowId, this.#language))
+        const provider = providerState.data?.find((item) => item.serviceId === target.providerId)
+        const catalog = get(catalogs)[target.providerId]
+        const connectionFailure = provider?.noSetup === true ? undefined : get(this.data.connections.get(target.providerId, flowId)).error
+        return {
+          provider,
+          actionError: providerState.error == null ? undefined : { message: errorNotice(providerState.error, this.#i18n.t).message },
+          activeConnections: catalog?.active,
+          authorizationPending: state.authorizationServiceId === target.providerId,
+          connection: target.connectionId == null ? undefined : catalog?.byId.get(target.connectionId),
+          connectionError: connectionFailure == null ? undefined : errorNotice(connectionFailure, this.#i18n.t).message,
+        }
+      }
+      const action = get(actions)[target.actionId!]
       const catalog = action == null ? undefined : get(catalogs)[action.serviceId]
-      const actionFailure = get(this.data.actions.detail(target.actionId, get(workspace.$.flowId), this.#language)).error
+      const actionFailure = get(this.data.actions.detail(target.actionId!, get(workspace.$.flowId), this.#language)).error
       const connectionFailure = action == null ? undefined : get(this.data.connections.get(action.serviceId, get(workspace.$.flowId))).error
       const connection = target.connectionId == null ? undefined : catalog?.byId.get(target.connectionId)
       return {
@@ -268,6 +315,7 @@ export class ConnectorStore {
       connectionLoading: derive(this.#state, (state) => state.connectionLoading),
       diagnostics: compute((get) => connectionDiagnostics(get(workspace.$.revision), get(actions), get(catalogs))),
       selectedAction: derive(this.#selected, (value) => value.action),
+      selectedProvider: derive(this.#selected, (value) => value.provider),
       selectedActionError: derive(this.#selected, (value) => value.actionError),
       selectedActiveConnections: derive(this.#selected, (value) => value.activeConnections),
       selectedAuthorizationPending: derive(this.#selected, (value) => value.authorizationPending),
@@ -338,15 +386,21 @@ export class ConnectorStore {
       const t = get(this.#i18n.t$)
       return {
         ...state,
-        data: state.data?.map((action) =>
-          option(
-            actionWithConnections(
-              { ...action, ...(provider == null ? {} : { serviceName: provider.serviceName, icon: action.icon ?? provider.icon }) },
-              undefined,
-            ),
-            t,
-          ),
-        ),
+        data:
+          provider == null && state.data == null
+            ? undefined
+            : [
+                ...(state.data ?? []).map((action) =>
+                  option(
+                    actionWithConnections(
+                      { ...action, ...(provider == null ? {} : { serviceName: provider.serviceName, icon: action.icon ?? provider.icon }) },
+                      undefined,
+                    ),
+                    t,
+                  ),
+                ),
+                proxyOption(provider ?? { serviceId: service, serviceName: service }, t),
+              ],
       }
     })
   }
@@ -410,7 +464,21 @@ export class ConnectorStore {
       }
       return
     }
-    const actionState = this.data.actions.detail(target.actionId, flowId, this.#language, force)
+    if (target.providerId != null) {
+      this.#set({ actionLoading: target.providerId, connectionError: undefined })
+      try {
+        const providers = await resourceValue(this.data.providers.get(flowId, this.#language, force), undefined, force)
+        if (!this.#isCurrent(current, flowId)) return
+        if (providers.find((provider) => provider.serviceId === target.providerId)?.noSetup !== true)
+          await this.#refreshConnections(flowId, target, target.providerId, force, current)
+      } catch (error) {
+        if (this.#isCurrent(current, flowId)) this.#set({ actionError: { actionId: target.providerId, message: errorNotice(error, this.#i18n.t).message } })
+      } finally {
+        if (this.#isCurrent(current, flowId)) this.#set({ actionLoading: undefined })
+      }
+      return
+    }
+    const actionState = this.data.actions.detail(target.actionId!, flowId, this.#language, force)
     this.#set({
       actionError: undefined,
       actionLoading: actionState.value.data == null ? target.actionId : undefined,
@@ -425,7 +493,7 @@ export class ConnectorStore {
       if (action.authenticated) await this.#refreshConnections(flowId, target, action.serviceId, force, current)
     } catch (error) {
       if (this.#isCurrent(current, flowId)) {
-        this.#set({ actionError: { actionId: target.actionId, message: errorNotice(error, this.#i18n.t).message } })
+        this.#set({ actionError: { actionId: target.actionId!, message: errorNotice(error, this.#i18n.t).message } })
       }
     } finally {
       if (this.#isCurrent(current, flowId) && this.#state.value.actionLoading == target.actionId) this.#set({ actionLoading: undefined })
@@ -478,7 +546,7 @@ export class ConnectorStore {
     if (this.#disposed || this.#authorization == null) return
     const serviceId = this.#authorization.serviceId
     this.#set({ authorizationServiceId: undefined })
-    if (this.$.selectedAction.value?.serviceId == serviceId) await this.refresh(true)
+    if (this.$.selectedAction.value?.serviceId == serviceId || this.$.selectedProvider.value?.serviceId == serviceId) await this.refresh(true)
     if (!this.#disposed && this.#authorization?.serviceId == serviceId) this.#authorization = undefined
   }
 
@@ -547,7 +615,10 @@ export class ConnectorStore {
     const flowId = this.#workspace.$.flowId.value
     const revision = this.#workspace.$.revision.value
     if (flowId == null || revision == null) return
-    if (Object.values(revision.graph()?.nodes ?? {}).some((node) => node.kind == 'integration' || node.kind == 'poll')) {
+    if (
+      Object.values(revision.graph()?.nodes ?? {}).some((node) => node.kind == 'integration' || node.kind == 'poll') ||
+      revision.connectorReferences.accounts.some((reference) => reference.kind === 'connector-proxy')
+    ) {
       this.data.providers.get(flowId, this.#language)
     }
     const missing = [...revision.connectorActionIds].filter((actionId) => this.$.actions.value[actionId] == null && !this.#loadingActions.has(actionId))
@@ -561,13 +632,14 @@ export class ConnectorStore {
           actions.map((action) => action.actionId),
         )
       } catch {
-        return
+        // Independent Provider accounts remain available when an Action cannot be loaded.
       } finally {
         for (const actionId of missing) this.#loadingActions.delete(actionId)
       }
     }
     if (!this.#isCurrent(current, flowId)) return
     const services = new Set<string>()
+    for (const reference of revision.connectorReferences.accounts) if (reference.kind === 'connector-proxy') services.add(reference.providerId)
     for (const { actionId } of revision.connectorNodes()) {
       const action = this.$.actions.value[actionId]
       if (action?.authenticated == true) services.add(action.serviceId)

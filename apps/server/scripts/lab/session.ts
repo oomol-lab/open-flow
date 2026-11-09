@@ -403,6 +403,7 @@ export class LabSession {
             if (this.scenarioId == 'http-request') sample.outputs = { ...sample.outputs, url: `${this.modelOrigin}/http-request` }
             Object.assign(this.mocks.sample, sample)
             const offset = this.mocks.calls.length,
+              proxyOffset = this.mocks.proxyCalls.length,
               modelOffset = this.mocks.modelCalls.length,
               started = performance.now()
             const inputs: Record<string, Record<string, JsonValue>> = {}
@@ -430,7 +431,7 @@ export class LabSession {
             errors.push(
               ...(this.scenarioId == 'fulfillment-ops'
                 ? fulfillmentRuntimeAssertions(this.stage, ...actual)
-                : runtimeAssertions(this.scenarioId, ...actual, revision.content)
+                : runtimeAssertions(this.scenarioId, ...actual, revision.content, this.mocks.proxyCalls.slice(proxyOffset))
               ).map((error) => `${sample.name}: ${error}`),
             )
             this.attempt.excluded!.push({ kind: 'verification', sample: sample.name, durationMs: performance.now() - started, runId: run.runId })

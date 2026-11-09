@@ -17,6 +17,7 @@ import type { AuthoringAgentTool, AuthoringCapability } from './authoringTools.t
 
 import { dequal } from 'dequal/lite'
 import { connectorOutputMode } from '../../connector/common/actionSchema.ts'
+import { connectorProxyConfigSchema, connectorProxyTask } from '../../connector/common/proxy.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
 import { supportsNodeRetry, isTriggerNode, applyFlowChanges, decodeChangeOperations, upgradeRevisionContent } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
@@ -41,6 +42,7 @@ import {
   updateOutputsDefs,
   renameFlowOutputSources,
 } from '../../flow/common/nodeChanges.ts'
+import { requestInputMappings } from '../../flow/common/requestParameters.ts'
 import { retryConfigurationSchema } from '../../flow/common/retry.ts'
 import { httpRequestTask, httpRequestConfigSchema, httpRequestInputs } from '../../http/common/httpRequest.ts'
 import { skipDuplicatesConfigSchema, skipDuplicatesTask } from '../../state/common/state.ts'
@@ -147,7 +149,7 @@ export function authoringNode(content: RevisionContent, ref: string) {
         ),
       }
     else if (task.executor.kind == 'workflow') config = { flowId: task.executor.flowId }
-    else if (task.executor.kind == 'http-request' || task.executor.kind == 'skip-duplicates') {
+    else if (task.executor.kind == 'http-request' || task.executor.kind == 'skip-duplicates' || task.executor.kind == 'connector-proxy') {
       const { kind: _kind, ...settings } = task.executor
       config = settings
     } else if (task.executor.kind == 'openapi') {
@@ -524,7 +526,10 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       } else if (type == 'decision') task = decisionTask(config.questions as Parameters<typeof decisionTask>[0], String(update.name))
       else if (type == 'skip-duplicates')
         task = { ...before, name: String(update.name), executor: { kind: 'skip-duplicates', ...skipDuplicatesConfigSchema.parse(config) } }
-      else if (type == 'http-request') {
+      else if (type == 'connector-proxy') {
+        task = connectorProxyTask(connectorProxyConfigSchema.parse(config), String(update.name), before)
+        next = { ...next, inputs: requestInputMappings(node.inputs, before, task) } as GraphNode
+      } else if (type == 'http-request') {
         task = httpRequestTask(httpRequestConfigSchema.parse(config), String(update.name), before)
         next = { ...next, inputs: httpRequestInputs(node.inputs, before, task) } as GraphNode
       } else if (type == 'openapi') {
@@ -776,6 +781,9 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
               break
             case 'connector':
               changes = createManagedTask(identity, await connectorTask(config, name))
+              break
+            case 'connector-proxy':
+              changes = createManagedTask(identity, connectorProxyTask(connectorProxyConfigSchema.parse(config), name))
               break
             case 'skip-duplicates':
               changes = createManagedTask(identity, skipDuplicatesTask(skipDuplicatesConfigSchema.parse(config), name))

@@ -19,6 +19,7 @@ const nodeKinds = new Set([
   'approval',
   'condition',
   'connector',
+  'connector-proxy',
   'decision',
   'javascript',
   'openapi',
@@ -53,6 +54,7 @@ function nodeKind(
   | 'approval'
   | 'condition'
   | 'connector'
+  | 'connector-proxy'
   | 'decision'
   | 'javascript'
   | 'openapi'
@@ -74,6 +76,7 @@ function nodeKind(
     | 'approval'
     | 'condition'
     | 'connector'
+    | 'connector-proxy'
     | 'decision'
     | 'javascript'
     | 'openapi'
