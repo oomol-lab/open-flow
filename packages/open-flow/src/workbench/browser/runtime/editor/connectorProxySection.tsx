@@ -4,7 +4,7 @@ import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
-import { connectorProxyIssues, connectorProxyTask } from '../../../../connector/common/proxy.ts'
+import { connectorProxyIssues, connectorProxySupportsBody, connectorProxyTask } from '../../../../connector/common/proxy.ts'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -15,15 +15,21 @@ import { TaskExecutorChanges } from './taskExecutorChanges.ts'
 export function ConnectorProxySection({
   task,
   disabled,
+  readOnly = false,
+  hasBody,
   parameters,
   input,
   onSave,
+  onClearBody,
 }: {
   task: ManagedTaskDefinition
   disabled: boolean
+  readOnly?: boolean
+  hasBody: boolean
   parameters: ReactNode
   input: (handle: string, label: string) => ReactNode
   onSave: (before: ManagedTaskDefinition, next: ManagedTaskDefinition) => Promise<boolean>
+  onClearBody: () => Promise<boolean>
 }) {
   const t = useTranslate()
   const id = useId()
@@ -39,7 +45,7 @@ export function ConnectorProxySection({
         const current = taskRef.current
         if (before.kind !== 'connector-proxy' || next.kind !== 'connector-proxy' || current.executor.kind !== 'connector-proxy') return Promise.resolve(false)
         const merged = { ...current.executor }
-        for (const key of ['method', 'bodyFormat'] as const) if (before[key] !== next[key]) Object.assign(merged, { [key]: next[key] })
+        if (before.method !== next.method) merged.method = next.method
         return saveRef.current(current, connectorProxyTask(merged, current.name, current))
       }),
   )
@@ -50,6 +56,11 @@ export function ConnectorProxySection({
     setConfig(changes.value)
   }, [changes, task.executor])
   if (config.kind !== 'connector-proxy') return null
+  const supportsBody = connectorProxySupportsBody(config.method)
+  const bodyError =
+    task.executor.kind === 'connector-proxy' &&
+    task.executor.method === config.method &&
+    connectorProxyIssues(config, hasBody).some((issue) => issue.code === 'bodyUnsupported')
   async function save() {
     try {
       setFailed(!(await changes.save()))
@@ -63,7 +74,6 @@ export function ConnectorProxySection({
     setConfig(changes.value)
     void save()
   }
-  const bodyError = connectorProxyIssues(config).some((issue) => issue.field === 'bodyFormat') ? t('httpRequest.bodyUnsupported') : undefined
   return (
     <InspectorSection title={t('connectorProxy.title')} data-inspector-section="task">
       <div className="node-settings flex flex-col gap-3" data-value-editor-scope>
@@ -85,26 +95,19 @@ export function ConnectorProxySection({
           </NativeSelect>
         </Field>
         {parameters}
-        <Field>
-          <FieldLabel htmlFor={`${id}-body`}>{t('httpRequest.bodyFormat')}</FieldLabel>
-          <ValueEditorFeedback error={bodyError}>
-            {(errorId) => (
-              <NativeSelect
-                id={`${id}-body`}
-                className="w-full"
-                value={config.bodyFormat}
-                disabled={disabled}
-                aria-invalid={!!errorId}
-                aria-describedby={errorId}
-                onChange={(event) => update({ bodyFormat: event.target.value as ConnectorProxyConfig['bodyFormat'] })}
-              >
-                <NativeSelectOption value="none">{t('httpRequest.none')}</NativeSelectOption>
-                <NativeSelectOption value="json">JSON</NativeSelectOption>
-              </NativeSelect>
+        {supportsBody && input('body', t('httpRequest.body'))}
+        {bodyError && (
+          <div className="flex flex-col gap-2">
+            <p id={`${id}-body-error`} role="alert" className="text-xs text-destructive">
+              {t('connectorProxy.bodyUnsupported')}
+            </p>
+            {!readOnly && (
+              <Button variant="outline" size="field" disabled={disabled} aria-describedby={`${id}-body-error`} onClick={() => void onClearBody()}>
+                {t('valueEditor.clear')} {t('httpRequest.body')}
+              </Button>
             )}
-          </ValueEditorFeedback>
-        </Field>
-        {config.bodyFormat === 'json' && input('body', t('httpRequest.body'))}
+          </div>
+        )}
         {failed && (
           <ValueEditorFeedback error={t('httpRequest.saveFailed')}>
             {(errorId) => (

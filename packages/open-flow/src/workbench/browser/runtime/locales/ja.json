@@ -1705,6 +1705,7 @@
     "workflow": "ワークフロー"
   },
   "connectorProxy": {
+    "bodyUnsupported": "GET リクエストはリクエストボディに対応していません。",
     "title": "カスタム API リクエスト",
     "description": "接続済みアカウントで Provider API を呼び出します。",
     "endpoint": "エンドポイント"

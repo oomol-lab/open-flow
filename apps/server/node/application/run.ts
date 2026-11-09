@@ -502,7 +502,8 @@ export class RunExecutor {
         assertConnectionNotDeferred(executor.connectionId)
         let request
         try {
-          request = buildConnectorProxyRequest(executor, invocation.input, node.inputs)
+          const bodyPort = task.inputs.find((port) => 'handle' in port && port.handle === 'body')
+          request = buildConnectorProxyRequest(executor, invocation.input, node.inputs, bodyPort != null && 'handle' in bodyPort ? bodyPort.value : undefined)
         } catch {
           throw new ConnectorTaskError('connector.input-invalid', 'The Provider API request configuration or inputs are invalid.')
         }

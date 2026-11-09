@@ -22,6 +22,7 @@ import { isJsonObject } from '../../../../base/common/json.ts'
 import { connectorOutputMode } from '../../../../connector/common/actionSchema.ts'
 import {
   connectorProxyConfigSchema,
+  connectorProxyInputs,
   connectorProxyTask,
   withConnectorProxyParameterFields,
   withConnectorProxyParameterSource,
@@ -620,7 +621,9 @@ function replaceTaskPorts(
     const inputs =
       currentNodeId == nodeId
         ? 'executor' in task && (task.executor.kind == 'http-request' || task.executor.kind == 'connector-proxy') && 'executor' in previous
-          ? requestInputMappings(revision.inputMappings(node), previous, task)
+          ? task.executor.kind === 'connector-proxy'
+            ? connectorProxyInputs(revision.inputMappings(node), previous, task)
+            : requestInputMappings(revision.inputMappings(node), previous, task)
           : updatedInputMappings(revision.inputMappings(node), previous.inputs, task.inputs, inputRename, values)
         : { ...revision.inputMappings(node) }
 

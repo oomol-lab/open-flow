@@ -1705,6 +1705,7 @@
     "workflow": "워크플로"
   },
   "connectorProxy": {
+    "bodyUnsupported": "GET 요청은 요청 본문을 지원하지 않습니다.",
     "title": "사용자 지정 API 요청",
     "description": "연결된 계정으로 Provider API를 호출합니다.",
     "endpoint": "엔드포인트"

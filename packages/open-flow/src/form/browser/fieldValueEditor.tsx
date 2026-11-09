@@ -1,5 +1,6 @@
 import styles from './valueEditor.module.scss'
 import type { CSSProperties, ReactNode } from 'react'
+import type { EditorComponent } from '../common/editorComponent.ts'
 import type { FieldExpansionPolicy } from '../common/fieldExpansion.ts'
 import type { FieldValueDeletion } from '../common/fieldValue.ts'
 import type { ValueType } from '../common/value.ts'
@@ -52,6 +53,8 @@ export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresen
   readonly valueSuffix?: ReactNode
   readonly description?: string
   readonly editor?: ReactNode
+  /** Preferred editor for untyped values; existing data keeps its type and fixed schemas remain authoritative. */
+  readonly defaultEditor?: EditorComponent
   readonly valueEditable?: boolean
   readonly hideOptions?: boolean
   /** Hides the inline clear and raw JSON controls while preserving field settings. */
@@ -81,7 +84,9 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
   const showDataType = editorComponent(schema) === 'json' && !definitionEditable && valueEditable && props.valueSuffix == null && props.editor == null
   // Value-editor preferences belong to this editor session, never to the fixed field definition.
   const [selectedEditorSchema, setSelectedEditorSchema] = useState<Record<string, unknown>>()
-  const editorSchema = showDataType ? (selectedEditorSchema ?? defaultValueEditorSchema(schema)) : schema
+  const editorSchema = showDataType
+    ? (selectedEditorSchema ?? defaultValueEditorSchema(schema, props.defaultEditor == null ? undefined : { component: props.defaultEditor, value }))
+    : schema
   const editorProps = { ...props, schema: editorSchema }
   const source = objectValue(editorSchema) ?? {}
   const compactValue = props.compact === true || hasHeader || props.valueAddon != null || props.valueSuffix != null || showDataType
@@ -207,7 +212,8 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
   const inlineTools = !props.hideValueTools && (props.layout === 'values' || props.layout === 'ports') && valueEditable && !disabled && !sorting
   const nullControl = (state.display === 'null' || presence === 'null') && props.editor === undefined && !choiceOptions && !enumeration
   const canReset = inlineTools && props.onReset != null && (showUnset || (!!nullable && nullControl))
-  const canClear = inlineTools && state.canClear
+  const clearable = state.canClear || (props.unset != null && presence === 'null')
+  const canClear = inlineTools && clearable
   const canToggleJson = inlineTools && expanded && shape.collection && presence === 'value'
   const arrayDefinition = !showDataType && hasHeader && source.type === 'array' && !Array.isArray(source.items) && !choiceOptions
   const changeValueEditor = (nextSchema: Record<string, unknown>) => {
@@ -339,7 +345,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
               null
             </Button>
           )}
-          {state.canClear && (
+          {clearable && (
             <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={clearValue}>
               <i aria-hidden="true" className="i-lucide-light:eraser" />
               {t('valueEditor.clear')}

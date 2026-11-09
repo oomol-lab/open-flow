@@ -17,7 +17,7 @@ import type { AuthoringAgentTool, AuthoringCapability } from './authoringTools.t
 
 import { dequal } from 'dequal/lite'
 import { connectorOutputMode } from '../../connector/common/actionSchema.ts'
-import { connectorProxyConfigSchema, connectorProxyTask } from '../../connector/common/proxy.ts'
+import { connectorProxyConfigSchema, connectorProxyInputs, connectorProxyTask } from '../../connector/common/proxy.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
 import { supportsNodeRetry, isTriggerNode, applyFlowChanges, decodeChangeOperations, upgradeRevisionContent } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
@@ -41,8 +41,8 @@ import {
   updateStartInputDefs,
   updateOutputsDefs,
   renameFlowOutputSources,
+  setInputMappings,
 } from '../../flow/common/nodeChanges.ts'
-import { requestInputMappings } from '../../flow/common/requestParameters.ts'
 import { retryConfigurationSchema } from '../../flow/common/retry.ts'
 import { httpRequestTask, httpRequestConfigSchema, httpRequestInputs } from '../../http/common/httpRequest.ts'
 import { skipDuplicatesConfigSchema, skipDuplicatesTask } from '../../state/common/state.ts'
@@ -528,7 +528,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
         task = { ...before, name: String(update.name), executor: { kind: 'skip-duplicates', ...skipDuplicatesConfigSchema.parse(config) } }
       else if (type == 'connector-proxy') {
         task = connectorProxyTask(connectorProxyConfigSchema.parse(config), String(update.name), before)
-        next = { ...next, inputs: requestInputMappings(node.inputs, before, task) } as GraphNode
+        next = { ...next, inputs: connectorProxyInputs(node.inputs, before, task) } as GraphNode
       } else if (type == 'http-request') {
         task = httpRequestTask(httpRequestConfigSchema.parse(config), String(update.name), before)
         next = { ...next, inputs: httpRequestInputs(node.inputs, before, task) } as GraphNode
@@ -682,7 +682,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       replace(ref, { ...node, config })
       return
     }
-    if (!Object.hasOwn(inputDefinitions(node), input)) {
+    if (!Object.hasOwn(inputDefinitions(node), input) && !(typeOf(node) === 'connector-proxy' && input === 'body')) {
       const type = typeOf(node)
       if (!['agent', 'code', 'llm', 'wait', 'approval'].includes(type))
         fail('input.not-found', `Unknown input ${input}.`, { node: ref, input, choices: Object.keys(inputDefinitions(node)) })
@@ -696,8 +696,8 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
         : value.kind == 'value' || value.kind == 'unset'
           ? value
           : { kind: 'sources', sources: (value.kind == 'sources' ? value.sources : [value]).map(source) }
-    const before = nodeInputMappings(nodeAt(content, ref))[input]
-    if (!dequal(before, mapping)) apply([{ kind: 'graph.node.input.set', nodeId: ref, handle: input, before, ...(mapping == null ? {} : { value: mapping }) }])
+    const changes = setInputMappings(content, ref, { [input]: mapping }) ?? []
+    if (changes.length > 0) apply(changes)
   }
   for (const edit of parsed.edits) {
     try {

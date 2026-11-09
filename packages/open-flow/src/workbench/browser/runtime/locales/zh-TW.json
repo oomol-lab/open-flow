@@ -1705,6 +1705,7 @@
     "workflow": "工作流程"
   },
   "connectorProxy": {
+    "bodyUnsupported": "GET 請求不支援請求本文。",
     "title": "自訂 API 請求",
     "description": "使用已連線帳號呼叫 Provider API。",
     "endpoint": "介面路徑"

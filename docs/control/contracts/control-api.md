@@ -1645,10 +1645,19 @@ null, without arrays or nested objects. Headers accept strings. Unconfigured nam
 omitted; explicit query null is preserved.
 
 `endpoint` is a required string data input supporting fixed values, variables and upstream outputs.
-JSON mode adds a nullable `body` input accepting any JSON value, including strings and explicit
-null. None mode omits the body entirely; JSON null sends an explicit null body. GET bodies are
-invalid. The node does not inject credentials; Connector uses the selected account. Providers
+Setting or binding `body` generates its nullable input and automatically selects JSON internally;
+callers need not configure `bodyFormat`. The input accepts any JSON value, including strings and
+explicit null. Clearing it stores an explicit unset mapping and preserves the field definition and
+its default; resetting the input restores inheritance. An absent input without a default or an unset
+input omits the body entirely; JSON null sends an explicit null body. Workbench exposes a single
+optional Request body field without a format selector. GET bodies are invalid. The node does not
+inject credentials; Connector uses the selected account. Providers
 advertising no authentication may omit `connectionId`.
+
+Workbench hides Request body for GET. Updating another method to GET unsets any existing body,
+including an inherited default, while preserving its definition and unrelated inputs. The method
+and body change share one undo entry. Existing invalid GET drafts show a clear action instead of a
+body editor; read-only previews show the diagnostic without a mutation action.
 
 Fixed outputs are nullable `body`, integer `statusCode`, string-object `headers` and nullable
 `bodyEncoding` (`"base64"` when returned, otherwise null). Preserve complete response data and

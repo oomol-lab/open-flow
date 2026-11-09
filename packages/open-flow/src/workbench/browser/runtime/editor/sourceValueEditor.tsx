@@ -286,6 +286,8 @@ export function SourceValueEditor({
     | 'depth'
     | 'objectChild'
     | 'actions'
+    | 'unset'
+    | 'defaultEditor'
   >
   readonly upstream?: NodeInputUpstreamSources
   readonly embedded?: boolean
@@ -586,7 +588,7 @@ export function SourceValueEditor({
                       if (variables.enabled) variables.onOpen?.()
                     },
               }
-            : undefined
+            : presentation?.unset
         }
         label={fieldLabel}
         path={`/${fieldLabel.replaceAll('~', '~0').replaceAll('/', '~1')}`}

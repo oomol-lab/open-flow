@@ -57,7 +57,7 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
         type: 'connector-proxy',
         as: 'proxy',
         name: 'Provider request',
-        config: { providerId: 'lab-data', connectionId: '', method: 'POST', bodyFormat: 'json', query: { names: ['page'] }, headers: { mode: 'object' } },
+        config: { providerId: 'lab-data', connectionId: '', method: 'POST', query: { names: ['page'] }, headers: { mode: 'object' } },
         inputs: {
           'endpoint': { kind: 'output', node: '$start', port: 'endpoint' },
           'body': { kind: 'output', node: '$start', port: 'payload' },

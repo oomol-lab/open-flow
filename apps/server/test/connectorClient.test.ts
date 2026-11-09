@@ -1462,6 +1462,72 @@ describe('Server Connector client', () => {
     })
   })
 
+  it.each([
+    ['omitted', undefined],
+    ['unset', undefined],
+    ['null', null],
+    ['empty object', {}],
+    ['string', 'message'],
+  ] as const)('uses input presence when forwarding a %s request body', async (state, body) => {
+    const requests: unknown[] = []
+    const origin = await startConnector(async (request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([app]))
+      requests.push(await readBody(request))
+      send(response, 200, success({ data: {}, status: 200 }))
+    })
+    const { service } = await startService(origin)
+    let content = proxyFlow({ method: 'POST', bodyFormat: 'json' }, { endpoint: '/items', ...(body === undefined ? {} : { body }) })
+    if (state === 'unset') {
+      const node = content.document.graph.nodes.proxy!
+      if (node.kind !== 'task') throw new Error('Expected a Provider request.')
+      content = {
+        ...content,
+        document: {
+          ...content.document,
+          graph: { ...content.document.graph, nodes: { proxy: { ...node, inputs: { ...node.inputs, body: { kind: 'unset' } } } } },
+        },
+      }
+    }
+    expect(service.run(await run(service, content))?.status).toBe('completed')
+    expect(requests).toEqual([{ endpoint: '/items', method: 'POST', query: {}, headers: {}, ...(body === undefined ? {} : { body }) }])
+  })
+
+  it('executes GET with a cleared body without sending its resolved null or an inherited default', async () => {
+    const requests: unknown[] = []
+    const origin = await startConnector(async (request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, success([app]))
+      requests.push(await readBody(request))
+      send(response, 200, success({ data: {}, status: 200 }))
+    })
+    const { service } = await startService(origin)
+    const content = proxyFlow({ method: 'GET', bodyFormat: 'json' }, { endpoint: '/items' })
+    const node = content.document.graph.nodes.proxy!
+    if (node.kind !== 'task') throw new Error('Expected a Provider request.')
+    const revision: RevisionContent = {
+      ...content,
+      document: {
+        ...content.document,
+        graph: {
+          ...content.document.graph,
+          nodes: {
+            proxy: {
+              ...node,
+              task: {
+                ...node.task,
+                inputs: node.task.inputs.map((inputPort) =>
+                  'handle' in inputPort && inputPort.handle === 'body' ? Object.assign({}, inputPort, { value: 'saved default' }) : inputPort,
+                ),
+              },
+              inputs: { ...node.inputs, body: { kind: 'unset' } },
+            },
+          },
+        },
+      },
+    }
+    expect(service.run(await run(service, revision))?.status).toBe('completed')
+    expect(requests).toEqual([{ endpoint: '/items', method: 'GET', query: {}, headers: {} }])
+  })
+
   it('checks Proxy account eligibility before publication without sending a business request', async () => {
     let active = false
     let proxyCalls = 0

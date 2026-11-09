@@ -1705,6 +1705,7 @@
     "workflow": "工作流"
   },
   "connectorProxy": {
+    "bodyUnsupported": "GET 请求不支持请求体。",
     "title": "自定义 API 请求",
     "description": "使用已连接账号调用 Provider API。",
     "endpoint": "接口路径"

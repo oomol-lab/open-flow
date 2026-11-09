@@ -1,10 +1,11 @@
 import type { AuthoringHost } from '../../control/common/authoring.ts'
-import type { RevisionContent } from '../../flow/common/change.ts'
+import type { InputMapping, RevisionContent } from '../../flow/common/change.ts'
 
 import { expect, it } from 'vitest'
 import { authoringNode, compileAuthoring } from '../../control/common/authoring.ts'
-import { currentFlowModelVersion } from '../../flow/common/change.ts'
+import { applyFlowChanges, currentFlowModelVersion } from '../../flow/common/change.ts'
 import { decodeRevisionContent } from '../../flow/common/changeSchema.ts'
+import { resetInputValues, setInputValue } from '../../flow/common/nodeChanges.ts'
 import { requestInputMappings } from '../../flow/common/requestParameters.ts'
 import { prepareFlow } from '../../flow/common/semantics.ts'
 import { currentEngineContract } from '../../runtime/common/engineContract.ts'
@@ -45,10 +46,18 @@ it('preserves scalar query values and text headers in both parameter modes, reje
 })
 
 it('distinguishes no request body from JSON null, empty objects and strings', () => {
-  expect(buildConnectorProxyRequest(config({ method: 'POST' }), { endpoint: '/items', body: null })).not.toHaveProperty('body')
-  for (const body of [null, {}, 'message']) {
-    expect(buildConnectorProxyRequest(config({ method: 'POST', bodyFormat: 'json' }), { endpoint: '/items', body })).toMatchObject({ body })
+  const post = config({ method: 'POST' })
+  expect(buildConnectorProxyRequest(post, { endpoint: '/items' })).not.toHaveProperty('body')
+  for (const mappings of [{}, { body: { kind: 'unset' } }] as Readonly<Record<string, InputMapping>>[]) {
+    expect(buildConnectorProxyRequest(post, { endpoint: '/items', body: null }, mappings)).not.toHaveProperty('body')
   }
+  for (const body of [null, {}, 'message', '', false, 0]) {
+    expect(buildConnectorProxyRequest(post, { endpoint: '/items', body })).toMatchObject({ body })
+    expect(buildConnectorProxyRequest(post, { endpoint: '/items', body }, { body: { kind: 'value', value: body } })).toMatchObject({ body })
+  }
+  expect(buildConnectorProxyRequest(post, { endpoint: '/items', body: null }, {}, null)).toHaveProperty('body', null)
+  expect(buildConnectorProxyRequest(post, { endpoint: '/items', body: null }, { body: { kind: 'unset' } }, null)).not.toHaveProperty('body')
+  expect(buildConnectorProxyRequest(config({ bodyFormat: 'json' }), { endpoint: '/items', body: null }, {})).not.toHaveProperty('body')
   expect(() => buildConnectorProxyRequest(config({ bodyFormat: 'json' }), { endpoint: '/items', body: {} })).toThrow('configuration')
 })
 
@@ -86,7 +95,7 @@ it('creates, reads, partially updates, saves and validates through the public au
           as: 'proxy',
           name: 'Provider request',
           onError: 'error',
-          config: { providerId: 'example', connectionId: '', method: 'POST', bodyFormat: 'json', query: { names: ['page'] }, headers: { mode: 'object' } },
+          config: { providerId: 'example', connectionId: '', method: 'POST', query: { names: ['page'] }, headers: { mode: 'object' } },
           inputs: {
             'endpoint': { kind: 'output', node: '$start', port: 'endpoint' },
             'body': { kind: 'value', value: null },
@@ -121,6 +130,32 @@ it('creates, reads, partially updates, saves and validates through the public au
   const prepared = await prepareFlow(reloaded, currentEngineContract)
   if (prepared.kind !== 'prepared') throw new Error(JSON.stringify(prepared))
   expect(await prepareFlow(reloaded, 'open-flow-engine/v10')).toEqual({ kind: 'engine-unsupported' })
+  const cleared = await compileAuthoring(
+    reloaded,
+    { baseRevision: 'updated', requestId: 'clear', edits: [{ op: 'input.set', node: id, input: 'body', source: { kind: 'unset' } }] },
+    host,
+  )
+  expect(authoringNode(cleared.content, id)).toMatchObject({ inputs: { body: { kind: 'unset' } } })
+  const restored = await compileAuthoring(
+    cleared.content,
+    { baseRevision: 'cleared', requestId: 'restore', edits: [{ op: 'input.set', node: id, input: 'body', source: { kind: 'value', value: {} } }] },
+    host,
+  )
+  expect(authoringNode(restored.content, id)).toMatchObject({ config: { bodyFormat: 'json' }, inputs: { body: { kind: 'value', value: {} } } })
+  const get = await compileAuthoring(
+    restored.content,
+    { baseRevision: 'restored', requestId: 'get', edits: [{ op: 'node.update', node: id, set: { config: { method: 'GET' } } }] },
+    host,
+  )
+  expect(authoringNode(get.content, id)).toMatchObject({
+    config: { providerId: 'example', connectionId: 'account', method: 'GET' },
+    inputs: {
+      'body': { kind: 'unset' },
+      'query.page': { kind: 'sources', sources: [{ kind: 'variable', name: 'PAGE' }] },
+      'headers': { kind: 'value', value: { Accept: 'application/json' } },
+    },
+  })
+  expect(await prepareFlow(get.content, currentEngineContract)).toMatchObject({ kind: 'prepared' })
   expect(() => decodeRevisionContent({ ...reloaded, modelVersion: 13 })).toThrow('v14')
   expect(await prepareFlow(decodeRevisionContent({ ...empty, modelVersion: 13 }), 'open-flow-engine/v10')).not.toMatchObject({ kind: 'engine-unsupported' })
   await expect(
@@ -143,4 +178,42 @@ it('creates, reads, partially updates, saves and validates through the public au
       host,
     ),
   ).rejects.toThrow()
+})
+
+it('clears a body without losing its definition or inherited default and can restore inheritance', () => {
+  const task = connectorProxyTask(config({ method: 'POST', bodyFormat: 'json' }))
+  const originalTask = {
+    ...task,
+    inputs: task.inputs.map((port) =>
+      'handle' in port && port.handle === 'body' ? Object.assign({}, port, { value: 'default', description: 'Saved' }) : port,
+    ),
+  }
+  const content: RevisionContent = {
+    ...empty,
+    document: {
+      ...empty.document,
+      graph: {
+        edges: [],
+        nodes: {
+          request: {
+            kind: 'task',
+            task: originalTask,
+            inputs: { endpoint: { kind: 'value', value: '/items' }, body: { kind: 'value', value: null } },
+          },
+        },
+      },
+    },
+  }
+  const cleared = applyFlowChanges(content, setInputValue(content, 'request', 'body', undefined)!)
+  const node = cleared.document.graph.nodes.request!
+  if (node.kind !== 'task' || !('executor' in node.task) || node.task.executor.kind !== 'connector-proxy') throw new Error('Expected a Provider request.')
+  expect(node.task).toEqual(originalTask)
+  expect(node.inputs.body).toEqual({ kind: 'unset' })
+  expect(buildConnectorProxyRequest(node.task.executor, { endpoint: '/items', body: null }, node.inputs, 'default')).not.toHaveProperty('body')
+  const reset = applyFlowChanges(cleared, resetInputValues(cleared, 'request', ['body']))
+  const inherited = reset.document.graph.nodes.request!
+  if (inherited.kind !== 'task') throw new Error('Expected a Provider request.')
+  expect(inherited.inputs).not.toHaveProperty('body')
+  expect(inherited.task).toEqual(node.task)
+  expect(buildConnectorProxyRequest(node.task.executor, { endpoint: '/items', body: 'default' }, inherited.inputs, 'default')).toHaveProperty('body', 'default')
 })

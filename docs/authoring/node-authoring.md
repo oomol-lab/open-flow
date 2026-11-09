@@ -274,11 +274,18 @@ failures still fail. See the Control API HTTP Request contract for wire formats 
 ## Provider API requests
 
 Public type `connector-proxy` calls Provider endpoints not packaged as Actions through the existing
-Connector Proxy. Configure `providerId`, optional `connectionId`, `method`, Query/Header modes and
-`bodyFormat: "none" | "json"`. Bind the required `endpoint` and request data through ordinary input
+Connector Proxy. Configure `providerId`, optional `connectionId`, `method` and Query/Header modes.
+Bind the required `endpoint` and optional request body through ordinary input
 sources. Query/Header editing shares HTTP Request's parameter implementation, with Proxy's scalar
 query contract: string, number, boolean or null; no arrays. JSON bodies accept strings and null.
-No body and an explicit null body remain distinct.
+No body and an explicit null body remain distinct. Setting or binding `body` automatically selects
+JSON internally; clearing it omits the body. Workbench exposes the ordinary optional input without
+a separate format choice, preferring the shared Object editor for new request bodies. Existing
+non-object values and whole-body sources keep their stored semantics. Public callers can omit
+`bodyFormat` when supplying `inputs.body`.
+GET hides the body input. Changing another method to GET explicitly unsets an existing body in the
+same edit, including inherited defaults; undo restores the previous method and body together.
+Existing invalid GET bodies remain diagnosable and can be cleared without exposing a body editor.
 
 The platform owns fixed `body`, `statusCode`, `headers` and `bodyEncoding` outputs. Responses are
 complete dynamic values; upstream 4xx/5xx statuses remain successful outputs when Connector returns

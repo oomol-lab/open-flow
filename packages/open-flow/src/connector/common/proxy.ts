@@ -9,6 +9,7 @@ import {
   requestParameterHandle,
   requestParameterIssues,
   requestParameterPorts,
+  requestInputMappings,
   retainRequestPorts,
   withRequestParameterFields,
   withRequestParameterSource,
@@ -74,6 +75,16 @@ export const connectorProxyExecutorSchema = connectorProxyConfigSchema.extend({ 
 export const connectorProxyQueryValueSchema = { type: ['string', 'number', 'boolean', 'null'] }
 export const connectorProxyQuerySchema = { type: 'object', additionalProperties: connectorProxyQueryValueSchema }
 export const connectorProxyHeaderSchema = { type: 'object', additionalProperties: { type: 'string' } }
+export const connectorProxyBodyInput: InputPort = { handle: 'body', jsonSchema: {}, nullable: true }
+
+export function connectorProxySupportsBody(method: ConnectorProxyRequest['method']): boolean {
+  return method !== 'GET'
+}
+
+export function connectorProxyHasBody(mapping: InputMapping | undefined, defaultValue?: JsonValue): boolean {
+  if (mapping?.kind === 'unset') return false
+  return mapping == null ? defaultValue !== undefined : mapping.kind === 'value' || mapping.sources.length > 0
+}
 
 export function connectorProxyTask(
   config: ConnectorProxyConfig,
@@ -84,7 +95,7 @@ export function connectorProxyTask(
   const inputs: InputPort[] = [
     { handle: 'endpoint', jsonSchema: { type: 'string' }, nullable: false },
     ...requestParameterPorts(config, connectorProxyQuerySchema, connectorProxyQueryValueSchema, connectorProxyHeaderSchema),
-    ...(config.bodyFormat === 'none' ? [] : [{ handle: 'body', jsonSchema: {}, nullable: true }]),
+    ...(config.bodyFormat === 'none' ? [] : [connectorProxyBodyInput]),
   ]
   const outputs: InputPort[] = [
     { handle: 'body', jsonSchema: {}, nullable: true },
@@ -100,10 +111,25 @@ export function connectorProxyTask(
   }
 }
 
-export function connectorProxyIssues(config: ConnectorProxyConfig) {
+export function connectorProxyInputs(
+  mappings: Readonly<Record<string, InputMapping>>,
+  previous: RequestTaskNode['task'],
+  next: RequestTaskNode['task'],
+): Record<string, InputMapping> {
+  const inputs = requestInputMappings(mappings, previous, next)
+  const before = previous.executor?.kind === 'connector-proxy' ? (previous.executor as ConnectorProxyExecutor) : undefined
+  const after = next.executor?.kind === 'connector-proxy' ? (next.executor as ConnectorProxyExecutor) : undefined
+  if (before != null && after != null && connectorProxySupportsBody(before.method) && !connectorProxySupportsBody(after.method)) {
+    const bodyPort = next.inputs.find((port): port is InputPort => 'handle' in port && port.handle === 'body')
+    if (connectorProxyHasBody(inputs.body, bodyPort?.value)) inputs.body = { kind: 'unset' }
+  }
+  return inputs
+}
+
+export function connectorProxyIssues(config: ConnectorProxyConfig, hasBody = config.bodyFormat !== 'none') {
   return [
     ...requestParameterIssues(config),
-    ...(config.method === 'GET' && config.bodyFormat !== 'none'
+    ...(!connectorProxySupportsBody(config.method) && hasBody
       ? [{ field: 'bodyFormat' as const, code: 'bodyUnsupported' as const, message: 'GET does not support a request body.' }]
       : []),
   ]
@@ -113,8 +139,10 @@ export function buildConnectorProxyRequest(
   config: ConnectorProxyConfig,
   input: Readonly<Record<string, JsonValue>>,
   mappings?: Readonly<Record<string, InputMapping>>,
+  bodyDefault?: JsonValue,
 ): ConnectorProxyRequest {
-  if (connectorProxyIssues(config).length > 0) throw new Error('Invalid Provider API request configuration.')
+  const hasBody = mappings == null ? input.body !== undefined : connectorProxyHasBody(mappings.body, bodyDefault)
+  if (connectorProxyIssues(config, hasBody).length > 0) throw new Error('Invalid Provider API request configuration.')
   const endpoint = input.endpoint
   if (typeof endpoint !== 'string' || !endpoint.trim()) throw new Error('An endpoint is required.')
   const parameters = (group: 'query' | 'headers'): Record<string, JsonValue> => {
@@ -143,7 +171,7 @@ export function buildConnectorProxyRequest(
     method: config.method,
     query: query as NonNullable<ConnectorProxyRequest['query']>,
     headers: headers as Readonly<Record<string, string>>,
-    ...(config.bodyFormat === 'none' ? {} : { body: input.body ?? null }),
+    ...(hasBody ? { body: input.body ?? null } : {}),
   }
 }
 

@@ -26,11 +26,12 @@ import type { WebhookDeploymentProps } from './webhookDeployment.tsx'
 
 import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
-import { connectorProxyQuerySchema, connectorProxyHeaderSchema } from '../../../../connector/common/proxy.ts'
+import { connectorProxyBodyInput, connectorProxyHasBody, connectorProxyQuerySchema, connectorProxyHeaderSchema } from '../../../../connector/common/proxy.ts'
 import { decisionModel } from '../../../../decision/common/decision.ts'
 import { executionReachableNodes, webhookResponseDiagnostics, inputSourceCandidates } from '../../../../flow/common/graph.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { webhookResponseInputs } from '../../../../flow/common/webhookResponse.ts'
+import { FieldTable } from '../../../../form/browser/fieldTable.tsx'
 import { httpQuerySchema, httpHeaderSchema } from '../../../../http/common/httpRequest.ts'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -393,34 +394,59 @@ export function NodeInspector({
 
   const requestInput = (handle: string, label: string) => {
     if (selection?.kind !== 'task' || task == null) return null
-    const definition = task.inputs.find((port): port is InputPort => 'handle' in port && port.handle === handle)
+    const proxyBody = proxy != null && handle === 'body'
+    const definition =
+      task.inputs.find((port): port is InputPort => 'handle' in port && port.handle === handle) ?? (proxyBody ? connectorProxyBodyInput : undefined)
     if (definition == null) return null
     const mapping = revision.inputMappings(selection.node)[handle]
     const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
     const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+    const input = (
+      <NodeInputValue
+        embedded
+        definition={definition}
+        label={label}
+        presentation={{
+          compact: !proxyBody,
+          hideOptions: true,
+          ...(proxyBody
+            ? {
+                layout: 'values' as const,
+                valueOnly: true,
+                hideChildTypes: true,
+                defaultEditor: 'object' as const,
+                expansionPolicy: () => true,
+                unset: { label: t(readOnly ? 'valueEditor.unset' : 'valueEditor.setValue'), required: false },
+              }
+            : {}),
+        }}
+        sourceOnly={handle.startsWith('auth.')}
+        readOnly={readOnly}
+        disabled={disabled}
+        value={inputValue(mapping, definition.value)}
+        connected={mapping?.kind === 'sources' && binding?.kind !== 'variable'}
+        variableName={binding?.kind === 'variable' ? binding.target : undefined}
+        upstream={inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, port: definition, t, triggerDisplays })}
+        variables={variables}
+        onValue={(value, deletion) => {
+          void store?.nodes.setInputValue(selection.id, handle, value, deletion)
+        }}
+        onVariable={(name) => {
+          void store?.nodes.setInputVariable(selection.id, handle, name)
+        }}
+        onReset={proxyBody && definition.value !== undefined ? () => void store?.nodes.resetInputs(selection.id, [handle]) : undefined}
+      />
+    )
     return (
       <Field key={handle}>
         <FieldLabel>{label}</FieldLabel>
-        <NodeInputValue
-          embedded
-          definition={definition}
-          label={label}
-          presentation={{ compact: true, hideOptions: true }}
-          sourceOnly={handle.startsWith('auth.')}
-          readOnly={readOnly}
-          disabled={disabled}
-          value={inputValue(mapping, definition.value)}
-          connected={mapping?.kind === 'sources' && binding?.kind !== 'variable'}
-          variableName={binding?.kind === 'variable' ? binding.target : undefined}
-          upstream={inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
-          variables={variables}
-          onValue={(value, deletion) => {
-            void store?.nodes.setInputValue(selection.id, handle, value, deletion)
-          }}
-          onVariable={(name) => {
-            void store?.nodes.setInputVariable(selection.id, handle, name)
-          }}
-        />
+        {proxyBody ? (
+          <FieldTable standalone layout="values" typeColumn={false} columnHeadings={false} actionSlots={2}>
+            {input}
+          </FieldTable>
+        ) : (
+          input
+        )}
       </Field>
     )
   }
@@ -768,8 +794,17 @@ export function NodeInspector({
             key={`proxy:${selection?.id}`}
             task={task}
             disabled={disabled}
+            readOnly={readOnly}
+            hasBody={
+              selection?.kind === 'task' &&
+              connectorProxyHasBody(
+                revision.inputMappings(selection.node).body,
+                task.inputs.find((port): port is InputPort => 'handle' in port && port.handle === 'body')?.value,
+              )
+            }
             input={requestInput}
             parameters={requestParameters}
+            onClearBody={() => store?.nodes.setInputValue(selection!.id, 'body', undefined) ?? Promise.resolve(false)}
             onSave={(before, value) =>
               store?.nodes.saveTaskSettings(selection!.id, { kind: 'connector-proxy', name: task.name, before, task: value }) ?? Promise.resolve(false)
             }

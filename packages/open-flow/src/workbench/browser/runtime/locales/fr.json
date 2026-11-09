@@ -1705,6 +1705,7 @@
     "workflow": "Workflow"
   },
   "connectorProxy": {
+    "bodyUnsupported": "Les requêtes GET ne prennent pas en charge de corps.",
     "title": "Requête API personnalisée",
     "description": "Appeler une API du fournisseur avec le compte connecté.",
     "endpoint": "Point de terminaison"

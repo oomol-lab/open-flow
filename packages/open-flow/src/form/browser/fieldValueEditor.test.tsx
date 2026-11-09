@@ -55,6 +55,13 @@ describe('Field unset policy', () => {
     expect(render({ schema: {}, value, unset: { label: 'Provided later', required: false } })).not.toContain('Provided later')
   })
 
+  it('allows an explicit nullable value to be cleared when unset has a separate meaning', () => {
+    const props = { schema: {}, value: null, nullable: true, layout: 'values' as const }
+    expect(render(props)).not.toContain('aria-label="Clear parameter"')
+    expect(render({ ...props, unset: { label: 'Click to set', required: false } })).toContain('aria-label="Clear parameter"')
+    expect(render({ ...props, unset: { label: 'Click to set', required: false }, readOnly: true })).not.toContain('aria-label="Clear parameter"')
+  })
+
   it('does not apply the parent policy to missing object children', () => {
     const markup = render({
       schema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
@@ -78,6 +85,22 @@ it('keeps delegated required prompts actionable without enabling literal editing
   expect(render({ ...props, readOnly: true })).toContain('disabled=""')
 })
 
+it('allows null in unconstrained collection children while retaining typed child constraints', () => {
+  for (const schema of [{}, true]) {
+    const object = render({ schema: { type: 'object', additionalProperties: schema }, value: { field: null }, valueOnly: true, expansionPolicy: () => true })
+    expect(object).not.toContain('aria-invalid="true"')
+    const array = render({ schema: { type: 'array', items: schema }, value: [null], valueOnly: true, expansionPolicy: () => true })
+    expect(array).not.toContain('aria-invalid="true"')
+  }
+  const constrained = render({
+    schema: { type: 'object', additionalProperties: { type: 'string' } },
+    value: { field: null },
+    valueOnly: true,
+    expansionPolicy: () => true,
+  })
+  expect(constrained).toContain('aria-invalid="true"')
+})
+
 describe('Default JSON value presentation', () => {
   it.each([undefined, '', 42, false, { answer: 42 }, ['one']])('uses single-line text for Any containing %j without changing the value', (value) => {
     const markup = render({ schema: {}, value })
@@ -92,6 +115,18 @@ describe('Default JSON value presentation', () => {
     const markup = render({ schema: { 'type': 'number', 'ui:widget': 'any', 'minimum': 0 }, value: 42 })
     expect(markup).toContain('aria-label="parameter, data type: Number"')
     expect(markup).toContain('value="42"')
+  })
+
+  it('uses an explicit Object preference without creating a value or changing saved scalar data', () => {
+    const props = { schema: {}, defaultEditor: 'object' as const, valueOnly: true, unset: { label: 'Set parameter', required: false } }
+    const markup = render(props)
+    expect(markup).toContain('aria-label="parameter, data type: Object"')
+    expect(markup).toContain('Set parameter')
+    expect(markup).not.toContain('<textarea')
+    expect(markup).not.toContain('aria-invalid="true"')
+    const saved = render({ ...props, value: 'saved' })
+    expect(saved).toContain('aria-label="parameter, data type: Text"')
+    expect(saved).toContain('value="saved"')
   })
 })
 

@@ -1705,6 +1705,7 @@
     "workflow": "Workflow"
   },
   "connectorProxy": {
+    "bodyUnsupported": "GET requests do not support a request body.",
     "title": "Custom API Request",
     "description": "Call a Provider API using its connected account.",
     "endpoint": "Endpoint"

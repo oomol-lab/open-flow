@@ -25,7 +25,7 @@ function content(): RevisionContent {
       graph: {
         edges: ['post', 'object'].map((target) => ({ source: 'data', target })),
         nodes: {
-          data: {
+          'data': {
             kind: 'value',
             name: 'Request data',
             inputs: {},
@@ -44,8 +44,14 @@ function content(): RevisionContent {
               },
             ],
           },
-          get: { kind: 'task', name: 'GitHub request', task: task(), inputs: { endpoint: { kind: 'value', value: '/user' } } },
-          post: {
+          'get': { kind: 'task', name: 'GitHub request', task: task(), inputs: { endpoint: { kind: 'value', value: '/user' } } },
+          'saved-get': {
+            kind: 'task',
+            name: 'Saved GET body',
+            task: task({ bodyFormat: 'json' }),
+            inputs: { endpoint: { kind: 'value', value: '/user' }, body: { kind: 'value', value: null } },
+          },
+          'post': {
             kind: 'task',
             name: 'JSON POST',
             task: task({ connectionId: 'work', method: 'POST', bodyFormat: 'json', query: { names: ['page'] }, headers: { names: ['X-Test'] } }),
@@ -56,7 +62,16 @@ function content(): RevisionContent {
               'header.X-Test': { kind: 'value', value: 'Workbench' },
             },
           },
-          object: {
+          'body-object': {
+            kind: 'task',
+            name: 'Object POST',
+            task: task({ connectionId: 'work', method: 'POST', bodyFormat: 'json' }),
+            inputs: {
+              endpoint: { kind: 'value', value: '/unlisted' },
+              body: { kind: 'value', value: { message: 'hello', metadata: { source: 'Workbench' }, optional: null } },
+            },
+          },
+          'object': {
             kind: 'task',
             name: 'Deferred account',
             task: task({ connectionId: '', query: { mode: 'object' }, headers: { mode: 'object' } }),
@@ -66,8 +81,8 @@ function content(): RevisionContent {
               headers: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'data', output: 'headers' }] },
             },
           },
-          public: { kind: 'task', name: 'Public API', task: task({ providerId: 'public-api' }), inputs: { endpoint: { kind: 'value', value: '/items' } } },
-          missing: {
+          'public': { kind: 'task', name: 'Public API', task: task({ providerId: 'public-api' }), inputs: { endpoint: { kind: 'value', value: '/items' } } },
+          'missing': {
             kind: 'task',
             name: 'Unavailable Provider',
             task: task({ providerId: 'retired-provider' }),
@@ -105,7 +120,7 @@ function ProxyStory({ dark, language, log }: { dark: boolean; language: UiLangua
     return () => next.dispose()
   }, [language])
   useStoryActions([
-    ...['get', 'post', 'object', 'public', 'missing'].map((id) => ({
+    ...['get', 'post', 'body-object', 'object', 'public', 'missing', 'saved-get'].map((id) => ({
       label: id,
       onClick: () => {
         setSelected(id)
@@ -169,7 +184,7 @@ export const connectorProxyStory: FrontendStory = {
   title: 'Provider API Request',
   standalone: true,
   description:
-    'Edit endpoint, scalar Query and Headers using fixed values, variables or Request data. Compare an unconfigured account, selected account, explicitly deferred account, public Provider and missing Provider. The missing Provider shows an error with Retry. Check JSON null, whole-object bindings, read-only preview, and Undo/Redo. HTTP Request has its own regression story for the shared parameter editor.',
+    'GET hides Request body. Other methods prefer the Object editor: create an optional body, add and edit fields, or bind the whole body to a variable or upstream output. An unset body is not sent; null, empty objects and existing non-object values retain their meaning. Change POST with a literal or bound body to GET: method and body clear together in one Undo/Redo entry. saved-get covers an older invalid GET body with a clear action and read-only error. Edit endpoint, scalar Query and Headers using fixed values, variables or Request data. Compare unconfigured, selected and deferred accounts, public and missing Providers. HTTP Request has its own shared-parameter regression story.',
   render: (log, dark, language) => <ProxyStory dark={dark} language={language} log={log} />,
 }
 
