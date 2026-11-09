@@ -1288,6 +1288,7 @@
     "missingStatuses": "部分已选状态不再可用，请移除或重新选择。"
   },
   "nodePicker": {
+    "custom": "自定义",
     "actionGroups": {
       "read": "读取接口",
       "write": "写入接口",

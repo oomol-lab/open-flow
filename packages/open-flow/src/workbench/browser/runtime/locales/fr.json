@@ -1288,6 +1288,7 @@
     "missingStatuses": "Certains statuts sélectionnés ne sont plus disponibles. Supprimez-les ou remplacez-les."
   },
   "nodePicker": {
+    "custom": "Personnalisé",
     "actionGroups": {
       "read": "Actions de lecture",
       "write": "Actions d’écriture",

@@ -1288,6 +1288,7 @@
     "missingStatuses": "Some selected statuses are no longer available. Remove or replace them."
   },
   "nodePicker": {
+    "custom": "Custom",
     "actionGroups": {
       "read": "Read actions",
       "write": "Write actions",

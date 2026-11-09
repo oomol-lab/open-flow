@@ -37,3 +37,17 @@ it('omits empty categories from filtered results', () => {
   expect(groupActionOptions([read])).toEqual([{ type: 'read', items: [read] }])
   expect(groupActionOptions([])).toEqual([])
 })
+
+it('keeps Provider request nodes out of Action selection for Code and Agent tools', () => {
+  const request: AddNodeOption = {
+    id: 'connector-proxy:app',
+    kind: 'connector-proxy',
+    provider: { serviceId: 'app', serviceName: 'App' },
+    label: 'Custom API Request',
+    description: '',
+    inputs: [],
+    outputs: [],
+  }
+  const read = action('read', 'read')
+  expect(groupActionOptions([request, read])).toEqual([{ type: 'read', items: [read] }])
+})

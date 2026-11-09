@@ -8,8 +8,11 @@ import { I18nProvider } from 'val-i18n-react'
 import { connectorProxyConfigSchema, connectorProxyTask } from '../../src/connector/common/proxy.ts'
 import { currentFlowModelVersion } from '../../src/flow/common/change.ts'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
+import { FlowEditor } from '../../src/workbench/browser/runtime/flowWorkspace.tsx'
+import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
 import { InspectorSamplePanel } from './inspectorSamplePanel.tsx'
-import { createInspectorSession } from './inspectorSession.ts'
+import { createInspectorSession, createInspectorTransport } from './inspectorSession.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 const task = (config: object = {}) => connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'github', ...config }))
@@ -168,4 +171,80 @@ export const connectorProxyStory: FrontendStory = {
   description:
     'Edit endpoint, scalar Query and Headers using fixed values, variables or Request data. Compare an unconfigured account, selected account, explicitly deferred account, public Provider and missing Provider. The missing Provider shows an error with Retry. Check JSON null, whole-object bindings, read-only preview, and Undo/Redo. HTTP Request has its own regression story for the shared parameter editor.',
   render: (log, dark, language) => <ProxyStory dark={dark} language={language} log={log} />,
+}
+
+function ProxyCreationStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
+  const [session, setSession] = useState<{ store: WorkbenchStore; i18n: ReturnType<typeof createI18n> }>()
+  const logRef = useRef(log)
+  useEffect(() => {
+    logRef.current = log
+  }, [log])
+  useEffect(() => {
+    const i18n = createI18n(language)
+    const { client, flowId } = createInspectorTransport(
+      (name, value) => logRef.current(name, value),
+      {
+        modelVersion: currentFlowModelVersion,
+        modules: {},
+        document: { bindings: {}, graph: { edges: [], nodes: {} } },
+      },
+      {
+        providers: [
+          { service: 'github', displayName: 'GitHub', authTypes: ['oauth'] },
+          { service: 'public-api', displayName: 'Public API', authTypes: ['no_auth'] },
+        ],
+        actions: [
+          {
+            actionId: 'github.get_user',
+            serviceId: 'github',
+            serviceName: 'GitHub',
+            name: 'Get user',
+            description: 'Read a user.',
+            authenticated: true,
+            inputs: {},
+            outputs: {},
+            inputSchema: { type: 'object', properties: {} },
+            outputSchema: { type: 'object', properties: { login: { type: 'string' } }, required: ['login'], additionalProperties: false },
+          },
+        ],
+        connections: [{ id: 'work', service: 'github', displayName: 'Work account', status: 'active', isDefault: true }],
+      },
+    )
+    const store = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, i18n, undefined, false)
+    setSession({ store, i18n })
+    void store.start(flowId)
+    return () => {
+      store.dispose()
+      i18n.dispose()
+    }
+  }, [language])
+  useStoryActions([{ label: 'Reload saved data', onClick: () => void session?.store.workspace.selectFlow('inspector-lab') }])
+  if (session == null) return null
+  return (
+    <I18nProvider i18n={session.i18n}>
+      <div className="open-flow-workbench open-flow-theme grid h-full" data-theme={dark ? 'dark' : 'light'}>
+        <FlowEditor
+          store={session.store}
+          theme={dark ? 'dark' : 'light'}
+          onRun={() => {}}
+          onRunStarted={() => {}}
+          onOpenPublications={() => {}}
+          onOpenRuns={() => {}}
+          onCloseRuns={() => {}}
+          onToggleRuns={() => {}}
+          runDrawerOpen={false}
+        />
+      </div>
+    </I18nProvider>
+  )
+}
+
+export const connectorProxyCreationStory: FrontendStory = {
+  id: 'connector-proxy-creation',
+  group: 'Node Task',
+  title: 'Create Provider API Request',
+  standalone: true,
+  description:
+    'Use the production Add node panel to open GitHub or Public API and select Custom API Request from the bottom Custom group. GitHub also has an Action; Public API has none. Create a node, edit its endpoint and account, then undo, redo and reload saved data. The real Workbench saves the graph and presentation through the fixture transport.',
+  render: (log, dark, language) => <ProxyCreationStory dark={dark} language={language} log={log} />,
 }

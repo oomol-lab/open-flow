@@ -200,7 +200,9 @@ export function NodePickerContent({
         onDragEnd={onDragEnd}
         className={`group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-start gap-2.5 rounded-[calc(var(--ui-control-radius)+2px)] px-2.5 py-1.5 text-left outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${compact ? '' : '[&>span:first-child]:translate-y-[2px]'}`}
       >
-        {item.kind == 'connector' || (item.kind == 'trigger' && 'trigger' in item && (item.trigger.kind == 'catalog' || item.trigger.kind == 'connect')) ? (
+        {item.kind == 'connector' ||
+        item.kind === 'connector-proxy' ||
+        (item.kind == 'trigger' && 'trigger' in item && (item.trigger.kind == 'catalog' || item.trigger.kind == 'connect')) ? (
           <ProviderAppIcon src={item.icon} />
         ) : (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-[var(--ui-control-radius)] bg-muted">
@@ -396,6 +398,10 @@ export function NodePickerContent({
                 <>
                   {section(t('addNode.triggers'), visibleTriggers)}
                   {actionSections(visibleActions)}
+                  {section(
+                    t('nodePicker.custom'),
+                    visibleActions.filter((item) => item.kind === 'connector-proxy'),
+                  )}
                   {!choicesLoading && !choicesFailed && !catalogFailed && visibleActions.length == 0 && visibleTriggers.length == 0 && <PickerStatus />}
                 </>
               ) : searching ? (

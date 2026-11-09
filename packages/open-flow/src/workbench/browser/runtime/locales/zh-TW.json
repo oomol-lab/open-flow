@@ -1288,6 +1288,7 @@
     "missingStatuses": "部分已選狀態不再可用，請移除或重新選擇。"
   },
   "nodePicker": {
+    "custom": "自訂",
     "actionGroups": {
       "read": "讀取介面",
       "write": "寫入介面",
