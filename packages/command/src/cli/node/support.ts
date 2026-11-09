@@ -53,13 +53,23 @@ export class CliError extends Error {
 
 export function checkedResourceName(value: string, label: 'Flow'): string {
   const name = value.trim()
-  if (resourceNameIssue(name) != null) {
-    throw new CliError(
-      'cli.invalid-arguments',
-      `${label} name must be between 1 and ${resourceNameMaxLength} characters and use only letters, numbers, spaces, hyphens, or underscores.`,
-    )
-  }
-  return name
+  const issue = resourceNameIssue(name)
+  if (issue == null) return name
+  const rule = `${label} names use letters (any language), numbers, spaces, hyphens, or underscores, and start and end with a letter or number.`
+  const message = {
+    controlCharacter: `${label} name contains a control character. ${rule}`,
+    empty: `${label} name is required.`,
+    specialCharacter: `${label} name ${invalidNameCharacterDescription(name)}. ${rule}`,
+    tooLong: `${label} name has ${[...name].length} characters; the limit is ${resourceNameMaxLength}.`,
+  }[issue]
+  throw new CliError('cli.invalid-arguments', message)
+}
+
+function invalidNameCharacterDescription(name: string): string {
+  const characters = [...name]
+  const invalid = characters.find((character) => !/[\p{L}\p{N} _-]/u.test(character))
+  if (invalid != null) return `contains unsupported character ${JSON.stringify(invalid)}`
+  return /[\p{L}\p{N}]/u.test(characters[0]!) ? 'must end with a letter or number' : 'must start with a letter or number'
 }
 
 const flowPageLimit = 100

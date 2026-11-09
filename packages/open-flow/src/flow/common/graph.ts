@@ -39,6 +39,13 @@ import {
 export function isResolutionNode(node: GraphNode | undefined): node is Extract<GraphNode, { readonly kind: 'approval' | 'wait' }> {
   return node?.kind == 'approval' || node?.kind == 'wait'
 }
+function keywordMismatchDetail(mismatch: SchemaMismatch | undefined): string {
+  if (mismatch?.kind != 'keyword') return ''
+  const location = mismatch.path.length == 0 ? '' : ` at ${mismatch.path.join('.')}`
+  const declared = mismatch.source === undefined ? 'does not declare it' : `declares ${JSON.stringify(mismatch.source)}`
+  return ` The input requires ${mismatch.keyword} ${JSON.stringify(mismatch.target)}${location}; the output ${declared}.`
+}
+
 function graphDiagnostic(
   code: string,
   message: string,
@@ -369,7 +376,9 @@ function checkSource(
           diagnostics.push(
             graphDiagnostic(
               'graph.node-output-incompatible',
-              `Upstream node "${source.nodeId}" output ${JSON.stringify(sourceOutputLabel(source))} is not compatible with this input.`,
+              `Upstream node "${source.nodeId}" output ${JSON.stringify(sourceOutputLabel(source))} is not compatible with this input.${
+                comparison.kind == 'incompatible' ? keywordMismatchDetail(comparison.mismatch) : ''
+              }`,
               path,
               { nodeId: source.nodeId, output: source.output, ...(source.field === undefined ? {} : { field: source.field }) },
               comparison.kind == 'incompatible' ? comparison.mismatch : undefined,

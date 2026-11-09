@@ -1746,7 +1746,7 @@ export class ControlClient {
       try {
         value = await response.json()
       } catch {
-        return invalidResponse()
+        return invalidResponse(`HTTP ${response.status} response did not include a JSON error body.`)
       }
       const error = record(value).error
       const source = error == null ? undefined : record(error)
@@ -1765,7 +1765,7 @@ export class ControlClient {
     try {
       return (await response.json()) as Value
     } catch {
-      return invalidResponse()
+      return invalidResponse(`HTTP ${response.status} response body is not JSON.`)
     }
   }
 }

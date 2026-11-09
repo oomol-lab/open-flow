@@ -298,6 +298,28 @@ describe('CLI', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
+  it('names the unsupported character in a rejected Flow name and accepts non-Latin letters', async () => {
+    const rejected = runtime()
+    const request = vi.fn()
+    await expect(runCli(['create', '发版告警（试验）', '--json'], { request }, rejected.value)).resolves.toBe(1)
+    expect(JSON.parse(rejected.stderr()).error.message).toContain('unsupported character "（"')
+    expect(request).not.toHaveBeenCalled()
+
+    const trailing = runtime()
+    await expect(runCli(['create', '发版 告警-', '--json'], { request }, trailing.value)).resolves.toBe(1)
+    expect(JSON.parse(trailing.stderr()).error.message).toContain('must end with a letter or number')
+  })
+
+  it('lists node types when a schema name is unknown', async () => {
+    const output = runtime()
+    const request = vi.fn()
+    await expect(runCli(['schema', 'variable', '--json'], { request }, output.value)).resolves.toBe(1)
+    const message = JSON.parse(output.stderr()).error.message as string
+    expect(message).toContain('code')
+    expect(message).toContain('Input sources such as variable are described by the edits schema.')
+    expect(request).not.toHaveBeenCalled()
+  })
+
   it('does not expose the removed Project command', async () => {
     const output = runtime()
     const request = vi.fn()
