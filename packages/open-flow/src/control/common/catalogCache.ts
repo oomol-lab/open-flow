@@ -76,8 +76,10 @@ function wait<Value>(promise: Promise<Value>, signal?: AbortSignal): Promise<Val
 /** Complete Flow API responses, never a merged store of catalog entities. */
 export class ControlCatalogCache {
   readonly #pending = new Map<string, { readonly fresh: boolean; readonly promise: Promise<ControlCacheRead> }>()
+  private readonly options: ControlCacheOptions
 
-  constructor(private readonly options: ControlCacheOptions) {
+  constructor(options: ControlCacheOptions) {
+    this.options = options
     if (!options.scope.trim()) throw new TypeError('Control cache scope must be nonempty.')
     if (options.maxAgeMs != null && (!Number.isFinite(options.maxAgeMs) || options.maxAgeMs < 0))
       throw new TypeError('Control cache maxAgeMs must be finite and nonnegative.')

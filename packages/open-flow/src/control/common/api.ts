@@ -869,12 +869,10 @@ export class ControlClient {
   private readonly requestControl: ControlRequest
   private readonly channel: 'workbench' | 'cli' | 'api'
   private readonly catalogCache?: ControlCatalogCache
+  private readonly options: { readonly cache?: ControlCacheOptions }
 
-  constructor(
-    requestControl: ControlRequest,
-    channel: 'workbench' | 'cli' | 'api' = 'api',
-    private readonly options: { readonly cache?: ControlCacheOptions } = {},
-  ) {
+  constructor(requestControl: ControlRequest, channel: 'workbench' | 'cli' | 'api' = 'api', options: { readonly cache?: ControlCacheOptions } = {}) {
+    this.options = options
     this.channel = channel
     this.requestControl = requestControl
     if (options.cache != null) this.catalogCache = new ControlCatalogCache(options.cache)
