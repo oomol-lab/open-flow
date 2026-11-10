@@ -396,6 +396,7 @@ it.each([false, true])('exports the chosen PNG theme independently of the worksp
     layout: 'compact',
     aspectRatio: '16:9',
     ignoredNodeIds: [],
+    iconCache: expect.objectContaining({ get: expect.any(Function) }),
   })
   expect(boundary.png!.preferences).toBe(view.store.preferences)
   set(view.store.workspace.$.flowId, 'other')

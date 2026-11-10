@@ -1,3 +1,5 @@
+import type { ProviderIconLoader } from '../../connector/common/providerIconCache.ts'
+import type { ConnectorProvider } from '../../control/common/api.ts'
 import type { WorkflowFile } from '../../flow/common/workflowFile.ts'
 import type { UiLanguage } from '../../localization/common/languages.ts'
 
@@ -30,6 +32,7 @@ export interface FlowPngOptions {
 export interface RenderRequest {
   readonly workflow: WorkflowFile
   readonly options: FlowPngOptions
+  readonly providers?: readonly ConnectorProvider[]
 }
 
 export interface RenderResponse {
@@ -41,4 +44,9 @@ export interface RenderResponse {
 
 export interface BrowserRenderer {
   render(request: RenderRequest): Promise<RenderResponse>
+}
+
+export interface RendererGlobals {
+  readonly OpenFlowRenderer: BrowserRenderer
+  readonly OpenFlowProviderIcon: ProviderIconLoader['get']
 }

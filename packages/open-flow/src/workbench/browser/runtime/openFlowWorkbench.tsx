@@ -3,6 +3,7 @@ import type { WorkflowFile } from '../../../flow/common/workflowFile.ts'
 import type { WorkflowBundleImporter } from './contract.ts'
 
 import { IconThemeContext } from '../../../ui/browser/icons/iconTheme.ts'
+import { ProviderIconCacheContext } from '../../../ui/browser/icons/providerIconResource.ts'
 export { EventSourcesPage } from './eventSources.tsx'
 import type { FormEvent, ReactElement, Ref } from 'react'
 import type {
@@ -405,5 +406,9 @@ const Session = forwardRef<OpenFlowWorkbenchHandle, SessionProps>(function Sessi
 })
 
 export const OpenFlowWorkbench = forwardRef<OpenFlowWorkbenchHandle, OpenFlowWorkbenchProps>(function OpenFlowWorkbench({ sessionKey, ...props }, ref) {
-  return <Session ref={ref} key={`${sessionKey}:${props.host.connectorOwnerId ?? ''}`} sessionKey={sessionKey} {...props} />
+  return (
+    <ProviderIconCacheContext.Provider value={props.host.iconCache}>
+      <Session ref={ref} key={`${sessionKey}:${props.host.connectorOwnerId ?? ''}`} sessionKey={sessionKey} {...props} />
+    </ProviderIconCacheContext.Provider>
+  )
 })

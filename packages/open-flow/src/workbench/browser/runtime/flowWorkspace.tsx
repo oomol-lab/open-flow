@@ -14,6 +14,7 @@ import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
 import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { Empty, EmptyHeader, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
+import { useProviderIconCache } from '../../../ui/browser/icons/providerIconResource.ts'
 import { canvasAnnotations } from './editor/canvasAnnotations.ts'
 import { CanvasHistoryScope } from './editor/canvasHistoryScope.tsx'
 import { CommentInspector } from './editor/commentInspector.tsx'
@@ -333,13 +334,14 @@ export function FlowEditor({
   const moduleEditor = useVal(store.workspace.$.moduleEditor)
   const initialAddNodeTab = triggers.length == 0 ? 'triggers' : 'nodes'
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(flowId ?? '')
+  const iconCache = useProviderIconCache()
   const renderPng = useCallback(
     async (options: PngExportSettings) => {
       const model = store.$.designer.value
       const { flowToPng } = await import('../../../canvas/browser/graph/FlowCanvas/exportPng.ts')
-      return flowToPng(model, language, { ...options, ignoredNodeIds })
+      return flowToPng(model, language, { ...options, ignoredNodeIds, iconCache })
     },
-    [store, language, ignoredNodeIds],
+    [store, language, ignoredNodeIds, iconCache],
   )
   const panel = useInspectorPanel({
     identity: flowId ?? '',

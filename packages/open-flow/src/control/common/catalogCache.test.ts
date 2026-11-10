@@ -34,6 +34,20 @@ function storage() {
 afterEach(() => vi.useRealTimers())
 
 describe('delegated Flow catalog caching', () => {
+  it('reads Provider metadata cache-only without joining or starting online requests', async () => {
+    const { delegate } = storage()
+    const request = vi.fn(async () => Response.json({ version: 1, providers: [{ serviceId: 'mail', serviceName: 'Mail' }] }))
+    const client = new ControlClient(request, 'api', { cache: { delegate, scope: 'provider', maxAgeMs: 0 } })
+    await expect(client.listConnectorProviders(undefined, undefined, 'en', { cacheOnly: true })).rejects.toMatchObject({ code: 'catalog.cache-miss' })
+    expect(request).not.toHaveBeenCalled()
+    const providers = await client.listConnectorProviders(undefined, undefined, 'en')
+    expect(await client.listConnectorProviders(undefined, undefined, 'en', { cacheOnly: true })).toEqual(providers)
+    expect(request).toHaveBeenCalledTimes(1)
+    await expect(new ControlClient(request).listConnectorProviders(undefined, undefined, 'en', { cacheOnly: true })).rejects.toMatchObject({
+      code: 'catalog.cache-miss',
+    })
+    expect(request).toHaveBeenCalledTimes(1)
+  })
   it('stores the complete response and shares persisted reads across client instances', async () => {
     const { delegate, records } = storage()
     const reads: ControlCacheRead[] = []

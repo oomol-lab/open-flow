@@ -14,6 +14,7 @@ import { twemojiCollectionPlugin } from '../../build/node/twemojiCollection.ts'
 const execFileAsync = promisify(execFile)
 const packageRequire = createRequire(import.meta.url)
 const connectorActionEntryPath = 'src/connector/common/actionSchema.ts'
+const providerIconsEntryPath = 'src/connector/common/providerIconCache.ts'
 const connectorProxyEntryPath = 'src/connector/common/proxy.ts'
 const controlRequestsEntryPath = 'src/control/common/requests.ts'
 const mcpEntryPath = 'src/control/common/mcp.ts'
@@ -49,6 +50,8 @@ const workbenchDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowWor
 
 /** Published declaration paths under `dist/`, keyed by source path under `src/`. A source may publish into several directories. */
 const declarationOutputs: readonly (readonly [source: string, output: string])[] = [
+  ['base/common/cache', 'common/cache'],
+  ['connector/common/providerIconCache', 'common/provider-icons'],
   ['canvas/common/commands', 'common/canvas-commands'],
   ['canvas/common/direction', 'common/canvas-direction'],
   ['canvas/common/interactiveMode', 'common/canvas-interactive-mode'],
@@ -165,6 +168,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, commonOutputPath, 'src/openapi/common/openapi.ts', 'openapi', false)
   await buildRuntime(options, commonOutputPath, 'src/workflow/common/workflow.ts', 'workflow', false)
   await buildRuntime(options, commonOutputPath, connectorActionEntryPath, 'connector-action', false)
+  await buildRuntime(options, commonOutputPath, providerIconsEntryPath, 'provider-icons', false)
   await buildRuntime(options, commonOutputPath, controlRequestsEntryPath, 'control-requests', false)
   await buildRuntime(options, commonOutputPath, mcpEntryPath, 'mcp', false)
   await buildRuntime(options, commonOutputPath, controlApiEntryPath, 'control-api', false)

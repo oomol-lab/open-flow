@@ -1,5 +1,7 @@
 import type { Browser } from 'playwright-core'
 import { flowToPng, type FlowPngAspectRatio, type FlowPngOptions, type FlowPngResult, type WorkflowFile } from '@oomol-lab/open-flow/render'
+import { ControlClient, type ControlCacheDelegate } from '@oomol-lab/open-flow/control-api'
+import { ProviderIconCache, type CacheDelegate } from '@oomol-lab/open-flow/provider-icons'
 
 export async function render(browser: Browser, workflow: WorkflowFile): Promise<FlowPngResult> {
   const aspectRatio: FlowPngAspectRatio = '4:3'
@@ -10,4 +12,12 @@ export async function render(browser: Browser, workflow: WorkflowFile): Promise<
   const replaced: boolean = result.hasImagePlaceholders
   void [bytes, width, replaced]
   return result
+}
+
+export async function renderProviders(browser: Browser, workflow: WorkflowFile, delegate: ControlCacheDelegate): Promise<FlowPngResult> {
+  const sharedStorage: CacheDelegate = delegate
+  const client = new ControlClient(fetch, 'api', { cache: {scope: 'consumer', delegate, mode: 'offline'} })
+  const iconCache = new ProviderIconCache({scope: 'consumer', delegate: sharedStorage, mode: 'offline'})
+  await client.listConnectorProviders(undefined, undefined, 'en', {cacheOnly: true})
+  return flowToPng(browser, workflow, {client, iconCache, allowNetwork: false})
 }

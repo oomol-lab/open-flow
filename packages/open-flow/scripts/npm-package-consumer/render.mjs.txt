@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
 import { flowToPng } from '@oomol-lab/open-flow/render'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { ProviderIconCache } from '@oomol-lab/open-flow/provider-icons'
 
 const workflow = {
   kind: 'open-flow-workflow',
@@ -42,11 +44,31 @@ const browser = await chromium.launch({ executablePath: process.env.OPEN_FLOW_RE
 const artifacts = process.env.OPEN_FLOW_RENDER_ARTIFACTS
 const results = []
 const requests = []
+let providerVersion = 1
 const image = '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="green"/></svg>'
 const server = createServer((request, response) => {
   requests.push(request.url)
   response.setHeader('Access-Control-Allow-Origin', '*')
-  if (request.url.startsWith('/redirect')) {
+  if (request.url.startsWith('/providers')) {
+    response.setHeader('ETag', `"providers-${providerVersion}"`)
+    if (request.headers['if-none-match'] === `"providers-${providerVersion}"`) { response.writeHead(304).end(); return }
+    const origin = `http://127.0.0.1:${server.address().port}`
+    const iconSprite = { version: String(providerVersion), pixelRatio: 2, iconSize: 48, bleed: 2, width: 104, height: 52,
+      lightUrl: `${origin}/provider-sprite/${providerVersion}/light.svg`, darkUrl: `${origin}/provider-sprite/${providerVersion}/dark.svg` }
+    response.setHeader('Content-Type', 'application/json')
+    response.end(JSON.stringify({version: 1, providers: [
+      ...['mail', 'github'].map(serviceId => ({serviceId, serviceName: serviceId, iconSprite, iconSpritePosition: {x: 54, y: 2}})),
+      {serviceId: 'files', serviceName: 'Files', icon: `${origin}/provider-original.svg`},
+    ]}))
+  } else if (request.url.startsWith('/provider-sprite/')) {
+    if (providerVersion === 3) { response.writeHead(503).end(); return }
+    const color = request.url.includes('/dark.') ? '#23b7ed' : providerVersion === 1 ? '#e72bbd' : '#6ee126'
+    response.setHeader('Content-Type', 'image/svg+xml')
+    response.end(`<svg xmlns="http://www.w3.org/2000/svg" width="104" height="52"><path fill="red" d="M2 2h48v48H2z"/><path fill="${color}" d="M54 2h48v48H54z"/></svg>`)
+  } else if (request.url.startsWith('/provider-original')) {
+    response.setHeader('Content-Type', 'image/svg+xml')
+    response.end('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><path fill="#1f4ddf" d="M0 0h48v48H0z"/></svg>')
+  } else if (request.url.startsWith('/redirect')) {
     response.writeHead(302, { Location: request.url.replace('/redirect', '/image') })
     response.end()
   } else {
@@ -97,6 +119,19 @@ async function cornerAlpha(result) {
     }
   }, 'data:image/png;base64,' + result.buffer.toString('base64'))
 }
+async function colorPixels(result, rgb) {
+  return callerPage.evaluate(async ({source, rgb}) => {
+    const image = new Image(); image.src = source; await image.decode()
+    const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight
+    try {
+      const context = canvas.getContext('2d'); context.drawImage(image, 0, 0)
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+      let count = 0
+      for (let i = 0; i < pixels.length; i += 4) if (pixels[i] === rgb[0] && pixels[i + 1] === rgb[1] && pixels[i + 2] === rgb[2] && pixels[i + 3] === 255) count++
+      return count
+    } finally { canvas.width = canvas.height = 0 }
+  }, {source: 'data:image/png;base64,' + result.buffer.toString('base64'), rgb})
+}
 try {
   const callerContext = await browser.newContext()
   await callerContext.route('**/*', (route) => route.abort())
@@ -145,6 +180,49 @@ try {
     assert.equal((await verify(allowNetwork ? 'network-allowed' : 'network-default', remote, { allowNetwork })).hasImagePlaceholders, false)
     assert.ok(requests.includes('/image'))
     assert.ok(requests.includes('/redirect'))
+  }
+  requests.length = 0
+  const records = new Map()
+  const delegate = {get: async key => records.get(key), set: async (key, value) => {records.set(key, structuredClone(value))}, delete: async key => {records.delete(key)}}
+  const client = new ControlClient((_, init) => fetch(origin + '/providers', init), 'api', {cache: {scope: 'artwork-test', delegate}})
+  const iconCache = new ProviderIconCache({scope: 'artwork-test', delegate})
+  const providerFile = structuredClone(workflow)
+  providerFile.content.document.graph.nodes.mail = {kind: 'task', name: 'Mail Provider', inputs: {}, task: {name: 'Read', inputs: [], outputs: [], executor: {kind: 'connector', action: 'mail.read'}}}
+  providerFile.content.document.graph.nodes.files = {kind: 'task', name: 'Files Provider', inputs: {}, task: {name: 'Read', inputs: [], outputs: [], executor: {kind: 'connector', action: 'files.read'}}}
+  providerFile.presentation.designer.flow.nodes.mail = {x: 0, y: 650}
+  providerFile.presentation.designer.flow.nodes.files = {x: 500, y: 650}
+  const providerOptions = {client, iconCache, layout: 'compact', aspectRatio: '4:3'}
+  const providerLight = await verify('provider-light', providerFile, providerOptions)
+  assert.ok(await colorPixels(providerLight, [231, 43, 189]) > 100, 'Missing correctly cropped light sprite.')
+  assert.ok(await colorPixels(providerLight, [31, 77, 223]) > 100, 'Missing original Provider image.')
+  await verify('provider-cached', providerFile, providerOptions)
+  const providerDark = await verify('provider-dark', providerFile, {...providerOptions, dark: true})
+  assert.ok(await colorPixels(providerDark, [35, 183, 237]) > 100, 'Missing dark sprite.')
+  assert.equal(requests.filter(url => url === '/providers').length, 1)
+  assert.equal(requests.filter(url => url === '/provider-original.svg').length, 1)
+  assert.equal(requests.filter(url => url.startsWith('/provider-sprite/')).length, 2)
+  const noFetch = async () => {throw new Error('Offline render attempted a network request')}
+  const offlineClient = new ControlClient(noFetch, 'api', {cache: {scope: 'artwork-test', delegate}})
+  const offlineIcons = new ProviderIconCache({scope: 'artwork-test', delegate, fetch: noFetch})
+  const count = requests.length
+  const providerOffline = await verify('provider-offline', providerFile, {...providerOptions, client: offlineClient, iconCache: offlineIcons, allowNetwork: false})
+  assert.ok(await colorPixels(providerOffline, [231, 43, 189]) > 100)
+  assert.equal(requests.length, count)
+  providerVersion = 2
+  const refreshedClient = new ControlClient((_, init) => fetch(origin + '/providers', init), 'api', {cache: {scope: 'artwork-test', delegate, mode: 'refresh'}})
+  const updated = await verify('provider-updated', providerFile, {...providerOptions, client: refreshedClient})
+  assert.ok(await colorPixels(updated, [110, 225, 38]) > 100)
+  assert.equal(await colorPixels(updated, [231, 43, 189]), 0)
+  await verify('provider-updated-dark', providerFile, {...providerOptions, client: refreshedClient, dark: true})
+  assert.equal([...records.keys()].filter(key => JSON.parse(key)[0] === 'open-flow:provider-icons').length, 3)
+  providerVersion = 3
+  const failedArtwork = await verify('provider-failed', providerFile, {...providerOptions, client: refreshedClient})
+  assert.equal(await colorPixels(failedArtwork, [110, 225, 38]), 0, 'An unavailable new sprite must not use an old crop.')
+  if (process.env.OPEN_FLOW_RENDER_WORKFLOW_PATH) {
+    providerVersion = 1
+    const internal = JSON.parse(await readFile(process.env.OPEN_FLOW_RENDER_WORKFLOW_PATH, 'utf8'))
+    const rendered = await verify('internal-workflow', internal, {...providerOptions, client: refreshedClient})
+    assert.ok(await colorPixels(rendered, [231, 43, 189]) > 100, 'The real workflow must receive its Provider artwork.')
   }
   const large = structuredClone(workflow)
   large.content.document.graph.nodes = Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`n${index}`, { kind: 'task', name: `节点 ${index + 1}`, inputs: {}, task: { moduleId: 'code', name: 'JavaScript', inputs: [], outputs: [] } }]))

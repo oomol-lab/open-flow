@@ -1,9 +1,11 @@
 import type { Browser, Route } from 'playwright-core'
 import type { WorkflowFile } from '../../flow/common/workflowFile.ts'
-import type { FlowPngOptions } from '../common/png.ts'
+import type { FlowPngOptions } from './index.ts'
 
 import { readFile } from 'node:fs/promises'
 import { beforeEach, expect, it, vi } from 'vitest'
+import { ProviderIconCache } from '../../connector/common/providerIconCache.ts'
+import { ControlClient } from '../../control/common/api.ts'
 import { currentFlowModelVersion } from '../../flow/common/change.ts'
 import { flowToPng } from './index.ts'
 
@@ -18,7 +20,7 @@ const workflow: WorkflowFile = {
 
 function renderer() {
   const evaluate = vi.fn().mockResolvedValue({ dataUrl: 'data:image/png;base64,cG5n', width: 800, height: 400, hasImagePlaceholders: true })
-  const page = { setContent: vi.fn(), addStyleTag: vi.fn(), addScriptTag: vi.fn(), evaluate }
+  const page = { setContent: vi.fn(), exposeFunction: vi.fn(), addStyleTag: vi.fn(), addScriptTag: vi.fn(), evaluate }
   const context = { route: vi.fn().mockResolvedValue(undefined), newPage: vi.fn().mockResolvedValue(page), close: vi.fn().mockResolvedValue(undefined) }
   const browser = { newContext: vi.fn().mockResolvedValue(context), close: vi.fn() }
   return {
@@ -125,4 +127,83 @@ it('rejects unsupported canvas ratios before allocating a browser context', asyn
   const view = renderer()
   await expect(view.render(workflow, { aspectRatio: '17:2' as FlowPngOptions['aspectRatio'] })).rejects.toThrow('aspect ratio')
   expect(view.browser.newContext).not.toHaveBeenCalled()
+})
+
+it.each([true, false])('bridges the cached Provider resources without serializing client objects (allowNetwork=%s)', async (allowNetwork) => {
+  const records = new Map()
+  const request = vi.fn(async () => Response.json({ version: 1, providers: [{ serviceId: 'mail', serviceName: 'Mail' }] }))
+  const client = new ControlClient(request, 'api', {
+    cache: {
+      scope: 'test',
+      delegate: {
+        get: async (key) => records.get(key),
+        set: async (key, value) => {
+          records.set(key, value)
+        },
+        delete: async (key) => {
+          records.delete(key)
+        },
+      },
+    },
+  })
+  await client.listConnectorProviders(undefined, undefined, 'en')
+  const iconCache = new ProviderIconCache({ scope: 'test' })
+  const get = vi.spyOn(iconCache, 'get').mockResolvedValue('data:image/png;base64,cG5n')
+  const file: WorkflowFile = {
+    ...workflow,
+    content: {
+      ...workflow.content,
+      document: {
+        bindings: {},
+        graph: {
+          edges: [],
+          nodes: {
+            mail: {
+              kind: 'task',
+              name: 'Read mail',
+              inputs: {},
+              task: { name: 'Read', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.read' } },
+            },
+          },
+        },
+      },
+    },
+  }
+  const view = renderer()
+  await view.render(file, { client, iconCache, allowNetwork })
+  const payload = JSON.parse(view.page.evaluate.mock.calls[0]![1])
+  expect(payload.providers).toEqual([{ serviceId: 'mail', serviceName: 'Mail' }])
+  expect(payload.options).toEqual({ allowNetwork })
+  expect(request).toHaveBeenCalledTimes(1)
+  const load = view.page.exposeFunction.mock.calls[0]![1]
+  const source = { kind: 'image', providerId: 'mail', url: 'https://example.test/mail.png' }
+  expect(await load(source)).toBe('data:image/png;base64,cG5n')
+  expect(get).toHaveBeenCalledWith(source, { allowNetwork })
+})
+
+it('loads Provider metadata for a Code-only workflow with Connector action hints', async () => {
+  const client = new ControlClient(async () => Response.json({ version: 1, providers: [{ serviceId: 'mail', serviceName: 'Mail' }] }))
+  const file: WorkflowFile = {
+    ...workflow,
+    content: {
+      ...workflow.content,
+      modules: { code: { name: 'Code', imports: [], source: 'export default () => ({})' } },
+      document: {
+        bindings: {},
+        graph: {
+          edges: [],
+          nodes: {
+            code: {
+              kind: 'task',
+              inputs: {},
+              task: { name: 'Code', moduleId: 'code', inputs: [], outputs: [], capabilities: [{ kind: 'connector', actionHints: ['mail.read'] }] },
+            },
+          },
+        },
+      },
+    },
+  }
+  const view = renderer()
+  await view.render(file, { client })
+  expect(JSON.parse(view.page.evaluate.mock.calls[0]![1]).providers).toEqual([{ serviceId: 'mail', serviceName: 'Mail' }])
 })

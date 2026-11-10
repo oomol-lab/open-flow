@@ -1,4 +1,5 @@
 import type { ReactFlowInstance } from '@xyflow/react'
+import type { ProviderIconLoader } from '../../../../connector/common/providerIconCache.ts'
 import type { FlowPngAspectRatio, FlowPngLayout } from '../../../../render/common/png.ts'
 import type { FlowCanvasViewModel } from './model.ts'
 
@@ -8,12 +9,14 @@ import { createRoot } from 'react-dom/client'
 import { getFlowPngAspectRatio } from '../../../../render/common/png.ts'
 import { IconImageCrossOriginContext } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { IconifyProvider } from '../../../../ui/browser/icons/iconifyContext.tsx'
+import { ProviderIconCacheContext } from '../../../../ui/browser/icons/providerIconResource.ts'
 import { openFlowLogoSource } from '../../../../ui/browser/logo.tsx'
 import { CanvasStore } from '../../stores/canvas/canvas.store.ts'
 import { captureStyleProperties } from './captureStyles.ts'
 import { FlowCanvas } from './FlowCanvas.tsx'
 
 export interface FlowPngOptions {
+  readonly iconCache?: ProviderIconLoader
   readonly layout?: FlowPngLayout
   readonly aspectRatio?: FlowPngAspectRatio
   readonly dark?: boolean
@@ -265,21 +268,25 @@ async function captureFlowImage(model: FlowCanvasViewModel, language: string, op
   try {
     root.render(
       createElement(
-        IconifyProvider,
-        null,
+        ProviderIconCacheContext.Provider,
+        { value: options.iconCache },
         createElement(
-          IconImageCrossOriginContext.Provider,
-          { value: 'anonymous' },
-          createElement(FlowCanvas, {
-            flowCanvasStore: store,
-            dark: options.dark ?? false,
-            fitView: false,
-            layoutMotion: false,
-            nodesDraggable: false,
-            onInit: (value) => {
-              instance = value
-            },
-          }),
+          IconifyProvider,
+          null,
+          createElement(
+            IconImageCrossOriginContext.Provider,
+            { value: 'anonymous' },
+            createElement(FlowCanvas, {
+              flowCanvasStore: store,
+              dark: options.dark ?? false,
+              fitView: false,
+              layoutMotion: false,
+              nodesDraggable: false,
+              onInit: (value) => {
+                instance = value
+              },
+            }),
+          ),
         ),
       ),
     )
