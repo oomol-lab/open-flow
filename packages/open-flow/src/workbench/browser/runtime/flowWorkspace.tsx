@@ -41,9 +41,11 @@ import { PngExportDialog } from './shell/pngExportDialog.tsx'
 import { WorkflowExportDialog } from './shell/workflowTransfer.tsx'
 import { WorkspaceDiagnosticsIsland } from './shell/workspaceDiagnosticsIsland.tsx'
 import { WorkspaceNavigationIsland } from './shell/workspaceNavigationIsland.tsx'
+import { derivePublishState } from './shell/workspacePublishIsland.tsx'
 import { WorkspacePublishIsland } from './shell/workspacePublishIsland.tsx'
 import { WorkspaceRecovery } from './shell/workspaceRecovery.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
+import { deriveSyncState } from './stores/workspaceModel.ts'
 
 const RUN_LOG_PANEL_ID = 'run-logs-panel'
 
@@ -313,6 +315,7 @@ export function FlowEditor({
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   useVal(store.runRequests.$.inputsLoaded)
   const busy = useVal(store.$.busy)
+  const authoringDisabled = useVal(store.$.authoringDisabled)
   const diagnostics = useVal(store.$.diagnostics)
   const diagnosticItems = useVal(store.$.diagnosticItems)
   const designerNodes = useVal(store.$.designerNodeById)
@@ -411,17 +414,7 @@ export function FlowEditor({
     if (selectedDesignerNode?.kind == 'trigger') setStartId(selectedDesignerNode.id)
   }, [selectedDesignerNode])
 
-  const authoringDisabled = draft == null || history.applying || history.failed || (busy != null && busy != 'designer' && busy != 'run')
-  const publishState: PublishState =
-    busy == 'publish'
-      ? 'publishing'
-      : busy != null
-        ? 'busy'
-        : diagnostics?.valid == false
-          ? 'issues'
-          : live?.hasUnpublishedChanges == false
-            ? 'current'
-            : 'ready'
+  const publishState: PublishState = derivePublishState(busy, diagnostics, live)
   const closeContextPanel = (focusTarget?: HTMLElement): void => {
     panel.close()
     focusInspectorOnOpen.current = false
@@ -618,7 +611,7 @@ export function FlowEditor({
         focusNodeRequest={diagnosticFocus ?? nodeFocus}
         inspectorOpen={contextPanelVisible}
         model={designer}
-        annotationContext={canvasAnnotations(flowId, draft, workspaceStatus, moduleEditor?.status, history.failed)}
+        annotationContext={canvasAnnotations(flowId, draft, deriveSyncState(workspaceStatus, moduleEditor?.status, history.failed))}
         onAddNode={async (option, position, connection) => {
           const nodeId = await store.addNode(option, position, connection)
           if (nodeId != null && flowId != null && store.workspace.$.flowId.value == flowId) {

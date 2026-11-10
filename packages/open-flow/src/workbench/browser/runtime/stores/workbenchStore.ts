@@ -51,6 +51,7 @@ import { WorkspaceStore } from './workspaceStore.ts'
 export type Busy = WorkspaceBusy | 'cancel' | 'publish' | 'rollback' | 'run'
 
 export interface Workbench$ {
+  readonly authoringDisabled: ReadonlyVal<boolean>
   readonly connectorSetupPending: ReadonlyVal<boolean>
   readonly busy: ReadonlyVal<Busy | undefined>
   readonly diagnosticItems: ReadonlyVal<readonly DiagnosticItem[]>
@@ -258,7 +259,22 @@ export class WorkbenchStore {
       return graph
     })
     const designerNodeById = derive(designer, indexNodes)
+    const busy = compute((get) => {
+      const workspaceBusy = get(this.workspace.$.busy)
+      if (workspaceBusy != null) return workspaceBusy
+      if (get(this.runRequests.$.starting)) return 'run'
+      if (get(this.runs.$.cancelingRunId) != null) return 'cancel'
+      if (get(this.publications.$.publishing)) return 'publish'
+      if (get(this.publications.$.rollingBackPublicationId) != null) return 'rollback'
+      return undefined
+    })
+    const authoringDisabled = compute((get) => {
+      const history = get(this.workspace.history$)
+      const current = get(busy)
+      return get(this.workspace.$.draft) == null || history.applying || history.failed || (current != null && current != 'designer' && current != 'run')
+    })
     this.$ = {
+      authoringDisabled,
       connectorSetupPending: compute((get) => {
         const flowId = get(this.workspace.$.flowId)
 
@@ -275,14 +291,7 @@ export class WorkbenchStore {
           (setup) => setup.flowId == flowId && setup.actionId == actionId && (setup.nodeId == null || setup.nodeId == selection.id),
         )
       }),
-      busy: compute((get) => {
-        const workspaceBusy = get(this.workspace.$.busy)
-        if (workspaceBusy != null) return workspaceBusy
-        if (get(this.runRequests.$.starting)) return 'run'
-        if (get(this.runs.$.cancelingRunId) != null) return 'cancel'
-        if (get(this.publications.$.publishing)) return 'publish'
-        if (get(this.publications.$.rollingBackPublicationId) != null) return 'rollback'
-      }),
+      busy,
       diagnosticItems: compute((get) => {
         const revision = get(this.workspace.$.revision)
 

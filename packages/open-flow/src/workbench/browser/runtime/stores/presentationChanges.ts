@@ -23,7 +23,7 @@ export class PresentationChanges {
   #changes: Promise<void> = Promise.resolve()
   #committed?: Presentation
   #disposed = false
-  #failed = false
+  #failed?: number
   #pending: PendingChange[] = []
 
   public constructor(client: WorkbenchClient, setNotice: SetNotice, setPresentation: (presentation: Presentation) => void, i18n: I18n) {
@@ -34,7 +34,7 @@ export class PresentationChanges {
   }
 
   public reset(presentation?: Presentation): void {
-    this.#failed = false
+    this.#failed = undefined
     this.#committed = presentation
     this.#pending = []
   }
@@ -70,6 +70,7 @@ export class PresentationChanges {
       const committed = this.#committed!
       const nextValue = update(committed.value)
       if (dequal(nextValue, committed.value)) {
+        this.#failed = undefined
         this.#finish(pending, committed)
         success = true
         return
@@ -77,15 +78,16 @@ export class PresentationChanges {
       try {
         const saved = await this.#client.updatePresentation(flowId, committed.revision, nextValue)
         if (this.#disposed || !current()) return
+        this.#failed = undefined
         this.#finish(pending, saved)
         success = true
       } catch (error) {
         if (this.#disposed || !current()) return
-        this.#failed = true
         if (error instanceof ApiError && error.code == 'flow.presentation-conflict') {
           try {
             const latest = await this.#client.getPresentation(flowId)
             if (this.#disposed || !current()) return
+            this.#failed = undefined
             this.#finish(pending, latest)
             this.#setNotice({
               kind: 'error',
@@ -94,11 +96,13 @@ export class PresentationChanges {
           } catch (reloadError) {
             if (!this.#disposed && current()) this.#finish(pending, committed)
             if (!this.#disposed && current()) this.#setNotice(errorNotice(reloadError, this.#i18n.t))
+            if (!this.#disposed && current()) this.#failed = committed.revision
           }
-        } else {
-          this.#finish(pending, committed)
-          this.#setNotice(errorNotice(error, this.#i18n.t))
+          return
         }
+        this.#failed = committed.revision
+        this.#finish(pending, committed)
+        this.#setNotice(errorNotice(error, this.#i18n.t))
       }
     })
     await this.#changes

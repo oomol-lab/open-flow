@@ -10,6 +10,19 @@ import { useWorkflowExportAction, WorkflowExportMenuItem } from './workflowExpor
 
 export type PublishState = 'ready' | 'current' | 'issues' | 'busy' | 'publishing'
 
+/** The single publish-state derivation shared by the workspace chrome. */
+export function derivePublishState(
+  busy: string | undefined,
+  diagnostics: { readonly valid: boolean } | undefined,
+  live: { readonly hasUnpublishedChanges: boolean } | undefined,
+): PublishState {
+  if (busy == 'publish') return 'publishing'
+  if (busy != null) return 'busy'
+  if (diagnostics?.valid == false) return 'issues'
+  if (live?.hasUnpublishedChanges == false) return 'current'
+  return 'ready'
+}
+
 const blockedReasonKey = {
   issues: 'workspace.publishIssuesReason',
   busy: 'workspace.publishActionInProgress',

@@ -14,6 +14,7 @@ import { revisionView } from '../revisionView.ts'
 export type WorkspaceBusy = 'designer' | 'flow' | 'resource'
 export type WorkspaceStatus = 'loading' | 'noDraft' | 'saved' | 'saving' | 'failed'
 export type ModuleEditorStatus = 'dirty' | 'failed' | 'saved' | 'saving'
+export type SyncState = 'dirty' | 'failed' | 'saved' | 'saving'
 
 export interface ModuleEditor {
   readonly moduleId: string
@@ -98,8 +99,17 @@ function status(state: WorkspaceState): WorkspaceStatus {
   if (state.workspaceLoading) return 'loading'
   if (state.moduleSaveStatus != null) return state.moduleSaveStatus
   if (state.busy == 'designer') return 'saving'
+  if (state.workspaceLoadFailed) return 'failed'
   if (state.draft == null) return 'noDraft'
   return 'saved'
+}
+
+/** The single Canvas sync-state derivation; callers must not recombine these inputs. */
+export function deriveSyncState(workspaceStatus: WorkspaceStatus, moduleStatus: ModuleEditorStatus | undefined, saveFailed: boolean): SyncState | undefined {
+  if (workspaceStatus == 'loading' || workspaceStatus == 'noDraft') return
+  if (saveFailed || workspaceStatus == 'failed' || moduleStatus == 'failed') return 'failed'
+  if (workspaceStatus == 'saving' || moduleStatus == 'saving') return 'saving'
+  return moduleStatus == 'dirty' ? 'dirty' : 'saved'
 }
 
 export function moduleEditorStatus(draft: Draft | undefined, editor: ModuleEditorDraft): ModuleEditorStatus {

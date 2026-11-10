@@ -98,3 +98,19 @@ it('blocks export after a current save failure until the authoritative Presentat
     dispose()
   }
 })
+
+it('clears a failed save after a later successful write', async () => {
+  const { client, latest, changes, presentation, dispose } = session()
+  vi.spyOn(client, 'updatePresentation')
+    .mockRejectedValueOnce(new Error('Save failed'))
+    .mockImplementation(async (_id, revision, value) => ({ ...initial, revision: revision + 1, value }))
+  vi.spyOn(client, 'getPresentation').mockResolvedValue(initial)
+  try {
+    expect(await changes.change('flow', presentation(), latest.capture(), () => ({ edited: true }))).toBe(false)
+    expect(await changes.flush()).toBe(false)
+    expect(await changes.change('flow', presentation(), latest.capture(), () => ({ edited: true }))).toBe(true)
+    expect(await changes.flush()).toBe(true)
+  } finally {
+    dispose()
+  }
+})

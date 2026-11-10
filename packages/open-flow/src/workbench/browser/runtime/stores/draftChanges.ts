@@ -138,7 +138,13 @@ export class DraftChanges {
     const pending: PendingChange = { ...context, active: true, changeId: randomId(), changes, started: false }
     this.#committed ??= draft
     this.#pending.push(pending)
-    this.#hooks.apply(this.project(this.#committed))
+    try {
+      this.#hooks.apply(this.project(this.#committed))
+    } catch (error) {
+      this.#pending = this.#pending.filter((candidate) => candidate !== pending)
+      if (this.#changes == 0) this.#hooks.finishChanges()
+      throw error
+    }
     this.#changes += 1
     const change = this.#queue.then(() => {
       pending.started = true

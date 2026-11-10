@@ -30,8 +30,7 @@ export class CanvasHistory {
   #generation = 0
   #pending = 0
   #applying = false
-  #failed = false
-
+  #sync: 'ok' | 'recovering' | 'failed' = 'ok'
   #disposed = false
 
   get generation(): number {
@@ -41,7 +40,7 @@ export class CanvasHistory {
     return this.#applying
   }
   get failed(): boolean {
-    return this.#failed
+    return this.#sync != 'ok'
   }
 
   beginChange(): void {
@@ -65,17 +64,22 @@ export class CanvasHistory {
   }
 
   beginRecovery(): void {
-    this.#failed = true
+    this.#sync = 'recovering'
     this.clear()
   }
 
   endRecovery(): void {
-    this.#failed = false
+    this.#sync = 'ok'
+    this.#publish()
+  }
+
+  failRecovery(): void {
+    this.#sync = 'failed'
     this.#publish()
   }
 
   reset(): void {
-    this.#failed = false
+    this.#sync = 'ok'
     this.clear()
   }
 
@@ -101,7 +105,7 @@ export class CanvasHistory {
 
   completeNodeCreation(nodeId: string, changes: FlowChanges): boolean {
     const index = this.#undo.findIndex((entry) => entry.forward.some((operation) => operation.kind == 'graph.node.create' && operation.nodeId == nodeId))
-    if (index < 0 || this.#applying || this.#failed) return false
+    if (index < 0 || this.#applying || this.failed) return false
     const entry = this.#undo[index]!
     this.#undo[index] = { ...entry, forward: [...entry.forward, ...changes] }
     this.#publish()
@@ -147,12 +151,12 @@ export class CanvasHistory {
 
   #publish(): void {
     if (this.#disposed) return
-    const available = this.#pending == 0 && !this.#applying && !this.#failed
+    const available = this.#pending == 0 && !this.#applying && this.#sync == 'ok'
     this.state$.set({
       canUndo: available && this.#undo.length > 0,
       canRedo: available && this.#redo.length > 0,
       applying: this.#applying,
-      failed: this.#failed,
+      failed: this.failed,
       undo: this.#undo.at(-1),
       redo: this.#redo.at(-1),
     })
