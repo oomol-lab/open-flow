@@ -82,7 +82,7 @@ export function triggerKey(value: unknown): TriggerKeySnapshot {
 }
 
 const triggerKinds: ReadonlySet<TriggerBinding['kind']> = new Set(['error', 'cron', 'integration', 'poll', 'webhook'])
-const triggerHealth: ReadonlySet<TriggerBinding['health']> = new Set(['failed', 'healthy', 'initializing', 'needs_reauth', 'suspended'])
+const triggerHealth: ReadonlySet<TriggerBinding['health']> = new Set(['failed', 'healthy', 'initializing', 'needs_reauth', 'unobservable'])
 const triggerActivityKinds: ReadonlySet<TriggerActivityKind> = new Set([
   'delivery.failed',
   'health.failed',

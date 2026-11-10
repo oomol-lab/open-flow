@@ -11,7 +11,7 @@ import type {
   TriggerOccurrenceInput,
 } from './trigger-store.ts'
 
-import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
+import { admitsListenerPage, decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
 
@@ -341,6 +341,7 @@ export class IntegrationStore {
               input.publishedAt,
               binding.bindingId,
             )
+          this.#pruneListenerWork(binding.bindingId)
         }
         desiredIntegrations.delete(binding.triggerNodeId)
       } else if (binding.currentPublicationId != null) {
@@ -352,6 +353,7 @@ export class IntegrationStore {
              WHERE binding_id = ?`,
           )
           .run(input.publishedAt, input.publishedAt, binding.bindingId)
+        this.#pruneListenerWork(binding.bindingId)
       }
     }
     for (const [triggerNodeId, integration] of desiredIntegrations) {
@@ -403,7 +405,7 @@ export class IntegrationStore {
       (sourceId == null || this.#eventSources.ready(sourceId, binding.bindingId)) &&
       binding.currentPublicationId == expectedLivePublicationId &&
       this.#matches(binding, integration) &&
-      (binding.health == 'healthy' || (integration.listener === true && this.listenerState(binding.bindingId, binding.runtimeVersion)?.health == 'healthy'))
+      admitsListenerPage(binding.health, integration.listener === true ? this.listenerState(binding.bindingId, binding.runtimeVersion)?.health : undefined)
     )
   }
 
@@ -543,7 +545,7 @@ export class IntegrationStore {
 
   #acceptIntegrationTarget(
     input: StoredIntegrationTarget & { readonly occurrenceId: string; readonly outputs: Readonly<Record<string, JsonValue>>; readonly requestDigest: string },
-    listener: boolean,
+    listenerPage: boolean,
   ): RunAdmission | undefined {
     const current = this.#database
       .prepare(
@@ -562,7 +564,7 @@ export class IntegrationStore {
              AND bindings.runtime_version = ?
              AND bindings.trigger_json = ?
              AND bindings.connection_id = ?
-             AND (bindings.health = 'healthy' OR ? = 1)
+             ${listenerPage ? '' : "AND bindings.health = 'healthy'"}
              AND publications.revision_id = ?
              AND publications.revision_digest = ?
              AND publications.closure_digest = ?
@@ -578,7 +580,6 @@ export class IntegrationStore {
         input.runtimeVersion,
         input.triggerJson,
         input.connectionId,
-        listener ? 1 : 0,
         input.revisionId,
         input.revisionDigest,
         input.closureDigest,
@@ -607,6 +608,12 @@ export class IntegrationStore {
         .run(accepted.runId, input.bindingId, input.runtimeVersion, input.currentPublicationId)
     }
     return accepted
+  }
+
+  #pruneListenerWork(bindingId: string): void {
+    this.#database
+      .prepare('DELETE FROM listener_work WHERE binding_id = ? AND runtime_version != (SELECT runtime_version FROM integration_bindings WHERE binding_id = ?)')
+      .run(bindingId, bindingId)
   }
 
   listenerState(
@@ -706,6 +713,14 @@ export class IntegrationStore {
         .run(lease.generation, now, nextAt, lease.bindingId, lease.token)
       return accepted ?? 'advanced'
     })
+  }
+
+  /** Defers the next Listener page without changing observed health. */
+  postponeListener(lease: ListenerLease, nextAt: number): void {
+    this.#database
+      .prepare(`UPDATE listener_work SET next_at = ?, lease_token = NULL, lease_until = NULL
+      WHERE binding_id = ? AND runtime_version = ? AND lease_token = ?`)
+      .run(nextAt, lease.bindingId, lease.runtimeVersion, lease.token)
   }
 
   retryListener(lease: ListenerLease, nextAt: number, health: 'failed' | 'needs_reauth' = 'failed'): void {

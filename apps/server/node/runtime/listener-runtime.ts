@@ -301,7 +301,7 @@ export class ListenerRuntime {
     return Effect.gen({ self: this }, function* () {
       const target = this.#store.integrations.integrationTarget(lease.endpointId)
       if (target == null || target.state == null || target.runtimeVersion != lease.runtimeVersion) {
-        this.#store.integrations.retryListener(lease, now + retryMs)
+        this.#store.integrations.postponeListener(lease, now + retryMs)
         return
       }
       const trigger = JSON.parse(target.triggerJson) as TriggerNode
@@ -360,7 +360,7 @@ export class ListenerRuntime {
         event,
       )
       if (completed == null || (completed != 'advanced' && completed.kind != 'accepted')) {
-        this.#store.integrations.retryListener(lease, now + retryMs)
+        this.#store.integrations.postponeListener(lease, now + retryMs)
       } else if (completed != 'advanced' && completed.kind == 'accepted' && completed.created) {
         this.#runCreated(target.flowId, completed.runId)
         this.#signal()

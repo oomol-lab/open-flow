@@ -5,9 +5,12 @@ import { currentEngineContract } from '../../runtime/common/engineContract.ts'
 import { flowStateSummarySchema, flowStateValuesSchema, flowStateViewSchema } from '../../state/common/state.ts'
 import { workflowContractSchema, workflowReferencesSchema } from '../../workflow/common/workflow.ts'
 export type { CanvasCommand, CanvasCommandSubscriber } from '../../canvas/common/commands.ts'
+import type { BindingHealth, ListenerHealth } from './health.ts'
 import type { LiveDetails } from './liveDetails.ts'
 
 import { decodeLiveDetails } from './liveDetails.ts'
+export type { BindingHealth, DisplayHealth, ListenerHealth } from './health.ts'
+export { admitsCallback, admitsListenerPage, displayHealth } from './health.ts'
 export { liveEntries } from './liveDetails.ts'
 export { flowInputDefinitions } from './authoringFields.ts'
 export type { LiveDetails, LiveEntry } from './liveDetails.ts'
@@ -244,12 +247,12 @@ export interface TriggerKeySummary {
 }
 
 export interface TriggerBinding {
-  readonly listener?: { readonly health: 'healthy' | 'failed' | 'needs_reauth'; readonly lastErrorCode?: string }
+  readonly listener?: { readonly health: ListenerHealth; readonly lastErrorCode?: string }
   readonly currentPublicationId?: string
   readonly currentRevisionId?: string
   readonly endpointUrl?: string
   readonly flowId: string
-  readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth' | 'suspended'
+  readonly health: BindingHealth
   readonly kind: 'error' | 'cron' | 'integration' | 'poll' | 'webhook'
   readonly lastErrorCode?: string
   readonly runtimeVersion: number
