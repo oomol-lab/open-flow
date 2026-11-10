@@ -92,7 +92,13 @@ export class ProviderIconCache implements ProviderIconLoader {
 
   get(request: ProviderIconRequest, options: ProviderIconReadOptions = {}): Promise<string> {
     if (request.url.startsWith('data:image/')) return Promise.resolve(request.url)
-    if (!['http:', 'https:'].includes(new URL(request.url).protocol)) return Promise.reject(new TypeError('Unsupported Provider icon URL.'))
+    let protocol: string
+    try {
+      protocol = new URL(request.url).protocol
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    if (!['http:', 'https:'].includes(protocol)) return Promise.reject(new TypeError('Unsupported Provider icon URL.'))
     const slot = JSON.stringify([
       'open-flow:provider-icons',
       1,

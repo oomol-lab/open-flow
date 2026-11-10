@@ -39,8 +39,8 @@ export async function flowToPng(browser: Browser, workflow: WorkflowFile, option
   if (client && (connectionUsage(file.content.document).length > 0 || codeActions(file.content.document).length > 0)) {
     try {
       providers = await client.listConnectorProviders(undefined, undefined, options.language ?? 'en', { cacheOnly: options.allowNetwork === false })
-    } catch (error) {
-      console.warn('Could not load PNG Provider metadata.', error)
+    } catch {
+      // Provider metadata is optional; render the bundled fallback icons.
     }
   }
   const packageRoot = dirname(createRequire(import.meta.url).resolve('@oomol-lab/open-flow/package.json'))

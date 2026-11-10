@@ -207,3 +207,33 @@ it('loads Provider metadata for a Code-only workflow with Connector action hints
   await view.render(file, { client })
   expect(JSON.parse(view.page.evaluate.mock.calls[0]![1]).providers).toEqual([{ serviceId: 'mail', serviceName: 'Mail' }])
 })
+
+it('keeps PNG rendering quiet when optional Provider metadata cannot be loaded', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    const client = new ControlClient(async () => {
+      throw new Error('Private Provider connection details')
+    })
+    const file: WorkflowFile = {
+      ...workflow,
+      content: {
+        ...workflow.content,
+        document: {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: {
+              mail: { kind: 'task', inputs: {}, task: { name: 'Read', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.read' } } },
+            },
+          },
+        },
+      },
+    }
+    const view = renderer()
+    expect((await view.render(file, { client })).buffer.toString()).toBe('png')
+    expect(JSON.parse(view.page.evaluate.mock.calls[0]![1]).providers).toBeUndefined()
+    expect(warn).not.toHaveBeenCalled()
+  } finally {
+    warn.mockRestore()
+  }
+})

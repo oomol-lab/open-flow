@@ -28,6 +28,22 @@ function storage() {
 }
 afterEach(() => vi.useRealTimers())
 
+it.each(['', '/relative/icon.svg', 'https://[invalid'])('rejects malformed Provider icon URLs asynchronously (%j)', async (url) => {
+  const fetch = vi.fn(async () => image())
+  const cache = new ProviderIconCache({ scope: 'test', fetch })
+  const result = cache.get({ ...original, url })
+  await expect(result).rejects.toBeInstanceOf(TypeError)
+  expect(fetch).not.toHaveBeenCalled()
+})
+
+it.each(['ftp://example.test/icon.svg', 'file:///icon.svg'])('rejects unsupported Provider icon URLs asynchronously (%j)', async (url) => {
+  const fetch = vi.fn(async () => image())
+  const cache = new ProviderIconCache({ scope: 'test', fetch })
+  const result = cache.get({ ...original, url })
+  await expect(result).rejects.toThrow('Unsupported Provider icon URL.')
+  expect(fetch).not.toHaveBeenCalled()
+})
+
 it('shares complete image bytes across instances without fetching again', async () => {
   const { records, delegate } = storage()
   const fetch = vi.fn(async () => image())

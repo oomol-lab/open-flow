@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { CanvasDirection } from '../../../canvas/common/direction.ts'
 import type { InteractiveMode } from '../../../canvas/common/interactiveMode.ts'
-import type { ProviderIconCache } from '../../../connector/common/providerIconCache.ts'
+import type { ProviderIconLoader } from '../../../connector/common/providerIconCache.ts'
 import type { Draft, Presentation } from '../../../control/common/api.ts'
 import type { UiLanguage } from '../../../localization/common/languages.ts'
 
@@ -21,7 +21,7 @@ export type { CanvasDirection } from '../../../canvas/common/direction.ts'
 
 export interface OpenFlowPreviewProps {
   /** Optional shared Provider artwork cache; defaults to browser IndexedDB. */
-  readonly iconCache?: ProviderIconCache
+  readonly iconCache?: ProviderIconLoader
   readonly draft: Draft
   readonly presentation: Presentation | null
   readonly language: UiLanguage

@@ -22,7 +22,7 @@ import type { HostNavigationActionsProps, OpenFlowLogoProps } from '@oomol-lab/o
 import type { OpenFlowWorkbenchHandle, WorkbenchImportInput, WorkbenchHost, WorkbenchLocation } from '@oomol-lab/open-flow/workbench'
 
 import { ControlClient, liveEntries } from '@oomol-lab/open-flow/control-api'
-import { ProviderIconCache } from '@oomol-lab/open-flow/provider-icons'
+import { ProviderIconCache, type ProviderIconLoader } from '@oomol-lab/open-flow/provider-icons'
 import { controlRequests, createWorkflowAuthoring } from '@oomol-lab/open-flow/control-requests'
 import { eventSourceDefinition, sourceReady, sourceResultSchema, preparedSourceSchema, sourceReceiptSchema } from '@oomol-lab/open-flow/event-source'
 import { encodeWorkflowFile, decodeWorkflowFile, cleanWorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
@@ -58,8 +58,8 @@ import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/wor
 import { createElement, createRef } from 'react'
 
 // Concrete consumer assignments and calls verify the published type signatures.
-export function providerArtwork(delegate: ControlCacheDelegate, host: WorkbenchHost, props: OpenFlowPreviewProps) {
-  const iconCache = new ProviderIconCache({scope: 'consumer', delegate})
+export function providerArtwork(delegate: ControlCacheDelegate, host: WorkbenchHost, props: OpenFlowPreviewProps, loader?: ProviderIconLoader) {
+  const iconCache = loader ?? new ProviderIconCache({scope: 'consumer', delegate})
   const configuredHost: WorkbenchHost = {...host, iconCache}
   return {host: configuredHost, preview: createElement(OpenFlowPreview, {...props, iconCache})}
 }
