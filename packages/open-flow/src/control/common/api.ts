@@ -857,10 +857,11 @@ function runEvents(value: unknown): RunEvents {
 
 const segment = encodeURIComponent
 
-async function responseJson(response: Response): Promise<unknown> {
+async function responseJson(response: Response, signal: AbortSignal | null | undefined): Promise<unknown> {
   try {
     return await response.json()
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw signal.reason ?? error
     return invalidResponse(`HTTP ${response.status} response body is not JSON.`)
   }
 }
@@ -1166,7 +1167,7 @@ export class ControlClient {
     const response = await this.response(query.path, { headers, signal }, true)
     const nextETag = response.headers.get('etag')?.trim() || null
     if (response.status == 304) return { modified: false, etag: nextETag }
-    return { modified: true, data: query.decode(await responseJson(response)), etag: nextETag }
+    return { modified: true, data: query.decode(await responseJson(response, signal)), etag: nextETag }
   }
 
   async getTriggerCatalog(locale: string, cached?: TriggerCatalogCache, signal?: AbortSignal): Promise<TriggerCatalogCache> {
@@ -1185,7 +1186,7 @@ export class ControlClient {
       if (cached == null) return invalidResponse()
       return { ...cached, etag: response.headers.get('etag')?.trim() || cached.etag }
     }
-    return { data: decodeTriggerCatalog(await responseJson(response)), etag: response.headers.get('etag')?.trim() || null }
+    return { data: decodeTriggerCatalog(await responseJson(response, signal)), etag: response.headers.get('etag')?.trim() || null }
   }
 
   async getTriggerKey(key: string, signal?: AbortSignal): Promise<TriggerKeySnapshot> {
@@ -1769,6 +1770,6 @@ export class ControlClient {
   }
 
   protected async request<Value = unknown>(path: string, init: RequestInit = {}): Promise<Value> {
-    return (await responseJson(await this.response(path, init))) as Value
+    return (await responseJson(await this.response(path, init), init.signal)) as Value
   }
 }

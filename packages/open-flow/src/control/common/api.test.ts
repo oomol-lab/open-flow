@@ -169,6 +169,17 @@ describe('ControlClient Flow API', () => {
     await expect(client.getTriggerCatalog('en')).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
   })
 
+  it('propagates cancellation while reading a catalog body', async () => {
+    const controller = new AbortController()
+    const reason = new Error('canceled')
+    const body = new ReadableStream({ start: (stream) => controller.signal.addEventListener('abort', () => stream.error(reason)) })
+    const client = new ControlClient(async () => {
+      queueMicrotask(() => controller.abort(reason))
+      return new Response(body, { status: 200 })
+    })
+    await expect(client.readCatalog({ path: '/v1/connector/proxy/actions', decode: (value) => value }, null, controller.signal)).rejects.toBe(reason)
+  })
+
   it('creates and lists top-level Flows', async () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == '/v1/flows' && init?.method == 'POST') return Response.json(flow, { status: 201 })
