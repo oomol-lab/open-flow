@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { WorkflowBundleImportResult } from '../../../control/common/api.ts'
 import type { FlowCatalogEvent, FlowChangeEvent } from '../../../control/common/flowNotifications.ts'
 import type { WorkflowBundle } from '../../../flow/common/workflowBundle.ts'
@@ -62,11 +63,12 @@ export type ConnectionHref = (flowId: string, providerId: string, connectionId?:
 
 /** Object values are complete response/ETag records; implementations must reject failures. */
 
-/** File content already loaded by the host; Open Flow never fetches sourceUrl. */
+/** File content already loaded by the host. */
 export interface WorkbenchImportInput {
   readonly text: string
   readonly fileName?: string
-  readonly sourceUrl?: string
+  /** Host-rendered content below the import dialog title. The host owns its links and presentation. */
+  readonly description?: ReactNode
 }
 
 export interface OpenFlowWorkbenchHandle {

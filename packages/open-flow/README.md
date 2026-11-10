@@ -164,7 +164,11 @@ function Host(props: OpenFlowWorkbenchProps) {
 
   async function openDownloadedFile(file: File) {
     const text = await file.text()
-    const result = workbenchRef.current?.openImport({ text, fileName: file.name })
+    const result = workbenchRef.current?.openImport({
+      text,
+      fileName: file.name,
+      description: <span>Local file: {file.name}</span>,
+    })
     // Handle an unavailable Workbench in the host; this call is never queued.
     return result
   }
@@ -185,12 +189,14 @@ function Host(props: OpenFlowWorkbenchProps) {
 }
 ```
 
-`openImport({ text, fileName?, sourceUrl? })` returns `opened` when confirmation opens,
+`openImport({ text, fileName?, description? })` returns `opened` when confirmation opens,
 `invalid-file` when parsing fails (reported through `host.notify`), or `unavailable` when the
 Workbench is not on an initialized Flow list, is busy, or already has a creation/import dialog open.
-`opened` does not mean a Flow has been created. The optional `sourceUrl` is displayed in the dialog;
-only HTTP(S) URLs become links. The file's name takes precedence over `fileName`, with a localized
-fallback when neither exists.
+`opened` does not mean a Flow has been created. The optional `description` accepts a `ReactNode`
+rendered below the dialog title. The host owns its content, link behavior, and styling; Open Flow
+does not parse or fetch source URLs. Replace previous `sourceUrl` arguments with host-rendered
+links in `description`. The file's name takes precedence over `fileName`, with a localized fallback
+when neither exists.
 
 Cancel creates nothing. Confirmation uses the existing `importFlow` callback, or the deployment's
 Control API when no callback is supplied, and opens the new unpublished draft after success.

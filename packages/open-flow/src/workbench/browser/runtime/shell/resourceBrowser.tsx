@@ -374,7 +374,7 @@ function FlowSkeleton(): ReactElement {
 
 type FlowCreation =
   | { readonly kind: 'create' }
-  | { readonly kind: 'import'; readonly file: WorkflowImportFile; readonly key: string; readonly sourceUrl?: string }
+  | { readonly kind: 'import'; readonly file: WorkflowImportFile; readonly key: string; readonly description?: WorkbenchImportInput['description'] }
 
 interface FlowBrowserProps extends LanguageSelectProps {
   readonly catalogWidth?: OpenFlowWorkbenchProps['catalogWidth']
@@ -460,7 +460,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
     setCreationTags([])
     setCreatingTag(false)
     setName(entry.name ?? (input.fileName == null ? importedWorkflowName(language) : workflowNameFromFile(input.fileName)))
-    creation$.set({ kind: 'import', file, key: randomId(), ...(input.sourceUrl == null ? {} : { sourceUrl: input.sourceUrl }) })
+    creation$.set({ kind: 'import', file, key: randomId(), description: input.description })
     return 'opened'
   }
 
@@ -668,6 +668,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
           {creation != null && (
             <Suspense fallback={null}>
               <CreateResourceDialog
+                description={creation.kind == 'import' ? creation.description : undefined}
                 disabled={createFlowDisabled || creatingTag}
                 tagField={(container) => (
                   <Field>
@@ -701,7 +702,6 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
                 }}
                 onSubmit={(event) => void create(event)}
                 pending={busy == 'flow'}
-                sourceUrl={creation.kind == 'import' ? creation.sourceUrl : undefined}
                 submitLabel={creation.kind == 'import' ? t('resource.importFlow') : undefined}
                 title={t(creation.kind == 'create' ? 'resource.newFlow' : 'resource.importFlow')}
               />

@@ -1,5 +1,15 @@
 # Public contracts and version evolution
 
+## Workbench import description slot (after beta.87)
+
+The published npm `next` baseline is `0.1.0-beta.87`, gitHead
+`bed840612c43bf6fca21caa83ac7ab4e574d5bb7`. Its Workbench import input includes `sourceUrl`.
+The next package release replaces that field with `description?: ReactNode`, rendered below the
+import dialog title. Hosts must move source links into this slot and own their labels, behavior,
+and styling. Open Flow no longer parses or renders source URLs. File parsing, name fallback,
+confirmation, and submission keep their existing behavior. This is a browser SDK API change;
+Flow model, Engine, checkpoint, and Control API contracts are unchanged.
+
 ## Local WorkflowFile authoring and delegated Flow response caching
 
 The npm `next` baseline is beta.85. These changes add public local file authoring and optional

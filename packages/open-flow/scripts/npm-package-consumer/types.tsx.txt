@@ -168,7 +168,11 @@ const host: WorkbenchHost = {
   subscribeFlowCatalog: () => ({ ready: Promise.resolve(), stop() {} }),
 }
 const workbenchRef = createRef<OpenFlowWorkbenchHandle>()
-const importInput: WorkbenchImportInput = { text: '{}', fileName: 'demo.openflow.json', sourceUrl: 'https://github.com/oomol-lab/open-flow' }
+const importInput: WorkbenchImportInput = {
+  text: '{}',
+  fileName: 'demo.openflow.json',
+  description: <a href="https://github.com/oomol-lab/open-flow">Open Flow templates</a>,
+}
 export const importResult: 'opened' | 'unavailable' | 'invalid-file' | undefined = workbenchRef.current?.openImport(importInput)
 export const workbench = createElement(OpenFlowWorkbench, {
   ref: workbenchRef,

@@ -212,14 +212,32 @@ it.each([
   expect((await dialog()).querySelector('input')?.value).toBe(expected)
 })
 
-it.each(['https://github.com/oomol-lab/open-flow', 'javascript:alert(1)'])('only links HTTP(S) provenance: %s', async (sourceUrl) => {
+it('renders host-owned import content and preserves its interaction', async () => {
   const { ref } = await browser()
+  const onClick = vi.fn()
   await act(async () => {
-    ref.current!.openImport({ ...input, sourceUrl })
+    ref.current!.openImport({
+      ...input,
+      description: (
+        <div>
+          <a href="https://github.com/oomol-lab/open-flow" target="_blank" rel="noreferrer">
+            Open Flow templates
+          </a>
+          <button type="button" onClick={onClick}>
+            View template details
+          </button>
+        </div>
+      ),
+    })
   })
   const modal = await dialog()
-  expect(modal.textContent).toContain(sourceUrl)
-  expect(modal.querySelector('a')?.getAttribute('href')).toBe(sourceUrl.startsWith('https:') ? sourceUrl : undefined)
+  const link = modal.querySelector('a')!
+  expect(link.textContent).toBe('Open Flow templates')
+  expect(link.getAttribute('href')).toBe('https://github.com/oomol-lab/open-flow')
+  expect(link.getAttribute('target')).toBe('_blank')
+  await act(async () => [...modal.querySelectorAll('button')].find((button) => button.textContent == 'View template details')!.click())
+  expect(onClick).toHaveBeenCalledOnce()
+  expect(document.querySelector('[role="dialog"]')).toBe(modal)
 })
 
 it('cancels without submitting and uses the same dialog for a local file', async () => {
