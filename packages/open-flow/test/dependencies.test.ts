@@ -94,6 +94,15 @@ it('retains both selected handles when a diamond rejoins the same invocation', (
   expect(dependencies.state.nodes.join!.input.producer!.outputs).toEqual({ left: 1, right: 2 })
 })
 
+it('rejects an illegal status transition instead of overwriting it', () => {
+  const dependencies = new Dependencies(graph(['first'], [{ source: 'start', target: 'first' }]))
+  dependencies.start('start', {})
+  expect(dependencies.ready()).toEqual(['first'])
+  dependencies.begin('first', 'first')
+  dependencies.release('first', {}, [], true)
+  expect(() => dependencies.begin('first', 'again')).toThrow('cannot move from completed to running')
+})
+
 it('resolves distant ancestors in a long chain and restores the same checkpoint values', () => {
   const ids = Array.from({ length: 400 }, (_, index) => `node${index}`)
   const source = graph(
