@@ -7,7 +7,9 @@ import type { RevisionStore } from './revision-store.ts'
 import type { TagStore } from './tag-store.ts'
 
 import { normalizeFlowQuery } from '@oomol-lab/open-flow/control-api'
+import { runStatusSets } from '@oomol-lab/open-flow/run-lifecycle'
 import { revisionResourceReferences } from './flow-resources.ts'
+import { statusIn } from './run-status-sql.ts'
 import { requireErrorSources } from './trigger-store.ts'
 
 export interface FlowCreation {
@@ -399,6 +401,7 @@ export class FlowStore {
   }
 
   pruneDraftRevisions(limit: number): number {
+    const active = statusIn('runs.status', runStatusSets.active)
     return this.#transaction(() =>
       Number(
         this.#database
@@ -410,7 +413,7 @@ export class FlowStore {
                  AND NOT EXISTS (SELECT 1 FROM flows WHERE flows.draft_revision_id = revisions.revision_id)
                  AND NOT EXISTS (SELECT 1 FROM publications WHERE publications.revision_id = revisions.revision_id)
                  AND NOT EXISTS (SELECT 1 FROM publish_operations WHERE publish_operations.revision_id = revisions.revision_id AND status = 'pending')
-                 AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revisions.revision_id AND status IN ('queued', 'starting', 'running', 'waiting'))
+                 AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revisions.revision_id AND ${active.sql})
                  AND NOT EXISTS (SELECT 1 FROM revision_deltas WHERE revision_deltas.base_revision_id = revisions.revision_id)
                  AND NOT EXISTS (
                    SELECT 1 FROM runs AS retained
@@ -424,12 +427,13 @@ export class FlowStore {
                LIMIT ?
              )`,
           )
-          .run(limit).changes,
+          .run(...active.params, limit).changes,
       ),
     )
   }
 
   pruneDraftDeltas(limit: number): number {
+    const active = statusIn('runs.status', runStatusSets.active)
     return Number(
       this.#database
         .prepare(
@@ -439,7 +443,7 @@ export class FlowStore {
              WHERE NOT EXISTS (SELECT 1 FROM flows WHERE flows.draft_revision_id = revision_deltas.revision_id)
                AND NOT EXISTS (SELECT 1 FROM publications WHERE publications.revision_id = revision_deltas.revision_id)
                AND NOT EXISTS (SELECT 1 FROM publish_operations WHERE publish_operations.revision_id = revision_deltas.revision_id AND status = 'pending')
-               AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revision_deltas.revision_id AND status IN ('queued', 'starting', 'running', 'waiting'))
+               AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revision_deltas.revision_id AND ${active.sql})
                AND NOT EXISTS (
                  SELECT 1 FROM runs AS retained
                  WHERE retained.revision_id = revision_deltas.revision_id AND retained.source = 'draft'
@@ -453,7 +457,7 @@ export class FlowStore {
              LIMIT ?
            )`,
         )
-        .run(limit).changes,
+        .run(...active.params, limit).changes,
     )
   }
 

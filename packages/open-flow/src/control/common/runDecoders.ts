@@ -2,7 +2,7 @@ import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type { JsonValue, WaitAction } from '../../flow/common/change.ts'
 import type { Run, RunCancellation, RunChannel, RunDetails, RunInitiator, RunPage, RunResult, RunWait } from './api.ts'
 
-import { runStatuses } from '../../execution/common/runLifecycle.ts'
+import { isRunTerminal, runStatuses } from '../../execution/common/runLifecycle.ts'
 import { requiredFields, integer, invalidResponse, record, string } from './decoding.ts'
 
 const runStatusSet: ReadonlySet<RunStatus> = new Set(runStatuses)
@@ -91,7 +91,7 @@ export function runDetails(value: unknown): RunDetails {
   if (
     new Set(waits.map((wait) => wait.waitId)).size != waits.length ||
     (summary.status == 'waiting' && waits.length == 0 && (!Array.isArray(source.calls) || source.calls.length == 0)) ||
-    (['completed', 'failed', 'canceled', 'indeterminate'].includes(summary.status) && waits.length > 0)
+    (isRunTerminal(summary.status) && waits.length > 0)
   )
     return invalidResponse()
   if (source.occurrenceId !== undefined && source.triggerNodeId === undefined) return invalidResponse()
@@ -148,14 +148,7 @@ export function runPage(value: unknown): RunPage {
 export function runCancellation(value: unknown): RunCancellation {
   const source = record(value)
   const status = runStatus(source.status)
-  if (
-    source.version != 1 ||
-    typeof source.cancelAccepted != 'boolean' ||
-    status == 'queued' ||
-    status == 'starting' ||
-    status == 'running' ||
-    status == 'waiting'
-  ) {
+  if (source.version != 1 || typeof source.cancelAccepted != 'boolean' || !isRunTerminal(status)) {
     return invalidResponse()
   }
   return { cancelAccepted: source.cancelAccepted, runId: string(source.runId), status, version: 1 }

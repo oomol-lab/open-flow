@@ -7,7 +7,6 @@ import type {
   PublishOperation,
   RunDetails,
   RunEvent,
-  RunStatus,
   TriggerKeySnapshot,
   TriggerKeySummary,
 } from '@oomol-lab/open-flow/control-api'
@@ -16,6 +15,7 @@ import type { ParsedArguments } from './arguments.ts'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
 import { resourceNameIssue, resourceNameMaxLength } from '@oomol-lab/open-flow/flow-change'
+import { isRunTerminal } from '@oomol-lab/open-flow/run-lifecycle'
 
 export interface CommandHost {
   readonly request: (path: string, init?: RequestInit) => Promise<Response>
@@ -75,7 +75,6 @@ function invalidNameCharacterDescription(name: string): string {
 const flowPageLimit = 100
 export const publicationPageLimit = 100
 export const runPageLimit = 100
-const terminalRunStatuses = new Set<RunStatus>(['canceled', 'completed', 'failed', 'indeterminate'])
 
 export async function allFlows(client: ControlClient): Promise<readonly Flow[]> {
   const flows: Flow[] = []
@@ -268,7 +267,7 @@ export async function publicationById(client: ControlClient, flowId: string, pub
 export async function waitForRun(client: ControlClient, created: RunDetails, runtime: Runtime, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs
   let current = created
-  while (!terminalRunStatuses.has(current.status) && current.waits.length == 0) {
+  while (!isRunTerminal(current.status) && current.waits.length == 0) {
     const remaining = deadline - Date.now()
     if (remaining <= 0) return { run: current, timedOut: true }
     await runtime.wait(Math.min(1_000, remaining))
@@ -286,7 +285,7 @@ export async function waitForRun(client: ControlClient, created: RunDetails, run
 export function runExitCode(run: RunDetails, timedOut = false): number {
   if (timedOut) return 3
   if (run.waits.length > 0) return 2
-  return run.status == 'failed' || run.status == 'canceled' || run.status == 'indeterminate' ? 1 : 0
+  return isRunTerminal(run.status) && run.status != 'completed' ? 1 : 0
 }
 
 export function cloudError(error: ApiError): CliError {

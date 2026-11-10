@@ -6,6 +6,13 @@ export const runStatuses = [...runTerminalStatuses, 'queued', 'running', 'starti
 export type RunStatus = (typeof runStatuses)[number]
 export type RunTerminalStatus = (typeof runTerminalStatuses)[number]
 
+export const runStatusSets = {
+  active: ['queued', 'starting', 'running', 'waiting'],
+  terminal: runTerminalStatuses,
+} as const satisfies Readonly<Record<string, readonly RunStatus[]>>
+
+export type RunActiveStatus = (typeof runStatusSets.active)[number]
+
 export type RunOperation =
   | { readonly kind: 'claim' }
   | { readonly kind: 'start' }
@@ -13,6 +20,38 @@ export type RunOperation =
   | { readonly kind: 'resolve' }
   | { readonly kind: 'fail-start' | 'fail-resume' }
   | { readonly kind: 'commit'; readonly status: RunTerminalStatus }
+
+export type RunTransitionScopeName =
+  | 'claim'
+  | 'start'
+  | 'resume'
+  | 'wait'
+  | 'resolve'
+  | 'fail-start'
+  | 'fail-resume'
+  | 'cancel'
+  | 'fail'
+  | 'complete'
+  | 'indeterminate'
+
+/**
+ * Statuses an operation may write from. Production SQL predicates and
+ * `transitionRun` both derive their guards from this table; it is the only
+ * place the writable status sets are declared.
+ */
+export const runTransitionScopes = {
+  'claim': ['queued', 'starting'],
+  'start': ['starting'],
+  'resume': ['starting'],
+  'wait': ['running'],
+  'resolve': ['waiting'],
+  'fail-start': ['starting'],
+  'fail-resume': ['starting'],
+  'cancel': runStatusSets.active,
+  'fail': runStatusSets.active,
+  'complete': ['running'],
+  'indeterminate': ['running'],
+} as const satisfies Readonly<Record<RunTransitionScopeName, readonly RunStatus[]>>
 
 export type RunTransition =
   | { readonly kind: 'ready'; readonly status: 'starting' }
@@ -29,54 +68,60 @@ export type RunTransition =
 export type RunClaim = Extract<RunTransition, { readonly kind: 'ready' | 'running' | 'terminal' | 'waiting' }>
 export type RunStart = Extract<RunTransition, { readonly kind: 'already-started' | 'started' | 'stale' }>
 
+const commitScopes = {
+  canceled: runTransitionScopes.cancel,
+  completed: runTransitionScopes.complete,
+  failed: runTransitionScopes.fail,
+  indeterminate: runTransitionScopes.indeterminate,
+} as const satisfies Readonly<Record<RunTerminalStatus, readonly RunStatus[]>>
+
+function within(scope: readonly RunStatus[], status: RunStatus): boolean {
+  return scope.some((candidate) => candidate == status)
+}
+
 export function isRunTerminal(status: RunStatus): status is RunTerminalStatus {
-  return status == 'canceled' || status == 'completed' || status == 'failed' || status == 'indeterminate'
+  return within(runStatusSets.terminal, status)
+}
+
+export function isRunActive(status: RunStatus): boolean {
+  return within(runStatusSets.active, status)
+}
+
+/** Whether a queued or recovered Run is eligible for the claim barrier. */
+export function isRunClaimable(status: RunStatus): boolean {
+  return within(runTransitionScopes.claim, status)
+}
+
+/** Statuses an operation may transition from, including terminal commits. */
+export function runTransitionScope(operation: RunOperation): readonly RunStatus[] {
+  return operation.kind == 'commit' ? commitScopes[operation.status] : runTransitionScopes[operation.kind]
 }
 
 export function transitionRun(status: RunStatus, operation: RunOperation): RunTransition {
   switch (operation.kind) {
     case 'claim':
-      switch (status) {
-        case 'queued':
-        case 'starting':
-          return { kind: 'ready', status: 'starting' }
-        case 'running':
-          return { kind: 'running', status }
-        case 'waiting':
-          return { kind: 'waiting', status }
-        case 'canceled':
-        case 'completed':
-        case 'failed':
-        case 'indeterminate':
-          return { kind: 'terminal', status }
-      }
+      if (within(runTransitionScopes.claim, status)) return { kind: 'ready', status: 'starting' }
+      if (status == 'running') return { kind: 'running', status }
+      if (status == 'waiting') return { kind: 'waiting', status }
+      if (!isRunTerminal(status)) throw new Error(`Unreachable Run claim state ${status}.`)
+      return { kind: 'terminal', status }
     case 'start':
-      switch (status) {
-        case 'starting':
-          return { kind: 'started', status: 'running' }
-        case 'running':
-          return { kind: 'already-started', status }
-        case 'queued':
-        case 'waiting':
-        case 'canceled':
-        case 'completed':
-        case 'failed':
-        case 'indeterminate':
-          return { kind: 'stale', status }
-      }
+      if (within(runTransitionScopes.start, status)) return { kind: 'started', status: 'running' }
+      if (status == 'running') return { kind: 'already-started', status }
+      return { kind: 'stale', status }
     case 'wait':
-      return status == 'running' ? { kind: 'waited', status: 'waiting' } : { kind: 'stale', status }
+      return within(runTransitionScopes.wait, status) ? { kind: 'waited', status: 'waiting' } : { kind: 'stale', status }
     case 'resolve':
-      return isRunTerminal(status) ? { kind: 'stale', status } : { kind: 'resolved', status: status == 'waiting' ? 'queued' : status }
+      if (isRunTerminal(status)) return { kind: 'stale', status }
+      return { kind: 'resolved', status: status == 'waiting' ? 'queued' : status }
     case 'fail-start':
     case 'fail-resume':
-      return status == 'starting' ? { kind: 'committed', status: operation.kind == 'fail-start' ? 'failed' : 'indeterminate' } : { kind: 'stale', status }
+      return within(runTransitionScopes[operation.kind], status)
+        ? { kind: 'committed', status: operation.kind == 'fail-start' ? 'failed' : 'indeterminate' }
+        : { kind: 'stale', status }
     case 'commit':
       if (isRunTerminal(status)) return { kind: 'stale', status }
-      if (operation.status == 'canceled' || status == 'running' || operation.status == 'failed') {
-        return { kind: 'committed', status: operation.status }
-      }
-      return { kind: 'stale', status }
+      return within(commitScopes[operation.status], status) ? { kind: 'committed', status: operation.status } : { kind: 'stale', status }
   }
 }
 

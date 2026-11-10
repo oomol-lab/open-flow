@@ -25,6 +25,7 @@ import { controlErrorCode, decodeRunEvent, readResult } from '@oomol-lab/open-fl
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions, normalizeRunTrigger, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { projectExecutionId } from '@oomol-lab/open-flow/run-events'
+import { isRunClaimable } from '@oomol-lab/open-flow/run-lifecycle'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
@@ -469,7 +470,7 @@ export class RunControl {
     if (existing.requestDigest != requestDigest || existing.source != source) {
       throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
     }
-    if (existing.status == 'queued' || existing.status == 'starting') this.wake()
+    if (isRunClaimable(existing.status)) this.wake()
     return { created: false, runId: existing.runId }
   }
 

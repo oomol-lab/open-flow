@@ -5,6 +5,9 @@ import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { WebhookResponseSnapshot } from '@oomol-lab/open-flow/webhook-trigger'
 import type { DatabaseSync } from 'node:sqlite'
 
+import { runStatusSets } from '@oomol-lab/open-flow/run-lifecycle'
+import { statusIn } from './run-status-sql.ts'
+
 export interface RunEvent {
   readonly cursor: number
   readonly kind: RunEventKind
@@ -165,9 +168,11 @@ export class RunViewStore {
       parameters.push(options.runId)
     }
     if (options.pendingWait != null) {
+      const active = statusIn('runs.status', runStatusSets.active)
       conditions.push(
-        `${options.pendingWait ? '' : 'NOT '}EXISTS (SELECT 1 FROM wait_receipts WHERE wait_receipts.run_id = runs.run_id AND action IS NULL AND runs.status IN ('running', 'waiting', 'queued', 'starting'))`,
+        `${options.pendingWait ? '' : 'NOT '}EXISTS (SELECT 1 FROM wait_receipts WHERE wait_receipts.run_id = runs.run_id AND action IS NULL AND ${active.sql})`,
       )
+      parameters.push(...active.params)
     }
     parameters.push(limit)
     return this.#controlRuns(conditions.join(' AND '), parameters, 'ORDER BY runs.created_at DESC, runs.run_id DESC LIMIT ?')
@@ -223,10 +228,11 @@ export class RunViewStore {
   }
 
   activeWaits(runId: string) {
+    const active = statusIn('runs.status', runStatusSets.active)
     const rows = this.#database
       .prepare(`SELECT wait_id AS waitId FROM wait_receipts JOIN runs USING (run_id)
-      WHERE run_id = ? AND action IS NULL AND runs.status IN ('running', 'waiting', 'queued', 'starting') ORDER BY waiting_since, wait_id`)
-      .all(runId) as { waitId: string }[]
+      WHERE run_id = ? AND action IS NULL AND ${active.sql} ORDER BY waiting_since, wait_id`)
+      .all(runId, ...active.params) as { waitId: string }[]
     return rows.map(({ waitId }) => this.waitReceipt(runId, waitId)!)
   }
 

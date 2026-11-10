@@ -1,15 +1,18 @@
+import { runStatusSets } from '@oomol-lab/open-flow/run-lifecycle'
 import { existsSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { pathToFileURL } from 'node:url'
+import { statusIn } from '../node/storage/run-status-sql.ts'
 
 const emptyDigest = 'sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
 
 export function resetProviderAccess(database: DatabaseSync, apply: boolean): void {
   database.exec('BEGIN IMMEDIATE')
   try {
+    const active = statusIn('status', runStatusSets.active)
     const blockers = database
       .prepare(`
-      SELECT 'unfinished Runs' AS reason, COUNT(*) AS count FROM runs WHERE status IN ('queued', 'starting', 'running', 'waiting')
+      SELECT 'unfinished Runs' AS reason, COUNT(*) AS count FROM runs WHERE ${active.sql}
       UNION ALL SELECT 'enabled Live', COUNT(*) FROM flow_live WHERE enabled = 1
       UNION ALL SELECT 'unfinished Publish', COUNT(*) FROM publish_operations WHERE status = 'pending'
       UNION ALL SELECT 'Integration state', COUNT(*) FROM integration_states
@@ -17,7 +20,7 @@ export function resetProviderAccess(database: DatabaseSync, apply: boolean): voi
       UNION ALL SELECT 'source subscriptions', COUNT(*) FROM source_subscriptions
       UNION ALL SELECT 'pending publish work', COUNT(*) FROM publish_work WHERE status = 'pending'
     `)
-      .all()
+      .all(...active.params)
       .filter((row) => Number(row.count) > 0)
     if (blockers.length > 0)
       throw new Error(
