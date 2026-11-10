@@ -159,6 +159,16 @@ describe('ControlClient Flow API', () => {
     })
   })
 
+  it('reports the HTTP status of a non-JSON catalog response', async () => {
+    const client = new ControlClient(async () => new Response('<html>ok</html>', { status: 200 }))
+    await expect(client.readCatalog({ path: '/v1/connector/proxy/actions', decode: (value) => value }, null)).rejects.toMatchObject({
+      code: 'response.invalid',
+      message: 'The Control API returned an invalid response. HTTP 200 response body is not JSON.',
+      status: 502,
+    })
+    await expect(client.getTriggerCatalog('en')).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+  })
+
   it('creates and lists top-level Flows', async () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == '/v1/flows' && init?.method == 'POST') return Response.json(flow, { status: 201 })

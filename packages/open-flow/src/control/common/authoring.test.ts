@@ -515,7 +515,10 @@ it('preserves literal JSON and supports multiple sources without connecting exec
   })
   expect(created.content.document.graph.edges).toEqual([])
   await expect(edit(created.content, [{ op: 'node.update', node: 'constructor', set: { name: 'Bad' } }])).rejects.toMatchObject({ code: 'node.not-found' })
-  await expect(edit(empty, [{ op: 'node.remove', node: '$constructor' }])).rejects.toMatchObject({ code: 'node.alias-missing' })
+  await expect(edit(empty, [{ op: 'node.remove', node: '$constructor' }])).rejects.toMatchObject({
+    code: 'node.alias-missing',
+    message: 'Unknown alias $constructor. Set the as field to "constructor" on an earlier node.add in the same request.',
+  })
 })
 it('maps source diagnostics onto nodes and code lines without storage IDs', async () => {
   const created = await edit(empty, [{ op: 'node.add', type: 'code', as: 'code', name: 'Formatter' }]),

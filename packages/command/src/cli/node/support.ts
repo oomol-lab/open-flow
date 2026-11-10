@@ -60,7 +60,7 @@ export function checkedResourceName(value: string, label: 'Flow'): string {
     controlCharacter: `${label} name contains a control character. ${rule}`,
     empty: `${label} name is required.`,
     specialCharacter: `${label} name ${invalidNameCharacterDescription(name)}. ${rule}`,
-    tooLong: `${label} name has ${[...name].length} characters; the limit is ${resourceNameMaxLength}.`,
+    tooLong: `${label} name is ${name.length} UTF-16 code units long; the limit is ${resourceNameMaxLength}.`,
   }[issue]
   throw new CliError('cli.invalid-arguments', message)
 }

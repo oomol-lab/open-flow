@@ -308,6 +308,10 @@ describe('CLI', () => {
     const trailing = runtime()
     await expect(runCli(['create', '发版 告警-', '--json'], { request }, trailing.value)).resolves.toBe(1)
     expect(JSON.parse(trailing.stderr()).error.message).toContain('must end with a letter or number')
+
+    const long = runtime()
+    await expect(runCli(['create', '𝒜'.repeat(41), '--json'], { request }, long.value)).resolves.toBe(1)
+    expect(JSON.parse(long.stderr()).error.message).toBe('Flow name is 82 UTF-16 code units long; the limit is 80.')
   })
 
   it('lists node types when a schema name is unknown', async () => {
@@ -316,6 +320,8 @@ describe('CLI', () => {
     await expect(runCli(['schema', 'variable', '--json'], { request }, output.value)).resolves.toBe(1)
     const message = JSON.parse(output.stderr()).error.message as string
     expect(message).toContain('code')
+    expect(message).toContain('outputs (Trigger outputs)')
+    expect(message).toContain('For the Outputs node schema, run schema outputs --flow <flow>.')
     expect(message).toContain('Input sources such as variable are described by the edits schema.')
     expect(request).not.toHaveBeenCalled()
   })

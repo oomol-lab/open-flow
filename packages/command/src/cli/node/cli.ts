@@ -129,7 +129,7 @@ export async function runCli(args: readonly string[], host: CommandHost, runtime
       if (schema == null)
         throw new CliError(
           'cli.invalid-arguments',
-          `Unknown schema. Use read, search, edit, check, edits, input, outputs, or a node type: ${authoringTypes.join(', ')}. Input sources such as variable are described by the edits schema.`,
+          `Unknown schema. Use read, search, edit, check, edits, input, outputs (Trigger outputs), or a node type: ${authoringTypes.filter((type) => type != 'outputs').join(', ')}. For the Outputs node schema, run schema outputs --flow <flow>. Input sources such as variable are described by the edits schema.`,
         )
       runtime.stdout.write(`${JSON.stringify(schema)}\n`)
       return 0
