@@ -1,5 +1,34 @@
 # Public contracts and version evolution
 
+## Explicit state authorities (after beta.92)
+
+The npm `next` baseline for this change is `0.1.0-beta.92`, gitHead `b92f0557`.
+Confirm the published artifact before release; if the baseline differs, re-evaluate this section
+against the actual npm artifact.
+
+Run lifecycle rules now live in one exported table (`@oomol-lab/open-flow/run-lifecycle`:
+`runTransitionScopes`, `runStatusSets`) that both the pure transition function and the Server SQL
+predicates consume. `claim` now writes `starting` from `queued` **or** `starting`, so a recovered
+claim is idempotent instead of silently skipping its update. Active/terminal status sets are no
+longer repeated as SQL literals. This does not change Engine, checkpoint v7, request envelopes, or
+observable execution ordering. `StoredRun` projects checkpoint recovery as a discriminated
+`startState` internally; a stored checkpoint that cannot be decoded terminates the Run as
+`execution.resume-unavailable` instead of remaining claimable.
+
+`TriggerBinding.health` no longer accepts `suspended`, which no Server path ever produced. Webhook
+and Error bindings now report `unobservable` instead of a hardcoded `healthy`, because the
+deployment has no failure signal for those channels. Clients must treat `unobservable` as neither
+healthy nor failed for display; Flow-wide suspension stays on `Live.status`. Trigger display is
+derived by one exported function (`displayHealth`), and callback/listener admission uses the shared
+`admitsCallback` / `admitsListenerPage` predicates. Stale `listener_work` rows are deleted when
+`runtime_version` advances, so an old-version failure can no longer suppress listener health.
+
+Listener lease fencing and incomplete pages no longer write `failed` health; they only postpone the
+next scan. Only real read failures degrade Listener health. `Live` and `LiveDetails` now compute
+suspension through one helper with a default-deny (`enabled === true`) policy; the `Live` wire shape
+is unchanged. There is no database migration, no checkpoint version change, and no Engine contract
+change in this section.
+
 ## Delay: Flow model v15 and Engine v12
 
 The npm `next` baseline is `0.1.0-beta.92`, gitHead `b92f0557b5c900e01a56972a13400b848386d7f1`, with Model v14 and Engine v11. Model v15 adds the `delay` node; earlier model envelopes reject it. Engine v12 adds durable timer-only suspension, while v11 remains supported for existing Publications and Runs. Checkpoint v7 retains its structure, and the isolated Code runtime digest is unchanged.
