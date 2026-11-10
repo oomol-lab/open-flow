@@ -257,20 +257,55 @@ it('initializes mini map and inspector once, preserves user toggles and applies 
 })
 
 it.each([
+  { ids: [], title: 'Node outline' },
   { ids: ['customer'], title: 'Customer details' },
   { ids: ['note'], title: 'Release notes' },
-  { ids: ['start', 'prepare'], title: 'Inspector' },
+  { ids: ['start', 'prepare'], title: '2 nodes selected' },
 ])('initializes selected IDs $ids with the matching inspector', ({ ids, title }) => {
   const view = render(<OpenFlowPreview {...previewProps({ defaultSelectedNodeIds: ids, defaultInspectorOpen: true })} />)
   expect(selectedIds(boundary.props!.flowCanvasStore)).toEqual(ids.toSorted())
   const panel = view.container.querySelector('[role="dialog"], [role="complementary"]')!
-  expect(panel.textContent).toContain(title)
+  expect(document.getElementById(panel.getAttribute('aria-labelledby')!)?.textContent).toBe(title)
   if (ids.length > 1) {
     expect(panel.textContent).toContain('Start onboarding')
     expect(panel.textContent).toContain('Prepare message')
     expect(panel.textContent).not.toContain('Customer details')
     expect(panel.textContent).not.toContain('Release notes')
   }
+})
+
+it('uses the canvas title and custom icon in the inspector and updates them with selection without changing the snapshot', async () => {
+  const sample = previewProps({ defaultSelectedNodeIds: ['prepare'], defaultInspectorOpen: true })
+  const graph = sample.draft.content.document.graph
+  const prepare = graph.nodes.prepare!
+  if (prepare.kind !== 'task') throw new Error('Expected a Task node.')
+  const icon = 'https://example.com/prepare.svg'
+  const props = {
+    ...sample,
+    draft: {
+      ...sample.draft,
+      content: {
+        ...sample.draft.content,
+        document: {
+          ...sample.draft.content.document,
+          graph: { ...graph, nodes: { ...graph.nodes, prepare: { ...prepare, name: undefined, icon } } },
+        },
+      },
+    },
+  }
+  const original = structuredClone(props)
+  const view = render(<OpenFlowPreview {...props} />)
+  const panel = view.container.querySelector('[role="dialog"], [role="complementary"]')!
+  const title = () => document.getElementById(panel.getAttribute('aria-labelledby')!)?.textContent
+  const headerIcon = () => panel.querySelector('header img')?.getAttribute('src')
+
+  expect(title()).toBe('Prepare message')
+  expect(headerIcon()).toBe(icon)
+
+  await selectNodes(boundary.props!.flowCanvasStore, ['customer'])
+  expect(title()).toBe('Customer details')
+  expect(headerIcon()).toBeUndefined()
+  expect(props).toEqual(original)
 })
 
 it('ignores missing and duplicate initial selection IDs without mutating the input', () => {

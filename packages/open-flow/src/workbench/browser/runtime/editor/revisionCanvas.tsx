@@ -10,6 +10,7 @@ import { decodeAppCatalogResponse, getAppCatalogCache } from '@oomol-lab/resourc
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
+import { CanvasNodeIcon } from '../../../../canvas/browser/graph/Nodes/components/CanvasNodeIcon.tsx'
 import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
 import { localizeTrigger } from '../../../../trigger/providers/localization.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -19,7 +20,7 @@ import { designerGraph } from '../workspace.ts'
 import { CommentInspector } from './commentInspector.tsx'
 import { ContextPanel } from './contextPanel.tsx'
 import { FlowNodeList } from './flowNodeList.tsx'
-import { inspectorIcon, NodeInspector } from './nodeInspector.tsx'
+import { NodeInspector } from './nodeInspector.tsx'
 import { changeRevisionCanvasSession } from './revisionCanvasSession.ts'
 import { WorkbenchInspectorToggle } from './workbenchInspectorToggle.tsx'
 
@@ -143,7 +144,8 @@ export function RevisionCanvas({
     })
 
   const selection = selected.length === 1 ? revision.node(selected[0]!) : undefined
-  const comment = selected.length === 1 ? model.nodes.find((node) => node.id === selected[0] && node.kind === 'comment') : undefined
+  const selectedNode = selected.length === 1 ? model.nodes.find((node) => node.id === selected[0]) : undefined
+  const panelTitle = selectedNode?.title ?? (selected.length > 1 ? t('inspector.multipleSelected', { count: selected.length }) : t('inspector.outline'))
   const restoreLayout = layoutChanged ? (
     <Button
       className="ml-auto"
@@ -213,8 +215,16 @@ export function RevisionCanvas({
             layoutRoot={root}
             className="open-flow-property-panel"
             theme={theme}
-            title={selection?.node.name ?? comment?.title ?? t('inspector.title')}
-            icon={comment?.kind === 'comment' ? 'comment' : inspectorIcon(selection)}
+            title={panelTitle}
+            icon={
+              selectedNode == null ? (
+                'flow'
+              ) : selectedNode.kind === 'comment' ? (
+                <i aria-hidden="true" className="i-codicon:note size-full" />
+              ) : (
+                <CanvasNodeIcon {...selectedNode} className="size-full" />
+              )
+            }
             focusOnOpen
             onClose={() => setInspectorOpen(false)}
           >
@@ -228,8 +238,8 @@ export function RevisionCanvas({
                 connectorProviders={providerMetadata}
                 triggerDisplays={triggerDisplays}
               />
-            ) : comment?.kind === 'comment' ? (
-              <CommentInspector key={comment.id} title={comment.title} content={comment.content ?? ''} dark={theme === 'dark'} readOnly />
+            ) : selectedNode?.kind === 'comment' ? (
+              <CommentInspector key={selectedNode.id} title={selectedNode.title} content={selectedNode.content ?? ''} dark={theme === 'dark'} readOnly />
             ) : (
               <FlowNodeList
                 nodes={selected.length > 1 ? model.nodes.filter((node) => selected.includes(node.id)) : model.nodes}

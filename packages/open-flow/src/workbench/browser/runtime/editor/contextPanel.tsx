@@ -19,7 +19,7 @@ interface ContextPanelProps {
   readonly actions?: ReactNode
   readonly children: ReactNode
   readonly focusOnOpen: boolean
-  readonly icon: IconName
+  readonly icon: IconName | ReactElement
   readonly onClose: () => void
   readonly showClose?: boolean
   readonly theme: WorkbenchTheme
@@ -183,7 +183,7 @@ export function ContextPanel({
             <>
               <span className="flex size-9 shrink-0 items-center justify-center" aria-hidden="true">
                 <span className={`flex items-center justify-center text-2xl [&>svg]:size-full! ${icon === 'flow' ? 'size-5' : 'size-6'}`}>
-                  <Icon name={icon} />
+                  {typeof icon === 'string' ? <Icon name={icon} /> : icon}
                 </span>
               </span>
               <strong id={titleId}>{title}</strong>
