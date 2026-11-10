@@ -363,7 +363,8 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
   }
   function resolve(ref: string) {
     return ref.startsWith('$')
-      ? ((Object.hasOwn(aliases, ref.slice(1)) ? aliases[ref.slice(1)] : undefined) ?? fail('node.alias-missing', `Unknown alias ${ref}.`))
+      ? ((Object.hasOwn(aliases, ref.slice(1)) ? aliases[ref.slice(1)] : undefined) ??
+          fail('node.alias-missing', `Unknown alias ${ref}. Set the as field to ${JSON.stringify(ref.slice(1))} on an earlier node.add in the same request.`))
       : ref
   }
   function source(

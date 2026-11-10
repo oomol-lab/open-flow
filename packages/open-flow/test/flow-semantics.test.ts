@@ -629,38 +629,49 @@ export default () => value`,
       sourceSchema: {} as JsonValue,
       targetSchema: { type: 'string' } as JsonValue,
     },
+    {
+      codes: ['graph.node-output-incompatible'],
+      message: 'The input requires minLength 1; the output does not declare it.',
+      name: 'names the input keyword an output does not guarantee',
+      sourceSchema: { type: 'string' } as JsonValue,
+      targetSchema: { type: 'string', minLength: 1 } as JsonValue,
+    },
     { codes: [], name: 'accepts two unconstrained schemas', sourceSchema: true as JsonValue, targetSchema: {} as JsonValue },
-  ])('$name', async ({ codes, sourceSchema, targetSchema }) => {
-    const source = revision('export default ({ input }) => ({ input })')
-    const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
-    const invalid: RevisionFixture = {
-      ...source,
-      document: {
-        ...source.document,
-        graph: {
-          edges: [{ source: 'source', target: 'task' }],
-          nodes: {
-            source: {
-              inputs: {},
-              kind: 'value',
-              name: 'Source',
-              values: [{ handle: 'value', jsonSchema: sourceSchema, nullable: false, value: 'text' }],
-            },
-            task: {
-              ...task,
-              inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
-              task: { ...task.task, inputs: [{ handle: 'input', jsonSchema: targetSchema, nullable: false }] },
+  ] as { codes: string[]; message?: string; name: string; sourceSchema: JsonValue; targetSchema: JsonValue }[])(
+    '$name',
+    async ({ codes, message, sourceSchema, targetSchema }) => {
+      const source = revision('export default ({ input }) => ({ input })')
+      const task = source.document.graph.nodes.task
+      if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
+      const invalid: RevisionFixture = {
+        ...source,
+        document: {
+          ...source.document,
+          graph: {
+            edges: [{ source: 'source', target: 'task' }],
+            nodes: {
+              source: {
+                inputs: {},
+                kind: 'value',
+                name: 'Source',
+                values: [{ handle: 'value', jsonSchema: sourceSchema, nullable: false, value: 'text' }],
+              },
+              task: {
+                ...task,
+                inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
+                task: { ...task.task, inputs: [{ handle: 'input', jsonSchema: targetSchema, nullable: false }] },
+              },
             },
           },
         },
-      },
-    }
+      }
 
-    const result = await validateFlow(invalid, engine)
-    expect(result.diagnostics.map(({ code }) => code)).toEqual(codes)
-    expect(result.valid).toBe(codes.length == 0)
-  })
+      const result = await validateFlow(invalid, engine)
+      expect(result.diagnostics.map(({ code }) => code)).toEqual(codes)
+      if (message != null) expect(result.diagnostics[0]?.message).toContain(message)
+      expect(result.valid).toBe(codes.length == 0)
+    },
+  )
 
   it('accepts a schema-nullable output for a nullable input', async () => {
     const source = revision('export default ({ input }) => ({ input })')

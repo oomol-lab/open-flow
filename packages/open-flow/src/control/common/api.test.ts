@@ -151,6 +151,35 @@ describe('ControlClient Flow API', () => {
     const client = new ControlClient(async () => Response.json({ ...flow, resourceReferences }))
     await expect(client.getFlow(flow.flowId)).rejects.toMatchObject({ code: 'response.invalid' })
   })
+  it('reports the HTTP status of a non-JSON error response', async () => {
+    const client = new ControlClient(async () => new Response('<html>Bad gateway</html>', { status: 504, headers: { 'content-type': 'text/html' } }))
+    await expect(client.getFlow(flow.flowId)).rejects.toMatchObject({
+      code: 'response.invalid',
+      message: 'The Control API returned an invalid response. HTTP 504 response did not include a JSON error body.',
+    })
+  })
+
+  it('reports the HTTP status of a non-JSON catalog response', async () => {
+    const client = new ControlClient(async () => new Response('<html>ok</html>', { status: 200 }))
+    await expect(client.readCatalog({ path: '/v1/connector/proxy/actions', decode: (value) => value }, null)).rejects.toMatchObject({
+      code: 'response.invalid',
+      message: 'The Control API returned an invalid response. HTTP 200 response body is not JSON.',
+      status: 502,
+    })
+    await expect(client.getTriggerCatalog('en')).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+  })
+
+  it('propagates cancellation while reading a catalog body', async () => {
+    const controller = new AbortController()
+    const reason = new Error('canceled')
+    const body = new ReadableStream({ start: (stream) => controller.signal.addEventListener('abort', () => stream.error(reason)) })
+    const client = new ControlClient(async () => {
+      queueMicrotask(() => controller.abort(reason))
+      return new Response(body, { status: 200 })
+    })
+    await expect(client.readCatalog({ path: '/v1/connector/proxy/actions', decode: (value) => value }, null, controller.signal)).rejects.toBe(reason)
+  })
+
   it('creates and lists top-level Flows', async () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == '/v1/flows' && init?.method == 'POST') return Response.json(flow, { status: 201 })

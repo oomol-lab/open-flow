@@ -2,6 +2,7 @@ import type { ParsedArguments } from './arguments.ts'
 import type { CommandHost, Runtime } from './support.ts'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
+import { authoringTypes } from '@oomol-lab/open-flow/control-requests'
 import { parseArguments } from './arguments.ts'
 import { commandContract, commandHelp, commandOptions, commandSchema, examplesForCommand } from './commands.ts'
 import { flowCommand } from './flowCommands.ts'
@@ -125,7 +126,11 @@ export async function runCli(args: readonly string[], host: CommandHost, runtime
           `Usage: ${runtime.commandPrefix ?? 'oo flow'} schema [read|search|edit|check|edits|node-type|input|outputs]`,
         )
       const schema = commandSchema(parsed.positionals[1])
-      if (schema == null) throw new CliError('cli.invalid-arguments', 'Unknown schema. Use read, search, edit, check, or a node type such as agent or code.')
+      if (schema == null)
+        throw new CliError(
+          'cli.invalid-arguments',
+          `Unknown schema. Use read, search, edit, check, edits, input, outputs (Trigger outputs), or a node type: ${authoringTypes.filter((type) => type != 'outputs').join(', ')}. For the Outputs node schema, run schema outputs --flow <flow>. Input sources such as variable are described by the edits schema.`,
+        )
       runtime.stdout.write(`${JSON.stringify(schema)}\n`)
       return 0
     }

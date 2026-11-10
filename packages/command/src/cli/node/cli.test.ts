@@ -298,6 +298,34 @@ describe('CLI', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
+  it('names the unsupported character in a rejected Flow name and accepts non-Latin letters', async () => {
+    const rejected = runtime()
+    const request = vi.fn()
+    await expect(runCli(['create', '发版告警（试验）', '--json'], { request }, rejected.value)).resolves.toBe(1)
+    expect(JSON.parse(rejected.stderr()).error.message).toContain('unsupported character "（"')
+    expect(request).not.toHaveBeenCalled()
+
+    const trailing = runtime()
+    await expect(runCli(['create', '发版 告警-', '--json'], { request }, trailing.value)).resolves.toBe(1)
+    expect(JSON.parse(trailing.stderr()).error.message).toContain('must end with a letter or number')
+
+    const long = runtime()
+    await expect(runCli(['create', '𝒜'.repeat(41), '--json'], { request }, long.value)).resolves.toBe(1)
+    expect(JSON.parse(long.stderr()).error.message).toBe('Flow name is 82 UTF-16 code units long; the limit is 80.')
+  })
+
+  it('lists node types when a schema name is unknown', async () => {
+    const output = runtime()
+    const request = vi.fn()
+    await expect(runCli(['schema', 'variable', '--json'], { request }, output.value)).resolves.toBe(1)
+    const message = JSON.parse(output.stderr()).error.message as string
+    expect(message).toContain('code')
+    expect(message).toContain('outputs (Trigger outputs)')
+    expect(message).toContain('For the Outputs node schema, run schema outputs --flow <flow>.')
+    expect(message).toContain('Input sources such as variable are described by the edits schema.')
+    expect(request).not.toHaveBeenCalled()
+  })
+
   it('does not expose the removed Project command', async () => {
     const output = runtime()
     const request = vi.fn()
