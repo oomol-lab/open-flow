@@ -1319,9 +1319,15 @@ export class ControlClient {
     }
   }
 
-  async listConnectorProviders(signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorProvider[]> {
+  async listConnectorProviders(
+    signal?: AbortSignal,
+    flowId?: string,
+    locale?: string,
+    options: { readonly cacheOnly?: boolean } = {},
+  ): Promise<readonly ConnectorProvider[]> {
     const query = connectorProvidersQuery(flowId, locale)
-    if (this.catalogCache != null) return (await this.catalogResponse(query, 300_000, signal)).data
+    if (this.catalogCache != null) return (await this.catalogResponse(query, 300_000, signal, false, options.cacheOnly)).data
+    if (options.cacheOnly) throw new ApiError(503, 'catalog.cache-miss', 'No Provider catalog cache is configured.')
     return this.connectorRequest(query.path, 'providers', signal, query.decode)
   }
 
@@ -1695,9 +1701,10 @@ export class ControlClient {
     maxAgeMs: number,
     signal?: AbortSignal,
     fresh = false,
+    cacheOnly = false,
   ) {
     if (this.catalogCache != null)
-      return this.catalogCache.read(query, (etag) => this.readCatalog({ path: query.path, decode: jsonValue }, etag), maxAgeMs, signal, fresh)
+      return this.catalogCache.read(query, (etag) => this.readCatalog({ path: query.path, decode: jsonValue }, etag), maxAgeMs, signal, fresh, cacheOnly)
     const response = await this.readCatalog(query, null, signal)
     if (!response.modified) return invalidResponse()
     return { data: response.data, etag: response.etag }

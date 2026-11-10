@@ -6,9 +6,9 @@ import { createContext, useContext, useMemo, useState } from 'react'
 import { providerIconAppearance } from '../../../connector/common/providerIconSprite.ts'
 import { IconifyIcon } from './IconifyIcon.tsx'
 import { IconThemeContext } from './iconTheme.ts'
-import { useSpriteStatus } from './spriteResource.ts'
+import { useProviderIconResource } from './providerIconResource.ts'
 
-/** Standalone image capture uses individual, cross-origin-readable images instead of sprites. */
+/** Standalone image capture crops sprites and uses cross-origin-readable images. */
 export const IconImageCrossOriginContext = createContext<'anonymous' | undefined>(undefined)
 
 /** A bundled, theme-aware placeholder that does not load a remote icon. */
@@ -34,12 +34,8 @@ export const ContentIcon = ({ src, className, fallback = null, loading = 'lazy',
   const [error, setError] = useState<string>()
   const onError = () => setError(source)
 
-  if (sprite)
-    return crossOrigin ? (
-      <ContentIcon {...{ className, fallback, loading, decoding }} src={sprite.fallback} />
-    ) : (
-      <SpriteIcon {...{ className, fallback, loading, decoding }} sprite={sprite} />
-    )
+  if (sprite) return <SpriteIcon {...{ className, fallback, loading, decoding }} sprite={sprite} />
+  if (image?.providerId) return <ProviderImage {...{ className, fallback, loading, decoding }} image={image as ProviderImageDescriptor} />
 
   if (source === placeholderIcon) return <i aria-hidden="true" className={clsx('i-lucide-light:plug', className)} />
 
@@ -87,15 +83,26 @@ export function initialsIcon(initials: string): string {
 
 const imageIconPrefix = 'data:application/vnd.open-flow.image-icon+json,'
 
-export function imageIcon(source: string, fallback: string): string {
-  return `${imageIconPrefix}${encodeURIComponent(JSON.stringify({ fallback, source }))}`
+export function imageIcon(source: string, fallback: string, providerId?: string): string {
+  return `${imageIconPrefix}${encodeURIComponent(JSON.stringify({ fallback, source, ...(providerId == null ? {} : { providerId }) }))}`
 }
 
-function parseImageIcon(src: string | undefined): { readonly fallback: string; readonly source: string } | undefined {
+interface ImageDescriptor {
+  readonly fallback: string
+  readonly source: string
+  readonly providerId?: string
+}
+type ProviderImageDescriptor = ImageDescriptor & { readonly providerId: string }
+function parseImageIcon(src: string | undefined): ImageDescriptor | undefined {
   if (!src?.startsWith(imageIconPrefix)) return
   try {
-    const value = JSON.parse(decodeURIComponent(src.slice(imageIconPrefix.length))) as { readonly fallback?: unknown; readonly source?: unknown }
-    if (typeof value.fallback == 'string' && typeof value.source == 'string') return { fallback: value.fallback, source: value.source }
+    const value = JSON.parse(decodeURIComponent(src.slice(imageIconPrefix.length))) as {
+      readonly fallback?: unknown
+      readonly source?: unknown
+      readonly providerId?: unknown
+    }
+    if (typeof value.fallback == 'string' && typeof value.source == 'string')
+      return { fallback: value.fallback, source: value.source, ...(typeof value.providerId === 'string' ? { providerId: value.providerId } : {}) }
   } catch {
     return
   }
@@ -130,23 +137,51 @@ function parseSpriteIcon(src?: string): SpriteDescriptor | undefined {
 }
 function SpriteIcon({ sprite, ...props }: Omit<ContentIconProps, 'src'> & { sprite: SpriteDescriptor }) {
   const theme = useContext(IconThemeContext)
+  const capture = useContext(IconImageCrossOriginContext) != null
   const { iconSprite: m, iconSpritePosition: p } = sprite
   const url = theme == 'dark' ? m.darkUrl : m.lightUrl
-  const status = useSpriteStatus(url)
-  if (status == 'failed') return <ContentIcon {...props} src={sprite.fallback} />
+  const resource = useProviderIconResource({ kind: 'sprite', theme, url, version: m.version }, capture ? { x: p.x, y: p.y, size: m.iconSize } : undefined)
+  if (resource.status == 'failed') return <ContentIcon {...props} src={sprite.fallback} />
+  if (resource.status === 'loading') return <PendingIcon className={props.className} fallback={props.fallback} />
+  if (capture)
+    return (
+      <img alt="" className={clsx(styles.img, props.className)} data-render-pending={resource.refreshing || undefined} src={resource.url} decoding="sync" />
+    )
   return (
-    <span aria-hidden="true" data-render-pending={status == 'loading' || undefined} className={clsx(styles.sprite, props.className)}>
-      {status == 'loaded' && (
-        <span
-          style={{
-            backgroundImage: `url(${JSON.stringify(url)})`,
-            width: `${(m.width / m.iconSize) * 100}%`,
-            height: `${(m.height / m.iconSize) * 100}%`,
-            left: `${(-p.x / m.iconSize) * 100}%`,
-            top: `${(-p.y / m.iconSize) * 100}%`,
-          }}
-        />
-      )}
+    <span aria-hidden="true" data-render-pending={resource.refreshing || undefined} className={clsx(styles.sprite, props.className)}>
+      <span
+        style={{
+          backgroundImage: `url(${JSON.stringify(resource.url)})`,
+          width: `${(m.width / m.iconSize) * 100}%`,
+          height: `${(m.height / m.iconSize) * 100}%`,
+          left: `${(-p.x / m.iconSize) * 100}%`,
+          top: `${(-p.y / m.iconSize) * 100}%`,
+        }}
+      />
+    </span>
+  )
+}
+
+function ProviderImage({ image, ...props }: Omit<ContentIconProps, 'src'> & { image: ProviderImageDescriptor }) {
+  const resource = useProviderIconResource({ kind: 'image', providerId: image.providerId, url: image.source })
+  if (resource.status === 'failed') return <ContentIcon {...props} src={image.fallback} />
+  if (resource.status === 'loading') return <PendingIcon className={props.className} fallback={props.fallback} />
+  return (
+    <img
+      alt=""
+      className={clsx(styles.img, props.className)}
+      data-render-pending={resource.refreshing || undefined}
+      src={resource.url}
+      loading={props.loading}
+      decoding={props.decoding}
+    />
+  )
+}
+
+function PendingIcon({ className, fallback }: Pick<ContentIconProps, 'className' | 'fallback'>) {
+  return (
+    <span aria-hidden="true" className={clsx(styles.pending, className)} data-render-pending>
+      {fallback ?? <ContentIcon src={placeholderIcon} className={className} />}
     </span>
   )
 }

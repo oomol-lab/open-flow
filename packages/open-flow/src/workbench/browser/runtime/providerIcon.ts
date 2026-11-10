@@ -7,7 +7,7 @@ export function providerIcon(
   provider: ProviderIconAppearance & { readonly homepageUrl?: string; readonly icon?: string; readonly serviceId: string; readonly serviceName: string },
 ): string {
   const source = provider.icon?.trim()
-  const original = source ? imageIcon(source, placeholderIcon) : placeholderIcon
+  const original = source ? imageIcon(source, placeholderIcon, provider.serviceId) : placeholderIcon
   const appearance = providerIconAppearance(provider.iconSprite, provider.iconSpritePosition)
   return appearance?.iconSprite && appearance.iconSpritePosition
     ? spriteIcon({ iconSprite: appearance.iconSprite, iconSpritePosition: appearance.iconSpritePosition }, original)

@@ -4,7 +4,7 @@ import { providerIcon } from './providerIcon.ts'
 
 it('uses the provider image with a bundled placeholder fallback', () => {
   expect(providerIcon({ icon: ' https://example.com/icon.svg ', serviceId: 'example', serviceName: 'Example' })).toBe(
-    imageIcon('https://example.com/icon.svg', placeholderIcon),
+    imageIcon('https://example.com/icon.svg', placeholderIcon, 'example'),
   )
 })
 

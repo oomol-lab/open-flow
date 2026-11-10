@@ -1,12 +1,14 @@
+import type { ProviderIconRequest } from '../../../connector/common/providerIconCache.ts'
+
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { ContentIcon, IconImageCrossOriginContext, imageIcon, initialsIcon, spriteIcon } from './ContentIcon.tsx'
 import { IconThemeContext } from './iconTheme.ts'
-const status = vi.hoisted(() => ({ value: 'loaded', urls: [] as string[] }))
-vi.mock('./spriteResource.ts', () => ({
-  useSpriteStatus: (url: string) => {
-    status.urls.push(url)
-    return status.value
+const status = vi.hoisted(() => ({ value: 'loaded', requests: [] as { request: ProviderIconRequest; crop?: unknown }[] }))
+vi.mock('./providerIconResource.ts', () => ({
+  useProviderIconResource: (request: ProviderIconRequest, crop?: unknown) => {
+    status.requests.push({ request, crop })
+    return { status: status.value, url: 'data:image/png;base64,Y3JvcA==' }
   },
 }))
 const metadata = {
@@ -23,7 +25,7 @@ const fallback = imageIcon('https://example.com/icon.svg', initialsIcon('AB'))
 const src = spriteIcon({ iconSprite: metadata, iconSpritePosition: { x: 54, y: 2 } }, fallback)
 beforeEach(() => {
   status.value = 'loaded'
-  status.urls = []
+  status.requests = []
 })
 it.each(['light', 'dark'] as const)('selects only the %s sprite and crops physical pixels', (theme) => {
   const html = renderToStaticMarkup(
@@ -31,7 +33,9 @@ it.each(['light', 'dark'] as const)('selects only the %s sprite and crops physic
       <ContentIcon src={src} />
     </IconThemeContext.Provider>,
   )
-  expect(status.urls).toEqual([metadata[theme == 'dark' ? 'darkUrl' : 'lightUrl']])
+  expect(status.requests).toEqual([
+    { request: { kind: 'sprite', theme, url: metadata[theme == 'dark' ? 'darkUrl' : 'lightUrl'], version: 'v1' }, crop: undefined },
+  ])
   expect(html).toContain('left:-112.5%')
   expect(html).toContain('width:216.66666666666666%')
   expect(html).not.toContain('icon.svg')
@@ -48,20 +52,19 @@ it('uses the original image after a shared failure', () => {
   expect(renderToStaticMarkup(<ContentIcon src={src} />)).toContain('src="https://example.com/icon.svg"')
 })
 
-it.each(['loaded', 'loading', 'failed'])('exports only the original image even when the sprite is %s', (spriteStatus) => {
-  status.value = spriteStatus
+it('exports a cropped sprite instead of skipping directly to its fallback', () => {
   const html = renderToStaticMarkup(
     <IconImageCrossOriginContext.Provider value="anonymous">
       <ContentIcon src={src} fallback={<span>Default node icon</span>} />
     </IconImageCrossOriginContext.Provider>,
   )
-  expect(html).toContain('src="https://example.com/icon.svg"')
-  expect(html).toContain('crossorigin="anonymous"')
+  expect(html).toContain('src="data:image/png;base64,Y3JvcA=="')
   expect(html).not.toContain('Default node icon')
-  expect(status.urls).toEqual([])
+  expect(status.requests[0]?.crop).toEqual({ x: 54, y: 2, size: 48 })
 })
 
 it('uses the node fallback during export when a sprite has no original image', () => {
+  status.value = 'failed'
   const html = renderToStaticMarkup(
     <IconImageCrossOriginContext.Provider value="anonymous">
       <ContentIcon

@@ -1,14 +1,10 @@
+import type { CacheDelegate } from '../../base/common/cache.ts'
 import type { JsonValue } from '../../flow/common/change.ts'
 
 import { jsonValue } from './decoding.ts'
 import { ApiError } from './errors.ts'
 
-/** Storage is host-owned. Keys and records are opaque to the delegate. */
-export interface ControlCacheDelegate {
-  get(key: string): Promise<unknown>
-  set(key: string, value: JsonValue): Promise<void>
-  delete(key: string): Promise<void>
-}
+export type ControlCacheDelegate = CacheDelegate
 
 export interface ControlCacheRead {
   readonly path: string
@@ -85,10 +81,15 @@ export class ControlCatalogCache {
       throw new TypeError('Control cache maxAgeMs must be finite and nonnegative.')
   }
 
-  async read<Value>(query: CatalogQuery<Value>, load: CatalogLoad, maxAgeMs: number, signal?: AbortSignal, fresh = false) {
+  async read<Value>(query: CatalogQuery<Value>, load: CatalogLoad, maxAgeMs: number, signal?: AbortSignal, fresh = false, cacheOnly = false) {
     signal?.throwIfAborted()
     const key = JSON.stringify(['open-flow:catalog', 1, this.options.scope, query.path])
-    const result = await wait(this.#request(key, query, load, this.options.maxAgeMs ?? maxAgeMs, fresh || this.options.mode == 'refresh'), signal)
+    const result = await wait(
+      cacheOnly
+        ? this.#load(key, query, load, this.options.maxAgeMs ?? maxAgeMs, false, true)
+        : this.#request(key, query, load, this.options.maxAgeMs ?? maxAgeMs, fresh || this.options.mode == 'refresh'),
+      signal,
+    )
     const data = query.decode(structuredClone(result.body))
     try {
       this.options.onRead?.({ ...result, body: structuredClone(result.body) })
@@ -110,7 +111,14 @@ export class ControlCatalogCache {
     return promise
   }
 
-  async #load<Value>(key: string, query: CatalogQuery<Value>, load: CatalogLoad, maxAgeMs: number, fresh: boolean): Promise<ControlCacheRead> {
+  async #load<Value>(
+    key: string,
+    query: CatalogQuery<Value>,
+    load: CatalogLoad,
+    maxAgeMs: number,
+    fresh: boolean,
+    cacheOnly = false,
+  ): Promise<ControlCacheRead> {
     let cached: CachedResponse | undefined
     try {
       const stored = await this.options.delegate.get(key)
@@ -125,8 +133,8 @@ export class ControlCatalogCache {
     }
     const now = Date.now()
     const stale = cached == null || cached.validatedAt > now || now - cached.validatedAt >= maxAgeMs
-    if (cached != null && (this.options.mode == 'offline' || (!fresh && !stale))) return { ...cached, path: query.path, source: 'cache', stale }
-    if (this.options.mode == 'offline') throw new ApiError(503, 'catalog.cache-miss', `No compatible cached response for ${query.path}.`)
+    if (cached != null && (cacheOnly || this.options.mode == 'offline' || (!fresh && !stale))) return { ...cached, path: query.path, source: 'cache', stale }
+    if (cacheOnly || this.options.mode == 'offline') throw new ApiError(503, 'catalog.cache-miss', `No compatible cached response for ${query.path}.`)
 
     const result = await load(cached?.etag ?? null)
     if (!result.modified && cached == null) throw new ApiError(502, 'response.invalid', 'A catalog returned 304 without a cached response.')

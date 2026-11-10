@@ -81,6 +81,47 @@ renderer's Context. Bundled rendering resources remain available. The exporter s
 node icons may instead use a component fallback or be omitted without setting this
 flag. A `false` value does not guarantee that every remote image loaded.
 
+### Provider artwork and offline caches
+
+Pass the same `ControlClient` used by `createWorkflowAuthoring` to render Provider
+names and artwork. Without a client, the renderer uses bundled fallback icons and
+does not request a public catalog. Provider JSON keeps the client's existing cache
+scope, TTL and ETag behavior. `allowNetwork: false` reads that catalog cache only.
+
+```ts
+import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { ProviderIconCache } from '@oomol-lab/open-flow/provider-icons'
+
+// The host supplies opaque JSON storage through get/set/delete.
+const client = new ControlClient(request, 'api', {
+  cache: { scope, delegate, mode: 'default' },
+})
+const iconCache = new ProviderIconCache({ scope, delegate })
+const result = await flowToPng(browser, workflow, { client, iconCache })
+const offline = await flowToPng(browser, workflow, {
+  client,
+  iconCache,
+  allowNetwork: false,
+})
+```
+
+Reuse the icon cache across exports. It stores complete image responses separately
+from JSON, with base64 bodies. Each scope has two fixed sprite slots, one per theme,
+and one original-image slot per Provider. Reads require the exact source URL and
+sprite version; updated artwork replaces its slot only after a successful download.
+Old sprite bytes are never combined with another version's crop coordinates.
+Matching versioned sprites are immutable; originals use HTTP cache headers and ETag,
+with a 24-hour default when no freshness is supplied. `no-store` images are not retained.
+The optional `mode` is `default`, `refresh` or `offline`; `fetch` can replace the image
+transport. A cache without a delegate uses memory. Storage failures retain successful
+loads in memory, and failed requests may be retried. Missing artwork falls back without
+making the export fail. Offline reads never start or join a network load.
+
+Browser Workbench and Preview use IndexedDB for Provider artwork by default, falling
+back to memory when storage is unavailable. To supply a cache, set `host.iconCache`
+on `OpenFlowWorkbench` or `iconCache` on `OpenFlowPreview`. Workbench PNG export uses
+the same cache. Iconify icons and Markdown images keep their existing loading behavior.
+
 ## Host themes
 
 The host selects light/dark mode through the `theme` prop. Open Flow does not read a host's

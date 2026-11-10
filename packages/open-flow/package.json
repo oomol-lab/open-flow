@@ -20,6 +20,7 @@
   "type": "module",
   "private": true,
   "exports": {
+    "./provider-icons": "./src/connector/common/providerIconCache.ts",
     "./connector-action": "./src/connector/common/actionSchema.ts",
     "./connector-proxy": "./src/connector/common/proxy.ts",
     "./control-api": "./src/control/common/api.ts",

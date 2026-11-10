@@ -88,6 +88,7 @@ function createManifest(version: string): object {
         types: './dist/index.d.ts',
       },
       './decision': { types: './dist/common/decision.d.ts', import: './dist/common/decision.js' },
+      './provider-icons': { types: './dist/common/provider-icons.d.ts', import: './dist/common/provider-icons.js' },
       './flow-state': { types: './dist/common/flow-state.d.ts', import: './dist/common/flow-state.js' },
       './http-request': { types: './dist/common/http-request.d.ts', import: './dist/common/http-request.js' },
       './openapi': { types: './dist/common/openapi.d.ts', import: './dist/common/openapi.js' },
@@ -258,6 +259,34 @@ renderer's Context. Bundled rendering resources remain available. The exporter s
 \`hasImagePlaceholders\` to \`true\` when it substitutes an image placeholder. Remote
 node icons may instead use a component fallback or be omitted without setting this
 flag. A \`false\` value does not guarantee that every remote image loaded.
+
+For Provider artwork, pass the same \`ControlClient\` used by offline authoring as
+\`client\`. The renderer reuses its Provider JSON cache; without a client it keeps
+bundled fallback icons and does not request a public catalog.
+
+\`\`\`ts
+import { ProviderIconCache } from '@oomol-lab/open-flow/provider-icons'
+
+const iconCache = new ProviderIconCache({ scope, delegate, mode: 'default' })
+const result = await flowToPng(browser, workflow, { client, iconCache })
+\`\`\`
+
+The storage delegate implements \`get(key)\`, \`set(key, json)\` and \`delete(key)\`,
+matching \`ControlCacheDelegate\`. Reuse the icon cache across exports. It uses a
+separate namespace for complete image responses with base64 bodies. Each scope has
+two fixed sprite slots, light and dark, and one original-image slot per Provider.
+URL and sprite version must match before reuse. Successfully loaded versions replace
+their slot; failed loads never combine old artwork with new crop coordinates.
+Original images use HTTP caching and ETag, with a 24-hour default; \`no-store\` is
+respected. Options include \`mode: 'refresh' | 'offline' | 'default'\` and \`fetch\`.
+Without a delegate, the cache uses memory. Storage failures retain successful loads
+in memory. \`allowNetwork: false\` reads both Provider JSON and artwork caches only,
+and blocks remote requests in the temporary browser Context. Missing artwork falls
+back without failing the export.
+
+Browser Workbench and Preview cache Provider artwork in IndexedDB by default. Supply
+\`host.iconCache\` or the Preview's \`iconCache\` prop to replace it. Workbench PNG
+export uses the same cache. Iconify and Markdown images keep their existing behavior.
 
 Install the Task contracts as a development dependency:
 

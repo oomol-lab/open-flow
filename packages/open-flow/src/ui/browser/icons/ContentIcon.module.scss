@@ -6,6 +6,15 @@
   object-fit: contain;
 }
 
+.pending {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
 .initials {
   display: inline-flex;
   width: 1em;

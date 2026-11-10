@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import type { CanvasDirection } from '../../../canvas/common/direction.ts'
 import type { InteractiveMode } from '../../../canvas/common/interactiveMode.ts'
+import type { ProviderIconLoader } from '../../../connector/common/providerIconCache.ts'
 import type { Draft, Presentation } from '../../../control/common/api.ts'
 import type { UiLanguage } from '../../../localization/common/languages.ts'
 
@@ -8,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
 import { IconThemeContext } from '../../../ui/browser/icons/iconTheme.ts'
+import { ProviderIconCacheContext } from '../../../ui/browser/icons/providerIconResource.ts'
 import { cn } from '../../../ui/browser/utils.ts'
 import { RevisionCanvas } from './editor/revisionCanvas.tsx'
 import { createI18n } from './i18n.ts'
@@ -18,6 +20,8 @@ export type { InteractiveMode } from '../../../canvas/common/interactiveMode.ts'
 export type { CanvasDirection } from '../../../canvas/common/direction.ts'
 
 export interface OpenFlowPreviewProps {
+  /** Optional shared Provider artwork cache; defaults to browser IndexedDB. */
+  readonly iconCache?: ProviderIconLoader
   readonly draft: Draft
   readonly presentation: Presentation | null
   readonly language: UiLanguage
@@ -44,6 +48,7 @@ export interface OpenFlowPreviewProps {
 
 /** Offline workflow preview. Use a React key to start a new layout/selection session. */
 export function OpenFlowPreview({
+  iconCache,
   draft,
   presentation,
   language,
@@ -65,28 +70,30 @@ export function OpenFlowPreview({
   }, [i18n, language])
   useEffect(() => () => i18n.dispose(), [i18n])
   return (
-    <IconThemeContext.Provider value={theme}>
-      <IconifyProvider>
-        <I18nProvider i18n={i18n}>
-          <div className={cn('open-flow-theme open-flow-workbench open-flow-preview', className)} data-theme={theme}>
-            <RevisionCanvas
-              draft={draft}
-              presentation={presentation}
-              theme={theme}
-              defaultInteractiveMode={defaultInteractiveMode}
-              defaultDirection={defaultDirection}
-              defaultMiniMapExpanded={defaultMiniMapExpanded}
-              defaultInspectorOpen={defaultInspectorOpen}
-              defaultSelectedNodeIds={defaultSelectedNodeIds}
-              nodesDraggable={nodesDraggable}
-              layoutMotion={layoutMotion}
-              label={label}
-              background={dottedBackground ? 'dotted' : 'none'}
-              showHeader={false}
-            />
-          </div>
-        </I18nProvider>
-      </IconifyProvider>
-    </IconThemeContext.Provider>
+    <ProviderIconCacheContext.Provider value={iconCache}>
+      <IconThemeContext.Provider value={theme}>
+        <IconifyProvider>
+          <I18nProvider i18n={i18n}>
+            <div className={cn('open-flow-theme open-flow-workbench open-flow-preview', className)} data-theme={theme}>
+              <RevisionCanvas
+                draft={draft}
+                presentation={presentation}
+                theme={theme}
+                defaultInteractiveMode={defaultInteractiveMode}
+                defaultDirection={defaultDirection}
+                defaultMiniMapExpanded={defaultMiniMapExpanded}
+                defaultInspectorOpen={defaultInspectorOpen}
+                defaultSelectedNodeIds={defaultSelectedNodeIds}
+                nodesDraggable={nodesDraggable}
+                layoutMotion={layoutMotion}
+                label={label}
+                background={dottedBackground ? 'dotted' : 'none'}
+                showHeader={false}
+              />
+            </div>
+          </I18nProvider>
+        </IconifyProvider>
+      </IconThemeContext.Provider>
+    </ProviderIconCacheContext.Provider>
   )
 }

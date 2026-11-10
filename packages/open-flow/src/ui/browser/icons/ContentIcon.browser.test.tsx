@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { IconStack } from '../icon-stack.tsx'
 import { ContentIcon, IconImageCrossOriginContext, imageIcon, initialsIcon, placeholderIcon, spriteIcon } from './ContentIcon.tsx'
 
-vi.mock('./spriteResource.ts', () => ({ useSpriteStatus: () => 'failed' }))
+vi.mock('./providerIconResource.ts', () => ({ useProviderIconResource: () => ({ status: 'failed' }) }))
 
 let container: HTMLDivElement
 let root: Root
