@@ -2,6 +2,7 @@ import type { RevisionContent, TaskDefinition } from '../../flow/common/change.t
 import type { AuthoringHost, AuthoringRequest } from './authoring.ts'
 
 import { describe, expect, it } from 'vitest'
+import { agentConfigIssues } from '../../flow/common/agent.ts'
 import { applyFlowChanges, currentFlowModelVersion } from '../../flow/common/change.ts'
 import { connect } from '../../flow/common/edgeChanges.ts'
 import { checkInputSource } from '../../flow/common/graph.ts'
@@ -75,11 +76,12 @@ describe('node authoring', () => {
     const task = taskAt(created.content, ref)
     expect(task).toMatchObject({
       executor: {
-        tools: [
-          { inputs: [{ handle: 'message', jsonSchema: { type: 'string' }, nullable: true, value: 'default', source: { kind: 'value', value: 'Hello' } }] },
-        ],
+        tools: [{ inputs: [{ handle: 'message', jsonSchema: { type: 'string' }, nullable: true, source: { kind: 'value', value: 'Hello' } }] }],
       },
     })
+    if (!('executor' in task) || task.executor.kind != 'agent') throw new Error('Agent expected')
+    expect(task.executor.tools[0]!.inputs[0]).not.toHaveProperty('value')
+    expect(agentConfigIssues(task)).toEqual([])
     const view = readAuthoring(created.content, { nodes: [ref] }) as unknown as { nodes: { config: Record<string, never> }[] }
     const saved = await compileAuthoring(
       created.content,

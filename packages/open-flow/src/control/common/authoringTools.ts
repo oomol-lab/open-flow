@@ -99,7 +99,7 @@ export async function prepareAgentTools(
         name: tool.name,
         description: tool.description,
         approval: tool.approval,
-        inputs: preparedTool.inputs.map((port) => Object.assign({}, port, { source: tool.inputs?.[port.handle] ?? port.source })),
+        inputs: preparedTool.inputs.map(({ value: _value, ...port }) => Object.assign({}, port, { source: tool.inputs?.[port.handle] ?? port.source })),
       })
       continue
     }
@@ -116,7 +116,9 @@ export async function prepareAgentTools(
       ...settings,
       id: old?.id ?? id(),
       action: definition?.actionId ?? tool.action,
-      inputs: ports.map((port) => (sources != null && Object.hasOwn(sources, port.handle) ? Object.assign({}, port, { source: sources[port.handle]! }) : port)),
+      inputs: ports.map(({ value: _value, ...port }) =>
+        sources != null && Object.hasOwn(sources, port.handle) ? Object.assign({}, port, { source: sources[port.handle]! }) : port,
+      ),
     })
   }
   return prepared

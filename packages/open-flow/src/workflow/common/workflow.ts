@@ -189,9 +189,10 @@ export function workflowAgentTool(id: string, name: string, target: WorkflowCont
     id,
     description: previous?.description ?? target.name,
     approval: previous?.approval ?? false,
-    inputs: capability.inputs.map((port) =>
-      Object.assign({}, port, { source: previous?.inputs.find((old) => old.handle == port.handle)?.source ?? { kind: 'model' as const } }),
-    ),
+    inputs: capability.inputs.map((input) => {
+      const { value: _value, ...port } = input as typeof input & { value?: unknown }
+      return Object.assign({}, port, { source: previous?.inputs.find((old) => old.handle == port.handle)?.source ?? { kind: 'model' as const } })
+    }),
   }
 }
 

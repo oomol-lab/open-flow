@@ -84,6 +84,9 @@ export function schemaEqualsChecker<E>(extendsContext: ExtendsContext): (schema1
     if (typeof value1 !== typeof value2) {
       return false
     }
+    if (extendsContext.isExtendsSchema(value1) || extendsContext.isExtendsSchema(value2)) {
+      return extendsContext.equals(value1, value2)
+    }
     if (isCompiledSchema<E>(value1) && isCompiledSchema<E>(value2)) {
       return isCompiledSchemaEquals(value1, value2)
     }

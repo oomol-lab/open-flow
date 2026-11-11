@@ -1,5 +1,7 @@
+import type { Schema as JsonSchema } from '@cfworker/json-schema'
 import type { ExtendsSchema, SubsetCompare } from '../../json-schema-subset/index.ts'
 
+import { Validator } from '@cfworker/json-schema'
 import { isString, toPlainObject } from '@wopjs/cast'
 import { CompiledKind, getKind, isCompiledSchema } from '../../json-schema-subset/compiler/index.ts'
 import { ExpressionSingleResult, makeSubsetCompare } from '../../json-schema-subset/index.ts'
@@ -72,12 +74,20 @@ class SingleSelectSchema extends SpecialSchema<SingleSelectSchemaValue> {
 
   public constructor(id: number, value: unknown, context?: unknown) {
     if (!SingleSelectSchema.isMatch(value)) throw new TypeError('Invalid single-select schema.')
-    super(id, value, context)
+    const validator = new Validator(structuredClone(value) as JsonSchema, '7')
+    super(id, { enum: value.enum.filter((item) => validator.validate(item).valid) }, context)
   }
 
   protected compareImpl(other: unknown): readonly ExpressionSingleResult[] {
+    if (this.value.enum.length == 0) {
+      const empty = other instanceof SingleSelectSchema ? other.value.enum.length == 0 : isCompiledSchema(other) && getKind(other) === CompiledKind.Never
+      return [empty ? ExpressionSingleResult.Equals : ExpressionSingleResult.ContainedBy]
+    }
     if (isStringLikeSchema(other)) {
-      return [ExpressionSingleResult.ContainedBy]
+      const validator = new Validator(structuredClone(other) as JsonSchema, '7')
+      const accepted = this.value.enum.filter((item) => validator.validate(item).valid).length
+      if (accepted == this.value.enum.length) return [ExpressionSingleResult.ContainedBy]
+      return [accepted == 0 ? ExpressionSingleResult.Rejection : ExpressionSingleResult.Intersection]
     }
 
     if (other instanceof SingleSelectSchema) {

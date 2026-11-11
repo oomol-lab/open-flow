@@ -2,6 +2,7 @@ import type { AgentTool, WorkflowCapability } from '../../flow/common/change.ts'
 import type { ConnectorAction } from './api.ts'
 
 import { expect, it, vi } from 'vitest'
+import { workflowAgentTool } from '../../workflow/common/workflow.ts'
 import { AuthoringToolInputError, outwardAgentTools, outwardCapabilities, prepareAgentTools, prepareCapabilities } from './authoringTools.ts'
 
 const existing: AgentTool = {
@@ -38,26 +39,28 @@ it('exposes only named sources and assembles new tools from authoritative Action
   const lookup = vi.fn(async () => action)
   const tools = await prepareAgentTools([{ ...publicTool, inputs: { text: { kind: 'input', input: 'summary' } } }], [], lookup, () => 'new-tool')
   expect(lookup).toHaveBeenCalledWith('notifications.send')
+  expect(tools[0]!.inputs[1]).not.toHaveProperty('value')
   expect(tools[0]).toMatchObject({
     id: 'new-tool',
     inputs: [
       { handle: 'text', jsonSchema: { type: 'string' }, nullable: false, source: { kind: 'input', input: 'summary' } },
-      { handle: 'channel', nullable: true, value: 'ops', source: { kind: 'model' } },
+      { handle: 'channel', nullable: true, source: { kind: 'model' } },
     ],
   })
 })
 
-it('preserves existing constraints, default values, order and sources without catalog reads', async () => {
+it('preserves existing constraints, order and sources without catalog reads', async () => {
   const lookup = vi.fn(async () => action)
   const publicTool = outwardAgentTools([existing])[0]!
   if (publicTool.kind == 'workflow') throw new Error('Expected connector tool')
+  const normalized = { ...existing, inputs: existing.inputs.map(({ value: _value, ...port }) => port) }
   const changed = await prepareAgentTools([{ ...publicTool, description: 'New description', approval: false }], [existing], lookup, () => 'unused')
-  expect(changed[0]).toEqual({ ...existing, description: 'New description', approval: false })
+  expect(changed[0]).toEqual({ ...normalized, description: 'New description', approval: false })
   const rebound = await prepareAgentTools([{ ...publicTool, inputs: { text: { kind: 'input', input: 'summary' } } }], [existing], lookup, () => 'unused')
-  expect(rebound[0]!.inputs).toEqual([{ ...existing.inputs[0], source: { kind: 'input', input: 'summary' } }, existing.inputs[1]])
+  expect(rebound[0]!.inputs).toEqual([{ ...normalized.inputs[0], source: { kind: 'input', input: 'summary' } }, normalized.inputs[1]])
   const { inputs: _inputs, ...withoutInputs } = publicTool
   const unchanged = await prepareAgentTools([withoutInputs], [existing], lookup, () => 'unused')
-  expect(unchanged[0]).toEqual(existing)
+  expect(unchanged[0]).toEqual(normalized)
   expect(lookup).not.toHaveBeenCalled()
 })
 
@@ -83,7 +86,7 @@ it('derives workflow tool contracts and preserves sources and snapshots on ordin
     name: 'Double',
     publicationId: 'publication',
     revisionId: 'revision',
-    inputs: [{ handle: 'amount', jsonSchema: { type: 'number' }, nullable: false }],
+    inputs: [{ handle: 'amount', jsonSchema: { type: 'number' }, nullable: false, value: 42 }],
     outputs: [{ handle: 'total', jsonSchema: { type: 'number' }, nullable: false }],
   }))
   const lookup = vi.fn()
@@ -95,6 +98,11 @@ it('derives workflow tool contracts and preserves sources and snapshots on ordin
     workflow,
   )
   expect(created).toMatchObject({ kind: 'workflow', flowId: 'target', revisionId: 'revision', inputs: [{ source: { kind: 'value', value: 0 } }] })
+  expect(created!.inputs[0]).not.toHaveProperty('value')
+  if (created!.kind != 'workflow') throw new Error('Expected workflow tool')
+  const refreshed = workflowAgentTool(created!.id, created!.name, await workflow('target'), created!)
+  expect(refreshed.inputs[0]).not.toHaveProperty('value')
+  expect(refreshed.inputs[0]!.source).toEqual({ kind: 'value', value: 0 })
   const view = outwardAgentTools([created!])[0]!
   expect(view).not.toHaveProperty('revisionId')
   expect(view).not.toHaveProperty('outputs')

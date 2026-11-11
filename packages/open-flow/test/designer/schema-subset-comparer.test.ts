@@ -148,6 +148,35 @@ describe('json-subset-comparer', () => {
       expect(compare({ schema: { enum: ['a', 'b'] } }, { schema: { enum: ['b', 'a'] } })).toEqual({ isSubset: true })
     })
 
+    it.each([
+      { constraint: { minLength: 3 }, values: ['a', 'long'], allowed: ['long'] },
+      { constraint: { maxLength: 1 }, values: ['a', 'long'], allowed: ['a'] },
+      { constraint: { pattern: '^a$' }, values: ['a', 'long'], allowed: ['a'] },
+      { constraint: { const: 'a' }, values: ['a', 'long'], allowed: ['a'] },
+      { constraint: { format: 'email' }, values: ['invalid', 'a@example.com'], allowed: ['a@example.com'] },
+    ])('respects string enum constraints %j', ({ constraint, values, allowed }) => {
+      const source = { type: 'string', enum: values }
+      const constrained = { ...source, ...constraint }
+      const accepted = { enum: allowed }
+
+      expect(compare({ schema: source }, { schema: constrained }).isSubset).toBe(false)
+      expect(compare({ schema: constrained }, { schema: accepted }).isSubset).toBe(true)
+      expect(compare({ schema: accepted }, { schema: constrained }).isSubset).toBe(true)
+      expect(compare({ schema: source }, { schema: { type: 'string', ...constraint } }).isSubset).toBe(false)
+      expect(compare({ schema: accepted }, { schema: { type: 'string', ...constraint } }).isSubset).toBe(true)
+    })
+
+    it('treats enums with no allowed values as empty schemas', () => {
+      const empty = { type: 'string', enum: ['a'], minLength: 2 }
+      const never = { type: 'string', minLength: 2, maxLength: 1 }
+      const number = { type: 'number' }
+
+      expect(compare({ schema: empty }, { schema: number }).isSubset).toBe(true)
+      expect(compare({ schema: number }, { schema: empty }).isSubset).toBe(false)
+      expect(compare({ schema: empty }, { schema: never }).isSubset).toBe(true)
+      expect(compare({ schema: never }, { schema: empty }).isSubset).toBe(true)
+    })
+
     it('should return true if one is single select and other is string', () => {
       expect(
         compare(
