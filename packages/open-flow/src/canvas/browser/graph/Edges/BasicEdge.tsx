@@ -3,11 +3,12 @@ import type { EdgeProps } from '@xyflow/react'
 import type { RFEdge } from '../../base/rfHelpers.ts'
 
 import { BaseEdge, EdgeLabelRenderer, Position, useInternalNode } from '@xyflow/react'
-import { useId, useMemo } from 'react'
+import { useContext, useId, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { ErrorCircle } from '../../components/errorCircle.tsx'
 import { useCanvasStore } from '../CanvasStoreContext.tsx'
 import { connectionNodeBounds, getConnectionPath } from './connectionPath.ts'
+import { ConnectionRoutesContext } from './ConnectionRoutes.tsx'
 import { EdgeGradient } from './EdgeGradient.tsx'
 
 export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
@@ -16,7 +17,7 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const error = useVal(edgeStore?.$.error)
   const canvasStore = useCanvasStore()
   const scale = useVal(canvasStore.$.scale)
-  const routes = useVal(canvasStore.connectionRoutes)
+  const routes = useContext(ConnectionRoutesContext)
 
   // Leave space between the arrow tip and the target port in every direction.
   const gap = 3

@@ -15,6 +15,7 @@ import type { Point, DesignerViewport } from './canvasPresentation.ts'
 import type { ConnectionCatalog, ConnectorActionView } from './connectionCatalog.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionSource, RevisionView } from './revisionView.ts'
 
+import { graphLayout } from '../../../canvas/browser/base/graphLayout.ts'
 import { wrapLayout } from '../../../canvas/browser/base/wrapLayout.ts'
 import { isTriggerNode } from '../../../flow/common/change.ts'
 import { nodeInputPorts } from '../../../flow/common/graph.ts'
@@ -46,6 +47,8 @@ export interface DesignerEdge {
 
 export interface DesignerGraph extends FlowCanvasViewModel {
   readonly edges: readonly DesignerEdge[]
+  /** Positions are estimates until the canvas performs its initial measured layout. */
+  readonly needsLayout: boolean
   readonly nodes: readonly DesignerNode[]
   readonly viewport: DesignerViewport
 }
@@ -59,11 +62,6 @@ interface EdgeProjection {
   readonly dependencies: ReadonlyMap<string, ReadonlySet<string>>
   readonly dependents: ReadonlyMap<string, ReadonlySet<string>>
   readonly edges: readonly DesignerEdge[]
-}
-
-interface NodeLayout {
-  readonly depth: ReadonlyMap<string, number>
-  readonly ordered: readonly string[]
 }
 
 interface NodeProjectionContext {
@@ -436,13 +434,12 @@ function projectEdges(graph: { readonly edges?: unknown }, nodeIds: ReadonlySet<
   return { dependencies, dependents, edges }
 }
 
-function layoutNodes(
+function orderNodes(
   nodeIds: ReadonlySet<string>,
   dependencies: ReadonlyMap<string, ReadonlySet<string>>,
   dependents: ReadonlyMap<string, ReadonlySet<string>>,
-): NodeLayout {
+): readonly string[] {
   const indegree = new Map([...dependencies].map(([nodeId, sources]) => [nodeId, sources.size]))
-  const depth = new Map<string, number>()
   const ordered: string[] = []
   const orderedIds = new Set<string>()
   const ready = [...indegree]
@@ -453,20 +450,16 @@ function layoutNodes(
     const nodeId = ready[cursor]!
     ordered.push(nodeId)
     orderedIds.add(nodeId)
-    const nextDepth = (depth.get(nodeId) ?? 0) + 1
     for (const targetId of [...dependents.get(nodeId)!].toSorted()) {
-      depth.set(targetId, Math.max(depth.get(targetId) ?? 0, nextDepth))
       const count = indegree.get(targetId)! - 1
       indegree.set(targetId, count)
       if (count == 0) ready.push(targetId)
     }
   }
-  const cycleDepth = Math.max(0, ...depth.values()) + 1
   for (const nodeId of [...nodeIds].filter((candidate) => !orderedIds.has(candidate)).toSorted()) {
-    depth.set(nodeId, cycleDepth)
     ordered.push(nodeId)
   }
-  return { depth, ordered }
+  return ordered
 }
 
 function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts, revision: RevisionView<RevisionSource>): readonly FlowCanvasViewInput[] {
@@ -694,7 +687,7 @@ export function designerGraph(
 ): DesignerGraph {
   const revision = draft == null ? undefined : revisionView(draft)
   const graph = revision == null ? undefined : revision.graph()
-  if (revision == null || graph == null) return { edges: [], nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }
+  if (revision == null || graph == null) return { edges: [], needsLayout: false, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }
   const projectedRun = runProjection(revision, run, runEvents)
 
   const entries = Object.entries(graph.nodes)
@@ -702,7 +695,7 @@ export function designerGraph(
   const nodeIds = new Set(entries.map(([nodeId]) => nodeId))
   const ports = new Map([...definitions].map(([nodeId, node]) => [nodeId, nodePorts(node, revision)]))
   const edgeProjection = projectEdges(graph, nodeIds)
-  const layout = layoutNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
+  const ordered = orderNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
   const direction = savedDirection(presentation)
   const positions = savedPositions(presentation)
   const hiddenNodeContent = savedHiddenNodeContent(presentation)
@@ -717,18 +710,27 @@ export function designerGraph(
     runNodes: projectedRun.nodes,
     t,
   }
-  const rows = new Map<number, number>()
-  const defaultNodes = layout.ordered.map((nodeId) => {
-    const column = layout.depth.get(nodeId) ?? 0
-    const row = rows.get(column) ?? 0
-    rows.set(column, row + 1)
-    return direction === 'vertical'
-      ? { id: nodeId, column, x: 80 + row * 400, y: 80 + column * 240, width: 320, height: 160 }
-      : { id: nodeId, column, x: 80 + column * 500, y: 80 + row * 240, width: 420, height: 240 }
-  })
+  const defaultNodes = ordered.every((nodeId) => positions[nodeId] != null)
+    ? []
+    : graphLayout(
+        ordered.map((nodeId) => {
+          const { kind } = definitions.get(nodeId)!
+          return {
+            id: nodeId,
+            width: direction === 'vertical' ? 320 : 420,
+            height: direction === 'vertical' ? 160 : 240,
+            branchHandles:
+              kind === 'condition' || kind === 'approval' || kind === 'wait'
+                ? [...ports.get(nodeId)!.outputs.keys()].map((handle) => '$branch:' + handle)
+                : undefined,
+          }
+        }),
+        edgeProjection.edges,
+        direction,
+      ).nodes
   const automaticPositions = direction === 'horizontal' ? wrapLayout(defaultNodes) : Object.fromEntries(defaultNodes.map(({ id, x, y }) => [id, { x, y }]))
   const nodes: DesignerNode[] = []
-  for (const nodeId of layout.ordered) {
+  for (const nodeId of ordered) {
     const position = positions[nodeId] ?? automaticPositions[nodeId]!
     const resolved = definitions.get(nodeId)!
     if (resolved.kind == 'trigger') {
@@ -758,6 +760,7 @@ export function designerGraph(
   return {
     direction,
     edges: edgeProjection.edges,
+    needsLayout: nodes.length > 0 && nodes.every((node) => positions[node.id] == null),
     nodes,
     ...(projectedRun.status == null ? {} : { runStatus: projectedRun.status }),
     viewport: savedViewport(presentation),

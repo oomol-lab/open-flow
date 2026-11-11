@@ -227,6 +227,55 @@ it('supports an initial direction without a saved presentation', async () => {
   expect(store.$.changingDirection.value).toBe(false)
 })
 
+it.each([
+  { direction: 'horizontal', value: null },
+  { direction: 'horizontal', value: {} },
+  { direction: 'vertical', value: setCanvasLayout({}, 'vertical') },
+  { direction: 'vertical', value: null, defaultDirection: 'vertical' },
+] as const)(
+  'measures missing coordinates on opening and restores the generated $direction layout (presentation=$value)',
+  async ({ direction, value, ...defaults }) => {
+    const sample = publicationFixture('preview', 'revision')
+    const props = previewProps({
+      ...sample,
+      ...defaults,
+      presentation: value == null ? null : { ...sample.presentation, value },
+    })
+    const original = structuredClone(props)
+    const view = render(<OpenFlowPreview {...props} />)
+    const store = boundary.props!.flowCanvasStore
+    const estimates = positions(store)
+    expect(await completeLayout(store)).toBe('relayout')
+    const arranged = positions(store)
+    expect(store.$.direction.value).toBe(direction)
+    expect(arranged).not.toEqual(estimates)
+    expect(view.container.textContent).not.toContain('Restore layout')
+
+    await act(async () => store.onRelayout(1000))
+    expect(positions(store)).toEqual(arranged)
+    expect(view.container.textContent).not.toContain('Restore layout')
+
+    await act(async () => store.changeDirection(direction === 'horizontal' ? 'vertical' : 'horizontal'))
+    expect(await completeLayout(store)).toBe('relayout')
+    expect(view.container.textContent).toContain('Restore layout')
+    const restore = [...view.container.querySelectorAll('button')].find((button) => button.textContent === 'Restore layout')!
+    await click(restore)
+    expect(positions(store)).toEqual(arranged)
+    expect(store.$.direction.value).toBe(direction)
+    expect(view.container.textContent).not.toContain('Restore layout')
+    expect(props).toEqual(original)
+  },
+)
+
+it('preserves partial layouts including a saved origin instead of rearranging existing coordinates', () => {
+  const sample = publicationFixture('preview', 'revision')
+  const value = setCanvasLayout({}, 'vertical', { prepare: { x: 0, y: 0 } })
+  render(<OpenFlowPreview {...previewProps({ ...sample, presentation: { ...sample.presentation, value } })} />)
+  const store = boundary.props!.flowCanvasStore
+  expect(store.completeLayout()).toBe(true)
+  expect(positions(store).prepare).toEqual({ x: 0, y: 0 })
+})
+
 it('initializes mini map and inspector once, preserves user toggles and applies defaults again after a key reset', async () => {
   const props = previewProps({ defaultMiniMapExpanded: true, defaultInspectorOpen: true })
   const view = render(<OpenFlowPreview {...props} />)

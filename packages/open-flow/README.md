@@ -272,8 +272,9 @@ function Example({ draft, presentation }: { draft: Draft; presentation: Presenta
 
 Supply a complete `Draft` (workflow document, task definitions and modules) and a `Presentation`
 using the existing control API contracts. They can be constructed locally; no server or
-`WorkbenchHost` is required. Pass `null` for an absent presentation to use the Publications viewer's
-existing missing-layout behavior. These are workflow definitions, not React Flow nodes.
+`WorkbenchHost` is required. When no node coordinates are saved, including an absent (`null`)
+presentation, the viewer measures the cards and applies the same layout used by the canvas's
+rearrange action. Existing coordinates are preserved. These are workflow definitions, not React Flow nodes.
 
 The preview has no title bar. Its optional `label` names the accessible region; layout restoration appears as canvas controls when needed.
 
@@ -303,6 +304,7 @@ are workflow node or presentation comment IDs, without React Flow's internal pre
 The host owns container dimensions, language and light/dark theme. Theme and language can change
 without resetting temporary node positions or layout direction. Layout changes never write back to the supplied objects.
 Restore layout returns both direction and positions to the supplied presentation while preserving the current viewport.
+Without saved coordinates, it restores the first automatically generated layout.
 Use a new React `key` when switching examples or applying new defaults to reset the session.
 
 For Shadow DOM, the host creates the shadow root and mounts the React component inside it.

@@ -1,9 +1,10 @@
 import type { AppCatalogResponse } from '@oomol-lab/resource-cache/oomol'
 import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
+import type { CanvasDirection } from '../../../../canvas/common/direction.ts'
 import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
 import type { ConnectorProvider, Draft, Presentation } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
-import type { RevisionCanvasSession } from './revisionCanvasSession.ts'
+import type { RevisionCanvasChange, RevisionCanvasSession } from './revisionCanvasSession.ts'
 
 import { loadJson } from '@oomol-lab/resource-cache'
 import { decodeAppCatalogResponse, getAppCatalogCache } from '@oomol-lab/resource-cache/oomol'
@@ -11,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { CanvasNodeIcon } from '../../../../canvas/browser/graph/Nodes/components/CanvasNodeIcon.tsx'
+import { canvasDirection } from '../../../../canvas/common/direction.ts'
 import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
 import { localizeTrigger } from '../../../../trigger/providers/localization.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -127,21 +129,33 @@ export function RevisionCanvas({
     return baseline.nodes.filter((node) => ids.has(node.id)).map((node) => node.id)
   })
   const session = sessions[graphId]
+  const needsInitialLayout = baseline.needsLayout && session?.initialLayout == null
   const model = useMemo(
     () => ({
       ...baseline,
-      direction: session?.direction ?? baseline.direction,
+      direction: session?.direction ?? session?.initialLayout?.direction ?? baseline.direction,
       viewport: session?.viewport ?? baseline.viewport,
-      nodes: baseline.nodes.map((node) => ({ ...node, position: session?.positions?.[node.id] ?? node.position })),
+      nodes: baseline.nodes.map((node) => ({
+        ...node,
+        position: session?.positions?.[node.id] ?? session?.initialLayout?.positions[node.id] ?? node.position,
+      })),
     }),
     [baseline, session],
   )
   const layoutChanged =
-    model.direction !== baseline.direction ||
+    model.direction !== (session?.initialLayout?.direction ?? baseline.direction) ||
     baseline.nodes.some((node) => {
       const position = session?.positions?.[node.id]
-      return position != null && (position.x !== node.position.x || position.y !== node.position.y)
+      const original = session?.initialLayout?.positions[node.id] ?? node.position
+      return position != null && (position.x !== original.x || position.y !== original.y)
     })
+  const changeLayout = (positions: Parameters<FlowCanvasViewProps['onMoveNodes']>[0], direction?: CanvasDirection) => {
+    let change: RevisionCanvasChange
+    if (needsInitialLayout) change = { kind: 'initialize', positions, direction: direction ?? canvasDirection(baseline.direction) }
+    else if (direction == null) change = { kind: 'move', positions }
+    else change = { kind: 'direction', positions, direction }
+    setSessions((current) => changeRevisionCanvasSession(current, graphId, change))
+  }
 
   const selection = selected.length === 1 ? revision.node(selected[0]!) : undefined
   const selectedNode = selected.length === 1 ? model.nodes.find((node) => node.id === selected[0]) : undefined
@@ -171,6 +185,7 @@ export function RevisionCanvas({
       <div className="revision-viewer-body">
         <div className="revision-viewer-canvas">
           <FlowCanvasView
+            autoLayout={needsInitialLayout}
             key={graphId}
             identity={graphId}
             model={model}
@@ -189,9 +204,9 @@ export function RevisionCanvas({
             selectedNodeIds={selected}
             ignoredNodeIds={[]}
             focusNodeRequest={focus}
-            onMoveNodes={(positions) => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'move', positions }))}
+            onMoveNodes={changeLayout}
             onChangeDirection={(direction, positions) => {
-              setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'direction', direction, positions }))
+              changeLayout(positions, direction)
               return true
             }}
             onMoveViewport={(viewport) => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'viewport', viewport }))}

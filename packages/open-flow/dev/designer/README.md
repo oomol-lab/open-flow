@@ -44,6 +44,8 @@ The **Nodes** section collects production canvas nodes under boundary inputs. It
 
 **Canvas / Vertical workflow** (`?story=vertical-workflow`) uses the production canvas for an English application-processing example. Switch direction in the lower-left controls to relayout the real nodes, ports and edges. Story actions cover Provider disconnection with previous records, a failed retry retaining results and logs, configuration errors, deferred accounts, manual approval and compact status icons. The sample saves changes only in page state. **Undo & Redo / Canvas history** (`?story=canvas-history`) additionally exercises direction and layout persistence through the production EditSession, undo/redo, save failure and reload.
 
+**Show coffee groups** reproduces the Mattermost weekly coffee workflow's pagination loop and two group-processing returns. Vertical feedback connections run in separate exterior lanes around measured cards; nested loops put the longer return outside. Independent subgraphs keep their own return lanes. Drag or resize nodes and switch directions to check that routes follow the actual ports and avoid intervening cards.
+
 **Canvas / Cards · Identity indicators** (`?story=canvas-card-indicators`) compares node diagnostics and execution outcomes at normal and compact zoom, including failed runs with and without data records.
 
 **Value / Node States** (`?story=node-value`) displays hidden, empty, primitive, structured, nullable, long-content and invalid values using the production canvas. The node toolbar places the content visibility toggle immediately before Delete, only when the node has collapsible content. The story toolbar provides read-only and reset actions; canvas actions are logged.
@@ -170,6 +172,10 @@ singleton with deterministic data. Move or select a node before loading metadata
 Connector icons and Agent tool badges update without resetting the session. The Shadow DOM host is Lab-only and copies the loaded Lab
 stylesheets, including production CSS modules; independent published-CSS verification must use
 the packaged `preview.css` without Lab styles.
+
+**Remove saved layout** initializes the measured canvas layout automatically in either direction.
+No Restore control appears for this initial placement. Drag nodes or change direction, then restore
+to check that the viewer returns to that generated layout and leaves the supplied snapshot unchanged.
 
 Trigger **Properties** includes separate **Read-only**, **Display**, and **Edit** samples. Read-only
 mounts the public `OpenFlowPreview` from a saved snapshot without Workspace, Connector, or Trigger

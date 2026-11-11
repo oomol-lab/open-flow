@@ -35,6 +35,7 @@ import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleImpl } from '../../components/handle.tsx'
 import type { RFGraph } from '../../stores/canvas/canvas.store.ts'
+import type { ConnectionRoutesProviderProps } from '../Edges/ConnectionRoutes.tsx'
 import type { FlowCanvasViewProps } from '../FlowCanvas/model.ts'
 import type { GetPopupContainer } from './useGetPopupContainer.ts'
 
@@ -77,6 +78,7 @@ import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
 import { FITTING_VIEW_CLASSNAME } from '../../stores/node/constants.ts'
 import { NodeStore } from '../../stores/node/node.store.ts'
 import { CanvasAnnotationContext } from '../annotations.tsx'
+import { ConnectionRoutesProvider } from '../Edges/ConnectionRoutes.tsx'
 import { InspectSelectionButton } from '../inspectSelection.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
@@ -145,6 +147,7 @@ export interface ReactFlowContainerProps {
   edgeTypes?: EdgeTypes
   nodes$: ReadonlyVal<RFGraph['nodes']>
   edges$: ReadonlyVal<RFGraph['edges']>
+  connectionRoutes$?: ConnectionRoutesProviderProps['routes$']
   viewport$: Val<Viewport | undefined>
   focused$?: ReadonlyVal<boolean>
   canDeleteNodes?: boolean
@@ -214,9 +217,11 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
           <I18nProvider i18n={props.i18n}>
             <TooltipProvider delay={300}>
               <ReactFlowProvider>
-                <HandleContextProvider Handle={Handle as HandleImpl}>
-                  <ReactFlowContainerInner {...props} />
-                </HandleContextProvider>
+                <ConnectionRoutesProvider direction={props.direction} routes$={props.connectionRoutes$}>
+                  <HandleContextProvider Handle={Handle as HandleImpl}>
+                    <ReactFlowContainerInner {...props} />
+                  </HandleContextProvider>
+                </ConnectionRoutesProvider>
               </ReactFlowProvider>
             </TooltipProvider>
           </I18nProvider>

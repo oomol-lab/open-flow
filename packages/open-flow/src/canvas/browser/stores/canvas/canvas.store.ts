@@ -92,7 +92,7 @@ export class CanvasStore {
 
   public readonly dispose: DisposableStore = disposableStore()
   /** Temporary routes used only by an explicitly arranged export canvas. */
-  public readonly connectionRoutes = this.dispose.add(val<ReadonlyMap<string, readonly LayoutPoint[]>>(new Map()))
+  public readonly exportRoutes = this.dispose.add(val<ReadonlyMap<string, readonly LayoutPoint[]>>(new Map()))
   public readonly ignoredNodeIds = this.dispose.add(val<readonly string[]>([]))
   public readonly ignoreNodes = (nodeIds: readonly string[], ignored: boolean): void => {
     if (this.$.editable.value) this.#callbacks.onIgnoreNodes?.(nodeIds, ignored)
@@ -423,7 +423,7 @@ export class CanvasStore {
     )
     const result = compactLayout({ nodes: graph.nodes, edges }, insets, aspectRatio)
     this.applyPositions(result.positions)
-    this.connectionRoutes.set(result.routes)
+    this.exportRoutes.set(result.routes)
     return result.bounds
   }
 

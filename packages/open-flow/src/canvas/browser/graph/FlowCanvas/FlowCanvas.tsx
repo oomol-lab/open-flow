@@ -110,6 +110,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
               interactiveMode$={flowCanvasStore.$$.interactiveMode}
               nodes$={flowCanvasStore.$.rfNodes}
               edges$={flowCanvasStore.$.rfEdges}
+              connectionRoutes$={flowCanvasStore.exportRoutes}
               viewport$={flowCanvasStore.$$.viewport}
               onRequestAddNode={onRequestAddNode}
               addNodeRequest={addNodeRequest}

@@ -299,6 +299,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
       tabIndex={0}
     >
       <FlowCanvasView
+        autoLayout={model.needsLayout}
         annotationContext={annotationContext}
         onRequestAddNode={(request) => {
           if (addNodeRequest == null) setPickerCentered(false)

@@ -1,33 +1,74 @@
 import type { GraphLayoutEdge } from './graphLayout.ts'
 import type { LayoutNode, LayoutPoint } from './wrapLayout.ts'
 
+import { graphlib } from '@dagrejs/dagre'
+
 const clearance = 16
 const portOffset = 24
 
+function componentIndex(sets: string[][]): Map<string, number> {
+  return new Map(sets.flatMap((ids, index) => ids.map((id) => [id, index] as const)))
+}
+
 /** Orthogonal channels around the measured cards, in primary/cross coordinates. */
-export function routeLayout(nodes: readonly LayoutNode[], edges: readonly GraphLayoutEdge[]): ReadonlyMap<string, readonly LayoutPoint[]> {
+export function routeLayout(
+  nodes: readonly LayoutNode[],
+  edges: readonly GraphLayoutEdge[],
+  options: { readonly allowBlockedPorts?: boolean } = {},
+): ReadonlyMap<string, readonly LayoutPoint[]> {
   const byId = new Map(nodes.map((node) => [node.id, node]))
+  const graph = new graphlib.Graph()
+  for (const node of nodes) graph.setNode(node.id)
+  for (const edge of edges) graph.setEdge(edge.source, edge.target)
+  const components = componentIndex(graphlib.alg.components(graph))
+  const cycles = componentIndex(graphlib.alg.tarjan(graph))
+  const obstacles = nodes.map((node) => ({
+    component: components.get(node.id),
+    left: node.x - clearance,
+    right: node.x + node.width + clearance,
+    top: node.y - clearance,
+    bottom: node.y + node.height + clearance,
+  }))
   const connections = edges.map((edge) => {
     const source = byId.get(edge.source)!
     const target = byId.get(edge.target)!
     const output = { x: source.x + (edge.sourceOffset?.x ?? source.width), y: source.y + (edge.sourceOffset?.y ?? source.height / 2) }
     const input = { x: target.x + (edge.targetOffset?.x ?? 0), y: target.y + (edge.targetOffset?.y ?? target.height / 2) }
     const offset = output.x < input.x ? Math.min(portOffset, (input.x - output.x) / 2) : portOffset
+    const feedback = input.x <= output.x && cycles.get(edge.source) === cycles.get(edge.target)
     return {
       id: edge.id,
+      component: components.get(edge.source),
       source: output,
       target: input,
       returnSide: input.x <= output.x ? Math.sign(input.y - output.y) : 0,
+      feedback,
+      returnLane: undefined as number | undefined,
       start: { x: output.x + offset, y: output.y },
       end: { x: input.x - offset, y: input.y },
     }
   })
-  const obstacles = nodes.map((node) => ({
-    left: node.x - clearance,
-    right: node.x + node.width + clearance,
-    top: node.y - clearance,
-    bottom: node.y + node.height + clearance,
-  }))
+  // Shorter loops use the inner lanes so nested returns do not cross.
+  const feedback = connections.filter((edge) => edge.feedback).toSorted((a, b) => a.source.x - a.target.x - (b.source.x - b.target.x))
+  for (const [index, edge] of feedback.entries()) {
+    const side = edge.source.y <= edge.target.y ? -1 : 1
+    const span = obstacles.filter((rect) => rect.component === edge.component && rect.right >= edge.end.x && rect.left <= edge.start.x)
+    let lane = side < 0 ? Math.min(...span.map((rect) => rect.top)) : Math.max(...span.map((rect) => rect.bottom))
+    let previousLane: number
+    do {
+      previousLane = lane
+      // A dragged card or comment from another subgraph can still obstruct this lane.
+      for (const rect of obstacles) {
+        if (rect.right >= edge.end.x && rect.left <= edge.start.x && lane > rect.top && lane < rect.bottom) lane = side < 0 ? rect.top : rect.bottom
+      }
+      for (const other of feedback.slice(0, index)) {
+        if (other.component !== edge.component || other.start.x < edge.end.x || other.end.x > edge.start.x) continue
+        if (side < 0 && other.returnLane! <= lane) lane = other.returnLane! - clearance
+        if (side > 0 && other.returnLane! >= lane) lane = other.returnLane! + clearance
+      }
+    } while (lane !== previousLane)
+    edge.returnLane = lane
+  }
   const routes = new Map<string, readonly LayoutPoint[]>()
   // Most connections only cross the empty gap between consecutive levels.
   // Reserve the obstacle grid for returns and genuinely obstructed connections.
@@ -55,9 +96,12 @@ export function routeLayout(nodes: readonly LayoutNode[], edges: readonly GraphL
   const xs = [...new Set([...obstacles.flatMap((rect) => [rect.left, rect.right]), ...pending.flatMap((edge) => [edge.start.x, edge.end.x])])].toSorted(
     (a, b) => a - b,
   )
-  const ys = [...new Set([...obstacles.flatMap((rect) => [rect.top, rect.bottom]), ...pending.flatMap((edge) => [edge.start.y, edge.end.y])])].toSorted(
-    (a, b) => a - b,
-  )
+  const ys = [
+    ...new Set([
+      ...obstacles.flatMap((rect) => [rect.top, rect.bottom]),
+      ...pending.flatMap((edge) => (edge.returnLane == null ? [edge.start.y, edge.end.y] : [edge.start.y, edge.end.y, edge.returnLane])),
+    ]),
+  ].toSorted((a, b) => a - b)
   const xIndex = new Map(xs.map((value, index) => [value, index]))
   const yIndex = new Map(ys.map((value, index) => [value, index]))
   const columns = xs.length
@@ -103,9 +147,12 @@ export function routeLayout(nodes: readonly LayoutNode[], edges: readonly GraphL
         y + 1 < ys.length && !vertical[vertex] ? vertex + columns : -1,
       ]
       for (const [index, next] of moves.entries()) {
-        // Keep the fixed port stubs forward and turn returns toward their next run.
+        // Keep fixed port stubs forward. Feedback travels upstream in its own
+        // exterior lane; folded forward runs turn toward their next column.
         if (next < 0 || (vertex === start && index === 0) || (next === end && index === 0)) continue
-        if (edge.returnSide * (ys[Math.floor(next / columns)]! - edge.start.y) < -1e-6) continue
+        if (edge.returnLane != null) {
+          if (index === 0 && ys[y] !== edge.returnLane) continue
+        } else if (edge.returnSide * (ys[Math.floor(next / columns)]! - edge.start.y) < -1e-6) continue
         const axis = index < 2 ? 0 : 1
         const state = next * 2 + axis
         const length = Math.abs(xs[next % columns]! - xs[x]!) + Math.abs(ys[Math.floor(next / columns)]! - ys[y]!)
@@ -117,7 +164,11 @@ export function routeLayout(nodes: readonly LayoutNode[], edges: readonly GraphL
         enqueue(queue, { state, score: distance + heuristic(next) })
       }
     }
-    if (finish < 0) throw new Error('Could not route the compact workflow connection.')
+    if (finish < 0) {
+      // Overlapping cards can block a port while dragging; keep export failures explicit.
+      if (options.allowBlockedPorts) continue
+      throw new Error('Could not route the compact workflow connection.')
+    }
     const points: LayoutPoint[] = []
     for (let state = finish; state >= 0; state = previous[state]!) {
       const vertex = Math.floor(state / 2)

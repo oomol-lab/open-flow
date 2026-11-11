@@ -7,7 +7,7 @@ import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { connectorProxyConfigSchema, connectorProxyTask } from '../../../connector/common/proxy.ts'
-import { setNodeContentHidden, flowPresentation } from './canvasPresentation.ts'
+import { setNodeContentHidden, flowPresentation, setCanvasLayout } from './canvasPresentation.ts'
 import { setComment, setFlowViewport, setNodePositions } from './canvasPresentation.ts'
 import { createI18n } from './i18n.ts'
 import { providerIcon } from './providerIcon.ts'
@@ -29,6 +29,7 @@ it('projects an exported file without server identity and retains its saved pres
   const graph = designerGraph(file, file.presentation)
   expect(graph.nodes).toMatchObject([{ id: 'start', title: '开始', kind: 'trigger', position: { x: -200, y: 70 } }])
   expect(graph.runStatus).toBeUndefined()
+  expect(graph.needsLayout).toBe(false)
   expect(file).toEqual(before)
 })
 
@@ -59,6 +60,7 @@ it('wraps CLI-created chains without replacing saved node positions or execution
     },
   }
   const graph = designerGraph(draft)
+  expect(graph.needsLayout).toBe(true)
   const positions = Object.fromEntries(graph.nodes.map((node) => [node.id, node.position]))
   expect(positions['step-6']!.x).toBe(positions['step-0']!.x)
   expect(positions['step-6']!.y).toBeGreaterThan(positions['step-5']!.y)
@@ -66,8 +68,62 @@ it('wraps CLI-created chains without replacing saved node positions or execution
   expect(graph.edges.map(({ source, target }) => ({ source, target }))).toEqual(edges)
   const saved = { x: 2500, y: -100 }
   const reopened = designerGraph(draft, setNodePositions({}, { 'step-4': saved }))
+  expect(reopened.needsLayout).toBe(false)
   expect(reopened.nodes.find((node) => node.id == 'step-4')!.position).toEqual(saved)
   expect(reopened.nodes.find((node) => node.id == 'step-5')!.position).toEqual(positions['step-5'])
+  expect(designerGraph(draft, setNodePositions({}, { 'step-4': { x: 0, y: 0 } })).needsLayout).toBe(false)
+  expect(designerGraph(undefined).needsLayout).toBe(false)
+})
+
+it.each(['horizontal', 'vertical'] as const)('keeps a coordinate-free %s feedback loop in dependency levels and authored branch order', (direction) => {
+  const code: TaskNode = { kind: 'task', inputs: {}, task: { name: 'Code', moduleId: 'code', inputs: [], outputs: [] } }
+  const file: WorkflowFile = {
+    kind: 'open-flow-workflow',
+    version: 1,
+    content: {
+      modelVersion: currentFlowModelVersion,
+      modules: { code: { name: 'Code', source: 'export default () => ({})', imports: [] } },
+      document: {
+        bindings: {},
+        graph: {
+          nodes: {
+            start: { kind: 'manual', name: 'Start' },
+            collect: code,
+            pages: {
+              kind: 'condition',
+              inputs: {},
+              matchMode: 'first',
+              cases: [
+                {
+                  output: 'more',
+                  groups: [{ expressions: [{ left: { kind: 'value', value: true }, operator: '==', right: { kind: 'value', value: true } }] }],
+                },
+              ],
+            },
+            read: code,
+            done: { kind: 'outputs', outputMappings: {}, outputDefs: [] },
+          },
+          edges: [
+            { source: 'start', target: 'collect' },
+            { source: 'collect', target: 'pages' },
+            { source: 'pages', sourceHandle: 'more', target: 'read' },
+            { source: 'read', target: 'collect' },
+            { source: 'pages', sourceHandle: 'otherwise', target: 'done' },
+          ],
+        },
+      },
+    },
+  }
+  const original = structuredClone(file)
+  const graph = designerGraph(file, setCanvasLayout({}, direction))
+  const positions = Object.fromEntries(graph.nodes.map((node) => [node.id, node.position]))
+  const primary = direction === 'vertical' ? 'y' : 'x'
+  const cross = direction === 'vertical' ? 'x' : 'y'
+  expect(graph.needsLayout).toBe(true)
+  expect(positions.pages![primary]).toBeGreaterThan(positions.collect![primary])
+  expect(positions.read![primary]).toBeGreaterThan(positions.pages![primary])
+  expect(positions.read![cross]).toBeLessThan(positions.done![cross])
+  expect(file).toEqual(original)
 })
 
 describe('Designer port projection', () => {

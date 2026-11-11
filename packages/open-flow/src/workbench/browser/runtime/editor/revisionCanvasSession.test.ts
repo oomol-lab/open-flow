@@ -30,3 +30,17 @@ it('applies direction and layout together and restores both while preserving vie
   expect(restored.other).toBe(initial.other)
   expect(initial.flow.positions).toEqual({ comment: { x: 50, y: 60 } })
 })
+
+it('retains the first measured layout as the restore baseline without saved coordinates', () => {
+  const viewport = { x: 14, y: 28, zoom: 0.6 }
+  const positions = { a: { x: 40, y: 80 }, b: { x: 40, y: 200 } }
+  const initialized = changeRevisionCanvasSession({ flow: { viewport } }, 'flow', { kind: 'initialize', direction: 'vertical', positions })
+  const repeated = changeRevisionCanvasSession(initialized, 'flow', { kind: 'initialize', direction: 'horizontal', positions: {} })
+  expect(repeated.flow?.initialLayout).toEqual({ direction: 'vertical', positions })
+  const moved = changeRevisionCanvasSession(repeated, 'flow', { kind: 'direction', direction: 'horizontal', positions: { b: { x: 200, y: 80 } } })
+  const restored = changeRevisionCanvasSession(moved, 'flow', { kind: 'restore' })
+  expect(restored.flow?.initialLayout).toBe(initialized.flow?.initialLayout)
+  expect(restored.flow?.positions).toBeUndefined()
+  expect(restored.flow?.direction).toBeUndefined()
+  expect(restored.flow?.viewport).toBe(viewport)
+})
