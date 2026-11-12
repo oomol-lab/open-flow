@@ -176,6 +176,20 @@ describe('CanvasStore graph projection', () => {
 })
 
 describe('CanvasStore layout', () => {
+  it('resolves an empty initial layout once without reporting node movement', () => {
+    const setup = createTestSetup()
+    const onInitialLayout = vi.fn()
+    const onMoveNodes = vi.fn()
+    setup.store.setCallbacks({ onInitialLayout, onMoveNodes, onChangeComment: undefined })
+
+    expect(setup.store.completeLayout()).toBe(true)
+    expect(onInitialLayout).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(setup.store.completeLayout()).toBe(true)
+    expect(onInitialLayout).toHaveBeenCalledTimes(1)
+    expect(onMoveNodes).not.toHaveBeenCalled()
+    setup.dispose()
+  })
+
   it('updates comment positions independently of viewport state', () => {
     const note = new CommentNodeStore('note' as NodeId, { position: { x: 10, y: 20 }, onSaveContent: () => undefined })
     note.$$.position.set({ x: 100, y: 200 })

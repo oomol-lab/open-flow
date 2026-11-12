@@ -266,7 +266,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 disabled={disabled}
                 ignoredNodeIds={[]}
                 inspectorOpen={false}
-                model={{ edges: [], nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }}
+                model={{ edges: [], needsLayout: false, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }}
                 nodePicker={{
                   browseOptions: data.browseOptions,
                   connections,

@@ -8,9 +8,11 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { useMemo, useState } from 'react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { applicationWorkflow, applicationPositions, applicationEdges } from './fixtures/applicationWorkflow.ts'
+import { coffeeGroupsWorkflow } from './fixtures/coffeeGroupsWorkflow.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 function WorkflowCanvas({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
+  const [coffeeGroups, setCoffeeGroups] = useState(false)
   const [scenario, setScenario] = useState<ApplicationScenario>('processing')
   const [showRecords, setShowRecords] = useState(true)
   const [direction, setDirection] = useState<CanvasDirection>('vertical')
@@ -45,36 +47,46 @@ function WorkflowCanvas({ dark, language, log }: { readonly dark: boolean; reado
     setScenario(scenario === next ? 'processing' : next)
     focus(nodeId)
   }
+  const reset = (coffee: boolean) => {
+    setCoffeeGroups(coffee)
+    setScenario('processing')
+    setShowRecords(true)
+    setDirection('vertical')
+    setPositions(coffee ? {} : applicationPositions)
+    setEdges(coffee ? [...coffeeGroupsWorkflow.edges] : applicationEdges)
+    setRemoved([])
+    setHidden({})
+    setWidths({})
+    setSelected([])
+    setGeneration((value) => value + 1)
+  }
   useStoryActions([
-    { label: 'Overview', onClick: () => commands.send({ type: 'fit' }) },
-    { label: 'Branch details', onClick: () => focus('condition') },
-    { label: scenario === 'disconnected' ? 'Restore connection' : 'Provider disconnected', onClick: () => show('disconnected', 'regular') },
-    { label: scenario === 'failed' ? 'Restore successful run' : 'Run failed', onClick: () => show('failed', 'save') },
-    { label: scenario === 'configuration' ? 'Restore configuration' : 'Configuration error', onClick: () => show('configuration', 'condition') },
-    { label: 'Compact view', onClick: () => commands.send({ type: 'zoom', zoom: 0.4 }) },
-    { label: scenario === 'deferred' ? 'Restore account' : 'Account setup deferred', onClick: () => show('deferred', 'regular') },
     {
-      label: scenario === 'review' ? 'Show standard route' : 'Show manual review',
-      onClick: () => setScenario(scenario === 'review' ? 'processing' : 'review'),
+      label: coffeeGroups ? 'Show applications' : 'Show coffee groups',
+      onClick: () => reset(!coffeeGroups),
     },
-    { label: showRecords ? 'Hide run records' : 'Show run records', onClick: () => setShowRecords(!showRecords) },
+    { label: 'Overview', onClick: () => commands.send({ type: 'fit' }) },
+    ...(coffeeGroups
+      ? []
+      : [
+          { label: 'Branch details', onClick: () => focus('condition') },
+          { label: scenario === 'disconnected' ? 'Restore connection' : 'Provider disconnected', onClick: () => show('disconnected', 'regular') },
+          { label: scenario === 'failed' ? 'Restore successful run' : 'Run failed', onClick: () => show('failed', 'save') },
+          { label: scenario === 'configuration' ? 'Restore configuration' : 'Configuration error', onClick: () => show('configuration', 'condition') },
+          { label: 'Compact view', onClick: () => commands.send({ type: 'zoom', zoom: 0.4 }) },
+          { label: scenario === 'deferred' ? 'Restore account' : 'Account setup deferred', onClick: () => show('deferred', 'regular') },
+          {
+            label: scenario === 'review' ? 'Show standard route' : 'Show manual review',
+            onClick: () => setScenario(scenario === 'review' ? 'processing' : 'review'),
+          },
+          { label: showRecords ? 'Hide run records' : 'Show run records', onClick: () => setShowRecords(!showRecords) },
+        ]),
     {
       label: 'Reset sample',
-      onClick: () => {
-        setScenario('processing')
-        setShowRecords(true)
-        setDirection('vertical')
-        setPositions(applicationPositions)
-        setEdges(applicationEdges)
-        setRemoved([])
-        setHidden({})
-        setWidths({})
-        setSelected([])
-        setGeneration((value) => value + 1)
-      },
+      onClick: () => reset(coffeeGroups),
     },
   ])
-  const sample = applicationWorkflow(scenario, showRecords)
+  const sample = coffeeGroups ? coffeeGroupsWorkflow : applicationWorkflow(scenario, showRecords)
   const note: FlowCanvasViewCommentNode = {
     id: 'comment',
     kind: 'comment',
@@ -87,7 +99,7 @@ function WorkflowCanvas({ dark, language, log }: { readonly dark: boolean; reado
     direction,
     viewport,
     edges: edges.filter((edge) => !removed.includes(edge.source) && !removed.includes(edge.target)),
-    nodes: [...sample.nodes, note]
+    nodes: (coffeeGroups ? sample.nodes : [...sample.nodes, note])
       .filter((node) => !removed.includes(node.id))
       .map((node) =>
         Object.assign(
@@ -144,6 +156,6 @@ export const verticalWorkflowStory: FrontendStory = {
   title: 'Vertical workflow',
   standalone: true,
   description:
-    'Inspect automatic spacing between compact cards, content, branches and comments. Change direction or re-layout from the canvas view controls; comments participate in both. Compare Provider disconnection, run failure, configuration errors, deferred accounts, manual review and compact status icons. Layout changes stay in this sample.',
+    'Inspect automatic spacing between compact cards, content, branches and comments. Show coffee groups reproduces pagination and two group-processing returns. Check that returns avoid every card, remain distinguishable, and follow dragged or resized nodes. Change direction or re-layout from the canvas view controls; comments participate in both. Compare Provider disconnection, run failure, configuration errors, deferred accounts, manual review and compact status icons. Layout changes stay in this sample.',
   render: (log, dark, language) => <WorkflowCanvas dark={dark} language={language} log={log} />,
 }

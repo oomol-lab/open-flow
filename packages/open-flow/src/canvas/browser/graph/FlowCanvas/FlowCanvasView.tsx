@@ -18,6 +18,7 @@ function callbacksFromProps(props: FlowCanvasViewProps): ViewCallbacks {
     onChangeDirection: props.onChangeDirection,
     onAddNode: props.onAddNode,
     onMoveNodes: props.onMoveNodes,
+    onInitialLayout: props.onInitialLayout,
     onChangeNodeContentHidden: props.onChangeNodeContentHidden,
     onChangeNodeWidth: props.onChangeNodeWidth,
     onChangeComment: props.onChangeComment,
@@ -43,6 +44,7 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
     [props.identity],
   )
   const previousStore = useRef(store)
+  const previousLayoutRequest = useRef({ store, requested: props.autoLayout })
   const propsRef = useRef(props)
   const selectedEdge = useRef<string>()
   propsRef.current = props
@@ -127,6 +129,11 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
   useLayoutEffect(() => {
     store.reconcile(props.model, props.editable, props.language ?? 'en', props.selectedNodeIds, props.ignoredNodeIds)
   }, [store, props.editable, props.language, props.model, props.selectedNodeIds, props.ignoredNodeIds])
+  useLayoutEffect(() => {
+    const previous = previousLayoutRequest.current
+    previousLayoutRequest.current = { store, requested: props.autoLayout }
+    if (previous.store === store && !previous.requested && props.autoLayout) store.requestLayout()
+  }, [store, props.autoLayout])
   useEffect(() => {
     if (props.focusNodeRequest != null) {
       const reducedMotion =

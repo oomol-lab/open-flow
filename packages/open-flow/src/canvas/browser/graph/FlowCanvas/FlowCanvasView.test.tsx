@@ -749,13 +749,54 @@ describe('FlowCanvasView model synchronization', () => {
   })
 
   it('runs the initial graph layout when requested by the host', () => {
-    const view = renderView(props(model([task([])]), { autoLayout: true }))
+    const onInitialLayout = vi.fn()
+    const view = renderView(props(model([task([])]), { autoLayout: true, onInitialLayout }))
     const store = view.props.flowCanvasStore
     const node = [...store.$.nodes.values()][0]
     if (node == null) throw new Error('Expected a Task node.')
     node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 420, height: 240 } })
 
     expect(store.completeLayout()).toBe('relayout')
+    expect(onInitialLayout).toHaveBeenCalledExactlyOnceWith({ direction: 'horizontal', positions: { target: node.$.position.value } })
+    expect(store.completeLayout()).toBe(true)
+    store.onRelayout()
+    expect(onInitialLayout).toHaveBeenCalledTimes(1)
+    store.dispose()
+  })
+
+  it('measures a newly asserted layout request on the existing store and preserves ordinary updates and movement', async () => {
+    const onMoveNodes = vi.fn()
+    const onInitialLayout = vi.fn()
+    const view = renderView(props(model([source]), { autoLayout: false, onMoveNodes, onInitialLayout }))
+    const store = view.props.flowCanvasStore
+    const first = [...store.$.nodes.values()][0]!
+    first.$$.rfNode.set({ ...first.$.rfNode.value, measured: { width: 420, height: 200 } })
+    expect(store.completeLayout()).toBe(true)
+
+    const requested = model([source, task([])])
+    const next = renderView(props(requested, { autoLayout: true, onMoveNodes, onInitialLayout }))
+    expect(next.props.flowCanvasStore).toBe(store)
+    expect(store.completeLayout(1000)).toBe(false)
+    expect(onMoveNodes).not.toHaveBeenCalled()
+    const target = [...store.$.nodes.values()].find((node) => node.nodeId === 'target')!
+    target.$$.rfNode.set({ ...target.$.rfNode.value, measured: { width: 420, height: 200 } })
+    expect(store.completeLayout(1000)).toBe('relayout')
+    expect(onMoveNodes).toHaveBeenCalledTimes(1)
+    expect(onInitialLayout).toHaveBeenCalledTimes(1)
+
+    const arranged = onMoveNodes.mock.calls[0]![0]
+    const saved = { ...requested, nodes: requested.nodes.map((node) => Object.assign({}, node, { position: arranged[node.id]!, title: 'Updated title' })) }
+    renderView(props(saved, { autoLayout: true, onMoveNodes, onInitialLayout }))
+    expect(store.completeLayout(1000)).toBe(true)
+    expect(onMoveNodes).toHaveBeenCalledTimes(1)
+
+    const position = { x: 1500, y: 800 }
+    await store.handleNodesChange([{ type: 'position', id: target.rfNodeId, position }])
+    next.props.onNodeDragStop?.({} as never, target.$.rfNode.value, [])
+    expect(store.completeLayout(1000)).toBe(true)
+    expect(target.$.position.value).toEqual(position)
+    expect(onMoveNodes).toHaveBeenCalledTimes(2)
+    expect(onInitialLayout).toHaveBeenCalledTimes(1)
     store.dispose()
   })
 
