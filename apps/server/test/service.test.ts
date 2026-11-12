@@ -138,7 +138,7 @@ function oversizedOutputsFlow(): RevisionContent {
     },
     modelVersion: currentFlowModelVersion,
     modules: {
-      main: { imports: [], name: 'Main', source: "export default async () => ({ value: 'x'.repeat(2_000_000) })" },
+      main: { imports: [], name: 'Main', source: "export default async () => ({ value: 'x'.repeat(4 * 1024 * 1024) })" },
     },
   }
 }
@@ -534,7 +534,7 @@ describe('Server application service', () => {
     }
   })
 
-  it.each([32, 600_000])('stores or truncates a complete output event atomically with %i-byte fields', async (size) => {
+  it.each([32, 600_000, 2_000_000, 2_100_000])('stores or truncates a complete output event atomically with %i-byte fields', async (size) => {
     const file = await databaseFile()
     const service = await openService(file)
     const opened = Database.open(file)
@@ -557,7 +557,7 @@ describe('Server application service', () => {
       })
       const history = service.control.runs.getRunEvents('test', accepted.runId, 0, 100)
       const completions = history.events.filter((event) => event.kind == 'node.completed')
-      if (size == 32) {
+      if (size <= 2_000_000) {
         expect(history.historyComplete).toBe(true)
         expect(completions).toHaveLength(1)
         expect(completions[0]?.payload.outputs).toEqual(outputs)

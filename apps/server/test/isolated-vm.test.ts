@@ -528,6 +528,19 @@ export default async (_, context) => { ${body}; return 'unbounded' }`),
     ).rejects.toEqual(expect.objectContaining<Partial<IsolatedVmError>>({ code: 'invalid-program' }))
   })
 
+  it('round-trips a 4 MiB JSON input and rejects the next byte', async () => {
+    const input = 'x'.repeat(4 * 1024 * 1024 - 2)
+    const invocation = {
+      capability: async () => ({ body: null, status: 200 }),
+      input,
+      invocationId: 'large-input',
+      program: program('export default input => input'),
+    }
+    expect(await host.invoke(invocation)).toBe(input)
+    await expect(host.invoke({ ...invocation, input: input + 'x' })).rejects.toMatchObject({ code: 'limit-exceeded' })
+    await expect(host.invoke({ ...invocation, program: program("export default input => input + 'x'") })).rejects.toThrow()
+  })
+
   it('rejects oversized inputs and programs before invoking user code', async () => {
     await expect(
       host.invoke(

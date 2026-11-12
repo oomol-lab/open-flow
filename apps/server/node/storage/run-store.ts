@@ -94,6 +94,7 @@ export interface RunStoreDependencies {
 
 const encoder = new TextEncoder()
 const maxEventBytes = 1024 * 1024
+const maxOutputBytes = 4 * 1024 * 1024
 const maxEventCount = 1_000
 const maxEventTotalBytes = 16 * 1024 * 1024
 const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
@@ -571,7 +572,12 @@ export class RunStore {
         }
         const historyEvent = event.kind === 'node.completed' ? { kind: event.kind, payload: event.payload, value: event.value } : event
         const bytes = encoder.encode(JSON.stringify(historyEvent)).byteLength
-        if (bytes > maxEventBytes || eventCount >= maxEventCount || eventBytes + bytes > maxEventTotalBytes) {
+        const oversized =
+          event.kind === 'node.completed'
+            ? encoder.encode(JSON.stringify({ kind: event.kind, payload: event.payload })).byteLength > maxEventBytes ||
+              (event.value !== undefined && encoder.encode(JSON.stringify(event.value)).byteLength > maxOutputBytes)
+            : bytes > maxEventBytes
+        if (oversized || eventCount >= maxEventCount || eventBytes + bytes > maxEventTotalBytes) {
           truncated = true
           continue
         }
