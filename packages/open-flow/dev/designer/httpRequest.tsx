@@ -155,7 +155,11 @@ function HttpPanel({
   const selection = revision?.node(selected)
   return (
     <I18nProvider i18n={session.i18n}>
-      <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', width: '100%' }}>
+      <div
+        className="open-flow-workbench open-flow-theme grid"
+        data-theme={dark ? 'dark' : 'light'}
+        style={{ height: '100%', width: '100%', gridTemplateColumns: 'var(--context-panel-width, 400px)' }}
+      >
         {visible && revision != null && selection != null && (
           <InspectorSamplePanel disabled={disabled} revision={revision} selection={selection} store={session.store} theme={dark ? 'dark' : 'light'} resizable>
             <NodeInspector

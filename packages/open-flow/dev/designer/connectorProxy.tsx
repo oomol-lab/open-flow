@@ -45,6 +45,20 @@ function content(): RevisionContent {
             ],
           },
           'get': { kind: 'task', name: 'GitHub request', task: task(), inputs: { endpoint: { kind: 'value', value: '/user' } } },
+          'long-query': {
+            kind: 'task',
+            name: 'Search repositories',
+            task: task({ connectionId: 'work', query: { names: ['q', 'sort', 'order', 'per_page', 'page'] }, headers: { names: ['Accept'] } }),
+            inputs: {
+              'endpoint': { kind: 'value', value: '/search/repositories' },
+              'query.q': { kind: 'value', value: 'open-flow' },
+              'query.sort': { kind: 'value', value: 'updated' },
+              'query.order': { kind: 'value', value: 'desc' },
+              'query.per_page': { kind: 'value', value: 10 },
+              'query.page': { kind: 'value', value: 1 },
+              'header.Accept': { kind: 'value', value: 'application/vnd.github+json' },
+            },
+          },
           'saved-get': {
             kind: 'task',
             name: 'Saved GET body',
@@ -120,7 +134,7 @@ function ProxyStory({ dark, language, log }: { dark: boolean; language: UiLangua
     return () => next.dispose()
   }, [language])
   useStoryActions([
-    ...['get', 'post', 'body-object', 'object', 'public', 'missing', 'saved-get'].map((id) => ({
+    ...['get', 'long-query', 'post', 'body-object', 'object', 'public', 'missing', 'saved-get'].map((id) => ({
       label: id,
       onClick: () => {
         setSelected(id)
@@ -154,7 +168,11 @@ function ProxyPanel({
   if (revision == null || selection == null) return null
   return (
     <I18nProvider i18n={session.i18n}>
-      <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', width: '100%' }}>
+      <div
+        className="open-flow-workbench open-flow-theme grid"
+        data-theme={dark ? 'dark' : 'light'}
+        style={{ height: '100%', width: '100%', gridTemplateColumns: 'var(--context-panel-width, 400px)' }}
+      >
         <InspectorSamplePanel disabled={readOnly} revision={revision} selection={selection} store={session.store} theme={dark ? 'dark' : 'light'} resizable>
           <NodeInspector
             revision={revision}
@@ -184,7 +202,7 @@ export const connectorProxyStory: FrontendStory = {
   title: 'Provider API Request',
   standalone: true,
   description:
-    'GET hides Request body. Other methods prefer the Object editor: create an optional body, add and edit fields, or bind the whole body to a variable or upstream output. An unset body is not sent; null, empty objects and existing non-object values retain their meaning. Change POST with a literal or bound body to GET: method and body clear together in one Undo/Redo entry. saved-get covers an older invalid GET body with a clear action and read-only error. Edit endpoint, scalar Query and Headers using fixed values, variables or Request data. Compare unconfigured, selected and deferred accounts, public and missing Providers. HTTP Request has its own shared-parameter regression story.',
+    'GET hides Request body. Other methods prefer the Object editor: create an optional body, add and edit fields, or bind the whole body to a variable or upstream output. An unset body is not sent; null, empty objects and existing non-object values retain their meaning. Change POST with a literal or bound body to GET: method and body clear together in one Undo/Redo entry. saved-get covers an older invalid GET body with a clear action and read-only error. Edit endpoint, scalar Query and Headers using fixed values, variables or Request data. In long-query, scroll the expanded Query under the sticky Custom API Request title and hover its children: ordinary controls stay behind the title. Compare editing and Read only, then open a source menu across the title. Compare unconfigured, selected and deferred accounts, public and missing Providers. HTTP Request has its own shared-parameter regression story.',
   render: (log, dark, language) => <ProxyStory dark={dark} language={language} log={log} />,
 }
 

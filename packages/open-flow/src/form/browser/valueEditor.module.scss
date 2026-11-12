@@ -176,7 +176,13 @@ $feedback-focus: ':has(#{$feedback-targets})';
   opacity: 1;
   visibility: visible;
 }
-.root:not([data-stacking='fields']):not(#{$feedback-focus}):has(> :is(.body, .summary, .valueTools, .summaryError):hover) {
+/* Ordinary hover stays below sticky titles, including an expanded collection's
+   summary. Raise the editor only while one of its attached errors is hovered. */
+.root:not([data-stacking='fields']):not(#{$feedback-focus}):has(
+  [data-feedback]:hover,
+  [data-summary-feedback] > :is(.summary, .valueTools, .summaryError):hover
+),
+.root:not([data-stacking='fields'])[data-summary-feedback]:not(#{$feedback-focus}):has(> :is(.summary, .valueTools, .summaryError):hover) {
   z-index: var(--value-editor-hover-layer, 1);
 }
 .root:not([data-stacking='fields']):has([data-feedback] :focus-visible),
@@ -768,7 +774,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   margin-left: var(--field-indent);
 }
 
-.errorAnchor:hover {
+.errorAnchor[data-feedback]:hover {
   z-index: var(--value-editor-hover-layer, 1);
 }
 .errorAnchor:has(:focus-visible, [data-popup-open]) {
