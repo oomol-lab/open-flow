@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { connectorProxyConfigSchema, connectorProxyTask } from '../../../connector/common/proxy.ts'
 import { setNodeContentHidden, flowPresentation, setCanvasLayout } from './canvasPresentation.ts'
 import { setComment, setFlowViewport, setNodePositions } from './canvasPresentation.ts'
+import { connectionCatalog } from './connectionCatalog.ts'
 import { createI18n } from './i18n.ts'
 import { providerIcon } from './providerIcon.ts'
 import { designerGraph } from './workspace.ts'
@@ -472,6 +473,59 @@ describe('Designer port projection', () => {
     } finally {
       i18n.dispose()
     }
+  })
+
+  it.each([
+    { connectionId: undefined, connectionRequired: true },
+    { connectionId: '', connectionRequired: false },
+    { connectionId: 'active', connectionRequired: false },
+    { connectionId: 'disconnected', connectionRequired: true },
+    { connectionId: 'missing', connectionRequired: true },
+  ])('checks Provider request connections only with account data ($connectionId)', ({ connectionId, connectionRequired }) => {
+    const file: WorkflowFile = {
+      kind: 'open-flow-workflow',
+      version: 1,
+      content: {
+        modelVersion: currentFlowModelVersion,
+        modules: {},
+        document: {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: {
+              request: {
+                kind: 'task',
+                inputs: {},
+                task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'youtube', connectionId })),
+              },
+            },
+          },
+        },
+      },
+    }
+    const provider = { serviceId: 'youtube', serviceName: 'YouTube', noSetup: false }
+    const catalogs = {
+      youtube: connectionCatalog([
+        { connectionId: 'active', serviceId: 'youtube', displayName: 'Active', status: 'active', isDefault: true },
+        { connectionId: 'disconnected', serviceId: 'youtube', displayName: 'Disconnected', status: 'disconnected', isDefault: false },
+      ]),
+    }
+    const before = structuredClone(file)
+    expect(designerGraph(file).nodes[0]).toMatchObject({ connectionRequired: false, diagnostics: 0 })
+    expect(designerGraph(file, {}, [], {}, {}, undefined, undefined, [], { youtube: provider }).nodes[0]).toMatchObject({
+      connectionRequired: false,
+      diagnostics: 0,
+      executorName: 'Connector · YouTube',
+      icon: providerIcon(provider),
+    })
+    expect(designerGraph(file, {}, [], {}, catalogs, undefined, undefined, [], { youtube: provider }).nodes[0]).toMatchObject({
+      connectionRequired,
+      connectionDeferred: connectionId === '',
+    })
+    expect(designerGraph(file, {}, [], {}, catalogs, undefined, undefined, [], { youtube: { ...provider, noSetup: true } }).nodes[0]).toMatchObject({
+      connectionRequired: false,
+    })
+    expect(file).toEqual(before)
   })
 
   it.each([

@@ -5,7 +5,7 @@ import type { OpenFlowPreviewProps } from './openFlowPreview.tsx'
 
 import { act } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { previewProviderCatalog } from '../../../../dev/designer/previewProviderFixture.ts'
+import { previewProviderCatalog, previewProviderFixture } from '../../../../dev/designer/previewProviderFixture.ts'
 import { publicationFixture } from '../../../../dev/designer/publicationFixture.ts'
 import { click, render } from '../../../../test/support/render.tsx'
 import { inputValues } from '../../../flow/common/inputValue.ts'
@@ -31,6 +31,28 @@ afterEach(() => {
 function previewProps(overrides: Partial<OpenFlowPreviewProps> = {}): OpenFlowPreviewProps {
   return { ...publicationFixture('preview', 'revision'), language: 'en', theme: 'light', ...overrides }
 }
+
+it('loads Provider metadata for an offline proxy without reporting a connection error or resetting the session', async () => {
+  const catalog = previewProviderCatalog('fr')
+  await catalog.cache.clear()
+  const props = previewProps({ ...previewProviderFixture(), language: 'fr', defaultSelectedNodeIds: ['proxy'] })
+  const original = structuredClone(props)
+  render(<OpenFlowPreview {...props} />)
+  const store = boundary.props!.flowCanvasStore
+  const proxy = [...store.$.nodes.values()].find((node) => node.nodeId === 'proxy')!
+  expect(proxy.content$.value).toMatchObject({ connectionRequired: false, diagnostics: 0, executorName: 'Connector · sample-files' })
+  await act(async () => {
+    await store.handleNodesChange([{ type: 'position', id: proxy.rfNodeId, position: { x: 900, y: 400 } }])
+    catalog.resolve()
+    await catalog.cache.get(undefined)
+  })
+  await vi.waitFor(() => expect(proxy.content$.value).toMatchObject({ executorName: 'Connector · Sample Files' }))
+  expect(proxy.content$.value).toMatchObject({ connectionRequired: false, diagnostics: 0 })
+  expect(boundary.props!.flowCanvasStore).toBe(store)
+  expect(positions(store).proxy).toEqual({ x: 900, y: 400 })
+  expect(selectedIds(store)).toEqual(['proxy'])
+  expect(props).toEqual(original)
+})
 
 it('localizes saved Provider fields and switches language without loading editable catalogs or changing the snapshot', async () => {
   previewProviderCatalog('zh-CN').resolve()

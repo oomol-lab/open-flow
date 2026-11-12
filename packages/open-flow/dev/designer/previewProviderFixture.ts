@@ -2,6 +2,7 @@ import type { ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { AppCatalogResponse } from '@oomol-lab/resource-cache/oomol'
 
 import { getAppCatalogCache } from '@oomol-lab/resource-cache/oomol'
+import { connectorProxyConfigSchema, connectorProxyTask } from '../../src/connector/common/proxy.ts'
 import { setNodePositions } from '../../src/workbench/browser/runtime/canvasPresentation.ts'
 import { sampleSprite } from './fixtures/providerSprite.ts'
 import { publicationFixture } from './publicationFixture.ts'
@@ -95,6 +96,12 @@ export function previewProviderFixture() {
                 inputs: {},
                 task: { name: 'Archive', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'sample-files.archive', connectionId: '' } },
               },
+              proxy: {
+                kind: 'task' as const,
+                name: 'Custom API request',
+                inputs: { endpoint: { kind: 'value' as const, value: '/files' } },
+                task: connectorProxyTask(connectorProxyConfigSchema.parse({ providerId: 'sample-files' })),
+              },
               agent: {
                 kind: 'task' as const,
                 name: 'Research and archive',
@@ -174,7 +181,14 @@ export function previewProviderFixture() {
       ...base.presentation,
       value: setNodePositions(
         {},
-        { mail: { x: 0, y: 0 }, agent: { x: 400, y: 0 }, code: { x: 0, y: 350 }, emptyCode: { x: 400, y: 350 }, deferred: { x: 800, y: 0 } },
+        {
+          mail: { x: 0, y: 0 },
+          agent: { x: 400, y: 0 },
+          code: { x: 0, y: 350 },
+          emptyCode: { x: 400, y: 350 },
+          deferred: { x: 800, y: 0 },
+          proxy: { x: 800, y: 350 },
+        },
       ),
     },
   }

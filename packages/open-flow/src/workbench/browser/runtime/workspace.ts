@@ -597,9 +597,12 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const connections = providerId == null ? undefined : context.connectionCatalogs[providerId]
   const connectionId = connector?.connectionId
   const selectedConnection = connectionId == null ? undefined : connections?.byId.get(connectionId)
+  // Public Provider metadata is also available offline; account checks require an account catalog.
   const connectionRequired =
     (connectionId !== '' &&
-      (connector?.kind === 'connector-proxy' ? connectorProvider != null && !connectorProvider.noSetup : connectorAction?.authenticated == true) &&
+      (connector?.kind === 'connector-proxy'
+        ? connections != null && connectorProvider != null && !connectorProvider.noSetup
+        : connectorAction?.authenticated == true) &&
       (connector?.connectionId == null || (connections != null && selectedConnection?.status != 'active'))) ||
     nodeDiagnosticCount(
       resolved,
