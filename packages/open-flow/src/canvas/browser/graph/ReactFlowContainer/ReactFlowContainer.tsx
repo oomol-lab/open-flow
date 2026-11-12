@@ -235,6 +235,7 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 type FlowControlsProps = Pick<
   ReactFlowContainerProps,
   | 'editable'
+  | 'onRequestAddNode'
   | 'cornerTools'
   | 'cornerLeading'
   | 'topLeftTools'
@@ -274,6 +275,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} size={2} variant={BackgroundVariant.Dots} />}
       <CanvasViewControls
+        editingControls={props.editable || props.onRequestAddNode != null}
         interactiveMode$={props.interactiveMode$}
         direction={props.direction}
         changingDirection={props.changingDirection}
@@ -786,6 +788,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           )}
           <FlowControls
             editable={props.editable}
+            onRequestAddNode={props.onRequestAddNode}
             cornerTools={props.cornerTools}
             cornerLeading={props.cornerLeading}
             topLeftTools={props.topLeftTools}

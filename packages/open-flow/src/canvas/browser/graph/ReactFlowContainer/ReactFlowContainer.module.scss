@@ -155,13 +155,25 @@
   }
 }
 
-@container open-flow-canvas-controls (width <= 900px) {
+@container open-flow-canvas-controls (width <= 720px) {
   .expandedViewControls {
     display: none;
   }
 
   .compactViewControls {
     display: block;
+  }
+}
+
+@container open-flow-canvas-controls (width <= 900px) {
+  .viewDock[data-editing-controls='true'] {
+    .expandedViewControls {
+      display: none;
+    }
+
+    .compactViewControls {
+      display: block;
+    }
   }
 }
 

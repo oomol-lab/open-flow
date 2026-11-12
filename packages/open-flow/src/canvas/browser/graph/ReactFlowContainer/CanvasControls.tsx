@@ -229,6 +229,7 @@ function CanvasOptionsMenu({
 }
 
 export function CanvasViewControls({
+  editingControls = false,
   direction,
   changingDirection,
   onChangeDirection,
@@ -243,6 +244,7 @@ export function CanvasViewControls({
   onZoomReset,
   zoom,
 }: DirectionControlProps & {
+  readonly editingControls?: boolean
   readonly interactiveMode$?: Val<InteractiveMode>
   readonly miniMapExpanded$?: Val<boolean | undefined>
   readonly maxZoomReached: boolean
@@ -263,6 +265,7 @@ export function CanvasViewControls({
       position="bottom-left"
       className={cn('open-flow-control-island open-flow-control-island-compact', styles.dock, styles.viewDock)}
       data-canvas-control-scope
+      data-editing-controls={editingControls}
       data-tooltip-toolbar
       ref={setPopupContainer}
     >

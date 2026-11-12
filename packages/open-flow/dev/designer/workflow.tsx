@@ -558,7 +558,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'workflow',
     title: 'Workflow components',
     description:
-      'Right-click the canvas for Add node and Paste. Add node opens the current picker; Paste logs its canvas position. Switch to read-only to inspect disabled actions and the expanded view controls, including below 900px.',
+      'Right-click the canvas for Add node and Paste. Add node opens the current picker; Paste logs its canvas position. Switch to read-only to inspect disabled actions. View controls collapse at 900px while editing and at 720px in read-only mode.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={workflow} />,
   },

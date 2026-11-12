@@ -291,6 +291,7 @@ function CanvasChromeStory({
               <WorkbenchInspectorToggle label="Toggle inspector" open={inspectorOpen} onToggle={() => setInspectorOpen((open) => !open)} />
             </CornerControls>
             <CanvasViewControls
+              editingControls
               interactiveMode$={interactiveMode$}
               miniMapExpanded$={miniMapExpanded$}
               maxZoomReached={false}

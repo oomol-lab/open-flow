@@ -61,7 +61,7 @@ function ShadowSample({ children }: { readonly children: ReactNode }) {
 function PreviewStory({ dark, language, shadow }: { readonly dark: boolean; readonly language: UiLanguage; readonly shadow: boolean }) {
   const [version, setVersion] = useState(0)
   const [missingLayout, setMissingLayout] = useState(false)
-  const [narrow, setNarrow] = useState(false)
+  const [containerWidth, setContainerWidth] = useState<number>()
   const [providerExample, setProviderExample] = useState(false)
   const [defaultInteractiveMode, setDefaultInteractiveMode] = useState<InteractiveMode>()
   const [defaultDirection, setDefaultDirection] = useState<CanvasDirection>()
@@ -146,7 +146,9 @@ function PreviewStory({ dark, language, shadow }: { readonly dark: boolean; read
         setVersion((value) => value + 1)
       },
     },
-    { label: narrow ? 'Wide container' : 'Narrow container', onClick: () => setNarrow(!narrow) },
+    { label: containerWidth === 420 ? 'Wide container' : 'Narrow container', onClick: () => setContainerWidth(containerWidth === 420 ? undefined : 420) },
+    { label: '720px container', onClick: () => setContainerWidth(720) },
+    { label: '721px container', onClick: () => setContainerWidth(721) },
     {
       label: providerExample ? 'Publication example' : 'Provider example',
       onClick: async () => {
@@ -186,7 +188,7 @@ function PreviewStory({ dark, language, shadow }: { readonly dark: boolean; read
       layoutMotion={layoutMotion}
     />
   )
-  return <div style={{ height: 640, width: narrow ? 420 : '100%', maxWidth: '100%' }}>{shadow ? <ShadowSample>{preview}</ShadowSample> : preview}</div>
+  return <div style={{ height: 640, width: containerWidth ?? '100%', maxWidth: '100%' }}>{shadow ? <ShadowSample>{preview}</ShadowSample> : preview}</div>
 }
 
 export const previewStories: readonly FrontendStory[] = [false, true].map((shadow) => ({
@@ -195,6 +197,6 @@ export const previewStories: readonly FrontendStory[] = [false, true].map((shado
   title: shadow ? 'Preview · Shadow DOM' : 'Preview',
   standalone: true,
   description:
-    'Public preview with no title bar. Initialize interaction mode, direction, mini map, inspector and selection, then change defaults without resetting to confirm the current session stays unchanged. Selection examples cover one node, a comment and multiple nodes; open the inspector to see each selection. Check Node outline with no selection, the selection count with multiple nodes, and matching canvas/sidebar titles and icons for Agent and Connector nodes. Toggle dragging, grid and layout motion during the session. With dragging disabled, nodes remain selectable and inspectable. Switch direction inside the canvas and restore the saved direction and positions. Remove saved layout to check automatic measured layout on opening, without a Restore button until the layout changes; Restore then returns to that first generated layout. Compare both directions, themes and narrow containers. In the Provider example, inspect Agent Tools or Compile research: the shared selection dialog shows only saved tools and accounts, without the picker or editing actions. Code keeps its tool badges and HTTP hosts in the title bar; open the hosts to read and copy them. Code without tools omits both entries. Find recent mail omits account controls after Provider metadata loads; Archive without an account shows the saved deferred-account state. Agent and Code share the tool badge presentation. Use each Agent settings gear to inspect saved parameters; Escape returns focus to that gear, then to the Tools button. Move or select a node before loading the deterministic catalog; Connector icons and tool badges read the same resource-cache singleton without resetting the session. No workflow API or persistence.',
+    'Public preview with no title bar. Initialize interaction mode, direction, mini map, inspector and selection, then change defaults without resetting to confirm the current session stays unchanged. Selection examples cover one node, a comment and multiple nodes; open the inspector to see each selection. Check Node outline with no selection, the selection count with multiple nodes, and matching canvas/sidebar titles and icons for Agent and Connector nodes. Toggle dragging, grid and layout motion during the session. With dragging disabled, nodes remain selectable and inspectable. Switch direction inside the canvas and restore the saved direction and positions. Remove saved layout to check automatic measured layout on opening, without a Restore button until the layout changes; Restore then returns to that first generated layout. Compare both directions, themes and narrow containers. At 720px the view controls collapse into the zoom menu; at 721px they stay expanded. Expand the view options beside Restore layout to check spacing. In the Provider example, inspect Agent Tools or Compile research: the shared selection dialog shows only saved tools and accounts, without the picker or editing actions. Code keeps its tool badges and HTTP hosts in the title bar; open the hosts to read and copy them. Code without tools omits both entries. Find recent mail omits account controls after Provider metadata loads; Archive without an account shows the saved deferred-account state. Agent and Code share the tool badge presentation. Use each Agent settings gear to inspect saved parameters; Escape returns focus to that gear, then to the Tools button. Move or select a node before loading the deterministic catalog; Connector icons and tool badges read the same resource-cache singleton without resetting the session. No workflow API or persistence.',
   render: (_log, dark, language) => <PreviewStory dark={dark} language={language} shadow={shadow} />,
 }))
