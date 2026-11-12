@@ -251,7 +251,10 @@ export class CanvasStore {
   public completeLayout = (availableWidth?: number): boolean | 'relayout' => {
     if (this.disposed || this.layoutComplete) return true
     const nodes = this.allLayoutNodes()
-    if (nodes.length === 0 && !this.$.changingDirection.value) return true
+    if (nodes.length === 0 && !this.$.changingDirection.value) {
+      this.resolveInitialLayout(undefined)
+      return true
+    }
     for (const node of nodes) {
       const measured = node.$.measured.value
       if (!measured?.width || !measured.height) {
