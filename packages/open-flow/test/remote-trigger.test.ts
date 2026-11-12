@@ -143,6 +143,7 @@ it('acknowledges Asana creation handshakes before a subscription exists without 
 })
 
 it.each([
+  ['shopify.on_shop_event', { 'x-shopify-hmac-sha256': 'signed' }, {}],
   ['typeform.on_form_response', { 'typeform-signature': 'signed' }, {}],
   ['clickup.on_task_event', { 'x-signature': 'signed' }, {}],
   ['resend.on_email_event', { 'svix-id': 'delivery', 'svix-timestamp': '123', 'svix-signature': 'signed' }, {}],

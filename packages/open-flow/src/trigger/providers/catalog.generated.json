@@ -3640,7 +3640,15 @@
       "type": "integration"
     },
     "callback": {
-      "headers": ["x-shopify-api-version", "x-shopify-event-id", "x-shopify-shop-domain", "x-shopify-topic", "x-shopify-triggered-at", "x-shopify-webhook-id"],
+      "headers": [
+        "x-shopify-api-version",
+        "x-shopify-event-id",
+        "x-shopify-hmac-sha256",
+        "x-shopify-shop-domain",
+        "x-shopify-topic",
+        "x-shopify-triggered-at",
+        "x-shopify-webhook-id"
+      ],
       "query": ["open_flow_callback"]
     },
     "options": false
