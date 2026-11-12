@@ -409,3 +409,14 @@ it('starts a fresh relative timer for each wait occurrence and reuses an existin
   f.store.runs.createWait(f.runId, { ...f.waits[0]!, waitId: 'next-iteration', jobId: 'next-job' }, 'https://flows.example')
   expect(f.store.runViews.waitReceipt(f.runId, 'next-iteration')?.autoContinueAt).toBe(4000)
 })
+
+it('preserves a 4 MiB input through checkpoint persistence and resume', () => {
+  const f = fixture()
+  const quotes = 'x'.repeat(4 * 1024 * 1024 - 13)
+  Object.assign(f.checkpoint.inputs, { source: { quotes } })
+  f.pause()
+  f.store.runs.resolveWait(f.runId, 'first', 'approve')
+  const claimed = f.store.runs.claim()
+  expect(claimed?.resume?.checkpoint.inputs).toEqual({ source: { quotes } })
+  expect(f.store.runs.resume(f.runId)).toBe(true)
+})

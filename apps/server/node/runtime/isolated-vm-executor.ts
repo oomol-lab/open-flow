@@ -573,7 +573,7 @@ function readResult(
   preserveCapabilityFailure: boolean,
   capabilityFailure: unknown,
 ): JsonValue | undefined {
-  if (typeof source != 'string' || encoder.encode(source).byteLength > maxBytes) {
+  if (typeof source != 'string' || encoder.encode(source).byteLength > maxBytes + 1024 * 1024) {
     throw new IsolatedVmError('limit-exceeded', 'Runtime result exceeds the configured byte limit.')
   }
   const result = JSON.parse(source) as {
@@ -604,6 +604,8 @@ function readResult(
   }
   if (result.ok !== true || result.engineDigest != program.engineDigest || (!returnedValue && !returnedVoid))
     throw new IsolatedVmError('invalid-program', 'Runtime Task result does not match its execution contract.')
+  if (returnedValue && serializedBytes(result.value) > maxBytes)
+    throw new IsolatedVmError('limit-exceeded', 'Runtime result exceeds the configured byte limit.')
   return returnedVoid ? undefined : (result.value as JsonValue)
 }
 
