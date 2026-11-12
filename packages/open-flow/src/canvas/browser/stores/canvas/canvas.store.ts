@@ -10,7 +10,14 @@ import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFEdge, RFNode } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
 import type { LayoutPoint } from '../../base/wrapLayout.ts'
-import type { FlowCanvasViewEdge, FlowCanvasViewModel, FlowCanvasViewPosition, FlowCanvasViewViewport, ViewCallbacks } from '../../graph/FlowCanvas/model.ts'
+import type {
+  FlowCanvasViewEdge,
+  FlowCanvasViewLayout,
+  FlowCanvasViewModel,
+  FlowCanvasViewPosition,
+  FlowCanvasViewViewport,
+  ViewCallbacks,
+} from '../../graph/FlowCanvas/model.ts'
 import type { NodeEntry } from '../../graph/FlowCanvas/node.tsx'
 import type { EdgeStore } from '../edge/edge.store.ts'
 import type { RFCommand } from './rfCommand.ts'
@@ -93,6 +100,7 @@ export class CanvasStore {
   public readonly dispose: DisposableStore = disposableStore()
   /** Temporary routes used only by an explicitly arranged export canvas. */
   public readonly exportRoutes = this.dispose.add(val<ReadonlyMap<string, readonly LayoutPoint[]>>(new Map()))
+  public readonly layoutRequest = this.dispose.add(val(0))
   public readonly ignoredNodeIds = this.dispose.add(val<readonly string[]>([]))
   public readonly ignoreNodes = (nodeIds: readonly string[], ignored: boolean): void => {
     if (this.$.editable.value) this.#callbacks.onIgnoreNodes?.(nodeIds, ignored)
@@ -142,6 +150,7 @@ export class CanvasStore {
   private disposed = false
   private layoutMeasurementAttempts = 0
   private layoutComplete: boolean
+  private initialLayoutPending = false
   #modelDirection: CanvasDirection = 'horizontal'
   private deletionTimer: ReturnType<typeof setTimeout> | undefined
   private readonly pendingNodeDeletes = new Set<NodeStore | CommentNodeStore>()
@@ -170,7 +179,7 @@ export class CanvasStore {
     const commentNodes = this.dispose.add(reactiveMap<NodeId, CommentNodeStore>(null, { onDeleted: dispose }))
     const viewport = this.dispose.add(val<FlowCanvasViewViewport | undefined>(model.viewport, { equal: isSameViewport }))
     this.rfCommand = this.dispose.add(createRFCommand(nodes))
-    this.layoutComplete = !options.autoLayout
+    this.layoutComplete = true
     this.#runStatus = this.dispose.add(val<FlowRunStatus>(model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle))
     this.#connections = this.dispose.add(val<readonly FlowCanvasViewEdge[]>([]))
     const edges = this.dispose.add(deriveEdges(this.#connections, nodes))
@@ -219,7 +228,23 @@ export class CanvasStore {
       nodeMiniMapPhase: this.dispose.add(compute((get) => getNodeMinimap(get(nodes.$).size + get(commentNodes.$).size, get(viewport)?.zoom ?? 1))),
     }
     this.#syncModel(model)
+    if (options.autoLayout) this.requestLayout()
     if (options.defaultDirection != null) this.changeDirection(options.defaultDirection)
+  }
+
+  /** Request another measured layout without replacing the canvas or its interaction state. */
+  public requestLayout = (): void => {
+    if (this.disposed) return
+    this.layoutComplete = false
+    this.layoutMeasurementAttempts = 0
+    this.initialLayoutPending = true
+    this.layoutRequest.set(this.layoutRequest.value + 1)
+  }
+
+  private resolveInitialLayout(layout: FlowCanvasViewLayout | undefined): void {
+    if (!this.initialLayoutPending) return
+    this.initialLayoutPending = false
+    this.#callbacks.onInitialLayout?.(layout)
   }
 
   /** Initializes the shared layout after React Flow has measured the nodes. */
@@ -234,6 +259,7 @@ export class CanvasStore {
         this.layoutMeasurementAttempts = 0
         this.layoutComplete = true
         this.#restoreDirection()
+        this.resolveInitialLayout(undefined)
         return true
       }
     }
@@ -241,6 +267,7 @@ export class CanvasStore {
     this.applyPositions(positions)
     this.layoutMeasurementAttempts = 0
     this.layoutComplete = true
+    this.resolveInitialLayout({ direction: this.$.direction.value, positions })
     if (this.$.changingDirection.value) void this.#saveDirection(positions)
     else this.#callbacks.onMoveNodes(positions)
     return 'relayout'

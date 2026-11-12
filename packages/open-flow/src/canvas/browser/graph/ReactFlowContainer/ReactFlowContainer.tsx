@@ -190,6 +190,7 @@ export interface ReactFlowContainerProps {
   fitView?: boolean
   fitViewOptions?: FitViewOptions
   layoutMotion?: boolean
+  layoutRequest?: number
   dottedBackground?: boolean
   toolbar?: React.ReactNode
   children?: React.ReactNode
@@ -499,7 +500,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
 
   useLayoutEffect(() => {
     setLayoutReady(props.layoutMotion !== false || props.onLayoutMeasured == null)
-  }, [props.layoutMotion, props.onLayoutMeasured])
+  }, [props.layoutMotion, props.onLayoutMeasured, props.layoutRequest])
 
   useEffect(() => {
     let active = true
@@ -546,7 +547,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       if (fitTimer) clearTimeout(fitTimer)
       if (transitionTimer) clearTimeout(transitionTimer)
     }
-  }, [flowState, onBeforeFitView, props.layoutMotion, props.onLayoutMeasured, props.direction, rf, updateNodeInternals])
+  }, [flowState, onBeforeFitView, props.layoutMotion, props.onLayoutMeasured, props.layoutRequest, props.direction, rf, updateNodeInternals])
 
   const viewport = useVal(props.viewport$)
   const nonEmptyViewport = useRef(viewport)

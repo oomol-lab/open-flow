@@ -150,10 +150,7 @@ export function RevisionCanvas({
       return position != null && (position.x !== original.x || position.y !== original.y)
     })
   const changeLayout = (positions: Parameters<FlowCanvasViewProps['onMoveNodes']>[0], direction?: CanvasDirection) => {
-    let change: RevisionCanvasChange
-    if (needsInitialLayout) change = { kind: 'initialize', positions, direction: direction ?? canvasDirection(baseline.direction) }
-    else if (direction == null) change = { kind: 'move', positions }
-    else change = { kind: 'direction', positions, direction }
+    const change: RevisionCanvasChange = direction == null ? { kind: 'move', positions } : { kind: 'direction', positions, direction }
     setSessions((current) => changeRevisionCanvasSession(current, graphId, change))
   }
 
@@ -205,6 +202,15 @@ export function RevisionCanvas({
             ignoredNodeIds={[]}
             focusNodeRequest={focus}
             onMoveNodes={changeLayout}
+            onInitialLayout={(layout) =>
+              setSessions((current) =>
+                changeRevisionCanvasSession(current, graphId, {
+                  kind: 'initialize',
+                  direction: layout?.direction ?? canvasDirection(baseline.direction),
+                  positions: layout?.positions ?? Object.fromEntries(baseline.nodes.map((node) => [node.id, node.position])),
+                }),
+              )
+            }
             onChangeDirection={(direction, positions) => {
               changeLayout(positions, direction)
               return true

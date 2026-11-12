@@ -276,6 +276,45 @@ it('preserves partial layouts including a saved origin instead of rearranging ex
   expect(positions(store).prepare).toEqual({ x: 0, y: 0 })
 })
 
+it.each(['drag', 'direction'] as const)('retains the original fallback after measurement retries fail and a user changes %s', async (change) => {
+  const sample = publicationFixture('preview', 'revision')
+  const props = previewProps({
+    ...sample,
+    presentation: { ...sample.presentation, value: setCanvasLayout({}, 'vertical') },
+    defaultDirection: 'horizontal',
+  })
+  const original = structuredClone(props)
+  const view = render(<OpenFlowPreview {...props} />)
+  const store = boundary.props!.flowCanvasStore
+  const fallback = positions(store)
+  expect(store.$.direction.value).toBe('horizontal')
+  await act(async () => {
+    for (let attempt = 0; attempt < 5; attempt++) expect(store.completeLayout()).toBe(false)
+    expect(store.completeLayout()).toBe(true)
+  })
+  expect(store.$.direction.value).toBe('vertical')
+  expect(view.container.textContent).not.toContain('Restore layout')
+
+  if (change === 'drag') {
+    await act(async () => {
+      const node = store.$.rfNodes.value[0]!
+      const position = { x: node.position.x + 100, y: node.position.y + 50 }
+      await store.handleNodesChange([{ type: 'position', id: node.id, position }])
+      boundary.props!.onNodeDragStop?.({} as never, Object.assign({}, node, { position }), [])
+    })
+  } else {
+    await act(async () => store.changeDirection('horizontal'))
+    expect(await completeLayout(store)).toBe('relayout')
+  }
+  expect(view.container.textContent).toContain('Restore layout')
+  const restore = [...view.container.querySelectorAll('button')].find((button) => button.textContent === 'Restore layout')!
+  await click(restore)
+  expect(positions(store)).toEqual(fallback)
+  expect(store.$.direction.value).toBe('vertical')
+  expect(view.container.textContent).not.toContain('Restore layout')
+  expect(props).toEqual(original)
+})
+
 it('initializes mini map and inspector once, preserves user toggles and applies defaults again after a key reset', async () => {
   const props = previewProps({ defaultMiniMapExpanded: true, defaultInspectorOpen: true })
   const view = render(<OpenFlowPreview {...props} />)

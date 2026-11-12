@@ -76,6 +76,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 }) => {
   const editable = useVal(flowCanvasStore.$.editable)
   const direction = useVal(flowCanvasStore.$.direction)
+  const layoutRequest = useVal(flowCanvasStore.layoutRequest)
   const changingDirection = useVal(flowCanvasStore.$.changingDirection)
   const nodeMiniMapPhase = useVal(flowCanvasStore.$.nodeMiniMapPhase)
 
@@ -104,6 +105,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
               fitView={fitView ?? !editable}
               fitViewOptions={fitViewOptions}
               layoutMotion={layoutMotion}
+              layoutRequest={layoutRequest}
               nodeTypes={NODE_TYPES}
               edgeTypes={EDGE_TYPES}
               miniMapExpanded$={flowCanvasStore.$$.miniMapExpanded}

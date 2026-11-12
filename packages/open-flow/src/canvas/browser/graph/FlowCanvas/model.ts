@@ -191,6 +191,11 @@ export interface FlowCanvasViewModel {
   readonly viewport: FlowCanvasViewViewport
 }
 
+export interface FlowCanvasViewLayout {
+  readonly direction: CanvasDirection
+  readonly positions: Readonly<Record<string, FlowCanvasViewPosition>>
+}
+
 export interface FlowCanvasViewEdge {
   readonly id: string
   readonly source: string
@@ -267,6 +272,8 @@ export interface FlowCanvasViewProps {
   /** Apply direction and its measured layout together. Also enables session-local layout in read-only views. */
   readonly onChangeDirection?: (direction: CanvasDirection, positions: Readonly<Record<string, FlowCanvasViewPosition>>) => Promise<boolean> | boolean
   readonly onMoveNodes: (positions: Readonly<Record<string, FlowCanvasViewPosition>>) => void
+  /** Resolves an automatic layout request. Undefined means node measurement exhausted its retries. */
+  readonly onInitialLayout?: (layout: FlowCanvasViewLayout | undefined) => void
   readonly onMoveViewport: (viewport: FlowCanvasViewViewport) => void
   readonly onCopy?: (nodeIds: readonly string[]) => void
   readonly onPaste?: (position?: FlowCanvasViewPosition) => void
@@ -287,6 +294,7 @@ export interface ViewCallbacks {
   readonly onIgnoreNodes?: FlowCanvasViewProps['onIgnoreNodes']
   readonly onChangeDirection?: FlowCanvasViewProps['onChangeDirection']
   readonly onMoveNodes: FlowCanvasViewProps['onMoveNodes']
+  readonly onInitialLayout?: FlowCanvasViewProps['onInitialLayout']
   readonly onAddNode?: FlowCanvasViewProps['onAddNode']
   readonly onConnect?: FlowCanvasViewProps['onConnect']
   readonly onChangeNodeContentHidden?: FlowCanvasViewProps['onChangeNodeContentHidden']
