@@ -13,6 +13,7 @@ import type {
 
 import { admitsListenerPage, decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
+import { insertPublishWork, preparingOperation, settlePublishWork } from './publish-work.ts'
 import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
 
 export interface IntegrationPublication {
@@ -126,43 +127,24 @@ export class IntegrationStore {
           now,
           JSON.stringify(providerAccess),
         )
-      this.#database
-        .prepare(
-          `INSERT INTO publish_work (
-             work_id, operation_id, node_id, action, status, next_at, created_at, updated_at
-           ) VALUES (?, ?, ?, 'integration.prepare', 'pending', ?, ?, ?)`,
-        )
-        .run('work_' + crypto.randomUUID().replaceAll('-', ''), operationId, integration.triggerNodeId, now, now, now)
+      insertPublishWork(this.#database, { action: 'integration.prepare', nodeId: integration.triggerNodeId, operationId }, now)
     }
     return true
   }
 
   dueCandidates(now: number, limit: number): readonly IntegrationCandidate[] {
-    return this.#transaction(() => {
-      this.#database
-        .prepare(
-          `UPDATE integration_candidates
-           SET status = 'cleanup', next_at = ?, updated_at = ?
-           WHERE status != 'cleanup' AND EXISTS (
-             SELECT 1 FROM publish_operations
-             WHERE publish_operations.operation_id = integration_candidates.operation_id
-               AND (publish_operations.status != 'pending' OR publish_operations.deadline_at <= ?)
-           )`,
-        )
-        .run(now, now, now)
-      return this.#database
-        .prepare(
-          `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson, connection_id AS connectionId,
-                  endpoint_id AS endpointId, flow_id AS flowId, node_id AS nodeId, operation_id AS operationId,
-                  reconcile_at AS reconcileAt, status, subscription_json AS subscriptionJson, trigger_json AS triggerJson,
-                  provider_access_snapshot AS providerAccessJson
-           FROM integration_candidates
-           WHERE status IN ('preparing', 'cleanup') AND next_at <= ?
-           ORDER BY next_at, operation_id, node_id
-           LIMIT ?`,
-        )
-        .all(now, limit) as unknown as readonly IntegrationCandidate[]
-    })
+    return this.#database
+      .prepare(
+        `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson, connection_id AS connectionId,
+                endpoint_id AS endpointId, flow_id AS flowId, node_id AS nodeId, operation_id AS operationId,
+                reconcile_at AS reconcileAt, status, subscription_json AS subscriptionJson, trigger_json AS triggerJson,
+                provider_access_snapshot AS providerAccessJson
+         FROM integration_candidates
+         WHERE next_at <= ? AND (status = 'cleanup' OR (status = 'preparing' AND ${preparingOperation('integration_candidates.operation_id')}))
+         ORDER BY next_at, operation_id, node_id
+         LIMIT ?`,
+      )
+      .all(now, now, limit) as unknown as readonly IntegrationCandidate[]
   }
 
   initializeCandidate(candidate: IntegrationCandidate, checkpoint: JsonValue, subscription: Readonly<Record<string, JsonValue>>, now: number): boolean {
@@ -218,13 +200,7 @@ export class IntegrationStore {
 
   failCandidate(candidate: IntegrationCandidate, code: string, message: string, now: number): void {
     this.#transaction(() => {
-      this.#database
-        .prepare(
-          `UPDATE publish_work
-           SET status = 'failed', next_at = NULL, issue_code = ?, issue_message = ?, updated_at = ?
-           WHERE operation_id = ? AND node_id = ? AND action = 'integration.prepare' AND status = 'pending'`,
-        )
-        .run(code, message.slice(0, 512), now, candidate.operationId, candidate.nodeId)
+      settlePublishWork(this.#database, integrationWork(candidate), { code, message }, now)
       this.#database
         .prepare(
           `UPDATE integration_candidates SET status = 'cleanup', next_at = ?, updated_at = ?
@@ -242,19 +218,11 @@ export class IntegrationStore {
            SET status = 'ready', next_at = NULL, updated_at = ?
            WHERE operation_id = ? AND node_id = ? AND status = 'preparing'
              AND checkpoint_json IS NOT NULL AND subscription_json IS NOT NULL
-             AND EXISTS (
-               SELECT 1 FROM publish_operations
-               WHERE operation_id = ? AND status = 'pending' AND deadline_at > ?
-             )`,
+             AND ${preparingOperation('integration_candidates.operation_id')}`,
         )
-        .run(now, candidate.operationId, candidate.nodeId, candidate.operationId, now).changes
+        .run(now, candidate.operationId, candidate.nodeId, now).changes
       if (changed != 1) return false
-      this.#database
-        .prepare(
-          `UPDATE publish_work SET status = 'ready', next_at = NULL, updated_at = ?
-           WHERE operation_id = ? AND node_id = ? AND action = 'integration.prepare' AND status = 'pending'`,
-        )
-        .run(now, candidate.operationId, candidate.nodeId)
+      settlePublishWork(this.#database, integrationWork(candidate), 'ready', now)
       return true
     })
   }
@@ -1026,4 +994,8 @@ export class IntegrationStore {
         .run(subscription, reconcileAt, now, bindingId, runtimeVersion, expected).changes == 1
     )
   }
+}
+
+function integrationWork(candidate: Pick<IntegrationCandidate, 'nodeId' | 'operationId'>) {
+  return { action: 'integration.prepare', nodeId: candidate.nodeId, operationId: candidate.operationId } as const
 }

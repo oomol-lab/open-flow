@@ -29,6 +29,18 @@ suspension through one helper with a default-deny (`enabled === true`) policy; t
 is unchanged. There is no database migration, no checkpoint version change, and no Engine contract
 change in this section.
 
+Publish operations now have one terminal transition that records `succeeded` or `failed` and moves
+every remaining candidate of the operation to cleanup in the same transaction, including success
+through an existing Publication. `publish_work` rows are written only through one guarded
+`pending` → `ready | failed` helper. Candidate queries no longer mutate state; the deadline is
+derived only by the operation scheduler. As a result, an expired operation always reports
+`publication.deadline-exceeded` without a `nodeId`, where a Poll baseline previously attached its
+node. Resource subscriptions use guarded transitions: a returning demand moves an unfinished delete
+back to `creating`, a delete removes the row only while no demand exists, and a failed remote change
+keeps its in-flight status and retries after 60 seconds instead of becoming `uncertain`. Existing
+`uncertain` rows reconcile like `creating`. A confirmed `ready` resource stays `ready` when a later
+managed reconcile fails.
+
 ## Delay: Flow model v15 and Engine v12
 
 The npm `next` baseline is `0.1.0-beta.92`, gitHead `b92f0557b5c900e01a56972a13400b848386d7f1`, with Model v14 and Engine v11. Model v15 adds the `delay` node; earlier model envelopes reject it. Engine v12 adds durable timer-only suspension, while v11 remains supported for existing Publications and Runs. Checkpoint v7 retains its structure, and the isolated Code runtime digest is unchanged.

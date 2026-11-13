@@ -202,6 +202,39 @@ it('schedules preparation deadlines, readiness, retries, and failures from durab
   expect(store.publications.nextPublishOperation(1_500)).toMatchObject({ kind: 'failed', code: 'publication.deadline-exceeded' })
 })
 
+it('expires a Publish operation through its single terminal transition without mutating state from candidate queries', () => {
+  const { database, store, input } = fixture()
+  database.exec('UPDATE publish_operations SET deadline_at = 1_500')
+  const snapshot = () => ({
+    candidates: database.prepare("SELECT 'integration' AS kind, status FROM integration_candidates UNION ALL SELECT 'poll', status FROM poll_candidates").all(),
+    work: database.prepare('SELECT node_id AS nodeId, status FROM publish_work ORDER BY node_id').all(),
+  })
+  const before = snapshot()
+  expect(store.integrations.dueCandidates(2_000, 10)).toEqual([])
+  expect(store.polls.dueCandidates(2_000, 10)).toEqual([])
+  expect(snapshot()).toEqual(before)
+  const expired = store.publications.nextPublishOperation(2_000)
+  expect(expired).toEqual({ code: 'publication.deadline-exceeded', kind: 'failed', message: expect.any(String), operationId: input.operationId })
+  if (expired?.kind != 'failed') throw new Error('Publish operation did not expire.')
+  store.publications.failPublishOperation(expired.operationId, expired)
+  expect(store.publications.publishOperation('flow', input.operationId)).toMatchObject({ issue: { code: 'publication.deadline-exceeded' }, status: 'failed' })
+  expect(database.prepare('SELECT status FROM integration_candidates').all()).toEqual([{ status: 'cleanup' }])
+  expect(database.prepare('SELECT COUNT(*) AS count FROM poll_candidates').get()).toEqual({ count: 0 })
+  expect(store.integrations.dueCandidates(2_000, 10).map((candidate) => candidate.status)).toEqual(['cleanup'])
+  store.publications.failPublishOperation(input.operationId, { code: 'late', message: 'Late failure.' })
+  expect(store.publications.publishOperation('flow', input.operationId)).toMatchObject({ issue: { code: 'publication.deadline-exceeded' } })
+})
+
+it('cleans up remaining candidates when an operation succeeds through an existing Publication', () => {
+  const { database, store, input } = fixture()
+  const direct = store.publications.publish({ ...input, operationId: undefined, integrations: [], polls: [] })
+  if (direct.kind != 'published') throw new Error('Publication was not committed.')
+  expect(store.publications.publish(input)).toEqual({ created: false, kind: 'published', publicationId: direct.publicationId })
+  expect(store.publications.publishOperation('flow', input.operationId)).toMatchObject({ publicationId: direct.publicationId, status: 'succeeded' })
+  expect(database.prepare('SELECT status FROM integration_candidates').all()).toEqual([{ status: 'cleanup' }])
+  expect(database.prepare('SELECT COUNT(*) AS count FROM poll_candidates').get()).toEqual({ count: 0 })
+})
+
 it.each([1, 2])('preserves a stored model version when publishing without metadata: %s', (modelVersion) => {
   const { database, store, input, poll, integration } = fixture()
   database.prepare('UPDATE revisions SET content = ? WHERE revision_id = ?').run(JSON.stringify({ modelVersion }), input.revisionId)

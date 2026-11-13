@@ -14,6 +14,7 @@ import type {
 
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
+import { insertPublishWork, preparingOperation, settlePublishWork } from './publish-work.ts'
 import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
 
 export interface PollPublication {
@@ -90,51 +91,23 @@ export class PollStore {
            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'null', 'preparing', ?, ?, ?)`,
         )
         .run(operationId, poll.triggerNodeId, bindingId, flowId, poll.triggerJson, poll.connectionId, poll.scheduleJson, now, now, now)
-      this.#database
-        .prepare(
-          `INSERT INTO publish_work (
-             work_id, operation_id, node_id, action, status, next_at, created_at, updated_at
-           ) VALUES (?, ?, ?, 'poll.baseline', 'pending', ?, ?, ?)`,
-        )
-        .run(`work_${randomUUID().replaceAll('-', '')}`, operationId, poll.triggerNodeId, now, now, now)
+      insertPublishWork(this.#database, { action: 'poll.baseline', nodeId: poll.triggerNodeId, operationId }, now)
     }
   }
 
   dueCandidates(now: number, limit: number): readonly PollCandidate[] {
-    return this.#transaction(() => {
-      this.#database
-        .prepare(
-          `UPDATE publish_work
-           SET status = 'failed', next_at = NULL,
-               issue_code = 'publication.deadline-exceeded',
-               issue_message = 'The Publish operation exceeded its preparation deadline.',
-               updated_at = ?
-           WHERE action = 'poll.baseline' AND status = 'pending' AND operation_id IN (
-             SELECT operation_id FROM publish_operations WHERE status = 'pending' AND deadline_at <= ?
-           )`,
-        )
-        .run(now, now)
-      this.#database
-        .prepare(
-          `DELETE FROM poll_candidates
-           WHERE operation_id IN (
-             SELECT operation_id FROM publish_operations WHERE status != 'pending' OR deadline_at <= ?
-           )`,
-        )
-        .run(now)
-      return this.#database
-        .prepare(
-          `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson,
-                  connection_id AS connectionId, flow_id AS flowId, node_id AS nodeId,
-                  operation_id AS operationId, retry_count AS retryCount, schedule_json AS scheduleJson, status,
-                  trigger_json AS triggerJson
-           FROM poll_candidates
-           WHERE status = 'preparing' AND next_at <= ?
-           ORDER BY next_at, operation_id, node_id
-           LIMIT ?`,
-        )
-        .all(now, limit) as unknown as readonly PollCandidate[]
-    })
+    return this.#database
+      .prepare(
+        `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson,
+                connection_id AS connectionId, flow_id AS flowId, node_id AS nodeId,
+                operation_id AS operationId, retry_count AS retryCount, schedule_json AS scheduleJson, status,
+                trigger_json AS triggerJson
+         FROM poll_candidates
+         WHERE status = 'preparing' AND next_at <= ? AND ${preparingOperation('poll_candidates.operation_id')}
+         ORDER BY next_at, operation_id, node_id
+         LIMIT ?`,
+      )
+      .all(now, now, limit) as unknown as readonly PollCandidate[]
   }
 
   candidate(operationId: string, nodeId: string): PollCandidate | undefined {
@@ -166,44 +139,27 @@ export class PollStore {
             .prepare(
               `UPDATE poll_candidates SET checkpoint_json = ?, next_at = ?, updated_at = ?
                WHERE operation_id = ? AND node_id = ? AND status = 'preparing' AND checkpoint_json = ?
-                 AND EXISTS (
-                   SELECT 1 FROM publish_operations
-                   WHERE operation_id = ? AND status = 'pending' AND deadline_at > ?
-                 )`,
+                 AND ${preparingOperation('poll_candidates.operation_id')}`,
             )
-            .run(checkpointJson, now, now, candidate.operationId, candidate.nodeId, candidate.checkpointJson, candidate.operationId, now).changes == 1
+            .run(checkpointJson, now, now, candidate.operationId, candidate.nodeId, candidate.checkpointJson, now).changes == 1
         )
       }
       const changed = this.#database
         .prepare(
           `UPDATE poll_candidates SET checkpoint_json = ?, status = 'ready', next_at = NULL, updated_at = ?
            WHERE operation_id = ? AND node_id = ? AND status = 'preparing' AND checkpoint_json = ?
-             AND EXISTS (
-               SELECT 1 FROM publish_operations
-               WHERE operation_id = ? AND status = 'pending' AND deadline_at > ?
-             )`,
+             AND ${preparingOperation('poll_candidates.operation_id')}`,
         )
-        .run(checkpointJson, now, candidate.operationId, candidate.nodeId, candidate.checkpointJson, candidate.operationId, now).changes
+        .run(checkpointJson, now, candidate.operationId, candidate.nodeId, candidate.checkpointJson, now).changes
       if (changed != 1) return false
-      this.#database
-        .prepare(
-          `UPDATE publish_work SET status = 'ready', next_at = NULL, updated_at = ?
-           WHERE operation_id = ? AND node_id = ? AND action = 'poll.baseline' AND status = 'pending'`,
-        )
-        .run(now, candidate.operationId, candidate.nodeId)
+      settlePublishWork(this.#database, pollWork(candidate), 'ready', now)
       return true
     })
   }
 
   failCandidate(candidate: PollCandidate, code: string, message: string, now: number): void {
     this.#transaction(() => {
-      this.#database
-        .prepare(
-          `UPDATE publish_work
-           SET status = 'failed', next_at = NULL, issue_code = ?, issue_message = ?, updated_at = ?
-           WHERE operation_id = ? AND node_id = ? AND action = 'poll.baseline' AND status = 'pending'`,
-        )
-        .run(code, message.slice(0, 512), now, candidate.operationId, candidate.nodeId)
+      settlePublishWork(this.#database, pollWork(candidate), { code, message }, now)
       this.#database.prepare('DELETE FROM poll_candidates WHERE operation_id = ? AND node_id = ?').run(candidate.operationId, candidate.nodeId)
     })
   }
@@ -818,4 +774,8 @@ export class PollStore {
     }
     return targets
   }
+}
+
+function pollWork(candidate: Pick<PollCandidate, 'nodeId' | 'operationId'>) {
+  return { action: 'poll.baseline', nodeId: candidate.nodeId, operationId: candidate.operationId } as const
 }

@@ -427,13 +427,13 @@ export class EventSourceRuntime {
   }
 
   async cleanup(signal: AbortSignal): Promise<void> {
-    for (const subscription of this.#store.eventSources.unusedSubscriptions()) {
+    this.#store.eventSources.releaseOrphanDemands()
+    for (const subscription of this.#store.eventSources.unusedSubscriptions(this.#clock())) {
       const key = JSON.stringify([subscription.sourceId, subscription.resourceKey])
       if (this.#operations.has(key)) continue
       const source = this.#store.eventSources.get(subscription.sourceId)
-      if (source == null) continue
-      this.#store.eventSources.subscriptionState(source.sourceId, subscription.resourceKey, 'deleting', this.#clock())
-      const operation = this.#change(source, subscription, false, signal)
+      if (source == null || !this.#store.eventSources.beginSubscriptionDelete(source.sourceId, subscription.resourceKey, this.#clock())) continue
+      const operation = this.#change(source, { ...subscription, status: 'deleting' }, false, signal)
       this.#operations.set(key, operation)
       try {
         await operation
@@ -478,10 +478,10 @@ export class EventSourceRuntime {
       )
       if (!this.#store.eventSources.saveReference(source, result.source)) throw new TransientIntegrationError('The Source changed during resource preparation.')
       if (result.outcome === 'pending') throw new TransientIntegrationError('The Source resource is still being prepared.')
-      if (active) this.#store.eventSources.subscriptionState(source.sourceId, stored.resourceKey, 'ready', this.#clock())
+      if (active) this.#store.eventSources.subscriptionReady(source.sourceId, stored.resourceKey, this.#clock())
       else this.#store.eventSources.deleteSubscription(source.sourceId, stored.resourceKey)
     } catch (error) {
-      this.#store.eventSources.subscriptionState(source.sourceId, stored.resourceKey, 'uncertain', this.#clock())
+      this.#store.eventSources.subscriptionFailed(source.sourceId, stored.resourceKey, stored.status, this.#clock())
       throw error
     }
   }
