@@ -296,7 +296,7 @@ export function validateCheckpoint(
       throw new Error('Checkpoint waiting dependency output is inconsistent.')
     const config = agentConfig(node)
     const saved = agents[waiting.jobId]
-    if (!isResolutionNode(node) && config == null) throw new Error('Checkpoint waiting node cannot suspend.')
+    if (!isResolutionNode(node) && node.kind !== 'delay' && config == null) throw new Error('Checkpoint waiting node cannot suspend.')
     if (config != null) {
       if (saved != null && saved.invocationId != waiting.jobId) throw new Error('Checkpoint Agent invocation identity changed.')
       if (saved == null || (node.timeoutMs == null) != (saved.remainingMs == null) || (saved.remainingMs != null && saved.remainingMs > node.timeoutMs!)) {
@@ -305,6 +305,8 @@ export function validateCheckpoint(
       const approval = agentApproval(config, saved.checkpoint, saved.input)
       if (!jsonEqual(waiting.value, approval)) throw new Error('Checkpoint Agent approval does not match its saved call.')
       if (!jsonEqual(resolveInputs(waiting.nodeId, node), saved.input)) throw new Error('Checkpoint Agent inputs changed.')
+    } else if (node.kind === 'delay') {
+      if (saved != null || waiting.pending != null || !jsonEqual(waiting.value, {})) throw new Error('Checkpoint Delay state is invalid.')
     } else {
       if (saved != null) throw new Error('Checkpoint Wait contains Agent state.')
       if (!isResolutionNode(node) || !jsonEqual(resolveInputs(waiting.nodeId, node), waiting.value)) throw new Error('Checkpoint resolution input changed.')

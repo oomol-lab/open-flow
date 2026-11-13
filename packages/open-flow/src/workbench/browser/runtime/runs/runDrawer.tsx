@@ -126,23 +126,25 @@ function WaitDecision({
   return (
     <div className="shrink-0 px-2 pt-2">
       <Alert>
-        <Icon name="wait" />
-        <AlertTitle>{waiting.prompt}</AlertTitle>
+        <Icon name={waiting.kind === 'delay' ? 'delay' : 'wait'} />
+        <AlertTitle>{waiting.kind === 'delay' ? t('delay.title') : waiting.prompt}</AlertTitle>
         <AlertDescription>
-          <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
+          {waiting.kind !== 'delay' && <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>}
           {waiting.autoContinueAt != null && <div>{t('run.waitAutoContinue', { date: new Date(waiting.autoContinueAt).toLocaleString(language) })}</div>}
-          <Field className="mt-2">
-            <FieldLabel htmlFor={commentId}>{t('run.waitComment')}</FieldLabel>
-            <Textarea
-              id={commentId}
-              rows={2}
-              value={comment}
-              disabled={resolving}
-              aria-invalid={tooLong}
-              onChange={(event) => setComment(event.target.value)}
-            />
-            {tooLong && <FieldError>{t('run.waitCommentTooLong')}</FieldError>}
-          </Field>
+          {waiting.kind !== 'delay' && (
+            <Field className="mt-2">
+              <FieldLabel htmlFor={commentId}>{t('run.waitComment')}</FieldLabel>
+              <Textarea
+                id={commentId}
+                rows={2}
+                value={comment}
+                disabled={resolving}
+                aria-invalid={tooLong}
+                onChange={(event) => setComment(event.target.value)}
+              />
+              {tooLong && <FieldError>{t('run.waitCommentTooLong')}</FieldError>}
+            </Field>
+          )}
           <div className="mt-2 flex flex-wrap gap-2">
             {waiting.actions.map((action) => (
               <Button

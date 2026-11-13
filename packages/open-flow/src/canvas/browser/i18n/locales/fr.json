@@ -611,7 +611,8 @@
       "input": "Entrée",
       "output": "Sortie",
       "outputs": "Sorties du workflow",
-      "webhook-response": "Réponse Webhook"
+      "webhook-response": "Réponse Webhook",
+      "delay": "Délai"
     },
     "units": {
       "minute": "minutes",

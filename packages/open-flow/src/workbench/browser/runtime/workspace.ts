@@ -32,6 +32,7 @@ import {
   savedHiddenNodeContent,
   savedVerticalNodeWidths,
 } from './canvasPresentation.ts'
+import { displayDelay } from './delayDuration.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 
@@ -100,6 +101,8 @@ function sourceNodePresentation(node: ResolvedSelection, context: NodeProjection
 export function nodeTitle(node: ResolvedNode, t?: TFunction): string {
   if (node.node.name != null) return node.node.name
   switch (node.kind) {
+    case 'delay':
+      return t?.('delay.title') ?? 'Delay'
     case 'webhook-response':
       return t?.('addNode.webhookResponse') ?? 'Webhook Response'
     case 'outputs':
@@ -119,6 +122,8 @@ export function nodeTitle(node: ResolvedNode, t?: TFunction): string {
 
 export function nodeIcon(node: ResolvedNode): string | undefined {
   switch (node.kind) {
+    case 'delay':
+      return ':lucide-light:timer:'
     case 'webhook-response':
       return ':lucide-light:reply:'
     case 'outputs':
@@ -158,6 +163,8 @@ function nodePorts(node: ResolvedSelection, revision: RevisionView<RevisionSourc
   )
   const outputs = new Map<string, Omit<FlowCanvasViewOutput, 'handle'>>()
   switch (node.kind) {
+    case 'delay':
+      break
     case 'webhook-response':
       for (const [handle, port] of Object.entries(nodeInputPorts(node.node))) inputs.set(handle, { ...port, defaultValue: port.value })
       break
@@ -622,6 +629,17 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
     title: nodeTitle(resolved, context.t),
   }
   switch (node.kind) {
+    case 'delay': {
+      const duration = displayDelay(node.durationMs)
+      return {
+        ...common,
+        kind: 'delay',
+        duration:
+          node.durationMs == null
+            ? (context.t?.('delay.missing') ?? 'Set duration')
+            : (context.t?.(`delay.summary.${duration.unit}`, { value: duration.value }) ?? `${duration.value} ${duration.unit}`),
+      }
+    }
     case 'condition':
       return {
         ...common,

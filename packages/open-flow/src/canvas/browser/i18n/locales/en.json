@@ -611,7 +611,8 @@
       "input": "Flow input",
       "output": "Flow output",
       "outputs": "Workflow Outputs",
-      "webhook-response": "Webhook Response"
+      "webhook-response": "Webhook Response",
+      "delay": "Delay"
     },
     "units": {
       "minute": "minutes",

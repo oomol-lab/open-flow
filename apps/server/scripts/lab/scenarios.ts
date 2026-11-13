@@ -8,6 +8,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'delay',
+    entry: { kind: 'start' },
+    name: 'Pause a branch for a fixed duration',
+    version: 1,
+    task: 'Create Start, a Delay named Pause with durationMs 100, and Outputs returning done=true. Connect them with ordinary execution edges. In a later request rename Pause to Pause updated and change only its duration to 50 milliseconds. Read back the Delay and check the workflow.',
+  },
+  {
     id: 'connector-proxy',
     entry: { kind: 'start' },
     name: 'Call an unlisted Provider API',
@@ -227,6 +234,7 @@ export function initialOperations(id: string): ChangeOperation[] {
     id == 'connector-proxy' ||
     id == 'poll-batch' ||
     id == 'wait-auto-continue' ||
+    id === 'delay' ||
     id == 'node-errors' ||
     id == 'node-retries' ||
     id == 'workflow-call' ||
@@ -525,6 +533,21 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
       : ['Preserve the selected Gmail account, default configuration and batch Poll contract.']
   }
 
+  if (id === 'delay') {
+    const entries = Object.entries(current.document.graph.nodes)
+    const pause = entries.find(([, candidate]) => candidate.name === 'Pause updated')
+    const start = entries.find(([, candidate]) => candidate.kind === 'start')
+    const out = entries.find(([, candidate]) => candidate.kind === 'outputs')
+    const edges = current.document.graph.edges
+    return pause?.[1].kind === 'delay' &&
+      pause[1].durationMs === 50 &&
+      start != null &&
+      out != null &&
+      edges.some((connection) => connection.source === start[0] && connection.target === pause[0] && connection.sourceHandle == null) &&
+      edges.some((connection) => connection.source === pause[0] && connection.target === out[0] && connection.sourceHandle == null)
+      ? []
+      : ['Create a 50-millisecond Delay connected through ordinary execution edges.']
+  }
   if (id == 'wait-auto-continue') {
     const nodes = Object.values(current.document.graph.nodes)
     const relative = nodes.find((candidate) => candidate.name == 'Relative wait updated')

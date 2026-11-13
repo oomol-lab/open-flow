@@ -11,10 +11,11 @@ export interface EngineContract {
   readonly codeFetch?: boolean
   readonly flowState?: boolean
   readonly connectorProxy?: boolean
+  readonly delays?: boolean
 }
 
-/** v11 adds Provider API requests through Connector Proxy. */
-export const currentEngineContract = 'open-flow-engine/v11'
+/** v12 adds durable Delay nodes. */
+export const currentEngineContract = 'open-flow-engine/v12'
 /** The published v8 Node compatibility contract, retained for existing Publications and Runs. */
 export const nodejsEngineContract = 'open-flow-engine/v8/nodejs-compat-v1'
 
@@ -67,10 +68,12 @@ const nodejsContract: EngineContract = {
 
 const v9Contract: EngineContract = { ...nodejsContract, codeFetch: true, platformSource: platformSource('open-flow-engine/v9') }
 const v10Contract: EngineContract = { ...v9Contract, flowState: true, platformSource: platformSource('open-flow-engine/v10') }
-const currentContract: EngineContract = { ...v10Contract, connectorProxy: true, platformSource: platformSource(currentEngineContract) }
+const v11Contract: EngineContract = { ...v10Contract, connectorProxy: true, platformSource: platformSource('open-flow-engine/v11') }
+const currentContract: EngineContract = { ...v11Contract, delays: true, platformSource: platformSource(currentEngineContract) }
 
 export function findEngineContract(contract: string): EngineContract | undefined {
   if (contract == currentEngineContract) return currentContract
+  if (contract == 'open-flow-engine/v11') return v11Contract
   if (contract == 'open-flow-engine/v10') return v10Contract
   if (contract == 'open-flow-engine/v9') return v9Contract
   if (contract == 'open-flow-engine/v8') return v8Contract

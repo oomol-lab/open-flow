@@ -541,15 +541,20 @@ export interface Run {
   readonly version: 1
 }
 
-export interface RunWait {
-  readonly autoContinueAt?: string
-  readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+export type RunWait = {
   readonly expiresAt: string
   readonly nodeId: string
-  readonly prompt: string
   readonly waitId: string
   readonly waitingSince: string
-}
+} & (
+  | { readonly kind: 'delay'; readonly autoContinueAt: string; readonly actions: readonly []; readonly prompt: '' }
+  | {
+      readonly kind?: 'interaction'
+      readonly autoContinueAt?: string
+      readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+      readonly prompt: string
+    }
+)
 
 export type ErrorDispatch =
   | { readonly status: 'pending'; readonly flowId: string }
@@ -696,6 +701,7 @@ export function decodeRunEvent(value: unknown) {
         kind,
         payload: {
           ...timing,
+          ...(payload.kind === 'delay' ? { kind: 'delay' as const } : {}),
           expiresAt: string(payload.expiresAt),
           nodeId: string(payload.nodeId),
           waitId: string(payload.waitId),
@@ -746,6 +752,7 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'connector-proxy' &&
             nodeKind !== 'javascript' &&
             nodeKind !== 'decision' &&
+            nodeKind !== 'delay' &&
             nodeKind !== 'openapi' &&
             nodeKind !== 'http-request' &&
             nodeKind !== 'skip-duplicates' &&

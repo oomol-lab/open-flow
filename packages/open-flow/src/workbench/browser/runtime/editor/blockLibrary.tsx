@@ -133,6 +133,8 @@ function fallbackIcon(item: LibraryNodeItem): IconName {
       return 'outputs'
     case 'wait':
       return 'wait'
+    case 'delay':
+      return 'delay'
     case 'new-task':
     case 'comment':
       return 'task'

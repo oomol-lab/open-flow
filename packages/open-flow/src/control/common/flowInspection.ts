@@ -74,6 +74,8 @@ function inspectNode(node: GraphNode): Record<string, unknown> {
     ...(Object.keys(defaults).length == 0 ? {} : { inputDefaults: defaults }),
   }
   switch (node.kind) {
+    case 'delay':
+      return { ...node, ...ports }
     case 'webhook-response':
       return { ...node, ...ports }
     case 'outputs':

@@ -713,7 +713,7 @@
     "connectorUnconfigured": "이 배포에는 Connector가 구성되어 있지 않습니다. 구성을 완료한 후 Flow를 다시 실행하세요.",
     "connectorUnavailable": "Connector 요청을 완료하지 못했습니다. Flow를 다시 실행하고, 계속 실패하면 선택한 Connection을 확인하세요.",
     "locateNode": "캔버스에서 {{name}} 위치 보기",
-    "locateWait": "대기 노드 찾기",
+    "locateWait": "노드 찾기",
     "nodeError": "노드 오류",
     "nodeFailed": "노드를 완료하지 못했습니다.",
     "nodeLog": "{{level}} 로그",
@@ -953,6 +953,9 @@
         "recursive": "재귀 호출은 지원되지 않습니다.",
         "interface-required": "대상 워크플로의 인터페이스를 불러오지 않았습니다.",
         "dependency-invalid": "대상 워크플로 내부에 호출할 수 없는 워크플로 노드가 있습니다."
+      },
+      "delay": {
+        "duration-invalid": "양의 정수 밀리초로 환산되는 시간을 입력하세요."
       }
     },
     "notChecked": "검사 안 됨",
@@ -1838,5 +1841,23 @@
     "export": "내보내기",
     "hostUnsupported": "이 호스트는 아직 워크플로 번들 가져오기를 지원하지 않습니다.",
     "unnamed": "이름 없는 워크플로"
+  },
+  "delay": {
+    "title": "지연",
+    "description": "지정한 시간이 지나면 이 분기를 계속합니다.",
+    "duration": "시간",
+    "unit": "단위",
+    "invalid": "양의 정수 밀리초로 환산되는 시간을 입력하세요.",
+    "missing": "시간 설정",
+    "units": {
+      "second": "초",
+      "minute": "분",
+      "hour": "시간"
+    },
+    "summary": {
+      "second": "{{value}}초",
+      "minute": "{{value}}분",
+      "hour": "{{value}}시간"
+    }
   }
 }

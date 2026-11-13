@@ -137,7 +137,7 @@ export function GeneralSettings({
             />
             {limitError != null && <FieldError>{limitError}</FieldError>}
           </Field>
-          {node.kind != 'approval' && node.kind != 'wait' && (
+          {node.kind != 'approval' && node.kind != 'wait' && node.kind !== 'delay' && (
             <Field data-invalid={error != null}>
               <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
               <Input

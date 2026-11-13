@@ -21,6 +21,16 @@ import { useStoryActions } from './storyActions.tsx'
 
 const waits: RunDetails['waits'] = [
   {
+    kind: 'delay',
+    waitId: 'pause',
+    nodeId: 'pause',
+    actions: [],
+    prompt: '',
+    waitingSince: '2026-09-15T08:00:00Z',
+    expiresAt: '2026-09-22T08:00:00Z',
+    autoContinueAt: '2026-09-15T08:00:05Z',
+  },
+  {
     waitId: 'release',
     nodeId: 'release',
     actions: ['approve', 'reject'],
@@ -139,7 +149,7 @@ function WaitRuns({ language, log }: { readonly language: UiLanguage; readonly l
   ])
   const states = [
     { title: 'Notification running · independent approvals', run: { ...base, waits: pending }, events: [] as RunEvent[] },
-    { title: 'Frozen · all waits remain actionable', run: { ...base, status: 'waiting' as const }, events: [] as RunEvent[] },
+    { title: 'Frozen · timers and decisions', run: { ...base, status: 'waiting' as const }, events: [] as RunEvent[] },
     {
       title: 'Decision history · manual and automatic',
       run: { ...base, status: 'completed' as const, waits: [] },
@@ -225,7 +235,7 @@ export const waitRunsStory: FrontendStory = {
   title: 'Run decisions',
   standalone: true,
   description:
-    'Add separate optional comments and resolve either wait while the notification branch continues. Frozen waits, manual and automatic decision history, and ordinary notification failure are shown alongside.',
+    'Compare timer-only Delay with manual decisions while the notification branch continues. Add optional comments to interactive waits. Frozen waits, decision history and notification failure are shown alongside.',
   render: (log, _dark, language) => <WaitRuns language={language} log={log} />,
 }
 

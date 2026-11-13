@@ -713,7 +713,7 @@
     "connectorUnconfigured": "Le Connector n’est pas configuré pour ce déploiement. Terminez la configuration, puis relancez le Flow.",
     "connectorUnavailable": "La requête Connector n'a pas pu aboutir. Exécutez à nouveau le Flow ; si l'échec persiste, vérifiez la Connection sélectionnée.",
     "locateNode": "Localiser {{name}} sur le canevas",
-    "locateWait": "Localiser le nœud d’attente",
+    "locateWait": "Localiser le nœud",
     "nodeError": "Erreur du nœud",
     "nodeFailed": "Le nœud n'a pas pu être terminé.",
     "nodeLog": "Journal {{level}}",
@@ -953,6 +953,9 @@
         "recursive": "Les appels récursifs ne sont pas pris en charge.",
         "interface-required": "L’interface du workflow cible n’a pas été chargée.",
         "dependency-invalid": "Le workflow cible contient un appel de workflow invalide."
+      },
+      "delay": {
+        "duration-invalid": "Saisissez une durée positive en millisecondes entières."
       }
     },
     "notChecked": "Non vérifié",
@@ -1838,5 +1841,23 @@
     "export": "Exporter",
     "hostUnsupported": "Cet hôte ne prend pas encore en charge l’import de lots de workflows.",
     "unnamed": "Workflow sans nom"
+  },
+  "delay": {
+    "title": "Délai",
+    "description": "Suspendre cette branche pendant une durée fixe.",
+    "duration": "Durée",
+    "unit": "Unité",
+    "invalid": "Saisissez une durée positive en millisecondes entières.",
+    "missing": "Définir la durée",
+    "units": {
+      "second": "Secondes",
+      "minute": "Minutes",
+      "hour": "Heures"
+    },
+    "summary": {
+      "second": "{{value}} s",
+      "minute": "{{value}} min",
+      "hour": "{{value}} h"
+    }
   }
 }

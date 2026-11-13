@@ -95,7 +95,7 @@ describe('RunsView output', () => {
     } else {
       expect(markup).toContain('Review before continuing')
       expect(markup).toContain('>Continue<')
-      expect(markup).toContain('Locate Wait node')
+      expect(markup).toContain('Locate node')
     }
     expect(markup).toContain('Initiated by')
     expect(markup).toContain('user-run-audit')

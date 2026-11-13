@@ -52,6 +52,7 @@ import { connectorActionPresentation } from './connectorActionPresentation.tsx'
 import { presentConnectorInputs } from './connectorInputPresentation.ts'
 import { ConnectorProxySection } from './connectorProxySection.tsx'
 import { DecisionSection } from './decisionSection.tsx'
+import { DelayDefinition } from './delayDefinition.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { EventSourceTriggerConfig } from './eventSourceTriggerConfig.tsx'
@@ -79,6 +80,7 @@ import { WebhookResponseEditor } from './webhookResponseEditor.tsx'
 import { WorkflowSection, WorkflowInterfaceAlert, useWorkflowActions } from './workflowSection.tsx'
 
 export function inspectorIcon(node: ResolvedSelection | undefined): IconName {
+  if (node?.kind === 'delay') return 'delay'
   if (node?.kind == 'trigger') return 'trigger'
   if (node?.kind == 'condition') return 'condition'
   if (node?.kind == 'value') return 'value'
@@ -103,6 +105,8 @@ function nodePurposePlaceholder(
   displays?: Readonly<Record<string, TriggerDisplay>>,
 ): string | undefined {
   switch (selection.kind) {
+    case 'delay':
+      return t('delay.description')
     case 'webhook-response':
       return t('addNode.webhookResponseDescription')
     case 'condition':
@@ -1166,6 +1170,8 @@ export function NodeInspector({
                   </GeneralSettings>
                 </>
               )
+            ) : selection.kind === 'delay' ? (
+              <DelayDefinition key={selection.id} disabled={disabled} selection={selection} store={store} />
             ) : selection.kind == 'approval' || selection.kind == 'wait' ? (
               <ResolutionDefinition disabled={disabled} selection={selection} store={store} />
             ) : null}

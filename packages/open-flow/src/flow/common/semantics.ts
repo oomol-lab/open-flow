@@ -88,6 +88,7 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
           if ('moduleId' in node.task) visitModule(node.task.moduleId)
           break
         case 'outputs':
+        case 'delay':
         case 'value':
           break
         case 'approval':
@@ -471,7 +472,7 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
     nodes[nodeId] =
       node.kind == 'outputs'
         ? { ...node, outputMappings: inputs(nodeId, node.outputMappings) }
-        : isTriggerNode(node)
+        : isTriggerNode(node) || node.kind === 'delay'
           ? node
           : {
               ...node,
@@ -560,6 +561,7 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
     return { kind: 'engine-unsupported' }
   if (!engine.waitAutoContinue && Object.values(revision.document.graph.nodes).some((node) => node.kind == 'wait' && node.autoContinue != null))
     return { kind: 'engine-unsupported' }
+  if (!engine.delays && Object.values(revision.document.graph.nodes).some((node) => node.kind === 'delay')) return { kind: 'engine-unsupported' }
   const validation = await validateFlow(revision, engine)
   if (!validation.valid) return { kind: 'flow-invalid', validation }
   const { closure } = validation

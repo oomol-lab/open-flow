@@ -6,14 +6,17 @@ import { describe, expect, it } from 'vitest'
 import { connectorActionPorts, normalizeConnectorRuntimeInputs } from '../../connector/common/actionSchema.ts'
 import { runFlow } from '../../execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../../flow/common/change.ts'
+import { applyFlowChanges } from '../../flow/common/change.ts'
 import { decodeRevisionContent } from '../../flow/common/changeSchema.ts'
 import { decodeRevision, encodeRevision } from '../../flow/common/encoding.ts'
 import { nodeInputPorts } from '../../flow/common/graph.ts'
+import { nodeOutputPorts } from '../../flow/common/graph.ts'
+import { inverseFlowChanges } from '../../flow/common/inverseChanges.ts'
 import { prepareFlow, validateFlow } from '../../flow/common/semantics.ts'
 import { findEngineContract } from '../../runtime/common/engineContract.ts'
 import { currentEngineContract } from '../../runtime/common/runtime.ts'
 import { triggerDefinitions } from '../../trigger/providers/definitions.ts'
-import { authoringNode, authoringSchema, authoringTypes, compileAuthoring, readAuthoring } from './authoring.ts'
+import { authoringDiagnostics, authoringNode, authoringSchema, authoringTypes, compileAuthoring, readAuthoring, searchAuthoring } from './authoring.ts'
 
 const empty: RevisionContent = {
   modelVersion: currentFlowModelVersion,
@@ -672,6 +675,71 @@ it('preserves explicit deferred accounts in public creation, reads, local update
   for (const type of ['poll', 'integration'] as const) {
     await expect(edit(empty, [{ op: 'node.add', as: 'trigger', type, name: 'Trigger', config: { key: type, connectionId: '' } }])).rejects.toThrow()
   }
+})
+
+describe('Delay authoring', () => {
+  it('creates a valid five-second Delay when configuration is omitted', async () => {
+    const created = await edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause' }])
+    expect(authoringNode(created.content, created.nodes.pause!)).toMatchObject({ config: { durationMs: 5000 } })
+    expect((await validateFlow(created.content, findEngineContract(currentEngineContract)!)).valid).toBe(true)
+  })
+
+  it('advertises and enforces the seven-day limit on creation and updates', async () => {
+    expect(authoringSchema('delay')).toMatchObject({ configuration: { properties: { durationMs: { exclusiveMaximum: 604_800_000 } } } })
+    const created = await edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 604_799_999 } }])
+    expect(authoringNode(created.content, created.nodes.pause!)).toMatchObject({ config: { durationMs: 604_799_999 } })
+    for (const durationMs of [604_800_000, 604_800_001]) {
+      await expect(edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs } }])).rejects.toThrow()
+      await expect(edit(created.content, [{ op: 'node.update', node: created.nodes.pause!, set: { config: { durationMs } } }])).rejects.toThrow()
+    }
+  })
+
+  it('creates and updates a port-free node while preserving unrelated nodes, and undoes edits', async () => {
+    const created = await edit(empty, [
+      { op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 5000 } },
+      { op: 'node.add', type: 'wait', as: 'review', name: 'Review', prompt: 'Continue?' },
+    ])
+    const ref = created.nodes.pause!
+    await roundTrip(created.content, ref)
+    expect(searchAuthoring(created.content, { query: '5000', type: 'delay' }).matches).toEqual([expect.objectContaining({ node: ref, field: 'config' })])
+    expect(decodeRevision(encodeRevision(created.content))).toEqual(created.content)
+    const node = created.content.document.graph.nodes[ref]!
+    expect(nodeInputPorts(node)).toEqual({})
+    expect(nodeOutputPorts(node)).toEqual({})
+    const changed = await edit(created.content, [{ op: 'node.update', node: ref, set: { name: 'Pause updated', config: { durationMs: 20 } } }])
+    expect(authoringNode(changed.content, ref)).toMatchObject({ type: 'delay', name: 'Pause updated', config: { durationMs: 20 } })
+    expect(changed.content.document.graph.nodes[created.nodes.review!]).toEqual(created.content.document.graph.nodes[created.nodes.review!])
+    expect(applyFlowChanges(changed.content, inverseFlowChanges(created.content, changed.operations)).document).toEqual(created.content.document)
+  })
+
+  it.each([null, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])('rejects invalid public duration %s while retaining draft values', async (durationMs) => {
+    await expect(edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs } }])).rejects.toThrow()
+    const content: RevisionContent = {
+      ...empty,
+      document: {
+        bindings: {},
+        graph: {
+          nodes: { pause: { kind: 'delay', inputs: {}, durationMs } },
+          edges: [],
+        },
+      },
+    }
+    expect(decodeRevision(encodeRevision(content))).toEqual(content)
+    const diagnostics = (await validateFlow(content, findEngineContract(currentEngineContract)!)).diagnostics
+    expect(diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'delay.duration-invalid', path: '/document/graph/nodes/pause/durationMs' })]),
+    )
+    expect(authoringDiagnostics(content, diagnostics)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'delay.duration-invalid', nodes: ['pause'], field: 'config.durationMs' })]),
+    )
+  })
+
+  it('requires Model v15 and Engine v12', async () => {
+    const created = await edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 1 } }])
+    expect(() => decodeRevisionContent({ ...created.content, modelVersion: 14 })).toThrow('Delay requires Flow model v15')
+    expect((await prepareFlow(created.content, 'open-flow-engine/v11')).kind).toBe('engine-unsupported')
+    expect((await prepareFlow(created.content, currentEngineContract)).kind).toBe('prepared')
+  })
 })
 
 describe('Wait automatic continuation authoring', () => {

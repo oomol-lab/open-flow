@@ -17,6 +17,7 @@ export {
   createProviderTrigger,
   createValue,
   createWait,
+  createDelay,
   deleteNodes,
   cleanVariableBindings,
   setConnectorConnection,

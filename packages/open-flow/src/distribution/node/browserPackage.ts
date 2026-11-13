@@ -98,6 +98,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['flow/common/authoring', 'common/flow-authoring'],
   ['flow/common/change', 'common/flow-change'],
   ['flow/common/changeSchema', 'common/flow-change-schema'],
+  ['flow/common/delay', 'common/flow-delay'],
   ['flow/common/connectionUsage', 'common/flow-connectionUsage'],
   ['flow/common/edgeChanges', 'common/flow-authoring-edge'],
   ['flow/common/encoding', 'common/flow-encoding'],

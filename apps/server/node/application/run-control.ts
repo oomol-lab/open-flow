@@ -8,6 +8,7 @@ import type {
   RunEvents,
   RunInitiator,
   RunResult,
+  RunWait,
 } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, TaskNode, WaitAction, WorkflowCapability } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
@@ -28,6 +29,7 @@ import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/
 import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
+import { waitDurationMs } from '../storage/run-store.ts'
 import { checkCodeActions, checkCodePermissions, checkConnectorProxies } from './connector-capabilities.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
 import { decodedRevision, preparedRevision } from './revision-cache.ts'
@@ -481,6 +483,8 @@ export class RunControl {
       case 'prepared':
         break
     }
+    if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind === 'delay' && node.durationMs != null && node.durationMs >= waitDurationMs))
+      throw new ControlError(controlErrorCode.flowInvalid, 'Delay must be shorter than seven days.')
     if (
       Object.values(fixed.flow.graph.nodes)
         .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))
@@ -572,15 +576,7 @@ export class RunControl {
   private runDetails(stored: StoredControlRun): RunDetails {
     const state = {
       status: stored.status,
-      waits: this.store.runViews.activeWaits(stored.runId).map((receipt) => ({
-        actions: receipt.actions,
-        expiresAt: timestamp(receipt.expiresAt),
-        nodeId: receipt.nodeId,
-        prompt: receipt.prompt,
-        waitId: receipt.waitId,
-        autoContinueAt: receipt.autoContinueAt == null ? undefined : timestamp(receipt.autoContinueAt),
-        waitingSince: timestamp(receipt.waitingSince),
-      })),
+      waits: this.store.runViews.activeWaits(stored.runId).map(runWait),
     }
     const caller = this.store.runs.workflowOrigin(stored.runId)
     const details = {
@@ -628,6 +624,25 @@ function run(stored: StoredControlRun): Run {
     ...(stored.startedAt == null ? {} : { startedAt: timestamp(stored.startedAt) }),
     status: stored.status,
     version: 1,
+  }
+}
+
+function runWait(receipt: ReturnType<Store['runViews']['activeWaits']>[number]): RunWait {
+  const identity = {
+    expiresAt: timestamp(receipt.expiresAt),
+    nodeId: receipt.nodeId,
+    waitId: receipt.waitId,
+    waitingSince: timestamp(receipt.waitingSince),
+  }
+  if (receipt.kind === 'delay') {
+    if (receipt.autoContinueAt == null) throw new Error('Delay deadline is missing.')
+    return { ...identity, kind: 'delay', actions: [], prompt: '', autoContinueAt: timestamp(receipt.autoContinueAt) }
+  }
+  return {
+    ...identity,
+    actions: receipt.actions,
+    prompt: receipt.prompt,
+    autoContinueAt: receipt.autoContinueAt == null ? undefined : timestamp(receipt.autoContinueAt),
   }
 }
 

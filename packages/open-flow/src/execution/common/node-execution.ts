@@ -96,6 +96,8 @@ export function nodeTitle(node: GraphNode): string | undefined {
       return 'Approval'
     case 'wait':
       return 'Wait'
+    case 'delay':
+      return 'Delay'
   }
 }
 
@@ -108,6 +110,7 @@ function nodeKind(
   | 'connector'
   | 'connector-proxy'
   | 'decision'
+  | 'delay'
   | 'javascript'
   | 'openapi'
   | 'http-request'
@@ -457,6 +460,7 @@ export function executeNode(
       }
       case 'approval':
       case 'wait':
+      case 'delay':
         return yield* Effect.fail(new Error('Resolution jobs are handled by the Scheduler suspension boundary.'))
     }
     return yield* Effect.try({

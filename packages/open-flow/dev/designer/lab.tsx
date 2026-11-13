@@ -27,6 +27,7 @@ const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
   'Node Outputs': 'i-lucide-light:log-out',
   'Node Task': 'i-carbon:code',
   'Node Wait': 'i-carbon:hourglass',
+  'Node Delay': 'i-lucide-light:timer',
   'Node Approval': 'i-carbon:stamp',
   'Node AI Decision': 'i-carbon:ml-model-reference',
   'Node Workflow': 'i-lucide-light:workflow',

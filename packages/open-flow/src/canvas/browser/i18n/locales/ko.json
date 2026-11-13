@@ -611,7 +611,8 @@
       "input": "입력",
       "output": "출력",
       "outputs": "워크플로 출력",
-      "webhook-response": "Webhook 응답"
+      "webhook-response": "Webhook 응답",
+      "delay": "지연"
     },
     "units": {
       "minute": "분",

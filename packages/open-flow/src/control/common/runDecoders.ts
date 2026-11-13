@@ -1,6 +1,6 @@
 import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type { JsonValue, WaitAction } from '../../flow/common/change.ts'
-import type { Run, RunCancellation, RunChannel, RunDetails, RunInitiator, RunPage, RunResult } from './api.ts'
+import type { Run, RunCancellation, RunChannel, RunDetails, RunInitiator, RunPage, RunResult, RunWait } from './api.ts'
 
 import { runStatuses } from '../../execution/common/runLifecycle.ts'
 import { requiredFields, integer, invalidResponse, record, string } from './decoding.ts'
@@ -32,24 +32,31 @@ function run(value: unknown): Run {
   }
 }
 
-function runWaiting(value: unknown) {
+function runWaiting(value: unknown): RunWait {
   const source = record(value)
   requiredFields(source, ['actions', 'expiresAt', 'nodeId', 'prompt', 'waitId', 'waitingSince'])
+  const identity = {
+    expiresAt: string(source.expiresAt),
+    nodeId: string(source.nodeId),
+    waitId: string(source.waitId),
+    waitingSince: string(source.waitingSince),
+  }
   const actions = source.actions
-  if (
-    !Array.isArray(actions) ||
-    !((actions.length == 1 && actions[0] == 'continue') || (actions.length == 2 && actions[0] == 'approve' && actions[1] == 'reject'))
-  ) {
+  if (!Array.isArray(actions)) return invalidResponse()
+  if (source.kind === 'delay') {
+    if (actions.length !== 0 || source.prompt !== '') return invalidResponse()
+    return { ...identity, kind: 'delay', actions: [], prompt: '', autoContinueAt: string(source.autoContinueAt) }
+  }
+  if (source.kind !== undefined && source.kind !== 'interaction') return invalidResponse()
+  if (!((actions.length == 1 && actions[0] == 'continue') || (actions.length == 2 && actions[0] == 'approve' && actions[1] == 'reject'))) {
     return invalidResponse()
   }
   return {
-    actions: actions as unknown as readonly ['continue'] | readonly ['approve', 'reject'],
+    ...identity,
+    ...(source.kind === undefined ? {} : { kind: source.kind }),
+    actions: actions.length === 1 ? ['continue'] : ['approve', 'reject'],
     ...(source.autoContinueAt === undefined ? {} : { autoContinueAt: string(source.autoContinueAt) }),
-    expiresAt: string(source.expiresAt),
-    nodeId: string(source.nodeId),
     prompt: string(source.prompt),
-    waitId: string(source.waitId),
-    waitingSince: string(source.waitingSince),
   }
 }
 

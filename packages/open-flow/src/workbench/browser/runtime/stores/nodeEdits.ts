@@ -11,6 +11,7 @@ import type { RevisionView } from '../revisionView.ts'
 import { dequal } from 'dequal/lite'
 import {
   resetInputValues,
+  updateDelay,
   setInputSources,
   updateTriggerSchedule,
   updateStartInputDefs,
@@ -40,6 +41,13 @@ import {
 } from '../editor/flowChanges.ts'
 
 export class NodeEdits {
+  public async saveDelay(nodeId: string, durationMs: number | null): Promise<boolean> {
+    const revision = this.revision.value
+    if (revision == null) return false
+    const changes = updateDelay(revision.revision.content, nodeId, durationMs)
+    return changes != null && (await this.save(changes))
+  }
+
   public constructor(
     private readonly revision: ReadonlyVal<RevisionView | undefined>,
     private readonly save: (changes: FlowChanges, deletion?: PropertyDeletion) => Promise<boolean>,

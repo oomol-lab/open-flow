@@ -253,6 +253,7 @@ describe('Repeated node executions', () => {
         ...waitHost(decisions),
         create: (request: WaitRequest) =>
           Effect.sync(() => {
+            if (request.kind === 'delay') throw new Error('Expected an interaction wait')
             requests.push(request)
             return {
               inputs: request.value,

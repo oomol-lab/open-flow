@@ -15,7 +15,7 @@ import { waitAutoContinueDraftSchema, waitAutoContinueSchema } from './wait.ts'
 import { webhookMethods } from './webhookMethod.ts'
 import { webhookResponseTimeout } from './webhookResponse.ts'
 
-export const currentFlowModelVersion = 14
+export const currentFlowModelVersion = 15
 const text = z.string()
 const actionConnection = text.describe(
   'Account selection: omit while unconfigured; use an account ID to select it; use "" to explicitly defer configuration. Deferred Actions fail if called; deferred Agent tools are excluded from the callable tool set. Not supported by Triggers.',
@@ -246,6 +246,16 @@ const base = {
   onError: z.enum(['stop', 'error']).optional(),
 }
 const node = z.union([
+  z
+    .strictObject({
+      ...base,
+      kind: z.literal('delay'),
+      inputs: z.record(text, z.never()),
+      durationMs: z.number().nullable(),
+      retry: z.never().optional(),
+      onError: z.never().optional(),
+    })
+    .omit({ timeoutMs: true }),
   z.strictObject({ ...base, kind: z.literal('webhook-response'), retry: z.never().optional(), onError: z.never().optional() }),
   z.strictObject({ ...base, kind: z.literal('outputs'), outputDefs: z.array(port.strict()), outputMappings: inputs }).omit({ inputs: true }),
   z.object({ ...base, inputs: z.record(text, z.never()), kind: z.literal('condition'), ...condition }),
@@ -324,6 +334,7 @@ const revision = z.object({
     z.literal(11),
     z.literal(12),
     z.literal(13),
+    z.literal(14),
     z.literal(currentFlowModelVersion),
   ]),
   document,
@@ -729,6 +740,8 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 }
 
 function checkModelVersion(content: RevisionContent): void {
+  if (content.modelVersion < 15 && Object.values(content.document.graph.nodes).some((candidateNode) => candidateNode.kind === 'delay'))
+    throw new TypeError('Delay requires Flow model v15.')
   if (
     content.modelVersion < 14 &&
     Object.values(content.document.graph.nodes).some(

@@ -1,7 +1,7 @@
 import type { RunInitiator } from '@oomol-lab/open-flow/control-api'
 import type { RunEventKind } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
-import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, WaitAction, WaitAutoContinue } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RunStatus, RunTerminalStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunCheckpoint, WaitRequest, WaitResolution, FlowRunOptions, FlowRunOutcome, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
@@ -97,11 +97,11 @@ const maxEventBytes = 1024 * 1024
 const maxOutputBytes = 4 * 1024 * 1024
 const maxEventCount = 1_000
 const maxEventTotalBytes = 16 * 1024 * 1024
-const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
+export const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
 
-function autoContinueAt(wait: WaitRequest, waitingSince: number): number | null {
+function autoContinueAt(wait: { readonly autoContinue?: WaitAutoContinue; readonly actions: readonly WaitAction[] }, waitingSince: number): number | null {
   if (wait.autoContinue == null) return null
-  if (wait.actions.length != 1 || wait.actions[0] != 'continue') throw new Error('Only Wait supports automatic continuation.')
+  if (wait.actions.length != 1 || wait.actions[0] != 'continue') throw new Error('Automatic continuation requires a single continue action.')
   const at = waitAutoContinueAt(wait.autoContinue, waitingSince)
   if (!Number.isSafeInteger(at) || at >= waitingSince + waitDurationMs) throw new Error('Automatic continuation must occur before the Wait expires in 7 days.')
   return at
@@ -605,15 +605,28 @@ export class RunStore {
       readonly messageHandle: string
     },
   ): JsonValue | undefined {
+    if (wait.kind === 'delay' && notification != null) throw new Error('Delay cannot send an interaction notification.')
+    const request =
+      wait.kind === 'delay'
+        ? {
+            ...wait,
+            value: {},
+            prompt: '',
+            actions: ['continue'] as const,
+            notify: false,
+            autoContinue: { kind: 'after' as const, durationMs: wait.durationMs },
+          }
+        : wait
     return this.#transaction(() => {
       this.resolutions(runId, [])
       const previous = this.#database
         .prepare(
-          'SELECT job_id AS jobId, node_id AS nodeId, value, prompt, actions, waiting_since AS waitingSince, auto_continue_at AS autoContinueAt, notification_output AS output FROM wait_receipts WHERE run_id = ? AND wait_id = ?',
+          'SELECT kind, job_id AS jobId, node_id AS nodeId, value, prompt, actions, waiting_since AS waitingSince, auto_continue_at AS autoContinueAt, notification_output AS output FROM wait_receipts WHERE run_id = ? AND wait_id = ?',
         )
         .get(runId, wait.waitId) as
         | {
             jobId: string
+            kind: string
             nodeId: string
             value: string
             prompt: string
@@ -626,27 +639,28 @@ export class RunStore {
       if (previous != null) {
         if (
           previous.jobId != wait.jobId ||
+          previous.kind !== (wait.kind ?? 'interaction') ||
           previous.nodeId != wait.nodeId ||
-          previous.value != JSON.stringify(wait.value) ||
-          previous.prompt != wait.prompt ||
-          previous.actions != JSON.stringify(wait.actions) ||
-          previous.autoContinueAt != autoContinueAt(wait, previous.waitingSince)
+          previous.value != JSON.stringify(request.value) ||
+          previous.prompt != request.prompt ||
+          previous.actions != JSON.stringify(request.actions) ||
+          previous.autoContinueAt != autoContinueAt(request, previous.waitingSince)
         )
           throw new Error('Wait identity changed.')
         return previous.output == null ? undefined : withWaitNotificationMessage(JSON.parse(previous.output) as JsonValue)
       }
       const waitingSince = this.#clock()
       const expiresAt = waitingSince + waitDurationMs
-      const continueAt = autoContinueAt(wait, waitingSince)
-      const needsLinks = wait.notify || notification != null
+      const continueAt = autoContinueAt(request, waitingSince)
+      const needsLinks = request.notify || notification != null
       if (needsLinks && publicOrigin == null) throw new Error('Wait action links require OPEN_FLOW_PUBLIC_ORIGIN.')
       const capability = needsLinks ? randomBytes(32).toString('base64url') : undefined
       const links =
-        capability == null ? [] : wait.actions.map((action) => ({ action, url: new URL(`/v1/wait-actions/${capability}/${action}`, publicOrigin!).href }))
-      const output: JsonValue | undefined = wait.notify
+        capability == null ? [] : request.actions.map((action) => ({ action, url: new URL(`/v1/wait-actions/${capability}/${action}`, publicOrigin!).href }))
+      const output: JsonValue | undefined = request.notify
         ? withWaitNotificationMessage({
-            inputs: wait.value,
-            prompt: wait.prompt,
+            inputs: request.value,
+            prompt: request.prompt,
             ...Object.fromEntries(links.map(({ action, url }) => [`${action}Url`, url])),
             expiresAt: new Date(expiresAt).toISOString(),
             ...(continueAt == null ? {} : { autoContinueAt: new Date(continueAt).toISOString() }),
@@ -654,24 +668,25 @@ export class RunStore {
         : undefined
       this.#database
         .prepare(
-          `INSERT INTO wait_receipts (run_id, wait_id, node_id, job_id, actions, prompt, value, waiting_since, expires_at, capability_digest, notification_output, auto_continue_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO wait_receipts (run_id, wait_id, node_id, job_id, actions, prompt, value, waiting_since, expires_at, capability_digest, notification_output, auto_continue_at, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           runId,
           wait.waitId,
           wait.nodeId,
           wait.jobId,
-          JSON.stringify(wait.actions),
-          wait.prompt,
-          JSON.stringify(wait.value),
+          JSON.stringify(request.actions),
+          request.prompt,
+          JSON.stringify(request.value),
           waitingSince,
           expiresAt,
           capability == null ? null : createHash('sha256').update(capability).digest('hex'),
           output == null ? null : JSON.stringify(output),
           continueAt,
+          wait.kind ?? 'interaction',
         )
       if (notification != null) {
-        const message = [wait.prompt, `Expires at: ${new Date(expiresAt).toISOString()}`, ...links.map(({ action, url }) => `${action}: ${url}`)].join('\n')
+        const message = [request.prompt, `Expires at: ${new Date(expiresAt).toISOString()}`, ...links.map(({ action, url }) => `${action}: ${url}`)].join('\n')
         this.#database
           .prepare(
             `INSERT INTO wait_notifications (run_id, wait_id, invocation_id, action, connection_id, input_json, status, attempts, retry_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)`,
@@ -690,6 +705,7 @@ export class RunStore {
       }
       const payload = {
         nodeId: wait.nodeId,
+        ...(wait.kind === 'delay' ? { kind: 'delay' } : {}),
         waitId: wait.waitId,
         ...(continueAt == null ? {} : { autoContinueAt: new Date(continueAt).toISOString() }),
         waitingSince: new Date(waitingSince).toISOString(),
@@ -829,7 +845,7 @@ export class RunStore {
   ): ReturnType<RunStore['resolveWait']> {
     const row = this.#database
       .prepare(
-        `SELECT wait_receipts.comment, wait_receipts.action, wait_receipts.actions, wait_receipts.expires_at AS expiresAt,
+        `SELECT wait_receipts.kind, wait_receipts.auto_continue_at AS autoContinueAt, wait_receipts.comment, wait_receipts.action, wait_receipts.actions, wait_receipts.expires_at AS expiresAt,
                   wait_receipts.resolved_at AS resolvedAt, runs.status
            FROM wait_receipts JOIN runs USING (run_id)
            WHERE wait_receipts.run_id = ? AND wait_receipts.wait_id = ?`,
@@ -837,6 +853,8 @@ export class RunStore {
       .get(runId, waitId) as
       | {
           readonly actions: string
+          readonly kind: 'interaction' | 'delay'
+          readonly autoContinueAt: number | null
           readonly action: WaitAction | null
           readonly comment: string | null
           readonly expiresAt: number
@@ -845,6 +863,8 @@ export class RunStore {
         }
       | undefined
     if (row == null) return { kind: 'not-found' as const }
+    if (row.kind === 'delay' && (source !== 'automatic' || row.autoContinueAt == null || this.#clock() < row.autoContinueAt))
+      return { kind: 'invalid-action' as const }
     if (!(JSON.parse(row.actions) as readonly WaitAction[]).includes(requested)) return { kind: 'invalid-action' as const }
     if (row.action != null && row.resolvedAt != null) {
       return {

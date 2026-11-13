@@ -81,7 +81,7 @@ export function pasteNodes(revision: RevisionView, clipboard: NodeClipboard, ide
   }
   for (const [sourceId, node] of entries) {
     const nodeId = ids.get(sourceId)!
-    if (!('inputs' in node) && node.kind != 'outputs') {
+    if ((!('inputs' in node) && node.kind != 'outputs') || node.kind === 'delay') {
       const response = node.kind === 'webhook' ? node.options?.responseBody : undefined
       const copy =
         node.kind === 'webhook' && response?.kind === 'webhook-response' && response.nodeId != null

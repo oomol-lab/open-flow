@@ -21,6 +21,7 @@ const nodeKinds = new Set([
   'connector',
   'connector-proxy',
   'decision',
+  'delay',
   'javascript',
   'openapi',
   'http-request',
@@ -56,6 +57,7 @@ function nodeKind(
   | 'connector'
   | 'connector-proxy'
   | 'decision'
+  | 'delay'
   | 'javascript'
   | 'openapi'
   | 'http-request'
@@ -78,6 +80,7 @@ function nodeKind(
     | 'connector'
     | 'connector-proxy'
     | 'decision'
+    | 'delay'
     | 'javascript'
     | 'openapi'
     | 'http-request'

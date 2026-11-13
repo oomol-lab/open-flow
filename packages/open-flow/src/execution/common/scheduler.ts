@@ -69,6 +69,7 @@ export type SchedulerEvent =
         | 'connector'
         | 'connector-proxy'
         | 'decision'
+        | 'delay'
         | 'javascript'
         | 'openapi'
         | 'http-request'
@@ -134,20 +135,25 @@ export interface FlowRunResult {
   }[]
 }
 
-export interface WaitRequest {
-  readonly autoContinue?: WaitAutoContinue
+export type WaitRequest = {
   readonly jobId: string
   readonly nodeId: string
-  readonly value: JsonValue
   readonly waitId: string
-  readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
-  readonly prompt: string
-  readonly notify: boolean
-  readonly notification?: {
-    readonly input: Readonly<Record<string, JsonValue>>
-    readonly messageHandle: string
-  }
-}
+} & (
+  | { readonly kind: 'delay'; readonly durationMs: number | null }
+  | {
+      readonly kind?: 'interaction'
+      readonly autoContinue?: WaitAutoContinue
+      readonly value: JsonValue
+      readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+      readonly prompt: string
+      readonly notify: boolean
+      readonly notification?: {
+        readonly input: Readonly<Record<string, JsonValue>>
+        readonly messageHandle: string
+      }
+    }
+)
 
 export type WaitOperation =
   | { readonly kind: 'create'; readonly wait: WaitRequest }
@@ -372,17 +378,23 @@ function runGraph(
           const node = target.graph.nodes[nodeId] as ExecutableNode
           const waitId = nanoid()
           const notify = isResolutionNode(node) && usesPending(target.graph, nodeId)
-          const notification = yield* context.waits.create({
-            jobId,
-            nodeId,
-            value,
-            waitId,
-            notify,
-            ...(node.kind == 'wait' && node.autoContinue != null ? { autoContinue: node.autoContinue } : {}),
-            actions: isResolutionNode(node) ? resolutionActions(node) : ['approve', 'reject'],
-            prompt: isResolutionNode(node) ? node.prompt : JSON.stringify(value, null, 2),
-            ...(isResolutionNode(node) ? {} : { notification: agentNotice(node, agents[jobId]!.input) }),
-          })
+          const identity = { jobId, nodeId, waitId }
+          const request: WaitRequest =
+            node.kind === 'delay'
+              ? { ...identity, kind: 'delay', durationMs: node.durationMs }
+              : {
+                  ...identity,
+                  value,
+                  notify,
+                  ...(isResolutionNode(node)
+                    ? { actions: resolutionActions(node), prompt: node.prompt, ...(node.kind === 'wait' ? { autoContinue: node.autoContinue } : {}) }
+                    : {
+                        actions: ['approve', 'reject'] as const,
+                        prompt: JSON.stringify(value, null, 2),
+                        notification: agentNotice(node, agents[jobId]!.input),
+                      }),
+                }
+          const notification = yield* context.waits.create(request)
           const pending = notification == null ? notification : withWaitNotificationMessage(notification)
           if (notify) {
             validateOutputs(nodeId, node, { pending: pending! })
@@ -452,7 +464,7 @@ function runGraph(
                   try: () => resolveInputs(nodeId, node),
                   catch: (error) => new NodeValidationError('node.input-invalid', error),
                 })
-                if (isResolutionNode(node)) {
+                if (isResolutionNode(node) || node.kind === 'delay') {
                   yield* context.emit({
                     inputs: Object.fromEntries(
                       Object.entries(nodeInputs).filter(([handle]) => {
@@ -506,7 +518,10 @@ function runGraph(
               saved.nodeId,
               saved.jobId,
               Effect.gen(function* () {
-                if (isResolutionNode(node)) {
+                if (node.kind === 'delay') {
+                  if (action !== 'continue') return yield* Effect.fail(new Error('Delay requires automatic continuation.'))
+                  yield* commit(saved.nodeId, saved.jobId, {}, [])
+                } else if (isResolutionNode(node)) {
                   if (!resolutionActions(node).some((candidate) => candidate == action))
                     return yield* Effect.fail(new Error('Resolution does not match node actions.'))
                   yield* commit(

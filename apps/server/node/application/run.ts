@@ -357,7 +357,7 @@ export class RunExecutor {
             const node = flow.graph.nodes[request.nodeId]
             if (node == null || !('inputs' in node)) throw new Error('Wait node is unavailable.')
             let notification: { action: string; connectionId?: string; input: Readonly<Record<string, JsonValue>>; messageHandle: string } | undefined
-            if (request.notification != null) {
+            if (request.kind !== 'delay' && request.notification != null) {
               const task = node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'agent' ? node.task.executor.notification : undefined
               if (task == null) throw new Error('Agent notification is unavailable.')
               notification = {
