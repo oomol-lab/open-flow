@@ -123,6 +123,36 @@ describe('RunStore', () => {
     }
   })
 
+  it.each(['unavailable', 'expired'] as const)('recovers result reads automatically when event history is %s', async (failure) => {
+    vi.useFakeTimers()
+    const client = new WorkbenchClient(vi.fn())
+    vi.spyOn(client, 'getRun').mockResolvedValue(details)
+    const readEvents = vi
+      .spyOn(client, 'getRunEvents')
+      .mockRejectedValue(failure == 'expired' ? new ApiError(410, 'run.events-expired', 'Expired') : new Error('Offline'))
+    const readResult = vi.spyOn(client, 'getRunResult').mockRejectedValue(new Error('Offline'))
+    const store = new RunStore(client, vi.fn())
+    try {
+      store.follow(run, store.prepareStart())
+      await vi.advanceTimersByTimeAsync(0)
+      expect(store.$.observationFailed.value).toBe(true)
+      expect(store.$.result.value).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(readResult.mock.calls.length).toBeGreaterThan(1)
+      readResult.mockResolvedValue({ finishedAt: timestamp, result: null, runId: run.runId, status: 'completed', version: 1 })
+      if (failure == 'unavailable')
+        readEvents.mockResolvedValue({ done: true, events: [terminalEvent], historyComplete: true, nextAfter: 1, runId: run.runId, version: 1 })
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(store.$.result.value?.status).toBe('completed')
+      expect(store.$.observationFailed.value).toBe(false)
+      expect(store.$.events.value).toEqual(failure == 'expired' ? [] : [terminalEvent])
+      expect(store.$.historyComplete.value).toBe(failure != 'expired')
+    } finally {
+      store.dispose()
+      vi.useRealTimers()
+    }
+  })
+
   it.each(['run', 'events'] as const)('finishes cancellation while failed %s reads keep retrying', async (failure) => {
     vi.useFakeTimers()
     const client = new WorkbenchClient(vi.fn())

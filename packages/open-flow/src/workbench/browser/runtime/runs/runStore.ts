@@ -506,16 +506,20 @@ export class RunStore {
           let nextRun = runResponse.value
           this.#set({ observationFailed: false, runById: replaceRun(this.#state.value, nextRun) })
           if (eventsResponse.status == 'rejected') {
-            yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error })
-            if (!(eventsResponse.reason instanceof ApiError) || eventsResponse.reason.code != 'run.events-expired') {
-              if (permanentObservationFailure(eventsResponse.reason)) return yield* Effect.fail(eventsResponse.reason)
+            const resultLoaded = yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error }).pipe(
+              Effect.as(true),
+              Effect.catch((error) => (permanentObservationFailure(error) ? Effect.fail(error) : Effect.succeed(false))),
+            )
+            const expired = eventsResponse.reason instanceof ApiError && eventsResponse.reason.code == 'run.events-expired'
+            if (expired) this.#set({ eventsExpiresAt: undefined, historyComplete: false })
+            else if (permanentObservationFailure(eventsResponse.reason)) return yield* Effect.fail(eventsResponse.reason)
+            if (!expired || !resultLoaded) {
               this.#set({ observationFailed: true })
               yield* Deferred.succeed(ready, undefined)
               idlePolls = Math.min(idlePolls + 1, 6)
               yield* Effect.sleep(Math.min(maxIdlePollDelay, startingPollDelay * 2 ** Math.max(0, idlePolls - 1)))
               continue
             }
-            this.#set({ eventsExpiresAt: undefined, historyComplete: false })
             return
           }
           const page = eventsResponse.value
