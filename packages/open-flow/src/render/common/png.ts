@@ -1,4 +1,4 @@
-import type { ProviderIconLoader } from '../../connector/common/providerIconCache.ts'
+import type { ProviderIconRequest } from '../../connector/common/providerIconCache.ts'
 import type { ConnectorProvider } from '../../control/common/api.ts'
 import type { WorkflowFile } from '../../flow/common/workflowFile.ts'
 import type { UiLanguage } from '../../localization/common/languages.ts'
@@ -48,5 +48,5 @@ export interface BrowserRenderer {
 
 export interface RendererGlobals {
   readonly OpenFlowRenderer: BrowserRenderer
-  readonly OpenFlowProviderIcon: ProviderIconLoader['get']
+  readonly OpenFlowProviderIcon: (request: ProviderIconRequest) => Promise<{ readonly bytes: readonly number[]; readonly contentType: string }>
 }

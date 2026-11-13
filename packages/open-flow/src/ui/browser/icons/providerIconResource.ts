@@ -1,15 +1,14 @@
-import type { CacheDelegate } from '../../../base/common/cache.ts'
-import type { ProviderIconLoader, ProviderIconRequest } from '../../../connector/common/providerIconCache.ts'
+import type { ProviderIconSource, ProviderIconRequest, ProviderIconStorage } from '../../../connector/common/providerIconCache.ts'
 
 import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { val } from 'value-enhancer'
 import { ProviderIconCache } from '../../../connector/common/providerIconCache.ts'
 
-export const ProviderIconCacheContext = createContext<ProviderIconLoader | undefined>(undefined)
+export const ProviderIconCacheContext = createContext<ProviderIconSource | undefined>(undefined)
 
-/** IDB holds the same opaque JSON records as a host's disk delegate. */
-export function indexedDbIconDelegate(): CacheDelegate {
+/** IndexedDB stores the complete image Blob without text encoding. */
+export function indexedDbIconDelegate(): ProviderIconStorage {
   let database: Promise<IDBDatabase> | undefined
   function open() {
     database ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -62,22 +61,44 @@ export function indexedDbIconDelegate(): CacheDelegate {
 
 let browserCache: ProviderIconCache | undefined
 export function defaultBrowserIconCache(): ProviderIconCache {
-  return (browserCache ??= new ProviderIconCache({ scope: 'browser', delegate: indexedDbIconDelegate() }))
+  return (browserCache ??= new ProviderIconCache({ scope: 'browser', storage: indexedDbIconDelegate() }))
 }
 
-export function useProviderIconCache(): ProviderIconLoader {
+export function useProviderIconCache(): ProviderIconSource {
   return useContext(ProviderIconCacheContext) ?? defaultBrowserIconCache()
 }
 
-type ReadyIcon = { readonly status: 'loaded'; readonly url: string; readonly image: HTMLImageElement; readonly refreshing?: boolean }
-type IconState = { readonly status: 'loading' } | { readonly status: 'failed' } | ReadyIcon
-const loading: IconState = { status: 'loading' }
+type ReadyIcon = { readonly status: 'loaded'; readonly blob: Blob; readonly image: HTMLImageElement; readonly refreshing?: boolean }
+type ResourceState = { readonly status: 'loading' } | { readonly status: 'failed' } | ReadyIcon
+type IconState =
+  | Exclude<ResourceState, ReadyIcon>
+  | { readonly status: 'loaded'; readonly url: string; readonly image: HTMLImageElement; readonly refreshing?: boolean }
+const loading: ResourceState = { status: 'loading' }
 
-function createIconResource(cache: ProviderIconLoader, request: ProviderIconRequest, ready?: ReadyIcon) {
-  const state = val<IconState>(ready ?? loading)
+function createIconResource(cache: ProviderIconSource, request: ProviderIconRequest, ready?: ReadyIcon) {
+  const state = val<ResourceState>(ready ?? loading)
+  const urls = new Map<Blob, string>()
+  let subscribers = 0
   let pending: Promise<void> | undefined
-  return {
+  function releaseUrls() {
+    if (subscribers) return
+    for (const url of urls.values()) URL.revokeObjectURL(url)
+    urls.clear()
+  }
+  const resource = {
     state,
+    url(blob: Blob) {
+      let url = urls.get(blob)
+      if (!url) urls.set(blob, (url = URL.createObjectURL(blob)))
+      return url
+    },
+    subscribe() {
+      subscribers++
+      return () => {
+        subscribers--
+        queueMicrotask(releaseUrls)
+      }
+    },
     refresh() {
       if (pending) return pending
       const previous = state.value.status === 'loaded' ? state.value : undefined
@@ -86,30 +107,32 @@ function createIconResource(cache: ProviderIconLoader, request: ProviderIconRequ
       pending = (async () => {
         let image: HTMLImageElement | undefined
         try {
-          const url = await cache.get(request)
-          if (previous?.url === url) {
+          const blob = 'getBlob' in cache ? await cache.getBlob(request) : await (await fetch(await cache.get(request))).blob()
+          if (previous?.blob === blob) {
             state.set({ ...previous, refreshing: false })
             return
           }
           image = new Image()
-          image.src = url
+          image.src = resource.url(blob)
           await image.decode()
-          state.set({ status: 'loaded', url, image })
+          state.set({ status: 'loaded', blob, image })
         } catch {
           if (image) image.src = ''
           state.set(previous ? { ...previous, refreshing: false } : { status: 'failed' })
         }
       })().finally(() => {
         pending = undefined
+        releaseUrls()
       })
       return pending
     },
   }
+  return resource
 }
 
 type IconResource = ReturnType<typeof createIconResource>
 // Only current logical slots are retained. Replaced resources live as long as their subscribers.
-const resources = new WeakMap<ProviderIconLoader, Map<string, { identity: string; resource: IconResource }>>()
+const resources = new WeakMap<ProviderIconSource, Map<string, { identity: string; resource: IconResource }>>()
 
 /** Components read ready state synchronously; only the shared owner fetches and decodes. */
 export function useProviderIconResource(request: ProviderIconRequest, crop?: { readonly x: number; readonly y: number; readonly size: number }): IconState {
@@ -134,23 +157,26 @@ export function useProviderIconResource(request: ProviderIconRequest, crop?: { r
   }, [cache, identity])
   const state = useVal(resource.state)
   useEffect(() => {
+    const unsubscribe = resource.subscribe()
     void resource.refresh()
+    return unsubscribe
   }, [resource])
 
   // Crops are capture-local; the shared decoded sheet is reused by all of its icons.
   return useMemo(() => {
-    if (state.status !== 'loaded' || !crop) return state
+    if (state.status !== 'loaded') return state
+    if (!crop) return { status: 'loaded', url: resource.url(state.blob), image: state.image, refreshing: state.refreshing }
     const canvas = document.createElement('canvas')
     try {
       canvas.width = canvas.height = crop.size
       const context = canvas.getContext('2d')
       if (!context) throw new Error('Could not crop the Provider icon.')
       context.drawImage(state.image, crop.x, crop.y, crop.size, crop.size, 0, 0, crop.size, crop.size)
-      return { ...state, url: canvas.toDataURL('image/png') }
+      return { status: 'loaded', url: canvas.toDataURL('image/png'), image: state.image, refreshing: state.refreshing }
     } catch {
       return { status: 'failed' }
     } finally {
       canvas.width = canvas.height = 0
     }
-  }, [state, crop?.x, crop?.y, crop?.size])
+  }, [state, resource, crop?.x, crop?.y, crop?.size])
 }

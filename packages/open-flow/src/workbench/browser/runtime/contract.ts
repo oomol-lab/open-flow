@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { ProviderIconLoader } from '../../../connector/common/providerIconCache.ts'
+import type { ProviderIconSource } from '../../../connector/common/providerIconCache.ts'
 import type { WorkflowBundleImportResult } from '../../../control/common/api.ts'
 import type { FlowCatalogEvent, FlowChangeEvent } from '../../../control/common/flowNotifications.ts'
 import type { WorkflowBundle } from '../../../flow/common/workflowBundle.ts'
@@ -29,7 +29,7 @@ export interface WorkbenchActor {
 
 export interface WorkbenchHost {
   /** Optional shared Provider artwork cache; defaults to browser IndexedDB. */
-  readonly iconCache?: ProviderIconLoader
+  readonly iconCache?: ProviderIconSource
   /** Optional deployment-owned identity lookup. Return null for an unknown actor. */
   readonly resolveActor?: (actorId: string, signal: AbortSignal) => Promise<WorkbenchActor | null>
 

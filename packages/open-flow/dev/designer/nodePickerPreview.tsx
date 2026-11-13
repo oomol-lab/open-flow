@@ -5,16 +5,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import snapshots from 'virtual:lab-trigger-snapshots'
+import { ProviderIconCache } from '../../src/connector/common/providerIconCache.ts'
 import { localizeTrigger } from '../../src/trigger/providers/localization.ts'
+import { ProviderIconCacheContext } from '../../src/ui/browser/icons/providerIconResource.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { BlockLibrary } from '../../src/workbench/browser/runtime/editor/blockLibrary.tsx'
 import { NodePickerContent } from '../../src/workbench/browser/runtime/editor/nodePicker.tsx'
 import { NodePickerPopover } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import { WorkbenchCanvas, WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
+import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
 import { CatalogStores } from '../../src/workbench/browser/runtime/stores/catalogStores.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
 import { combineSources, mapSource } from '../../src/workbench/browser/runtime/stores/optionSource.ts'
-import { sampleSprite } from './fixtures/providerSprite.ts'
+import { largeSprite, largeSpriteBlob, sampleSprite } from './fixtures/providerSprite.ts'
 import { useStoryActions } from './storyActions.tsx'
 import { triggerFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
@@ -100,6 +103,13 @@ const sampleConnections = ['feishu', 'gmail', 'seedream'].map((serviceId) => ({
   status: 'active' as const,
 }))
 
+const largeSpriteIcon = providerIcon({
+  serviceId: 'sample',
+  serviceName: 'Sample App',
+  iconSprite: largeSprite,
+  iconSpritePosition: { x: 2, y: 2 },
+})
+
 function sampleActionData(path: string, cached = false) {
   const url = new URL(path, 'https://lab.invalid')
   return {
@@ -143,6 +153,17 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const [configuredOnly, setConfiguredOnly] = useState(false)
   const [slowAdd, setSlowAdd] = useState(false)
   const [cancelAdd, setCancelAdd] = useState(false)
+  const [iconCache] = useState(
+    () =>
+      new ProviderIconCache({
+        scope: 'lab-node-picker',
+        fetch: async (input) => {
+          const url = String(input)
+          if (url !== largeSprite.lightUrl && url !== largeSprite.darkUrl) return new Response(null, { status: 404 })
+          return new Response(largeSpriteBlob(url === largeSprite.darkUrl))
+        },
+      }),
+  )
   const { session, connectors } = useMemo(() => {
     const providers = sampleProviders.map((provider) =>
       Object.assign({}, provider, {
@@ -223,6 +244,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
             largeCatalog && sample
               ? Array.from({ length: 1000 }, (_, index) => ({
                   ...sample,
+                  icon: largeSpriteIcon,
                   id: `sample-${index}`,
                   serviceId: `sample-${index}`,
                   label: `Sample App ${String(index).padStart(4, '0')}`,
@@ -255,78 +277,80 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
     },
   }
   return (
-    <I18nProvider i18n={session.i18n}>
-      <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-        <div className="grid gap-8 min-[1100px]:grid-cols-2">
-          <section className="min-[1100px]:col-span-2">
-            <h3 className="mb-3 text-sm font-medium">Empty canvas · centered picker</h3>
-            <div className="editor-grid context-panel-closed h-[560px] max-h-[70vh] overflow-hidden rounded-xl border border-[var(--ui-border)]">
-              <WorkbenchCanvas
-                addNodeOptions={options}
-                disabled={disabled}
-                ignoredNodeIds={[]}
-                inspectorOpen={false}
-                model={{ edges: [], needsLayout: false, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }}
-                nodePicker={{
-                  browseOptions: data.browseOptions,
-                  connections,
-                  initialTab: 'triggers',
-                  loadConnections: connectors.loadConnections,
-                  provideChoices: connectors.provideAddNodeOptionChoices,
-                }}
-                provideAddNodeOptions={data.searchOptions}
-                selectedNodeIds={[]}
+    <ProviderIconCacheContext.Provider value={iconCache}>
+      <I18nProvider i18n={session.i18n}>
+        <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', overflow: 'auto', padding: 24 }}>
+          <div className="grid gap-8 min-[1100px]:grid-cols-2">
+            <section className="min-[1100px]:col-span-2">
+              <h3 className="mb-3 text-sm font-medium">Empty canvas · centered picker</h3>
+              <div className="editor-grid context-panel-closed h-[560px] max-h-[70vh] overflow-hidden rounded-xl border border-[var(--ui-border)]">
+                <WorkbenchCanvas
+                  addNodeOptions={options}
+                  disabled={disabled}
+                  ignoredNodeIds={[]}
+                  inspectorOpen={false}
+                  model={{ edges: [], needsLayout: false, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }}
+                  nodePicker={{
+                    browseOptions: data.browseOptions,
+                    connections,
+                    initialTab: 'triggers',
+                    loadConnections: connectors.loadConnections,
+                    provideChoices: connectors.provideAddNodeOptionChoices,
+                  }}
+                  provideAddNodeOptions={data.searchOptions}
+                  selectedNodeIds={[]}
 
-                theme={dark ? 'dark' : 'light'}
-                onAddNode={async (option) => {
-                  log('Add node from empty canvas', option.id)
-                  return option.id
-                }}
-                onChangeComment={() => {}}
-                onConnect={() => {}}
-                onCopy={() => {}}
-                onDeleteEdge={() => {}}
-                onDeleteNodes={() => {}}
-                onDuplicate={() => {}}
-                onIgnoreNodes={() => {}}
-                onMoveNodes={() => {}}
-                onMoveViewport={() => {}}
-                onPaste={() => {}}
-                onSelectNodes={() => {}}
-                onToggleInspector={() => {}}
-              />
-            </div>
-          </section>
-          <section>
-            <h3 className="mb-3 text-sm font-medium">Catalog · open preview</h3>
-            <div className="h-[560px] max-h-[70vh] w-[440px] max-w-full overflow-hidden rounded-xl border border-[var(--ui-border)] bg-popover text-popover-foreground shadow-md">
-              <BlockLibrary {...props} presentation="picker" />
-            </div>
-          </section>
-          {['g', 'gmail', 'email'].map((query) => (
-            <section key={query}>
-              <h3 className="mb-3 text-sm font-medium">
-                {query == 'g' ? 'Provider matches · two columns' : query == 'gmail' ? 'Provider match · browse and return' : 'Action matches · direct add'}
-              </h3>
-              <div className="h-[560px] max-h-[70vh] w-[440px] max-w-full overflow-hidden rounded-xl border border-[var(--ui-border)] bg-popover text-popover-foreground shadow-md">
-                <NodePickerContent {...props} initialQuery={query} />
+                  theme={dark ? 'dark' : 'light'}
+                  onAddNode={async (option) => {
+                    log('Add node from empty canvas', option.id)
+                    return option.id
+                  }}
+                  onChangeComment={() => {}}
+                  onConnect={() => {}}
+                  onCopy={() => {}}
+                  onDeleteEdge={() => {}}
+                  onDeleteNodes={() => {}}
+                  onDuplicate={() => {}}
+                  onIgnoreNodes={() => {}}
+                  onMoveNodes={() => {}}
+                  onMoveViewport={() => {}}
+                  onPaste={() => {}}
+                  onSelectNodes={() => {}}
+                  onToggleInspector={() => {}}
+                />
               </div>
             </section>
-          ))}
-          <section className="relative min-h-[640px] rounded-xl border border-[var(--ui-border)] bg-muted/30">
-            <h3 className="p-4 text-sm font-medium">Button dock · anchored popover</h3>
-            <div className="absolute bottom-4 left-4">
-              <WorkbenchCanvasActions
-                pickerOpen={false}
-                onOpenNodePicker={() => log('nodePicker.open')}
-                disabled={disabled}
-                addNodeControl={<NodePickerPopover {...props} />}
-              />
-            </div>
-          </section>
+            <section>
+              <h3 className="mb-3 text-sm font-medium">Catalog · open preview</h3>
+              <div className="h-[560px] max-h-[70vh] w-[440px] max-w-full overflow-hidden rounded-xl border border-[var(--ui-border)] bg-popover text-popover-foreground shadow-md">
+                <BlockLibrary {...props} presentation="picker" />
+              </div>
+            </section>
+            {['g', 'gmail', 'email'].map((query) => (
+              <section key={query}>
+                <h3 className="mb-3 text-sm font-medium">
+                  {query == 'g' ? 'Provider matches · two columns' : query == 'gmail' ? 'Provider match · browse and return' : 'Action matches · direct add'}
+                </h3>
+                <div className="h-[560px] max-h-[70vh] w-[440px] max-w-full overflow-hidden rounded-xl border border-[var(--ui-border)] bg-popover text-popover-foreground shadow-md">
+                  <NodePickerContent {...props} initialQuery={query} />
+                </div>
+              </section>
+            ))}
+            <section className="relative min-h-[640px] rounded-xl border border-[var(--ui-border)] bg-muted/30">
+              <h3 className="p-4 text-sm font-medium">Button dock · anchored popover</h3>
+              <div className="absolute bottom-4 left-4">
+                <WorkbenchCanvasActions
+                  pickerOpen={false}
+                  onOpenNodePicker={() => log('nodePicker.open')}
+                  disabled={disabled}
+                  addNodeControl={<NodePickerPopover {...props} />}
+                />
+              </div>
+            </section>
+          </div>
         </div>
-      </div>
-    </I18nProvider>
+      </I18nProvider>
+    </ProviderIconCacheContext.Provider>
   )
 }
 
@@ -336,6 +360,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'The production empty canvas opens the centered picker on Triggers from its Add node button or the A key. Every Provider has a Custom group at the bottom with Custom API Request, including Providers with no Actions. Trigger rows use the shared Provider artwork; Feishu App Bot and Outlook show theme-aware sprites after the delayed Provider response. Compare the 10px search, tab track and provider-header corners with the 12px node/app rows and outer popover in both themes. The selected tab uses a 7px radius to follow the track’s 3px inset. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and a flat back button with a subtle hover fill, keyboard focus outline and localized tooltip, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Connected services show an inline status independently of Flow authorization. Includes cached loading and 1,000-app scrolling. Scroll the node, provider and action lists to check overlay scrollbars with the shared 6px handle width, equal 12px side insets, sticky group headings and transitions between groups. Browse into an app and return to check restored scroll position; use 1,000 apps to check virtualization. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent.',
+    'The production empty canvas opens the centered picker on Triggers from its Add node button or the A key. Every Provider has a Custom group at the bottom with Custom API Request, including Providers with no Actions. Trigger rows use the shared Provider artwork; Feishu App Bot and Outlook show theme-aware sprites after the delayed Provider response. Compare the 10px search, tab track and provider-header corners with the 12px node/app rows and outer popover in both themes. The selected tab uses a 7px radius to follow the track’s 3px inset. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and a flat back button with a subtle hover fill, keyboard focus outline and localized tooltip, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Connected services show an inline status independently of Flow authorization. Includes cached loading and 1,000-app scrolling with a 3 MB sprite to check shared Blob URLs when opening and scrolling. Scroll the node, provider and action lists to check overlay scrollbars with the shared 6px handle width, equal 12px side insets, sticky group headings and transitions between groups. Browse into an app and return to check restored scroll position; use 1,000 apps to check virtualization. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }

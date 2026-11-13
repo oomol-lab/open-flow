@@ -106,7 +106,7 @@ const offline = await flowToPng(browser, workflow, {
 ```
 
 Reuse the icon cache across exports. It stores complete image responses separately
-from JSON, with base64 bodies. Each scope has two fixed sprite slots, one per theme,
+from JSON, with binary image bodies. Each scope has two fixed sprite slots, one per theme,
 and one original-image slot per Provider. Reads require the exact source URL and
 sprite version; updated artwork replaces its slot only after a successful download.
 Old sprite bytes are never combined with another version's crop coordinates.
@@ -116,6 +116,11 @@ The optional `mode` is `default`, `refresh` or `offline`; `fetch` can replace th
 transport. A cache without a delegate uses memory. Storage failures retain successful
 loads in memory, and failed requests may be retried. Missing artwork falls back without
 making the export fail. Offline reads never start or join a network load.
+
+Browser Workbench and Preview store Blobs in IndexedDB and share short Blob URLs for
+rendering. `getBlob` reads binary artwork; the published `get` data-URL method remains
+available for existing hosts. A `storage` delegate accepts opaque records containing
+Blobs; a JSON `delegate` stores byte arrays and can read earlier cache records.
 
 Browser Workbench and Preview use IndexedDB for Provider artwork by default, falling
 back to memory when storage is unavailable. To supply a cache, set `host.iconCache`

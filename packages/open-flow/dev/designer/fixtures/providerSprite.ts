@@ -12,6 +12,19 @@ export const sampleSprite = {
   darkUrl: sheet('#8fbcff'),
 }
 
+export const largeSprite = {
+  ...sampleSprite,
+  version: 'lab-large-v1',
+  lightUrl: 'https://provider-sprites.lab.invalid/large/light.svg',
+  darkUrl: 'https://provider-sprites.lab.invalid/large/dark.svg',
+}
+
+export function largeSpriteBlob(dark: boolean): Blob {
+  const source = dark ? sampleSprite.darkUrl : sampleSprite.lightUrl
+  // Match the payload of a real catalog sheet without a multi-megabyte fixture file.
+  return new Blob([decodeURIComponent(source.slice(source.indexOf(',') + 1)), '<!--', ' '.repeat(3 * 1024 * 1024), '-->'], { type: 'image/svg+xml' })
+}
+
 // Public catalog snapshot, including the original image for a missing remote sprite.
 const remoteSpriteVersion = '6c09b9866c4ca60f8f86018668a0ef1e3908f43de202044febf34ad59afb12e1'
 export const remoteGithubArtwork = {

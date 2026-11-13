@@ -53,7 +53,10 @@ export async function flowToPng(browser: Browser, workflow: WorkflowFile, option
   try {
     if (options.allowNetwork === false) await context.route('**/*', (route) => route.abort())
     const page = await context.newPage()
-    await page.exposeFunction('OpenFlowProviderIcon', (request: ProviderIconRequest) => iconCache.get(request, { allowNetwork: options.allowNetwork }))
+    await page.exposeFunction('OpenFlowProviderIcon', async (request: ProviderIconRequest) => {
+      const blob = await iconCache.getBlob(request, { allowNetwork: options.allowNetwork })
+      return { bytes: Array.from(new Uint8Array(await blob.arrayBuffer())), contentType: blob.type }
+    })
     await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>')
     await page.addStyleTag({ content: style })
     await page.addScriptTag({ content: script })

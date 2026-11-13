@@ -48,7 +48,7 @@ function CachedSprites({ dark }: { readonly dark: boolean }) {
     () =>
       new ProviderIconCache({
         scope: 'lab-provider-sprites',
-        delegate,
+        storage: delegate,
         mode: offline ? 'offline' : 'default',
         fetch: async (input) => {
           setDownloads((value) => value + 1)

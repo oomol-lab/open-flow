@@ -148,7 +148,7 @@ it.each([true, false])('bridges the cached Provider resources without serializin
   })
   await client.listConnectorProviders(undefined, undefined, 'en')
   const iconCache = new ProviderIconCache({ scope: 'test' })
-  const get = vi.spyOn(iconCache, 'get').mockResolvedValue('data:image/png;base64,cG5n')
+  const get = vi.spyOn(iconCache, 'getBlob').mockResolvedValue(new Blob(['png'], { type: 'image/png' }))
   const file: WorkflowFile = {
     ...workflow,
     content: {
@@ -177,7 +177,7 @@ it.each([true, false])('bridges the cached Provider resources without serializin
   expect(request).toHaveBeenCalledTimes(1)
   const load = view.page.exposeFunction.mock.calls[0]![1]
   const source = { kind: 'image', providerId: 'mail', url: 'https://example.test/mail.png' }
-  expect(await load(source)).toBe('data:image/png;base64,cG5n')
+  expect(await load(source)).toEqual({ bytes: [112, 110, 103], contentType: 'image/png' })
   expect(get).toHaveBeenCalledWith(source, { allowNetwork })
 })
 
