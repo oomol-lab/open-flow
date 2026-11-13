@@ -141,7 +141,7 @@ describe('shareable workflow files', () => {
         modules: {},
         document: {
           bindings: {},
-          graph: { nodes: { pause: { kind: 'delay', name: 'Pause', inputs: {}, durationMs } }, edges: [] },
+          graph: { nodes: { pause: { kind: 'delay', name: 'Pause', inputs: { durationMs: { kind: 'value', value: durationMs } } } }, edges: [] },
         },
       },
     }

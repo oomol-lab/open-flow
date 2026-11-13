@@ -7,10 +7,11 @@ import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { createInspectorSession } from '../../../../../dev/designer/inspectorSession.ts'
+import { click } from '../../../../../test/support/render.tsx'
 import { applyFlowChanges, currentFlowModelVersion } from '../../../../flow/common/change.ts'
 import { createDelay } from '../../../../flow/common/nodeChanges.ts'
 import { designerGraph } from '../workspace.ts'
-import { DelayDefinition } from './delayDefinition.tsx'
+import { NodeInspector } from './nodeInspector.tsx'
 
 async function fixture() {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -36,7 +37,20 @@ async function fixture() {
     if (selection.kind !== 'delay') throw new Error('Expected Delay')
     return (
       <I18nProvider i18n={session.i18n}>
-        <DelayDefinition disabled={disabled} selection={selection} store={session.store} />
+        <NodeInspector
+          disabled={disabled}
+          revision={revision}
+          selection={selection}
+          theme="light"
+          {...(disabled
+            ? { readOnly: true as const }
+            : {
+                store: session.store,
+                connectors: session.connectors,
+                triggers: session.triggers,
+                variables: { enabled: false, loaded: true, loading: false, names: [], onOpen: undefined },
+              })}
+        />
       </I18nProvider>
     )
   }
@@ -49,15 +63,17 @@ async function fixture() {
     vi.unstubAllGlobals()
   })
   const node = () => session.store.$.revision.value!.graph().nodes.pause!
-  const input = () => container.querySelector<HTMLInputElement>('input')!
+  const unit = () => container.querySelector<HTMLButtonElement>('[role="combobox"][aria-label="Duration unit"]')!
+  const clear = () => container.querySelector<HTMLButtonElement>('[aria-label="Clear Duration"]')!
+  const input = () => container.querySelector<HTMLInputElement>('input[aria-label="Duration"]')!
   const edit = async (value: string) => {
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input(), value)
       input().dispatchEvent(new Event('input', { bubbles: true }))
     })
-    await act(async () => input().dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+    await act(async () => input()?.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
   }
-  return { session, container, render, node, input, edit }
+  return { session, container, render, node, input, unit, clear, edit }
 }
 
 it('saves duration and units through production history, copies Delay, and restores empty drafts', async () => {
@@ -65,31 +81,35 @@ it('saves duration and units through production history, copies Delay, and resto
   expect(f.input().value).toBe('5')
   expect(f.input().getAttribute('aria-invalid')).toBe('false')
   await f.edit('2')
-  expect(f.node()).toMatchObject({ durationMs: 2000 })
+  expect(f.node()).toMatchObject({ inputs: { durationMs: { kind: 'value', value: 2000 } } })
   await act(async () => f.session.store.undo())
   expect(f.input().value).toBe('5')
   await act(async () => f.session.store.redo())
   expect(f.input().value).toBe('2')
-  await act(async () => {
-    const select = f.container.querySelector('select')!
-    select.value = 'minute'
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-  })
-  expect(f.node()).toMatchObject({ durationMs: 120_000 })
+  await click(f.unit())
+  await click([...f.container.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'min')!)
+  expect(f.node()).toMatchObject({ inputs: { durationMs: { kind: 'value', value: 120_000 } } })
   await act(async () => {
     f.session.store.selectNodes(['pause'])
     await f.session.store.duplicateSelectedNodes()
   })
   const copy = f.session.store.$.selectedNodeIds.value[0]!
   expect(copy).not.toBe('pause')
-  expect(f.session.store.$.revision.value!.graph().nodes[copy]).toMatchObject({ kind: 'delay', durationMs: 120_000 })
-  expect(designerGraph(f.session.store.$.revision.value!.revision).nodes.find((node) => node.id === copy)).toMatchObject({ inputs: [], outputs: [] })
-  await f.edit('')
-  expect(f.node()).toMatchObject({ durationMs: null })
+  expect(f.session.store.$.revision.value!.graph().nodes[copy]).toMatchObject({ kind: 'delay', inputs: { durationMs: { kind: 'value', value: 120_000 } } })
+  expect(designerGraph(f.session.store.$.revision.value!.revision).nodes.find((node) => node.id === copy)).toMatchObject({
+    inputs: [expect.objectContaining({ handle: 'durationMs' })],
+    outputs: [],
+  })
+  expect(f.input().compareDocumentPosition(f.clear()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(f.clear().compareDocumentPosition(f.unit()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  await act(async () => f.clear().click())
+  expect(f.node()).toMatchObject({ inputs: { durationMs: { kind: 'unset' } } })
   await act(async () => f.session.start())
-  expect(f.input().value).toBe('')
-  expect(f.input().getAttribute('aria-invalid')).toBe('true')
+  expect(f.node()).toMatchObject({ inputs: { durationMs: { kind: 'unset' } } })
+  expect(f.container.querySelector('[aria-invalid="true"]')).not.toBeNull()
+  await act(async () => f.session.store.nodes.resetInputs('pause', ['durationMs']))
+  expect(f.input().value).toBe('5')
   await f.render(true)
-  expect(f.input().disabled).toBe(true)
-  expect(f.container.querySelector('select')!.disabled).toBe(true)
+  expect(f.input().readOnly).toBe(true)
+  expect(f.unit().disabled).toBe(true)
 })

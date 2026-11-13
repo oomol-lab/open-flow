@@ -1846,14 +1846,7 @@
     "title": "Délai",
     "description": "Suspendre cette branche pendant une durée fixe.",
     "duration": "Durée",
-    "unit": "Unité",
-    "invalid": "Saisissez une durée positive en millisecondes entières.",
     "missing": "Définir la durée",
-    "units": {
-      "second": "Secondes",
-      "minute": "Minutes",
-      "hour": "Heures"
-    },
     "summary": {
       "second": "{{value}} s",
       "minute": "{{value}} min",

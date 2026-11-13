@@ -18,9 +18,12 @@ import type { ResolvedNode, ResolvedSelection, RevisionSource, RevisionView } fr
 import { graphLayout } from '../../../canvas/browser/base/graphLayout.ts'
 import { wrapLayout } from '../../../canvas/browser/base/wrapLayout.ts'
 import { isTriggerNode } from '../../../flow/common/change.ts'
+import { delayDurationInput } from '../../../flow/common/delay.ts'
 import { nodeInputPorts } from '../../../flow/common/graph.ts'
 import { resolutionOutputPorts } from '../../../flow/common/graph.ts'
+import { inputValue } from '../../../flow/common/inputValue.ts'
 import { sourceOutputLabel } from '../../../flow/common/sourceField.ts'
+import { durationDraft } from '../../../form/common/durationValue.ts'
 import { triggerOutputPorts } from '../../../trigger/common/contract.ts'
 import { actionSummary } from './actionSummary.ts'
 import {
@@ -32,7 +35,6 @@ import {
   savedHiddenNodeContent,
   savedVerticalNodeWidths,
 } from './canvasPresentation.ts'
-import { displayDelay } from './delayDuration.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 
@@ -164,7 +166,6 @@ function nodePorts(node: ResolvedSelection, revision: RevisionView<RevisionSourc
   const outputs = new Map<string, Omit<FlowCanvasViewOutput, 'handle'>>()
   switch (node.kind) {
     case 'delay':
-      break
     case 'webhook-response':
       for (const [handle, port] of Object.entries(nodeInputPorts(node.node))) inputs.set(handle, { ...port, defaultValue: port.value })
       break
@@ -630,14 +631,27 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   }
   switch (node.kind) {
     case 'delay': {
-      const duration = displayDelay(node.durationMs)
+      const mapping = node.inputs.durationMs
+      const value = inputValue(mapping, delayDurationInput.value)
+      const duration = durationDraft(typeof value === 'number' ? value : null)
+      const sources =
+        mapping?.kind === 'sources'
+          ? mapping.sources
+              .map((source) => {
+                if (source.kind === 'binding') return context.revision.binding(source.bindingId)?.target ?? source.bindingId
+                const sourceNode = context.nodes.get(source.nodeId)
+                return `${sourceNode == null ? source.nodeId : sourceNodePresentation(sourceNode, context).title} · ${sourceOutputLabel(source)}`
+              })
+              .join(' / ')
+          : undefined
       return {
         ...common,
         kind: 'delay',
         duration:
-          node.durationMs == null
+          sources ??
+          (typeof value !== 'number'
             ? (context.t?.('delay.missing') ?? 'Set duration')
-            : (context.t?.(`delay.summary.${duration.unit}`, { value: duration.value }) ?? `${duration.value} ${duration.unit}`),
+            : (context.t?.(`delay.summary.${duration.unit}`, { value: duration.value }) ?? `${duration.value} ${duration.unit}`)),
       }
     }
     case 'condition':

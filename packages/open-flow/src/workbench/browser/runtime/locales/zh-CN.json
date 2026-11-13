@@ -1846,14 +1846,7 @@
     "title": "延时",
     "description": "延时指定时长后继续当前分支。",
     "duration": "时长",
-    "unit": "单位",
-    "invalid": "请输入可换算为正整数毫秒的时长。",
     "missing": "设置时长",
-    "units": {
-      "second": "秒",
-      "minute": "分钟",
-      "hour": "小时"
-    },
     "summary": {
       "second": "{{value}} 秒",
       "minute": "{{value}} 分钟",

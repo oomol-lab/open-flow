@@ -238,7 +238,7 @@ if downstream processing also executes after a handled failure.
 
 ## Delay
 
-Delay has public type `delay` and static configuration `{ durationMs: 5000 }`. New nodes default to five seconds. The duration is a positive safe integer in milliseconds. Workbench drafts retain an empty duration as null and invalid numbers for validation. Delay has no data ports or prompt and continues through ordinary execution edges. Each invocation registers its own durable deadline; recovery retains that deadline. Server requires the deadline to precede the seven-day expiry. Manual resolution is unavailable.
+Delay has public type `delay` and one fixed input `durationMs`, a positive safe integer in milliseconds with a five-second default. Use ordinary `inputs` and `input.set` for values and upstream sources. Callers do not supply input definitions or duration configuration. Explicit unset suppresses the default; invalid drafts remain editable and diagnosable. Delay has no business outputs or prompt and continues through ordinary execution edges. Each invocation resolves its input and registers one durable deadline; recovery retains both. Server requires the duration to precede the seven-day expiry. Manual resolution is unavailable.
 
 ## Wait automatic continuation
 

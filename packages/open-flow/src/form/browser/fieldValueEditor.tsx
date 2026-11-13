@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popove
 import { SelectChevron } from '../../ui/browser/select.tsx'
 import { enumIndex } from '../common/choices.ts'
 import { isDateFormat } from '../common/dateValue.ts'
+import { isDurationInput } from '../common/durationValue.ts'
 import { defaultValueEditorSchema, editorComponent, valueForEditor } from '../common/editorComponent.ts'
 import { fieldValueState, fieldValueShape } from '../common/fieldValue.ts'
 import { objectFieldNames } from '../common/objectFields.ts'
@@ -366,6 +367,29 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
       ? array.length > 0
       : firstName != null &&
         ((sorting && props.onDefinitionChange != null) || fieldValueShape(firstEditorSchema, firstValue, { objectChild: true, depth: depth + 1 }).expandable)
+  const actionsInControl =
+    valueEditable && props.editor === undefined && !jsonMode && !complex && !enumeration && !choiceOptions && isDurationInput(editorSchema, value)
+  const valueTools = (
+    <ValueTools
+      inline={actionsInControl}
+      label={label}
+      container={container}
+      raw={jsonMode}
+      danger={invalid}
+      disclosure={inlineExpansion && hasExpandedContent ? { controls: `${id}-body`, expanded, onToggle: toggleExpanded, disabled: sorting } : undefined}
+      onReset={canReset ? props.onReset : undefined}
+      onClear={canClear ? clearValue : undefined}
+      onToggleJson={
+        canToggleJson
+          ? () => {
+              if (showDataType) setSelectedEditorSchema(undefined)
+              setJsonMode(!jsonMode)
+              if (!jsonMode) setEditorFocusRequest((request) => request + 1)
+            }
+          : undefined
+      }
+    />
+  )
   const shouldMountBody = !compactValue || !expandable || expanded || bodyMounted
   const body = shouldMountBody && !uncreatedText && (
     <FieldBody
@@ -488,7 +512,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
           ))}
         </FieldSelect>
       ) : (
-        <ValueEditor {...editorProps} onDraftIssue={reportDraftIssue} invalid={invalid} />
+        <ValueEditor {...editorProps} onDraftIssue={reportDraftIssue} invalid={invalid} valueActions={actionsInControl ? valueTools : undefined} />
       )}
       {anchor === 'body' && errorMessage}
     </FieldBody>
@@ -514,14 +538,14 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
       data-summary-feedback={(anchor === 'summary' && messages.length > 0) || undefined}
       data-inline={(props.hideOptions && !hasHeader) || undefined}
       data-compact={props.compact || undefined}
-      data-value-tools={canReset || canClear || canToggleJson || (inlineExpansion && hasExpandedContent) || undefined}
+      data-value-tools={(!actionsInControl && (canReset || canClear || canToggleJson || (inlineExpansion && hasExpandedContent))) || undefined}
       data-array-child={props.arrayChild || undefined}
       data-object-child={props.objectChild || undefined}
       data-nested-field={depth > 0 || undefined}
       style={
         {
           '--field-indent': `${depth * 16}px`,
-          '--value-tools-width': `${(Number(canReset) + Number(canClear) + Number(canToggleJson) + Number(!!inlineExpansion && hasExpandedContent)) * 24}px`,
+          '--value-tools-width': `${actionsInControl ? 0 : (Number(canReset) + Number(canClear) + Number(canToggleJson) + Number(!!inlineExpansion && hasExpandedContent)) * 24}px`,
           '--value-native-action-width': `${canReset && showUnset ? 24 : 0}px`,
           '--value-suffix-width': `${valueSuffix}px`,
         } as CSSProperties
@@ -579,24 +603,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
         </FieldValuePreview>
       )}
       {(!expandable || inlineExpansion) && body}
-      <ValueTools
-        label={label}
-        container={container}
-        raw={jsonMode}
-        danger={invalid}
-        disclosure={inlineExpansion && hasExpandedContent ? { controls: `${id}-body`, expanded, onToggle: toggleExpanded, disabled: sorting } : undefined}
-        onReset={canReset ? props.onReset : undefined}
-        onClear={canClear ? clearValue : undefined}
-        onToggleJson={
-          canToggleJson
-            ? () => {
-                if (showDataType) setSelectedEditorSchema(undefined)
-                setJsonMode(!jsonMode)
-                if (!jsonMode) setEditorFocusRequest((request) => request + 1)
-              }
-            : undefined
-        }
-      />
+      {!actionsInControl && valueTools}
       {endAddon != null && (
         <div className={styles.valueAddon} data-value-addon-control data-side="end">
           {endAddon}

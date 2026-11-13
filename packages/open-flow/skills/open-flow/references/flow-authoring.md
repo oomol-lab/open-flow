@@ -302,7 +302,7 @@ For Connector Tasks, Provider API requests, independent Code Actions, Agent tool
 | Single HTTP request             | `http-request`: method, parameter modes, authentication, body and response configuration; URL and request values use public inputs.                                                                                                                                                                                                                                                 |
 | Fixed HTTP operation            | `openapi`: an OpenAPI source, path and method; resolved authentication choices and ports appear in node details.                                                                                                                                                                                                                                                                    |
 | Reusable constants              | `value`: named JSON values and optional output constraints.                                                                                                                                                                                                                                                                                                                         |
-| Fixed-duration pause            | `delay`: `config: {"durationMs":5000}` pauses this branch for five seconds, then follows ordinary execution edges.                                                                                                                                                                                                                                                                  |
+| Fixed-duration pause            | `delay`: `inputs: {"durationMs":{"kind":"value","value":5000}}` pauses this branch for five seconds, then follows ordinary execution edges.                                                                                                                                                                                                                                         |
 | Durable interaction             | `wait`, `approval`: prompt and named inputs; resume through the Run's Wait ID. Wait additionally supports optional `config.autoContinue` with `{kind:"after",durationMs:86400000}` or `{kind:"at",at:"2026-10-25T10:00:00+08:00"}`.                                                                                                                                                 |
 
 Connector and LLM services are configured on the Server. Missing capabilities
@@ -343,7 +343,7 @@ Declare parameters on Start: `{"op":"node.add","as":"start","type":"start","name
 <!-- agentic:var flowCommand --> runs resolve RUN_ID WAIT_ID approve --json
 ```
 
-Use `delay` for a fixed-duration pause, defaulting to five seconds. Use `wait` when a person or external system may continue the Run; Wait can also continue automatically at its configured time.
+Use `delay` for a timed pause, defaulting to five seconds. Its `durationMs` input accepts a fixed value or a numeric upstream output. Use `wait` when a person or external system may continue the Run; Wait can also continue automatically at its configured time.
 
 Wait supports optional `config.autoContinue`. Omit `config.autoContinue` for manual waiting or clear
 `["config", "autoContinue"]` to disable it. Relative timing starts at each Wait registration;

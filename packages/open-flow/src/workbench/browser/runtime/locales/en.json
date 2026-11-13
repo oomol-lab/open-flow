@@ -1846,14 +1846,7 @@
     "title": "Delay",
     "description": "Pause this branch for a fixed duration.",
     "duration": "Duration",
-    "unit": "Unit",
-    "invalid": "Enter a positive duration in whole milliseconds.",
     "missing": "Set duration",
-    "units": {
-      "second": "Seconds",
-      "minute": "Minutes",
-      "hour": "Hours"
-    },
     "summary": {
       "second": "{{value}} s",
       "minute": "{{value}} min",

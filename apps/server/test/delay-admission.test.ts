@@ -11,7 +11,7 @@ async function fixture(durationMs: number, connected = true) {
   const flow = await api.createFlow('Delay admission')
   const draft = await api.changeDraft(flow.flowId, flow.draftRevisionId, [
     { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'start', name: 'Start', inputDefs: [] } },
-    { kind: 'graph.node.create', nodeId: 'delay', node: { kind: 'delay', name: 'Delay', inputs: {}, durationMs } },
+    { kind: 'graph.node.create', nodeId: 'delay', node: { kind: 'delay', name: 'Delay', inputs: { durationMs: { kind: 'value', value: durationMs } } } },
     ...(connected ? [{ kind: 'graph.edge.connect' as const, edge: { source: 'start', target: 'delay' } }] : []),
   ])
   return { service, api, flowId: flow.flowId, revisionId: draft.revision.revisionId }

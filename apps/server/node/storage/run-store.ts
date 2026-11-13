@@ -610,7 +610,7 @@ export class RunStore {
       wait.kind === 'delay'
         ? {
             ...wait,
-            value: {},
+            value: { durationMs: wait.durationMs },
             prompt: '',
             actions: ['continue'] as const,
             notify: false,

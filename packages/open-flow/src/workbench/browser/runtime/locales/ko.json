@@ -1846,14 +1846,7 @@
     "title": "지연",
     "description": "지정한 시간이 지나면 이 분기를 계속합니다.",
     "duration": "시간",
-    "unit": "단위",
-    "invalid": "양의 정수 밀리초로 환산되는 시간을 입력하세요.",
     "missing": "시간 설정",
-    "units": {
-      "second": "초",
-      "minute": "분",
-      "hour": "시간"
-    },
     "summary": {
       "second": "{{value}}초",
       "minute": "{{value}}분",

@@ -28,6 +28,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { connectorProxyBodyInput, connectorProxyHasBody, connectorProxyQuerySchema, connectorProxyHeaderSchema } from '../../../../connector/common/proxy.ts'
 import { decisionModel } from '../../../../decision/common/decision.ts'
+import { delayDurationInput } from '../../../../flow/common/delay.ts'
 import { executionReachableNodes, webhookResponseDiagnostics, inputSourceCandidates } from '../../../../flow/common/graph.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { webhookResponseInputs } from '../../../../flow/common/webhookResponse.ts'
@@ -52,7 +53,6 @@ import { connectorActionPresentation } from './connectorActionPresentation.tsx'
 import { presentConnectorInputs } from './connectorInputPresentation.ts'
 import { ConnectorProxySection } from './connectorProxySection.tsx'
 import { DecisionSection } from './decisionSection.tsx'
-import { DelayDefinition } from './delayDefinition.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { EventSourceTriggerConfig } from './eventSourceTriggerConfig.tsx'
@@ -882,14 +882,20 @@ export function NodeInspector({
           proxy == null &&
           !unconfiguredOpenApi &&
           !unconfiguredWorkflow &&
-          (selection?.kind === 'outputs' || selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'task') &&
+          (selection?.kind === 'outputs' ||
+            selection?.kind === 'approval' ||
+            selection?.kind === 'wait' ||
+            selection?.kind === 'task' ||
+            selection?.kind === 'delay') &&
           (() => {
             const definitions: (InputPort | Group)[] =
               selection.kind === 'outputs'
                 ? [...selection.node.outputDefs]
                 : selection.kind === 'task'
                   ? [...(selection.definition?.inputs ?? [])]
-                  : [...selection.node.inputDefinitions]
+                  : selection.kind === 'delay'
+                    ? [delayDurationInput]
+                    : [...selection.node.inputDefinitions]
             const handles = new Set(definitions.flatMap((definition) => ('handle' in definition ? [definition.handle] : [])))
             for (const handle of Object.keys(revision.inputMappings(selection.node))) {
               if (!handles.has(handle) && !(selection.kind === 'task' && selection.node.additionalInputs?.some((port) => port.handle === handle)))
@@ -911,8 +917,10 @@ export function NodeInspector({
                 const mapping = revision.inputMappings(selection.node)[definition.handle]
                 const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
                 const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+                const fixedValue = inputValue(mapping, definition.value)
                 return {
                   definition,
+                  label: selection.kind === 'delay' ? t('delay.duration') : undefined,
                   sourceOnly: isHttpRequest && definition.handle.startsWith('auth.'),
                   editor:
                     !readOnly && connectors != null && mapping?.kind != 'sources'
@@ -920,14 +928,14 @@ export function NodeInspector({
                           handle: definition.handle,
                           source: connectors,
                           flowId: revision.revision.flowId,
-                          value: inputValue(mapping, definition.value),
+                          value: fixedValue,
                           disabled,
                           onChange: (value) => {
                             void store?.nodes.setInputValue(selection.id, definition.handle, value)
                           },
                         })
                       : undefined,
-                  value: inputValue(mapping, definition.value),
+                  value: fixedValue,
                   onReset:
                     definition.value !== undefined && mapping != null ? () => void store?.nodes.resetInputs(selection.id, [definition.handle]) : undefined,
                   connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
@@ -942,7 +950,7 @@ export function NodeInspector({
                 title={t(selection.kind === 'outputs' ? 'inspector.ports.outputsTitle' : 'inspector.ports.inputsTitle')}
                 titleIcon={selection.kind === 'outputs' ? 'output' : 'input'}
                 entries={entries}
-                fieldLabels={connectorPresentation?.fieldLabels}
+                fieldLabels={selection.kind === 'delay' ? { durationMs: t('delay.duration') } : connectorPresentation?.fieldLabels}
                 onReset={() => {
                   return store?.nodes.resetInputs(
                     selection.id,
@@ -1170,8 +1178,6 @@ export function NodeInspector({
                   </GeneralSettings>
                 </>
               )
-            ) : selection.kind === 'delay' ? (
-              <DelayDefinition key={selection.id} disabled={disabled} selection={selection} store={store} />
             ) : selection.kind == 'approval' || selection.kind == 'wait' ? (
               <ResolutionDefinition disabled={disabled} selection={selection} store={store} />
             ) : null}

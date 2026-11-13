@@ -1846,14 +1846,7 @@
     "title": "遅延",
     "description": "指定した時間が経過したら、この分岐を続行します。",
     "duration": "時間",
-    "unit": "単位",
-    "invalid": "正の整数ミリ秒に換算できる時間を入力してください。",
     "missing": "時間を設定",
-    "units": {
-      "second": "秒",
-      "minute": "分",
-      "hour": "時間"
-    },
     "summary": {
       "second": "{{value}} 秒",
       "minute": "{{value}} 分",

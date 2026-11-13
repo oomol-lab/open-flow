@@ -1,22 +1,23 @@
 import type { FlowRunOptions, SchedulerEvent, WaitRequest } from '../src/execution/common/scheduler.ts'
-import type { DelayNode, RevisionContent, WaitAction } from '../src/flow/common/change.ts'
+import type { DelayNode, InputMapping, RevisionContent, WaitAction } from '../src/flow/common/change.ts'
 
 import * as Effect from 'effect/Effect'
 import { expect, expectTypeOf, it } from 'vitest'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../src/flow/common/change.ts'
+import { delayDurationInput } from '../src/flow/common/delay.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 import { waitHost } from './waitHost.ts'
 
-it('types Delay as a timer-only node without inputs or Task policies', () => {
-  expectTypeOf<DelayNode['inputs']>().toEqualTypeOf<Readonly<Record<string, never>>>()
+it('types Delay as a ordinary duration mappings without Task policies', () => {
+  expectTypeOf<DelayNode['inputs']>().toEqualTypeOf<Readonly<Record<string, InputMapping>>>()
   expectTypeOf<DelayNode['timeoutMs']>().toEqualTypeOf<undefined>()
   expectTypeOf<DelayNode['retry']>().toEqualTypeOf<undefined>()
   expectTypeOf<DelayNode['onError']>().toEqualTypeOf<undefined>()
 })
 
-async function fixture(loop = false) {
+async function fixture(loop = false, fromStart = false) {
   const content: RevisionContent = {
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -24,8 +25,8 @@ async function fixture(loop = false) {
       bindings: {},
       graph: {
         nodes: {
-          start: { kind: 'start', name: 'Start', inputDefs: [] },
-          delay: { kind: 'delay', inputs: {}, durationMs: 5000 },
+          start: { kind: 'start', name: 'Start', inputDefs: fromStart ? [{ handle: 'hold', jsonSchema: delayDurationInput.jsonSchema, nullable: false }] : [] },
+          delay: { kind: 'delay', inputs: fromStart ? { durationMs: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'start', output: 'hold' }] } } : {} },
           side: { kind: 'task', inputs: {}, task: { name: 'Side', inputs: [], outputs: [], executor: { kind: 'connector', action: 'test.side' } } },
           out: { kind: 'outputs', outputDefs: [], outputMappings: {} },
           ...(loop
@@ -140,4 +141,19 @@ it('registers a distinct relative delay for each loop iteration', async () => {
   const result = await Effect.runPromise(runFlow(f.prepared, { ...f.options, resume: { checkpoint: second.checkpoint } }))
   expect(result.kind).toBe('node-results')
   expect(f.requests).toHaveLength(2)
+})
+
+it('resolves a duration from upstream once and retains its registered input on recovery', async () => {
+  const f = await fixture(false, true)
+  const first = await Effect.runPromise(runFlow(f.prepared, { ...f.options, trigger: { nodeId: 'start', outputs: { hold: 25 } } }))
+  if (first.kind !== 'waiting') throw new Error('Expected Delay suspension')
+  expect(f.requests[0]).toMatchObject({ kind: 'delay', durationMs: 25 })
+  expect(first.checkpoint.waits[0]?.value).toEqual({ durationMs: 25 })
+  const restored = await Effect.runPromise(runFlow(f.prepared, { ...f.options, resume: { checkpoint: JSON.parse(JSON.stringify(first.checkpoint)) } }))
+  expect(restored.kind).toBe('waiting')
+  expect(f.requests).toHaveLength(1)
+  f.decisions[f.requests[0]!.waitId] = 'continue'
+  const completed = await Effect.runPromise(runFlow(f.prepared, { ...f.options, resume: { checkpoint: first.checkpoint } }))
+  expect(completed.kind).toBe('node-results')
+  expect(f.events.filter((event) => event.type === 'node.completed' && event.nodeId === 'delay')).toHaveLength(1)
 })

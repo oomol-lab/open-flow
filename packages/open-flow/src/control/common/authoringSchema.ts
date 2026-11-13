@@ -10,7 +10,6 @@ import {
   httpCapabilitySchema,
   authoringDefinitionSchemas as definitions,
 } from '../../flow/common/changeSchema.ts'
-import { delayDurationSchema } from '../../flow/common/delay.ts'
 import { retryConfigurationSchema, retryNodeTypes } from '../../flow/common/retry.ts'
 import { httpRequestConfigSchema } from '../../http/common/httpRequest.ts'
 import { currentEngineContract, findEngineContract } from '../../runtime/common/engineContract.ts'
@@ -111,7 +110,7 @@ const expression = z.strictObject({
 const all = z.strictObject({ all: z.array(expression) })
 const when = z.union([expression, all, z.strictObject({ any: z.array(z.union([expression, all])) })])
 export const authoringConfigurations = {
-  'delay': z.strictObject({ durationMs: delayDurationSchema.lt(604_800_000) }),
+  'delay': z.strictObject({}),
   'webhook-response': z.strictObject({}),
   'workflow': z.strictObject({ flowId: id }),
   'start': z.strictObject({ inputDefs: flowInputFields.default({}) }),
@@ -297,13 +296,13 @@ export function authoringSchema(kind?: AuthoringType) {
         retry: retryNodeTypes.some((nodeType) => nodeType == kind) ? z.toJSONSchema(retryConfigurationSchema) : false,
         inputSources: ['poll', 'integration'].includes(kind)
           ? ['value', 'unset', 'default']
-          : ['delay', 'start', 'outputs', 'error', 'cron', 'webhook', 'value', 'condition'].includes(kind)
+          : ['start', 'outputs', 'error', 'cron', 'webhook', 'value', 'condition'].includes(kind)
             ? []
             : ['value', 'unset', 'default', 'output', 'system', 'variable', 'sources'],
         extensibleInputs: ['code', 'agent', 'llm', 'wait', 'approval'].includes(kind),
         guidance:
           kind == 'delay'
-            ? 'Pause this branch for config.durationMs milliseconds, then continue through ordinary execution edges. No inputs, business outputs or manual continuation. Server requires the delay to be shorter than seven days.'
+            ? 'Pause this branch for input durationMs milliseconds (default 5000), then continue through ordinary execution edges. Use ordinary numeric input values and sources. No business outputs or manual continuation. Server requires the delay to be shorter than seven days.'
             : kind == 'webhook-response'
               ? 'Prepare an HTTP response using fixed inputs body (any JSON, default empty text), statusCode (number, default 200) and headers (scalar-valued object, default {}). Select this node in Webhook options.responseBody as {kind: "webhook-response", nodeId: "node reference", timeoutMs: 30000}. Its first completion responds immediately while the Run continues. It has no business outputs. Multiple response nodes are allowed; each Webhook selects one reachable node.'
               : kind == 'outputs'
@@ -371,7 +370,7 @@ export function authoringSchema(kind?: AuthoringType) {
               'value': { config: { values: { threshold: 100, region: 'EU' } } },
               'webhook': { config: { method: 'POST', body: { orderId: { schema: { type: 'string' }, nullable: false } } } },
               'wait': { prompt: 'Continue processing this order?', inputs: { order: { kind: 'value', value: { orderId: 'A-1' } } } },
-              'delay': { config: { durationMs: 5000 } },
+              'delay': { inputs: { durationMs: { kind: 'value', value: 5000 } } },
               'approval': { prompt: 'Approve this order?', inputs: { order: { kind: 'value', value: { orderId: 'A-1' } } } },
               'llm': {
                 config: { model: { model: 'deepseek-v4-flash' }, template: [{ role: 'user', content: 'Summarize {{order}}.' }] },

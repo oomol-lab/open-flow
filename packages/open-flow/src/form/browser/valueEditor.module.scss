@@ -388,16 +388,22 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 
 .valueTools {
-  grid-column: var(--field-value-column);
-  grid-row: var(--field-value-row);
-  align-self: start;
-  justify-self: end;
   display: flex;
   align-items: center;
-  height: var(--field-control-height);
-  margin-right: calc(var(--value-native-action-width, 0px) + var(--value-suffix-width) + var(--value-end-addon-width) + 3px);
   z-index: var(--value-editor-control-layer);
   color: var(--ui-muted-foreground);
+  &[data-inline] {
+    flex-shrink: 0;
+    align-self: stretch;
+  }
+  &:not([data-inline]) {
+    grid-column: var(--field-value-column);
+    grid-row: var(--field-value-row);
+    align-self: start;
+    justify-self: end;
+    height: var(--field-control-height);
+    margin-right: calc(var(--value-native-action-width, 0px) + var(--value-suffix-width) + var(--value-end-addon-width) + 3px);
+  }
 }
 .clearValue[data-danger] {
   --ui-control-hover-background: var(--ui-danger-control-background-hover);
@@ -432,12 +438,15 @@ $feedback-focus: ':has(#{$feedback-targets})';
   grid-row: 1;
 }
 .root {
-  > .valueTools > :is(.clearValue, .resetValue) {
+  > .valueTools > :is(.clearValue, .resetValue),
+  > .body > [data-slot='input-group'] > .valueTools > :is(.clearValue, .resetValue) {
     opacity: 0;
     pointer-events: none;
   }
   &:has(> .body:hover, > .summary:hover, > .valueTools:hover) > .valueTools > :is(.clearValue, .resetValue),
-  > .valueTools > :is(.clearValue, .resetValue):focus-visible {
+  > .valueTools > :is(.clearValue, .resetValue):focus-visible,
+  > .body > [data-slot='input-group']:hover > .valueTools > :is(.clearValue, .resetValue),
+  > .body > [data-slot='input-group'] > .valueTools > :is(.clearValue, .resetValue):focus-visible {
     opacity: 1;
     pointer-events: auto;
   }

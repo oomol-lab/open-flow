@@ -97,6 +97,12 @@
     "emptyObjectValue": "空对象",
     "unrestrictedFields": "未限定字段",
     "additionalFieldValues": "额外字段值类型",
-    "schemaDefinedFields": "字段受 Schema 约束"
+    "schemaDefinedFields": "字段受 Schema 约束",
+    "durationUnit": "单位",
+    "durationUnits": {
+      "second": "秒",
+      "minute": "分钟",
+      "hour": "小时"
+    }
   }
 }

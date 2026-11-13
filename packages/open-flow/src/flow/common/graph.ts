@@ -20,8 +20,9 @@ import { missingTriggerConfig, resolveTriggerConfig } from '../../trigger/common
 import { triggerOutputDefinitions, triggerOutputPorts, webhookSupportsBody } from '../../trigger/common/contract.ts'
 import { isTriggerNode, portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
-import { delayDurationSchema } from './delay.ts'
+import { delayDurationInput, delayDurationSchema } from './delay.ts'
 import { nodeSystemOutputPorts, supportsNodeErrorHandling } from './errorHandling.ts'
+import { inputValue } from './inputValue.ts'
 import { supportsNodeRetry, retryConfigurationSchema } from './retry.ts'
 import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
@@ -215,7 +216,7 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, path: string, 
 export function nodeInputPorts(node: GraphNode): Readonly<Record<string, InputPortDefinition>> {
   switch (node.kind) {
     case 'delay':
-      return {}
+      return portsByHandle([delayDurationInput])
     case 'webhook-response':
       return portsByHandle(webhookResponseInputs)
     case 'outputs':
@@ -779,8 +780,12 @@ function validateGraph(graph: Graph, document: FlowDocument, path: string, diagn
   }
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
     const nodePath = `${path}/nodes/${nodeId}`
-    if (node.kind === 'delay' && !delayDurationSchema.safeParse(node.durationMs).success)
-      diagnostics.push(graphDiagnostic('delay.duration-invalid', 'Enter a positive integer duration in milliseconds.', `${nodePath}/durationMs`))
+    if (
+      node.kind === 'delay' &&
+      node.inputs.durationMs?.kind !== 'sources' &&
+      !delayDurationSchema.safeParse(inputValue(node.inputs.durationMs, delayDurationInput.value)).success
+    )
+      diagnostics.push(graphDiagnostic('delay.duration-invalid', 'Enter a positive integer duration in milliseconds.', `${nodePath}/inputs/durationMs`))
     if (!isTriggerNode(node) && node.maxExecutions != null && (!Number.isSafeInteger(node.maxExecutions) || node.maxExecutions < 1)) {
       diagnostics.push(graphDiagnostic('node.max-executions-invalid', 'Maximum executions must be a positive safe integer.', `${nodePath}/maxExecutions`))
     }
