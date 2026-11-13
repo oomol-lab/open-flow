@@ -1311,7 +1311,7 @@ Independent resolution receipts survive event retention and are removed with Flo
 
 ### Delay
 
-The `delay` node accepts static `config: { durationMs }`, a positive safe integer in milliseconds. New nodes default to 5000 ms. Delay runs with no inputs, business outputs or prompt. It suspends only its branch and continues through ordinary execution edges. Each invocation persists its deadline once and recovery retains it. Server requires durations shorter than seven days.
+The `delay` node accepts static `config: { durationMs }`, a positive safe integer in milliseconds. New nodes default to 5000 ms. Delay runs with no inputs, business outputs or prompt. It suspends only its branch and continues through ordinary execution edges. Each invocation persists its deadline once and recovery retains it. Public authoring and Server Run admission require durations shorter than seven days.
 
 Delay uses the existing Run waiting lifecycle. Its `run.waits` entry adds `kind: "delay"`, has `actions: []`, an empty prompt and a required `autoContinueAt`. Existing interaction waits may omit `kind`. `wait.created` also carries the Delay marker. Manual resolution is rejected, no public capability links are issued, and cancellation prevents automatic continuation. Arrival at the deadline uses the same transactional automatic decision owner.
 

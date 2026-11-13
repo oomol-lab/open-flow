@@ -472,7 +472,7 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
     nodes[nodeId] =
       node.kind == 'outputs'
         ? { ...node, outputMappings: inputs(nodeId, node.outputMappings) }
-        : isTriggerNode(node)
+        : isTriggerNode(node) || node.kind === 'delay'
           ? node
           : {
               ...node,

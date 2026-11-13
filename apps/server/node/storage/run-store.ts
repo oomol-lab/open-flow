@@ -97,7 +97,7 @@ const maxEventBytes = 1024 * 1024
 const maxOutputBytes = 4 * 1024 * 1024
 const maxEventCount = 1_000
 const maxEventTotalBytes = 16 * 1024 * 1024
-const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
+export const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
 
 function autoContinueAt(wait: { readonly autoContinue?: WaitAutoContinue; readonly actions: readonly WaitAction[] }, waitingSince: number): number | null {
   if (wait.autoContinue == null) return null

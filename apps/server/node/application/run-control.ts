@@ -29,6 +29,7 @@ import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/
 import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
+import { waitDurationMs } from '../storage/run-store.ts'
 import { checkCodeActions, checkCodePermissions, checkConnectorProxies } from './connector-capabilities.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
 import { decodedRevision, preparedRevision } from './revision-cache.ts'
@@ -482,6 +483,8 @@ export class RunControl {
       case 'prepared':
         break
     }
+    if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind === 'delay' && node.durationMs != null && node.durationMs >= waitDurationMs))
+      throw new ControlError(controlErrorCode.flowInvalid, 'Delay must be shorter than seven days.')
     if (
       Object.values(fixed.flow.graph.nodes)
         .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))

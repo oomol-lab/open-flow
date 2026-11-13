@@ -683,6 +683,17 @@ describe('Delay authoring', () => {
     expect(authoringNode(created.content, created.nodes.pause!)).toMatchObject({ config: { durationMs: 5000 } })
     expect((await validateFlow(created.content, findEngineContract(currentEngineContract)!)).valid).toBe(true)
   })
+
+  it('advertises and enforces the seven-day limit on creation and updates', async () => {
+    expect(authoringSchema('delay')).toMatchObject({ configuration: { properties: { durationMs: { exclusiveMaximum: 604_800_000 } } } })
+    const created = await edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 604_799_999 } }])
+    expect(authoringNode(created.content, created.nodes.pause!)).toMatchObject({ config: { durationMs: 604_799_999 } })
+    for (const durationMs of [604_800_000, 604_800_001]) {
+      await expect(edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs } }])).rejects.toThrow()
+      await expect(edit(created.content, [{ op: 'node.update', node: created.nodes.pause!, set: { config: { durationMs } } }])).rejects.toThrow()
+    }
+  })
+
   it('creates and updates a port-free node while preserving unrelated nodes, and undoes edits', async () => {
     const created = await edit(empty, [
       { op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 5000 } },

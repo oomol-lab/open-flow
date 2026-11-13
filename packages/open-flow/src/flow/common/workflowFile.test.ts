@@ -2,6 +2,7 @@ import type { GraphNode } from './change.ts'
 import type { WorkflowFile } from './workflowFile.ts'
 
 import { describe, expect, it } from 'vitest'
+import { currentFlowModelVersion } from './change.ts'
 import { decodeRevision, encodeRevision } from './encoding.ts'
 import { cleanWorkflowFile, decodeWorkflowFile, encodeWorkflowFile, parseWorkflowFile, workflowFileName } from './workflowFile.ts'
 
@@ -131,6 +132,23 @@ function fixture(): WorkflowFile {
 }
 
 describe('shareable workflow files', () => {
+  it.each([null, 5000, 604_800_000])('preserves Delay drafts through portable files: %j', (durationMs) => {
+    const file: WorkflowFile = {
+      kind: 'open-flow-workflow',
+      version: 1,
+      content: {
+        modelVersion: currentFlowModelVersion,
+        modules: {},
+        document: {
+          bindings: {},
+          graph: { nodes: { pause: { kind: 'delay', name: 'Pause', inputs: {}, durationMs } }, edges: [] },
+        },
+      },
+    }
+    expect(cleanWorkflowFile(file)).toEqual({ file, summary: { changedNodeIds: [], removedBindings: 0 } })
+    expect(parseWorkflowFile(encodeWorkflowFile(file))).toEqual(file)
+  })
+
   it('preserves accounts, Variables and Trigger resource configuration when saving a local document', () => {
     const file = fixture()
     const saved = parseWorkflowFile(encodeWorkflowFile(file, { clean: false }))

@@ -1,13 +1,20 @@
 import type { FlowRunOptions, SchedulerEvent, WaitRequest } from '../src/execution/common/scheduler.ts'
-import type { RevisionContent, WaitAction } from '../src/flow/common/change.ts'
+import type { DelayNode, RevisionContent, WaitAction } from '../src/flow/common/change.ts'
 
 import * as Effect from 'effect/Effect'
-import { expect, it } from 'vitest'
+import { expect, expectTypeOf, it } from 'vitest'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../src/flow/common/change.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 import { waitHost } from './waitHost.ts'
+
+it('types Delay as a timer-only node without inputs or Task policies', () => {
+  expectTypeOf<DelayNode['inputs']>().toEqualTypeOf<Readonly<Record<string, never>>>()
+  expectTypeOf<DelayNode['timeoutMs']>().toEqualTypeOf<undefined>()
+  expectTypeOf<DelayNode['retry']>().toEqualTypeOf<undefined>()
+  expectTypeOf<DelayNode['onError']>().toEqualTypeOf<undefined>()
+})
 
 async function fixture(loop = false) {
   const content: RevisionContent = {

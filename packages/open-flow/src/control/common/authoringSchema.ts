@@ -111,7 +111,7 @@ const expression = z.strictObject({
 const all = z.strictObject({ all: z.array(expression) })
 const when = z.union([expression, all, z.strictObject({ any: z.array(z.union([expression, all])) })])
 export const authoringConfigurations = {
-  'delay': z.strictObject({ durationMs: delayDurationSchema }),
+  'delay': z.strictObject({ durationMs: delayDurationSchema.lt(604_800_000) }),
   'webhook-response': z.strictObject({}),
   'workflow': z.strictObject({ flowId: id }),
   'start': z.strictObject({ inputDefs: flowInputFields.default({}) }),

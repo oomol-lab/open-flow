@@ -98,8 +98,11 @@ export type WaitAction = 'approve' | 'continue' | 'reject'
 
 export interface DelayNode extends GraphNodeBase {
   readonly kind: 'delay'
+  readonly inputs: Readonly<Record<string, never>>
   readonly durationMs: number | null
   readonly timeoutMs?: never
+  readonly retry?: never
+  readonly onError?: never
 }
 
 interface ResolutionNodeBase extends GraphNodeBase {

@@ -89,7 +89,7 @@ describe('Runtime event projector', () => {
     })
   })
 
-  it('projects Wait node metadata without exposing its input', async () => {
+  it.each(['wait', 'delay'])('projects %s node metadata without exposing its input', async (nodeKind) => {
     const project = createEventProjector(runId)
     await project({ flowId: 'flows/wait/flow.oo.yaml', runId: 'runtime-run', type: 'run.started' })
 
@@ -97,13 +97,13 @@ describe('Runtime event projector', () => {
       inputs: { value: 'private' },
       jobId: 'wait-job',
       nodeId: 'approval',
-      nodeKind: 'wait',
+      nodeKind,
       nodeTitle: 'Approval',
       runId: 'runtime-run',
       type: 'node.started',
     })
 
-    expect(event).toMatchObject({ kind: 'node.started', payload: { nodeId: 'approval', nodeKind: 'wait', nodeTitle: 'Approval' } })
+    expect(event).toMatchObject({ kind: 'node.started', payload: { nodeId: 'approval', nodeKind, nodeTitle: 'Approval' } })
     expect(JSON.stringify(event)).not.toContain('private')
   })
 
