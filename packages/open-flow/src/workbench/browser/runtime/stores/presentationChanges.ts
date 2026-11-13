@@ -70,7 +70,6 @@ export class PresentationChanges {
       const committed = this.#committed!
       const nextValue = update(committed.value)
       if (dequal(nextValue, committed.value)) {
-        this.#failed = false
         this.#finish(pending, committed)
         success = true
         return
