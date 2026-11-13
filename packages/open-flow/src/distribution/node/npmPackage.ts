@@ -273,7 +273,7 @@ const result = await flowToPng(browser, workflow, { client, iconCache })
 
 The storage delegate implements \`get(key)\`, \`set(key, json)\` and \`delete(key)\`,
 matching \`ControlCacheDelegate\`. Reuse the icon cache across exports. It uses a
-separate namespace for complete image responses with base64 bodies. Each scope has
+separate namespace for complete image responses with binary bodies. Each scope has
 two fixed sprite slots, light and dark, and one original-image slot per Provider.
 URL and sprite version must match before reuse. Successfully loaded versions replace
 their slot; failed loads never combine old artwork with new crop coordinates.
@@ -283,6 +283,11 @@ Without a delegate, the cache uses memory. Storage failures retain successful lo
 in memory. \`allowNetwork: false\` reads both Provider JSON and artwork caches only,
 and blocks remote requests in the temporary browser Context. Missing artwork falls
 back without failing the export.
+
+Browser Workbench and Preview store Blobs in IndexedDB and share short Blob URLs.
+The \`getBlob\` method reads binary artwork; the published \`get\` data-URL method
+remains available for existing hosts. A \`storage\` delegate accepts opaque Blob
+records; a JSON \`delegate\` stores byte arrays and reads earlier cache records.
 
 Browser Workbench and Preview cache Provider artwork in IndexedDB by default. Supply
 \`host.iconCache\` or the Preview's \`iconCache\` prop to replace it. Workbench PNG

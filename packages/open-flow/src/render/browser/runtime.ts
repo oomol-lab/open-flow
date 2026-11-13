@@ -31,7 +31,12 @@ export async function render({ workflow, options, providers }: RenderRequest): P
       dark: options.dark,
       frame: options.frame,
       title: options.title ?? workflow.name ?? 'Workflow',
-      iconCache: { get: (request) => (globalThis as typeof globalThis & RendererGlobals).OpenFlowProviderIcon(request) },
+      iconCache: {
+        getBlob: async (request) => {
+          const { bytes, contentType } = await (globalThis as typeof globalThis & RendererGlobals).OpenFlowProviderIcon(request)
+          return new Blob([new Uint8Array(bytes)], { type: contentType })
+        },
+      },
     })
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()

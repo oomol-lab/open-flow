@@ -1,5 +1,5 @@
 import type { ReactFlowInstance } from '@xyflow/react'
-import type { ProviderIconLoader } from '../../../../connector/common/providerIconCache.ts'
+import type { ProviderIconSource } from '../../../../connector/common/providerIconCache.ts'
 import type { FlowPngAspectRatio, FlowPngLayout } from '../../../../render/common/png.ts'
 import type { FlowCanvasViewModel } from './model.ts'
 
@@ -16,7 +16,7 @@ import { captureStyleProperties } from './captureStyles.ts'
 import { FlowCanvas } from './FlowCanvas.tsx'
 
 export interface FlowPngOptions {
-  readonly iconCache?: ProviderIconLoader
+  readonly iconCache?: ProviderIconSource
   readonly layout?: FlowPngLayout
   readonly aspectRatio?: FlowPngAspectRatio
   readonly dark?: boolean
