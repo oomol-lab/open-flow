@@ -1845,7 +1845,7 @@
   "delay": {
     "title": "Delay",
     "description": "Pause this branch for a fixed duration.",
-    "duration": "Duration",
+    "durationDescription": "Delay duration in milliseconds. Continue this branch when the delay ends.",
     "missing": "Set duration",
     "summary": {
       "second": "{{value}} s",

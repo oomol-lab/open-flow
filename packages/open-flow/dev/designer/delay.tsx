@@ -131,6 +131,6 @@ export const delayStory: FrontendStory = {
   title: 'Duration and continuation',
   standalone: true,
   description:
-    'Compare default, fixed and upstream durations with Schedule content. Check blank drafts, units, panel widths, clear/reset, history, reload and read-only states.',
+    'Compare default, fixed and upstream durations with Schedule. Check field tooltips, blank drafts, units, widths, clear/reset, history, reload and read-only states.',
   render: (log, dark, language) => <Delay dark={dark} language={language} log={log} />,
 }

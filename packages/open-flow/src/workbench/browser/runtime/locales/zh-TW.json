@@ -1845,7 +1845,7 @@
   "delay": {
     "title": "延時",
     "description": "延時指定時長後繼續目前分支。",
-    "duration": "時長",
+    "durationDescription": "延時時長，單位為毫秒。到期後繼續目前分支。",
     "missing": "設定時長",
     "summary": {
       "second": "{{value}} 秒",

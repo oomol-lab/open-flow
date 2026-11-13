@@ -82,6 +82,10 @@ Subflow editing path. Examples must compile through the public interface. Use th
 CLI/MCP Lab scenarios to verify task completion; deterministic model responses can verify request
 configuration and forwarding, but cannot establish generation quality.
 
+When adding or changing built-in node fields, follow
+[built-in field presentation](.agents/skills/frontend-ui/references/property-panel-values.md#built-in-node-fields)
+and its existing implementation references for field names, localized descriptions, and tooltips.
+
 ### Frontend style boundaries
 
 Before implementing or reviewing frontend appearance, layout, components, or interactions, read and

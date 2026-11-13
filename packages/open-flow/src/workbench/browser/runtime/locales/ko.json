@@ -1845,7 +1845,7 @@
   "delay": {
     "title": "지연",
     "description": "지정한 시간이 지나면 이 분기를 계속합니다.",
-    "duration": "시간",
+    "durationDescription": "지연 시간(밀리초)입니다. 시간이 지나면 현재 분기를 계속 실행합니다.",
     "missing": "시간 설정",
     "summary": {
       "second": "{{value}}초",

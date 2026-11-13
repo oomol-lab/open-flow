@@ -1845,7 +1845,7 @@
   "delay": {
     "title": "Délai",
     "description": "Suspendre cette branche pendant une durée fixe.",
-    "duration": "Durée",
+    "durationDescription": "Durée du délai en millisecondes. Cette branche reprend à la fin du délai.",
     "missing": "Définir la durée",
     "summary": {
       "second": "{{value}} s",

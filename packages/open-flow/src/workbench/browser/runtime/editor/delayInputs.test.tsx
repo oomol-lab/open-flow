@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import type { RevisionContent } from '../../../../flow/common/change.ts'
+import type { UiLanguage } from '../../../../localization/common/languages.ts'
 
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -13,7 +14,7 @@ import { createDelay } from '../../../../flow/common/nodeChanges.ts'
 import { designerGraph } from '../workspace.ts'
 import { NodeInspector } from './nodeInspector.tsx'
 
-async function fixture() {
+async function fixture(language: UiLanguage = 'en') {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   const content: RevisionContent = {
     modelVersion: currentFlowModelVersion,
@@ -26,7 +27,7 @@ async function fixture() {
       },
     },
   }
-  const session = createInspectorSession('en', vi.fn(), applyFlowChanges(content, createDelay('pause', 'Pause')))
+  const session = createInspectorSession(language, vi.fn(), applyFlowChanges(content, createDelay('pause', 'Pause')))
   await session.start()
   const container = document.createElement('div')
   document.body.append(container)
@@ -64,14 +65,35 @@ async function fixture() {
   })
   const node = () => session.store.$.revision.value!.graph().nodes.pause!
   const unit = () => container.querySelector<HTMLButtonElement>('[role="combobox"][aria-label="Duration unit"]')!
-  const clear = () => container.querySelector<HTMLButtonElement>('[aria-label="Clear Duration"]')!
-  const input = () => container.querySelector<HTMLInputElement>('input[aria-label="Duration"]')!
+  const clear = () => container.querySelector<HTMLButtonElement>('[aria-label="Clear durationMs"]')!
+  const input = () => container.querySelector<HTMLInputElement>('input[aria-label="durationMs"]')!
   const edit = async (value: string) => {
     await typeInput(input(), value)
     await act(async () => input()?.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
   }
   return { session, container, render, node, input, unit, clear, edit }
 }
+
+it.each([
+  {
+    language: 'en',
+    nameLabel: 'Field name',
+    description: 'Delay duration in milliseconds. Continue this branch when the delay ends.',
+  },
+  { language: 'zh-CN', nameLabel: '字段名', description: '延时时长，单位为毫秒。到期后继续当前分支。' },
+] as const)('shows the fixed input name and localized description in $language', async ({ language, nameLabel, description }) => {
+  const f = await fixture(language)
+  for (const readOnly of [false, true]) {
+    await f.render(readOnly)
+    const name = f.container.querySelector<HTMLInputElement>(`input[aria-label="${nameLabel}"]`)!
+    expect(name.value).toBe('durationMs')
+    expect(name.readOnly).toBe(true)
+    expect(f.input().value).toBe('5')
+    await act(async () => name.focus())
+    await vi.waitFor(() => expect(f.container.textContent).toContain(description))
+    await act(async () => name.blur())
+  }
+})
 
 it('saves duration and units through production history, copies Delay, and restores empty drafts', async () => {
   const f = await fixture()

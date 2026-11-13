@@ -913,6 +913,8 @@ export function NodeInspector({
                   definition.handle === 'target'
                 ) {
                   definition = { ...definition, description: t('decision.targetDescription') }
+                } else if (selection.kind === 'delay' && definition.handle === delayDurationInput.handle) {
+                  definition = { ...definition, description: t('delay.durationDescription') }
                 }
                 const mapping = revision.inputMappings(selection.node)[definition.handle]
                 const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
@@ -920,7 +922,6 @@ export function NodeInspector({
                 const fixedValue = inputValue(mapping, definition.value)
                 return {
                   definition,
-                  label: selection.kind === 'delay' ? t('delay.duration') : undefined,
                   sourceOnly: isHttpRequest && definition.handle.startsWith('auth.'),
                   editor:
                     !readOnly && connectors != null && mapping?.kind != 'sources'
@@ -950,7 +951,7 @@ export function NodeInspector({
                 title={t(selection.kind === 'outputs' ? 'inspector.ports.outputsTitle' : 'inspector.ports.inputsTitle')}
                 titleIcon={selection.kind === 'outputs' ? 'output' : 'input'}
                 entries={entries}
-                fieldLabels={selection.kind === 'delay' ? { durationMs: t('delay.duration') } : connectorPresentation?.fieldLabels}
+                fieldLabels={connectorPresentation?.fieldLabels}
                 onReset={() => {
                   return store?.nodes.resetInputs(
                     selection.id,

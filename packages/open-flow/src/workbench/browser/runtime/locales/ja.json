@@ -1845,7 +1845,7 @@
   "delay": {
     "title": "遅延",
     "description": "指定した時間が経過したら、この分岐を続行します。",
-    "duration": "時間",
+    "durationDescription": "遅延時間（ミリ秒）。時間が経過すると、この分岐を続行します。",
     "missing": "時間を設定",
     "summary": {
       "second": "{{value}} 秒",

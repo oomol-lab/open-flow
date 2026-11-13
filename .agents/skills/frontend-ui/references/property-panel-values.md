@@ -12,6 +12,21 @@ collections, definitions, and field, node, or group settings. Also read the
 - Exercise each applicable semantic state: set, unset, empty string, null, empty collection,
   invalid, and disabled. Keep state labels distinguishable from user-entered content.
 
+## Built-in node fields
+
+Before adding or changing built-in input or output fields, inspect a comparable existing node and
+reuse its field composition and localization path. Use
+[AI Decision's `target` input](../../../../packages/open-flow/src/workbench/browser/runtime/editor/nodeInspector.tsx)
+as an input reference and
+[built-in output presentation](../../../../packages/open-flow/src/workbench/browser/runtime/editor/builtInOutputPresentation.ts)
+for Schedule, Webhook, Wait/Approval and system outputs.
+
+Ordinary built-in port tables show the actual `handle` in the Name column. Supply localized
+`description` text, including nested built-in fields where applicable, through the owning locale
+bundle for all `uiLanguages`. Apply it to presentation copies while preserving runtime schemas and
+user-authored descriptions. Reuse `PortDefinitionEditor` and `FieldName` for the description tooltip.
+Verify the field-name tooltip in Lab with a language switch and in read-only inspection.
+
 ## Value semantics
 
 - Stored undefined, null, empty strings, and empty collections remain distinct. Nullable fields
