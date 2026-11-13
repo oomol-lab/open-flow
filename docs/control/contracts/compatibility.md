@@ -1,8 +1,8 @@
 # Public contracts and version evolution
 
-## Explicit state authorities (after beta.92)
+## Explicit state authorities (after beta.93)
 
-The npm `next` baseline for this change is `0.1.0-beta.92`, gitHead `b92f0557`.
+The npm `next` baseline for this change is `0.1.0-beta.93`, gitHead `53efb3fa`.
 Confirm the published artifact before release; if the baseline differs, re-evaluate this section
 against the actual npm artifact.
 
