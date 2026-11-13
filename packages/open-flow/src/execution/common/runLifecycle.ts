@@ -37,7 +37,9 @@ export type RunTransitionScopeName =
 /**
  * Statuses an operation may write from. Production SQL predicates and
  * `transitionRun` both derive their guards from this table; it is the only
- * place the writable status sets are declared.
+ * place the writable status sets are declared. `resolve` writes only from
+ * `waiting`; `transitionRun` reports an active Run past its wait as an
+ * idempotent no-op rather than a write.
  */
 export const runTransitionScopes = {
   'claim': ['queued', 'starting'],
@@ -112,8 +114,10 @@ export function transitionRun(status: RunStatus, operation: RunOperation): RunTr
     case 'wait':
       return within(runTransitionScopes.wait, status) ? { kind: 'waited', status: 'waiting' } : { kind: 'stale', status }
     case 'resolve':
+      if (within(runTransitionScopes.resolve, status)) return { kind: 'resolved', status: 'queued' }
       if (isRunTerminal(status)) return { kind: 'stale', status }
-      return { kind: 'resolved', status: status == 'waiting' ? 'queued' : status }
+      // A Run already past its wait was resolved by an earlier write; resolving again is a no-op.
+      return { kind: 'resolved', status: status as 'queued' | 'starting' | 'running' }
     case 'fail-start':
     case 'fail-resume':
       return within(runTransitionScopes[operation.kind], status)

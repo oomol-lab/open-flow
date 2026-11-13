@@ -495,6 +495,7 @@ export class RunStore {
           })
           if (runResponse.status == 'rejected') {
             if (!current() || this.#state.value.selectedRunId != run.runId) return
+            if (permanentObservationFailure(runResponse.reason)) return yield* Effect.fail(runResponse.reason)
             this.#set({ observationFailed: true })
             idlePolls = Math.min(idlePolls + 1, 6)
             yield* Effect.sleep(Math.min(maxIdlePollDelay, startingPollDelay * 2 ** Math.max(0, idlePolls - 1)))
@@ -505,6 +506,7 @@ export class RunStore {
           this.#set({ observationFailed: false })
           if (eventsResponse.status == 'rejected') {
             if (!(eventsResponse.reason instanceof ApiError) || eventsResponse.reason.code != 'run.events-expired') {
+              if (permanentObservationFailure(eventsResponse.reason)) return yield* Effect.fail(eventsResponse.reason)
               this.#set({ observationFailed: true })
               idlePolls = Math.min(idlePolls + 1, 6)
               yield* Effect.sleep(Math.min(maxIdlePollDelay, startingPollDelay * 2 ** Math.max(0, idlePolls - 1)))
@@ -586,4 +588,9 @@ export class RunStore {
   #set(patch: Partial<RunState>): void {
     this.#state.set({ ...this.#state.value, ...patch })
   }
+}
+
+// Client errors other than timeouts and rate limits will not change by polling again.
+function permanentObservationFailure(error: unknown): boolean {
+  return error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status != 408 && error.status != 429
 }

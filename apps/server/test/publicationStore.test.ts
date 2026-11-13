@@ -220,6 +220,7 @@ it('expires a Publish operation through its single terminal transition without m
   expect(store.publications.publishOperation('flow', input.operationId)).toMatchObject({ issue: { code: 'publication.deadline-exceeded' }, status: 'failed' })
   expect(database.prepare('SELECT status FROM integration_candidates').all()).toEqual([{ status: 'cleanup' }])
   expect(database.prepare('SELECT COUNT(*) AS count FROM poll_candidates').get()).toEqual({ count: 0 })
+  expect(database.prepare("SELECT COUNT(*) AS count FROM publish_work WHERE status = 'pending'").get()).toEqual({ count: 0 })
   expect(store.integrations.dueCandidates(2_000, 10).map((candidate) => candidate.status)).toEqual(['cleanup'])
   store.publications.failPublishOperation(input.operationId, { code: 'late', message: 'Late failure.' })
   expect(store.publications.publishOperation('flow', input.operationId)).toMatchObject({ issue: { code: 'publication.deadline-exceeded' } })

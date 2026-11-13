@@ -123,6 +123,29 @@ describe('RunStore', () => {
     }
   })
 
+  it.each([
+    { failure: new ApiError(404, 'run.not-found', 'Missing'), retries: false },
+    { failure: new ApiError(403, 'auth.forbidden', 'Forbidden'), retries: false },
+    { failure: new ApiError(503, 'server.unavailable', 'Unavailable'), retries: true },
+    { failure: new ApiError(429, 'rate.limited', 'Limited'), retries: true },
+  ])('stops observing on permanent failures and retries transient ones ($failure.status)', async ({ failure, retries }) => {
+    vi.useFakeTimers()
+    const client = new WorkbenchClient(vi.fn())
+    const readRun = vi.spyOn(client, 'getRun').mockRejectedValue(failure)
+    vi.spyOn(client, 'getRunEvents').mockResolvedValue({ done: false, events: [], historyComplete: true, nextAfter: 0, runId: run.runId, version: 1 })
+    const store = new RunStore(client, vi.fn())
+    try {
+      store.follow({ ...run, status: 'running' }, store.prepareStart())
+      await vi.waitFor(() => expect(store.$.observationFailed.value).toBe(true))
+      await vi.advanceTimersByTimeAsync(60_000)
+      if (retries) expect(readRun.mock.calls.length).toBeGreaterThan(1)
+      else expect(readRun).toHaveBeenCalledTimes(1)
+    } finally {
+      store.dispose()
+      vi.useRealTimers()
+    }
+  })
+
   it.each((['completed', 'failed', 'canceled', 'indeterminate'] as const).flatMap((status) => [200, 201].map((count) => ({ status, count }))))(
     'reads $count events through run.$status even when earlier pages report done',
     async ({ status, count }) => {

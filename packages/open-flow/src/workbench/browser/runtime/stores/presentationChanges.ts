@@ -23,7 +23,7 @@ export class PresentationChanges {
   #changes: Promise<void> = Promise.resolve()
   #committed?: Presentation
   #disposed = false
-  #failed?: number
+  #failed = false
   #pending: PendingChange[] = []
 
   public constructor(client: WorkbenchClient, setNotice: SetNotice, setPresentation: (presentation: Presentation) => void, i18n: I18n) {
@@ -34,7 +34,7 @@ export class PresentationChanges {
   }
 
   public reset(presentation?: Presentation): void {
-    this.#failed = undefined
+    this.#failed = false
     this.#committed = presentation
     this.#pending = []
   }
@@ -70,7 +70,7 @@ export class PresentationChanges {
       const committed = this.#committed!
       const nextValue = update(committed.value)
       if (dequal(nextValue, committed.value)) {
-        this.#failed = undefined
+        this.#failed = false
         this.#finish(pending, committed)
         success = true
         return
@@ -78,7 +78,7 @@ export class PresentationChanges {
       try {
         const saved = await this.#client.updatePresentation(flowId, committed.revision, nextValue)
         if (this.#disposed || !current()) return
-        this.#failed = undefined
+        this.#failed = false
         this.#finish(pending, saved)
         success = true
       } catch (error) {
@@ -87,7 +87,7 @@ export class PresentationChanges {
           try {
             const latest = await this.#client.getPresentation(flowId)
             if (this.#disposed || !current()) return
-            this.#failed = undefined
+            this.#failed = false
             this.#finish(pending, latest)
             this.#setNotice({
               kind: 'error',
@@ -96,11 +96,11 @@ export class PresentationChanges {
           } catch (reloadError) {
             if (!this.#disposed && current()) this.#finish(pending, committed)
             if (!this.#disposed && current()) this.#setNotice(errorNotice(reloadError, this.#i18n.t))
-            if (!this.#disposed && current()) this.#failed = committed.revision
+            if (!this.#disposed && current()) this.#failed = true
           }
           return
         }
-        this.#failed = committed.revision
+        this.#failed = true
         this.#finish(pending, committed)
         this.#setNotice(errorNotice(error, this.#i18n.t))
       }

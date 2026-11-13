@@ -8,7 +8,8 @@ import { randomUUID } from 'node:crypto'
  * A Publish operation stays `pending` until exactly one terminal transition records `succeeded` or
  * `failed`. Each preparation step owns one `publish_work` row that moves once from `pending` to
  * `ready` or `failed`. Deadline expiry is not written into work rows: the operation scheduler derives
- * it from `deadline_at`, and the terminal transition cleans up every candidate of the operation.
+ * it from `deadline_at`. The terminal transition cleans up every candidate of the operation and
+ * discards its unsettled work, so a terminal operation never leaves `pending` work behind.
  */
 export type PublishWorkAction = 'integration.prepare' | 'poll.baseline'
 
@@ -69,4 +70,9 @@ export function settlePublishWork(database: DatabaseSync, key: PublishWorkKey, o
       )
       .run(outcome.code, outcome.message.slice(0, 512), now, key.operationId, key.nodeId, key.action).changes == 1
   )
+}
+
+/** Discards unsettled work of an operation that has reached its terminal state. */
+export function discardPendingPublishWork(database: DatabaseSync, operationId: string): void {
+  database.prepare("DELETE FROM publish_work WHERE operation_id = ? AND status = 'pending'").run(operationId)
 }

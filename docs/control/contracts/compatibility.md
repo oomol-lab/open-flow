@@ -31,7 +31,8 @@ change in this section.
 
 Publish operations now have one terminal transition that records `succeeded` or `failed` and moves
 every remaining candidate of the operation to cleanup in the same transaction, including success
-through an existing Publication. `publish_work` rows are written only through one guarded
+through an existing Publication. Unsettled `publish_work` rows of a terminal operation are discarded,
+so no terminal operation leaves `pending` work. `publish_work` rows are written only through one guarded
 `pending` → `ready | failed` helper. Candidate queries no longer mutate state; the deadline is
 derived only by the operation scheduler. As a result, an expired operation always reports
 `publication.deadline-exceeded` without a `nodeId`, where a Poll baseline previously attached its

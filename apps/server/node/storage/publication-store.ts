@@ -19,7 +19,7 @@ import { presentationView } from './flow-store.ts'
 import { insert } from './insert.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
-import { publishDeadlineIssue } from './publish-work.ts'
+import { discardPendingPublishWork, publishDeadlineIssue } from './publish-work.ts'
 import { errorSourcesAvailable } from './trigger-store.ts'
 import { VariableStore } from './variable-store.ts'
 
@@ -548,6 +548,7 @@ export class PublicationStore {
             )
             .run(outcome.issue.nodeId ?? null, outcome.issue.code, outcome.issue.message, now, operationId).changes
     if (settled != 1) return
+    discardPendingPublishWork(this.#database, operationId)
     this.#integrations.cleanupCandidates(operationId, now)
     this.#polls.cleanupCandidates(operationId)
   }
