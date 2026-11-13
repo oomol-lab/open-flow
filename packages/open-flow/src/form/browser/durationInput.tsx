@@ -29,12 +29,23 @@ export function DurationInput({
   const change = (next: typeof draft) => {
     if (disabled) return
     setDraft(next)
+    if (next.value.trim() === '') return
     const milliseconds = durationMilliseconds(next.value, next.unit) ?? undefined
     saved.current = milliseconds
     onChange(milliseconds)
   }
   return (
-    <InputGroup ref={setContainer} controlSize="field" data-disabled={disabled || undefined}>
+    <InputGroup
+      ref={setContainer}
+      controlSize="field"
+      data-disabled={disabled || undefined}
+      onBlur={(event) => {
+        if (!disabled && draft.value.trim() === '' && !event.currentTarget.contains(event.relatedTarget)) {
+          saved.current = undefined
+          onChange(undefined)
+        }
+      }}
+    >
       <InputGroupInput
         controlSize="field"
         type="number"

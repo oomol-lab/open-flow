@@ -7,7 +7,7 @@ import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { createInspectorSession } from '../../../../../dev/designer/inspectorSession.ts'
-import { click } from '../../../../../test/support/render.tsx'
+import { click, input as typeInput } from '../../../../../test/support/render.tsx'
 import { applyFlowChanges, currentFlowModelVersion } from '../../../../flow/common/change.ts'
 import { createDelay } from '../../../../flow/common/nodeChanges.ts'
 import { designerGraph } from '../workspace.ts'
@@ -67,10 +67,7 @@ async function fixture() {
   const clear = () => container.querySelector<HTMLButtonElement>('[aria-label="Clear Duration"]')!
   const input = () => container.querySelector<HTMLInputElement>('input[aria-label="Duration"]')!
   const edit = async (value: string) => {
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input(), value)
-      input().dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await typeInput(input(), value)
     await act(async () => input()?.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
   }
   return { session, container, render, node, input, unit, clear, edit }
@@ -112,4 +109,33 @@ it('saves duration and units through production history, copies Delay, and resto
   await f.render(true)
   expect(f.input().readOnly).toBe(true)
   expect(f.unit().disabled).toBe(true)
+})
+
+it('keeps blank duration drafts and unit changes mounted until the field loses focus', async () => {
+  const f = await fixture()
+  await click(f.unit())
+  await click([...f.container.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'min')!)
+  const input = f.input()
+  await typeInput(input, '')
+  expect(f.node()).toMatchObject({ inputs: { durationMs: { kind: 'value', value: 300_000 } } })
+  expect(f.input()).toBe(input)
+  expect(input.value).toBe('')
+  expect(f.unit().textContent).toContain('min')
+  await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: f.clear() })))
+  await act(async () => f.clear().dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: f.unit() })))
+  await click(f.unit())
+  const hour = [...f.container.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'h')!
+  await act(async () => f.unit().dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: hour })))
+  await click(hour)
+  expect(f.node()).toMatchObject({ inputs: { durationMs: { kind: 'value', value: 300_000 } } })
+  expect(f.input()).toBe(input)
+  expect(input.value).toBe('')
+  expect(f.unit().textContent).toContain('h')
+  await typeInput(input, '2')
+  expect(f.node()).toMatchObject({ inputs: { durationMs: { kind: 'value', value: 7_200_000 } } })
+  expect(f.unit().textContent).toContain('h')
+  await typeInput(input, '')
+  await act(async () => f.unit().dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+  expect(f.node()).toMatchObject({ inputs: { durationMs: { kind: 'unset' } } })
+  expect(f.input()).toBeNull()
 })
