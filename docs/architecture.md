@@ -212,7 +212,9 @@ Each call owns a durable parent Run/node/execution to child Run association. The
 
 Definition references use `flow_resource_references` with relation kind `flow`, independently of runtime call associations. The existing single resource extraction feeds both variable and Flow relationships in the owning Draft/Live transaction. Index maintenance never reads or materializes another Revision.
 
-### Wait and Agent
+### Delay, Wait and Agent
+
+Delay suspends a local branch until its persisted deadline, with no notification or manual decision. It shares durable waiting, cancellation and recovery with Wait.
 
 Wait suspends a local branch within the same Run. The deployment persists the Wait before releasing its notification branch.
 Unresolved action branches remain blocked while other ready work continues.

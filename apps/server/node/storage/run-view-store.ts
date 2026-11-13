@@ -233,11 +233,12 @@ export class RunViewStore {
   waitReceipt(runId: string, waitId: string) {
     const row = this.#database
       .prepare(`SELECT node_id AS nodeId, wait_id AS waitId,
-      waiting_since AS waitingSince, expires_at AS expiresAt, auto_continue_at AS autoContinueAt, actions, prompt, value
+      kind, waiting_since AS waitingSince, expires_at AS expiresAt, auto_continue_at AS autoContinueAt, actions, prompt, value
       FROM wait_receipts WHERE run_id = ? AND wait_id = ?`)
       .get(runId, waitId) as
       | {
           readonly nodeId: string
+          readonly kind: 'interaction' | 'delay'
           readonly waitId: string
           readonly autoContinueAt: number | null
           readonly waitingSince: number

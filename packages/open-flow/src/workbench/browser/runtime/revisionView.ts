@@ -28,6 +28,7 @@ export interface InputSourceQuery {
 }
 
 export type ResolvedNode =
+  | { readonly id: string; readonly kind: 'delay'; readonly node: Extract<GraphNode, { kind: 'delay' }> }
   | { readonly id: string; readonly kind: 'webhook-response'; readonly node: Extract<GraphNode, { kind: 'webhook-response' }> }
   | { readonly id: string; readonly kind: 'outputs'; readonly node: import('../../../flow/common/change.ts').OutputsNode }
   | { readonly id: string; readonly kind: 'condition'; readonly node: ConditionNode }
@@ -162,6 +163,9 @@ export class RevisionView<Source extends RevisionSource = Draft> {
     resolvedById ??= new Map()
     let resolved: ResolvedSelection
     switch (node.kind) {
+      case 'delay':
+        resolved = { id: nodeId, kind: node.kind, node }
+        break
       case 'condition':
         resolved = { id: nodeId, kind: node.kind, node }
         break

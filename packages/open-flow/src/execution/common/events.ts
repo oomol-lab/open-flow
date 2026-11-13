@@ -21,6 +21,7 @@ const nodeKinds = new Set([
   'connector',
   'connector-proxy',
   'decision',
+  'delay',
   'javascript',
   'openapi',
   'http-request',

@@ -46,6 +46,7 @@ import {
   createProviderTrigger,
   createValue,
   createWait,
+  createDelay,
   defaultNodeName,
   deleteNodes,
   updateSettings,
@@ -154,6 +155,7 @@ export type TaskSettings =
 export type TaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 
 export type AddNodeIntent =
+  | { readonly kind: 'delay'; readonly name: string }
   | { readonly kind: 'connector-proxy'; readonly providerId: string; readonly name: string }
   | { readonly kind: 'webhook-response'; readonly name: string }
   | { readonly kind: 'outputs'; readonly name: string }
@@ -221,6 +223,9 @@ export function nameCreatedNodes(revision: RevisionView, changes: FlowChanges): 
 export function addNode(revision: RevisionView, nodeId: string, intent: AddNodeIntent): FlowChanges | undefined {
   let changes: FlowChanges | undefined
   switch (intent.kind) {
+    case 'delay':
+      changes = createDelay(nodeId, intent.name)
+      break
     case 'workflow':
       changes = createManagedTask({ nodeId }, { name: intent.name, inputs: [], outputs: [], executor: { kind: 'workflow', flowId: '', revisionId: '' } })
       break

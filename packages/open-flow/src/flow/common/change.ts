@@ -96,6 +96,12 @@ export interface ValueNode extends GraphNodeBase {
 
 export type WaitAction = 'approve' | 'continue' | 'reject'
 
+export interface DelayNode extends GraphNodeBase {
+  readonly kind: 'delay'
+  readonly durationMs: number | null
+  readonly timeoutMs?: never
+}
+
 interface ResolutionNodeBase extends GraphNodeBase {
   readonly inputDefinitions: readonly InputPort[]
   readonly prompt: string
@@ -390,7 +396,7 @@ export interface WebhookResponseNode extends GraphNodeBase {
   readonly onError?: never
 }
 
-export type GraphNode = WebhookResponseNode | OutputsNode | ApprovalNode | ConditionNode | TaskNode | TriggerNode | ValueNode | WaitNode
+export type GraphNode = DelayNode | WebhookResponseNode | OutputsNode | ApprovalNode | ConditionNode | TaskNode | TriggerNode | ValueNode | WaitNode
 
 export interface FlowDocument {
   readonly bindings: Readonly<Record<string, { readonly kind: 'variable'; readonly target: string }>>
@@ -399,7 +405,7 @@ export interface FlowDocument {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 

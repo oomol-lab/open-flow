@@ -99,6 +99,8 @@ export function authoringDiagnosticField(node: GraphNode | undefined, parts: rea
     return 'config'
   }
   switch (node.kind) {
+    case 'delay':
+      return head === 'durationMs' ? 'config.durationMs' : 'config'
     case 'condition':
       return head == 'cases' || head == 'matchMode' ? ['config', ...conditionConfigurationFieldPath(node, location)].join('.') : 'config'
     case 'wait':

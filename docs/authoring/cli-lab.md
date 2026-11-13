@@ -419,3 +419,7 @@ Both transports share the deployment implementation. The fixture's Code node val
 HTTP `body` as an array before connecting it to the node's array input; unknown response data
 is not assumed to meet the downstream contract. This scenario has no paid model or Connector
 calls. Its read-only preview does not replace inspection of the editable Workbench state panel.
+
+## Delay
+
+`delay` creates, reads and updates a fixed-duration Delay through public authoring, then verifies automatic continuation through ordinary execution edges with no business outputs. Run `bun run lab test delay` and `bun run lab test delay --mcp`.

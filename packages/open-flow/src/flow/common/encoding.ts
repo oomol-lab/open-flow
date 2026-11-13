@@ -142,6 +142,8 @@ function canonicalNode(value: GraphNode): JsonValue {
     }
     case 'value':
       return { ...common, kind: value.kind, values: canonicalPorts(value.values) }
+    case 'delay':
+      return { ...common, kind: value.kind, durationMs: value.durationMs }
     case 'approval':
     case 'wait':
       return {

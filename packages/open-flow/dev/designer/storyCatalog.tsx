@@ -14,6 +14,7 @@ import { connectionPathsStory } from './connectionPaths.tsx'
 import { connectorAccessStory } from './connectorAccess.tsx'
 import { connectorProxyStory, connectorProxyCreationStory } from './connectorProxy.tsx'
 import { decisionStory } from './decision.tsx'
+import { delayStory } from './delay.tsx'
 import { errorWorkflowStory } from './errorWorkflow.tsx'
 import { eventSourcesStory, createEventSourceStory, eventSourceSetupStory, feishuFiltersStory, feishuSummaryStory, eventPickerStory } from './eventSources.tsx'
 import { fieldLayoutStory } from './fieldLayout.tsx'
@@ -101,6 +102,7 @@ export const labStories: readonly FrontendStory[] = [
   ...previewStories,
   waitRunsStory,
   waitConfigurationStory,
+  delayStory,
   runStatusIslandStory,
   notificationsStory,
   iconPickerStory,

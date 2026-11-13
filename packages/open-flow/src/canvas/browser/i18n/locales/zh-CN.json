@@ -611,7 +611,8 @@
       "input": "流程输入",
       "output": "流程输出",
       "outputs": "工作流输出",
-      "webhook-response": "Webhook 响应"
+      "webhook-response": "Webhook 响应",
+      "delay": "延时"
     },
     "units": {
       "minute": "分钟",

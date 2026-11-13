@@ -611,7 +611,8 @@
       "input": "入力",
       "output": "出力",
       "outputs": "ワークフロー出力",
-      "webhook-response": "Webhook レスポンス"
+      "webhook-response": "Webhook レスポンス",
+      "delay": "遅延"
     },
     "units": {
       "minute": "分",

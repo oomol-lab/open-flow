@@ -162,7 +162,7 @@ describe('RunDrawer terminal result', () => {
     expect(markup).toContain(`Expires ${new Date(run.waits[0]!.expiresAt).toLocaleString('en')}`)
     expect(markup).toContain('>Approve<')
     expect(markup).toContain('>Reject<')
-    expect(markup).toContain('Locate Wait node')
+    expect(markup).toContain('Locate node')
   })
 })
 

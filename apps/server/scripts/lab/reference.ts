@@ -237,6 +237,29 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
     await call('flow_check', { flowId, revisionId: savedRevision })
     return
   }
+  if (id === 'delay') {
+    await call('flow_schema', { type: 'delay' })
+    const before = await read()
+    const created = await submit(before.revision, [
+      { op: 'node.add', type: 'start', as: 'start', name: 'Start' },
+      { op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 100 } },
+      {
+        op: 'node.add',
+        type: 'outputs',
+        as: 'out',
+        name: 'Outputs',
+        config: { outputDefs: { done: { schema: { type: 'boolean' }, nullable: false } } },
+        inputs: { done: { kind: 'value', value: true } },
+      },
+      { op: 'edge.connect', source: '$start', target: '$pause' },
+      { op: 'edge.connect', source: '$pause', target: '$out' },
+    ])
+    const refs = created.nodes as Record<string, string>
+    await submit(created.revision, [{ op: 'node.update', node: refs.pause!, set: { name: 'Pause updated', config: { durationMs: 50 } } }])
+    await read([refs.pause!])
+    await call('flow_check', { flowId, revisionId: savedRevision })
+    return
+  }
   if (id == 'wait-auto-continue') {
     await call('flow_schema', { type: 'wait' })
     const before = await read()

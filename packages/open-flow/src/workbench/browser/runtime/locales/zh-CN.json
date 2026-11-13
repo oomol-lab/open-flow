@@ -713,7 +713,7 @@
     "connectorUnconfigured": "当前部署尚未配置 Connector。请先完成配置，然后重新运行工作流。",
     "connectorUnavailable": "Connector 请求未能完成。请再次运行工作流；如果仍然失败，请检查所选连接。",
     "locateNode": "在画布中定位{{name}}",
-    "locateWait": "定位 Wait 节点",
+    "locateWait": "定位节点",
     "nodeError": "节点错误",
     "nodeFailed": "节点未能完成执行。",
     "nodeLog": "{{level}} 日志",
@@ -953,6 +953,9 @@
         "recursive": "不支持递归调用工作流。",
         "interface-required": "尚未加载目标工作流的接口定义。",
         "dependency-invalid": "目标工作流中有无法调用的工作流节点。"
+      },
+      "delay": {
+        "duration-invalid": "请输入可换算为正整数毫秒的时长。"
       }
     },
     "notChecked": "尚未检查",
@@ -1838,5 +1841,23 @@
     "export": "导出",
     "hostUnsupported": "当前宿主尚不支持导入工作流包。",
     "unnamed": "未命名工作流"
+  },
+  "delay": {
+    "title": "延时",
+    "description": "延时指定时长后继续当前分支。",
+    "duration": "时长",
+    "unit": "单位",
+    "invalid": "请输入可换算为正整数毫秒的时长。",
+    "missing": "设置时长",
+    "units": {
+      "second": "秒",
+      "minute": "分钟",
+      "hour": "小时"
+    },
+    "summary": {
+      "second": "{{value}} 秒",
+      "minute": "{{value}} 分钟",
+      "hour": "{{value}} 小时"
+    }
   }
 }

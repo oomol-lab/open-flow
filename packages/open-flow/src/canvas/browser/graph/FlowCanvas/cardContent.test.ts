@@ -44,6 +44,15 @@ describe('Canvas content', () => {
       }),
     ).toBe('Refresh the report')
   })
+  it('keeps Delay duration in its content preview and preserves authored purpose', () => {
+    const node = { ...base, kind: 'delay' as const, duration: '5 s' }
+    expect(nodeCardContent(node)).toMatchObject({ duration: '5 s', summary: '', collapsible: true })
+    expect(nodeCardContent({ ...node, description: 'Allow the service to finish processing.' })).toMatchObject({
+      duration: '5 s',
+      summary: 'Allow the service to finish processing.',
+    })
+    expect(nodeCardContent({ ...node, contentHidden: true })).toMatchObject({ collapsible: true, hidden: true })
+  })
   it('keeps a condition purpose in the card body and puts each rule on its branch', () => {
     const node = {
       ...base,

@@ -1,5 +1,13 @@
 # Public contracts and version evolution
 
+## Delay: Flow model v15 and Engine v12
+
+The npm `next` baseline is `0.1.0-beta.92`, gitHead `b92f0557b5c900e01a56972a13400b848386d7f1`, with Model v14 and Engine v11. Model v15 adds the `delay` node; earlier model envelopes reject it. Engine v12 adds durable timer-only suspension, while v11 remains supported for existing Publications and Runs. Checkpoint v7 retains its structure, and the isolated Code runtime digest is unchanged.
+
+Server migration 64 distinguishes Delay receipts from existing interaction waits. Existing receipts remain interactive. Delay shares the persisted automatic deadline, transactional continuation and seven-day expiry, but rejects manual resolution and never produces notification links. Run waits add an optional `kind: "delay"` marker and an empty `actions` list. Upgrade Server and clients together before using Delay; old clients cannot decode timer-only Run waits. Historical Revisions, Run identities and deadlines are preserved.
+
+Scheduler `WaitRequest` distinguishes Delay registration (`kind: "delay"`, `durationMs`) from interaction waits, which retain the existing fields and may omit `kind`. Delay registration carries no prompt, actions, input value or notification configuration. Delay Run waits require `autoContinueAt`, an empty prompt and no actions.
+
 ## Workbench import description slot (after beta.87)
 
 The published npm `next` baseline is `0.1.0-beta.87`, gitHead

@@ -713,7 +713,7 @@
     "connectorUnconfigured": "目前部署尚未設定 Connector。請先完成設定，再重新執行 Flow。",
     "connectorUnavailable": "Connector 請求無法完成。請再次執行 Flow；若仍然失敗，請檢查所選的 Connection。",
     "locateNode": "在畫布上定位 {{name}}",
-    "locateWait": "定位 Wait 節點",
+    "locateWait": "定位節點",
     "nodeError": "節點錯誤",
     "nodeFailed": "這個節點未能完成。",
     "nodeLog": "{{level}} 日誌",
@@ -953,6 +953,9 @@
         "recursive": "不支援遞迴呼叫工作流程。",
         "interface-required": "尚未載入目標工作流程的介面定義。",
         "dependency-invalid": "目標工作流程中有無法呼叫的工作流程節點。"
+      },
+      "delay": {
+        "duration-invalid": "請輸入可換算為正整數毫秒的時長。"
       }
     },
     "notChecked": "尚未檢查",
@@ -1838,5 +1841,23 @@
     "export": "匯出",
     "hostUnsupported": "目前的宿主尚未支援匯入工作流程套件。",
     "unnamed": "未命名工作流程"
+  },
+  "delay": {
+    "title": "延時",
+    "description": "延時指定時長後繼續目前分支。",
+    "duration": "時長",
+    "unit": "單位",
+    "invalid": "請輸入可換算為正整數毫秒的時長。",
+    "missing": "設定時長",
+    "units": {
+      "second": "秒",
+      "minute": "分鐘",
+      "hour": "小時"
+    },
+    "summary": {
+      "second": "{{value}} 秒",
+      "minute": "{{value}} 分鐘",
+      "hour": "{{value}} 小時"
+    }
   }
 }

@@ -10,6 +10,7 @@ import {
   httpCapabilitySchema,
   authoringDefinitionSchemas as definitions,
 } from '../../flow/common/changeSchema.ts'
+import { delayDurationSchema } from '../../flow/common/delay.ts'
 import { retryConfigurationSchema, retryNodeTypes } from '../../flow/common/retry.ts'
 import { httpRequestConfigSchema } from '../../http/common/httpRequest.ts'
 import { currentEngineContract, findEngineContract } from '../../runtime/common/engineContract.ts'
@@ -42,6 +43,7 @@ export const authoringTypes = [
   'condition',
   'value',
   'wait',
+  'delay',
   'approval',
 ] as const
 const type = z.enum(authoringTypes)
@@ -109,6 +111,7 @@ const expression = z.strictObject({
 const all = z.strictObject({ all: z.array(expression) })
 const when = z.union([expression, all, z.strictObject({ any: z.array(z.union([expression, all])) })])
 export const authoringConfigurations = {
+  'delay': z.strictObject({ durationMs: delayDurationSchema }),
   'webhook-response': z.strictObject({}),
   'workflow': z.strictObject({ flowId: id }),
   'start': z.strictObject({ inputDefs: flowInputFields.default({}) }),
@@ -294,42 +297,44 @@ export function authoringSchema(kind?: AuthoringType) {
         retry: retryNodeTypes.some((nodeType) => nodeType == kind) ? z.toJSONSchema(retryConfigurationSchema) : false,
         inputSources: ['poll', 'integration'].includes(kind)
           ? ['value', 'unset', 'default']
-          : ['start', 'outputs', 'error', 'cron', 'webhook', 'value', 'condition'].includes(kind)
+          : ['delay', 'start', 'outputs', 'error', 'cron', 'webhook', 'value', 'condition'].includes(kind)
             ? []
             : ['value', 'unset', 'default', 'output', 'system', 'variable', 'sources'],
         extensibleInputs: ['code', 'agent', 'llm', 'wait', 'approval'].includes(kind),
         guidance:
-          kind == 'webhook-response'
-            ? 'Prepare an HTTP response using fixed inputs body (any JSON, default empty text), statusCode (number, default 200) and headers (scalar-valued object, default {}). Select this node in Webhook options.responseBody as {kind: "webhook-response", nodeId: "node reference", timeoutMs: 30000}. Its first completion responds immediately while the Run continues. It has no business outputs. Multiple response nodes are allowed; each Webhook selects one reachable node.'
-            : kind == 'outputs'
-              ? 'Declare output fields through config.outputDefs. Set their values through node.add.inputs or input.set. Outputs is a singleton execution sink; it waits for its predecessors and produces workflow business outputs independently of node logs. No downstream edges or data references to Outputs are allowed.'
-              : kind == 'webhook'
-                ? 'Use options.responseBody: {kind: "webhook-response", nodeId: "node ID or $alias", timeoutMs: 30000} to respond on the selected node’s first completion while the Run continues. Body, statusCode and headers come exclusively from that node; clear workflow-output-only status/header references when switching. Alternatively configure options.responseBody as {kind: "workflow-outputs", output?: "top-level output name", timeoutMs?: 30000} to respond after the Run succeeds. Omit output for the complete object. Connect Webhook to Outputs. Timeout is 1000–60000 ms; HTTP timeout does not cancel the Run. Strings return text; other values return JSON. Only in this mode, options.responseStatusCodeOutput can select a numeric top-level workflow output as the HTTP status, overriding the preserved fixed responseStatusCode (default 200). Its runtime value must be an integer from 200 to 599, excluding 204, 205, 304; missing or invalid values return 500. Use responseHeaders for fixed text headers. In workflow-output mode, responseHeaderOutputs maps header names to top-level output names; values can be string, number or boolean and are converted to text. Alternatively responseHeadersSource: {kind: "workflow-outputs", output?: "object field"} replaces the entire header object (omit output for all outputs), preserving but ignoring per-header settings. Missing, null, complex or invalid header values return 500 without fallback. Header restrictions and Content-Type policy still apply. Omit responseBody for immediate responseData. Clear options.responseBody, options.responseStatusCodeOutput, options.responseHeadersSource and options.responseHeaderOutputs explicitly to switch back.'
-                : kind == 'start'
-                  ? 'Declare workflow inputs through config.inputDefs; read them in Start node details. REST calls and manual runs supply them as trigger.outputs. Downstream nodes bind these parameters as Start outputs. Start has no input sources or defaults; non-nullable parameters are required, and omitted nullable parameters become null.'
-                  : kind == 'condition'
-                    ? 'Edit branch operands through config.branches. A branch can test one expression, all expressions, or any alternatives. Unmatched execution uses branch otherwise.'
-                    : ['poll', 'integration'].includes(kind)
-                      ? 'Configure static parameters with node.add.inputs or input.set. Definitions come from the selected Trigger key; execution output and variable sources are unavailable.'
-                      : kind == 'llm'
-                        ? 'Configure model settings, message templates and history as defaults. Input bindings with the same names override these defaults; named business inputs can be bound directly. Template strings interpolate {{name}}.'
-                        : kind == 'skip-duplicates'
-                          ? 'Bind an items array. Configure fields as dot-separated identity paths; an empty list uses each scalar item. Outputs are items and duplicates. History belongs to this node and commits only when the Run completes successfully. Fields accept strings or finite numbers; missing or complex values reject the batch.'
-                          : kind == 'connector-proxy'
-                            ? 'Call a Provider API using its Connector account. Configure providerId, connectionId, method and query/headers modes and names. Bind endpoint, query.<name>/header.<name> or complete query/headers objects, and optional body. Setting or binding body automatically selects JSON; clearing it omits the body. Explicit null is a JSON body. Outputs: body, statusCode, headers, bodyEncoding. Proxy permissions are independent of Action permissions. Upstream HTTP errors remain response data when Connector returns a successful proxy result. Unsupported Providers fail at execution. Use connectionId: "" to defer account configuration. Retries are not supported.'
-                            : kind == 'http-request'
-                              ? 'Configure method, query/headers modes and names, bodyFormat, authentication, responseFormat and statusPolicy. Bind url, query.<name>/header.<name> or whole query/headers objects, body and auth.token (Basic: auth.username/auth.password). Credentials accept variables or upstream outputs only. Outputs: body, statusCode, headers. Authentication is replaced as a complete choice.'
-                              : kind == 'openapi'
-                                ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
-                                : kind == 'workflow'
-                                  ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
-                                  : kind == 'connector'
-                                    ? 'Select an Action and account. The platform derives ports from its schema. Open or dynamic response objects expose the complete response as one output; closed objects expose named fields. Read the created node for output names. Bind the whole response for dynamic fields; declared direct properties also support output field selection. Local edits preserve saved ports and response mapping.'
-                                    : kind == 'agent'
-                                      ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
-                                      : kind == 'code'
-                                        ? codeGuidance
-                                        : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
+          kind == 'delay'
+            ? 'Pause this branch for config.durationMs milliseconds, then continue through ordinary execution edges. No inputs, business outputs or manual continuation. Server requires the delay to be shorter than seven days.'
+            : kind == 'webhook-response'
+              ? 'Prepare an HTTP response using fixed inputs body (any JSON, default empty text), statusCode (number, default 200) and headers (scalar-valued object, default {}). Select this node in Webhook options.responseBody as {kind: "webhook-response", nodeId: "node reference", timeoutMs: 30000}. Its first completion responds immediately while the Run continues. It has no business outputs. Multiple response nodes are allowed; each Webhook selects one reachable node.'
+              : kind == 'outputs'
+                ? 'Declare output fields through config.outputDefs. Set their values through node.add.inputs or input.set. Outputs is a singleton execution sink; it waits for its predecessors and produces workflow business outputs independently of node logs. No downstream edges or data references to Outputs are allowed.'
+                : kind == 'webhook'
+                  ? 'Use options.responseBody: {kind: "webhook-response", nodeId: "node ID or $alias", timeoutMs: 30000} to respond on the selected node’s first completion while the Run continues. Body, statusCode and headers come exclusively from that node; clear workflow-output-only status/header references when switching. Alternatively configure options.responseBody as {kind: "workflow-outputs", output?: "top-level output name", timeoutMs?: 30000} to respond after the Run succeeds. Omit output for the complete object. Connect Webhook to Outputs. Timeout is 1000–60000 ms; HTTP timeout does not cancel the Run. Strings return text; other values return JSON. Only in this mode, options.responseStatusCodeOutput can select a numeric top-level workflow output as the HTTP status, overriding the preserved fixed responseStatusCode (default 200). Its runtime value must be an integer from 200 to 599, excluding 204, 205, 304; missing or invalid values return 500. Use responseHeaders for fixed text headers. In workflow-output mode, responseHeaderOutputs maps header names to top-level output names; values can be string, number or boolean and are converted to text. Alternatively responseHeadersSource: {kind: "workflow-outputs", output?: "object field"} replaces the entire header object (omit output for all outputs), preserving but ignoring per-header settings. Missing, null, complex or invalid header values return 500 without fallback. Header restrictions and Content-Type policy still apply. Omit responseBody for immediate responseData. Clear options.responseBody, options.responseStatusCodeOutput, options.responseHeadersSource and options.responseHeaderOutputs explicitly to switch back.'
+                  : kind == 'start'
+                    ? 'Declare workflow inputs through config.inputDefs; read them in Start node details. REST calls and manual runs supply them as trigger.outputs. Downstream nodes bind these parameters as Start outputs. Start has no input sources or defaults; non-nullable parameters are required, and omitted nullable parameters become null.'
+                    : kind == 'condition'
+                      ? 'Edit branch operands through config.branches. A branch can test one expression, all expressions, or any alternatives. Unmatched execution uses branch otherwise.'
+                      : ['poll', 'integration'].includes(kind)
+                        ? 'Configure static parameters with node.add.inputs or input.set. Definitions come from the selected Trigger key; execution output and variable sources are unavailable.'
+                        : kind == 'llm'
+                          ? 'Configure model settings, message templates and history as defaults. Input bindings with the same names override these defaults; named business inputs can be bound directly. Template strings interpolate {{name}}.'
+                          : kind == 'skip-duplicates'
+                            ? 'Bind an items array. Configure fields as dot-separated identity paths; an empty list uses each scalar item. Outputs are items and duplicates. History belongs to this node and commits only when the Run completes successfully. Fields accept strings or finite numbers; missing or complex values reject the batch.'
+                            : kind == 'connector-proxy'
+                              ? 'Call a Provider API using its Connector account. Configure providerId, connectionId, method and query/headers modes and names. Bind endpoint, query.<name>/header.<name> or complete query/headers objects, and optional body. Setting or binding body automatically selects JSON; clearing it omits the body. Explicit null is a JSON body. Outputs: body, statusCode, headers, bodyEncoding. Proxy permissions are independent of Action permissions. Upstream HTTP errors remain response data when Connector returns a successful proxy result. Unsupported Providers fail at execution. Use connectionId: "" to defer account configuration. Retries are not supported.'
+                              : kind == 'http-request'
+                                ? 'Configure method, query/headers modes and names, bodyFormat, authentication, responseFormat and statusPolicy. Bind url, query.<name>/header.<name> or whole query/headers objects, body and auth.token (Basic: auth.username/auth.password). Credentials accept variables or upstream outputs only. Outputs: body, statusCode, headers. Authentication is replaced as a complete choice.'
+                                : kind == 'openapi'
+                                  ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
+                                  : kind == 'workflow'
+                                    ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
+                                    : kind == 'connector'
+                                      ? 'Select an Action and account. The platform derives ports from its schema. Open or dynamic response objects expose the complete response as one output; closed objects expose named fields. Read the created node for output names. Bind the whole response for dynamic fields; declared direct properties also support output field selection. Local edits preserve saved ports and response mapping.'
+                                      : kind == 'agent'
+                                        ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
+                                        : kind == 'code'
+                                          ? codeGuidance
+                                          : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
         example: {
           op: 'node.add',
           as: 'step',
@@ -366,6 +371,7 @@ export function authoringSchema(kind?: AuthoringType) {
               'value': { config: { values: { threshold: 100, region: 'EU' } } },
               'webhook': { config: { method: 'POST', body: { orderId: { schema: { type: 'string' }, nullable: false } } } },
               'wait': { prompt: 'Continue processing this order?', inputs: { order: { kind: 'value', value: { orderId: 'A-1' } } } },
+              'delay': { config: { durationMs: 5000 } },
               'approval': { prompt: 'Approve this order?', inputs: { order: { kind: 'value', value: { orderId: 'A-1' } } } },
               'llm': {
                 config: { model: { model: 'deepseek-v4-flash' }, template: [{ role: 'user', content: 'Summarize {{order}}.' }] },

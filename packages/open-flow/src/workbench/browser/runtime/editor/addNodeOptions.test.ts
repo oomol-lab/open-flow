@@ -140,7 +140,7 @@ it.each([
 ] as const)('orders built-in nodes consistently in the %s node library', (language, javascriptLabel, javascriptDescription, agentDescription) => {
   const options = deriveAddNodeOptions(emptyDraft(), createI18n(language).t).filter((option) => option.kind != 'trigger')
 
-  expect(options.slice(0, 8)).toMatchObject([
+  expect(options.slice(0, 9)).toMatchObject([
     { id: 'javascript', label: javascriptLabel, description: javascriptDescription },
     { id: 'value' },
     { id: 'agent', label: language === 'zh-CN' ? 'AI 智能体' : language === 'zh-TW' ? 'AI 智能體' : 'AI Agent', description: agentDescription },
@@ -148,6 +148,7 @@ it.each([
     { id: 'http-request' },
     { id: 'openapi' },
     { id: 'condition' },
+    { id: 'delay' },
     { id: 'skip-duplicates' },
   ])
 })

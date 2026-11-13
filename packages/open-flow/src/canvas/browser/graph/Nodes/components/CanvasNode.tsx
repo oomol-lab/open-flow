@@ -37,7 +37,7 @@ export function CanvasNode({
   const actions = node.kind === 'task' ? node.actionSummary : undefined
   const actionLabel = actions == null ? undefined : t('canvasCard.actionSummary', { actions: actions.count, providers: actions.providers.length })
   const title = node.title
-  const { values, summary, schedules, images, inline, hidden } = nodeCardContent(node)
+  const { values, summary, schedules, duration, images, inline, hidden } = nodeCardContent(node)
   const kind = node?.kind ?? 'task'
   const triggerSource =
     node.kind == 'trigger'
@@ -89,8 +89,15 @@ export function CanvasNode({
         run={node.run}
         branches={branches}
         preview={
-          (values.length > 0 || Boolean(schedules?.length) || (node?.run != null && images.length > 0)) && (
+          (values.length > 0 || Boolean(schedules?.length) || Boolean(duration) || (node?.run != null && images.length > 0)) && (
             <>
+              {duration && (
+                <NodeContentRows>
+                  <li>
+                    <span className={styles.interval}>{duration}</span>
+                  </li>
+                </NodeContentRows>
+              )}
               {schedules != null && schedules.length > 0 && (
                 <NodeContentRows>
                   {schedules.map((schedule, index) => {

@@ -481,7 +481,7 @@ describe('ControlClient Publish API', () => {
       1,
       '/v1/flows/flow%2F1/revisions/revision-1/publications',
       expect.objectContaining({
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v11', expectedLivePublicationId: null, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v12', expectedLivePublicationId: null, version: 1 }),
         method: 'POST',
       }),
     )
@@ -595,6 +595,26 @@ describe('ControlClient Wait API', () => {
       },
     ],
   } as const
+
+  it('decodes a timer-only Delay without a prompt or decision actions', async () => {
+    const response = { ...waiting, waits: [{ ...waiting.waits[0], kind: 'delay', actions: [], prompt: '', autoContinueAt: '2026-09-01T00:00:07.000Z' }] }
+    const client = new ControlClient(async () => Response.json(response))
+    await expect(client.getRun(waiting.runId)).resolves.toEqual(response)
+    response.waits[0]!.kind = 'interaction'
+    await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid' })
+  })
+
+  it.each([{ autoContinueAt: undefined }, { actions: ['continue'] }, { prompt: 'Continue?' }])(
+    'rejects a Delay with inconsistent timing or interaction fields: %j',
+    async (fields) => {
+      const response = {
+        ...waiting,
+        waits: [{ ...waiting.waits[0], kind: 'delay', actions: [], prompt: '', autoContinueAt: '2026-09-01T00:00:07.000Z', ...fields }],
+      }
+      const client = new ControlClient(async () => Response.json(response))
+      await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid' })
+    },
+  )
 
   it.each([
     { actorId: 'user-1', channel: 'workbench' },
@@ -815,6 +835,7 @@ describe('Run event contract', () => {
     ['run.canceled', { result: {} }],
     ['run.events-truncated', {}],
     ['node.started', { ...node, nodeKind: 'javascript', nodeTitle: 'Task' }],
+    ['node.started', { ...node, nodeKind: 'delay', nodeTitle: 'Delay' }],
     ['node.completed', { ...node, outputs: { nested: [null, { value: true }] } }],
     ['node.failed', { ...node, error: { code: 'node.failed', message: 'Failed.' } }],
     ['node.log', { ...node, level: 'info', message: 'Message.' }],

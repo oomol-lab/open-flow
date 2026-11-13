@@ -713,7 +713,7 @@
     "connectorUnconfigured": "このデプロイには Connector が設定されていません。設定を完了してから、Flow を再実行してください。",
     "connectorUnavailable": "Connector へのリクエストを完了できませんでした。もう一度 Flow を実行し、それでも失敗する場合は選択中の Connection を確認してください。",
     "locateNode": "キャンバス上で {{name}} を表示",
-    "locateWait": "待機ノードを表示",
+    "locateWait": "ノードを表示",
     "nodeError": "ノードのエラー",
     "nodeFailed": "ノードの実行を完了できませんでした。",
     "nodeLog": "{{level}} ログ",
@@ -953,6 +953,9 @@
         "recursive": "再帰呼び出しには対応していません。",
         "interface-required": "対象ワークフローのインターフェースが読み込まれていません。",
         "dependency-invalid": "対象ワークフロー内に呼び出せないワークフローノードがあります。"
+      },
+      "delay": {
+        "duration-invalid": "正の整数ミリ秒に換算できる時間を入力してください。"
       }
     },
     "notChecked": "未検査",
@@ -1838,5 +1841,23 @@
     "export": "エクスポート",
     "hostUnsupported": "このホストはワークフローバンドルのインポートにまだ対応していません。",
     "unnamed": "無題のワークフロー"
+  },
+  "delay": {
+    "title": "遅延",
+    "description": "指定した時間が経過したら、この分岐を続行します。",
+    "duration": "時間",
+    "unit": "単位",
+    "invalid": "正の整数ミリ秒に換算できる時間を入力してください。",
+    "missing": "時間を設定",
+    "units": {
+      "second": "秒",
+      "minute": "分",
+      "hour": "時間"
+    },
+    "summary": {
+      "second": "{{value}} 秒",
+      "minute": "{{value}} 分",
+      "hour": "{{value}} 時間"
+    }
   }
 }

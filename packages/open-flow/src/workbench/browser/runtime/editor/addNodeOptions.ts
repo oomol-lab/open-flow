@@ -71,6 +71,7 @@ export type AddNodeOption = AddNodeOptionBase &
     | { readonly kind: 'trigger'; readonly trigger: AddTrigger }
     | { readonly kind: 'value' }
     | { readonly kind: 'wait' }
+    | { readonly kind: 'delay' }
     | { readonly kind: 'outputs' }
     | { readonly kind: 'webhook-response' }
   )
@@ -152,6 +153,7 @@ function builtinOptions(_draft: Draft, t: TFunction): readonly AddNodeOption[] {
         { handle: 'true', jsonSchema: {} },
       ],
     },
+    { id: 'delay', kind: 'delay', group, label: t('delay.title'), description: t('delay.description'), icon: ':lucide-light:timer:', inputs: [], outputs: [] },
     {
       description: t('flowState.warning'),
       group,
@@ -291,6 +293,8 @@ export function deriveAddNodeOptions(draft: Draft | undefined, t: TFunction): re
 
 export function addNodeIntent(option: AddNodeOption, revision: RevisionView, t: TFunction): AddNodeIntent | undefined {
   switch (option.kind) {
+    case 'delay':
+      return { kind: 'delay', name: t('delay.title') }
     case 'workflow':
       return { kind: 'workflow', name: t('addNode.workflow') }
     case 'webhook-response':

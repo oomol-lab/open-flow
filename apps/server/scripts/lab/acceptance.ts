@@ -99,6 +99,26 @@ export function runtimeAssertions(
     if (calls.length || modelCalls.length) errors.push('No external requests are needed.')
     return errors
   }
+  if (id === 'delay') {
+    const delay = Object.entries(content.document.graph.nodes).find(([, node]) => node.kind === 'delay')
+    const created = events.filter((event) => event.kind === 'wait.created').filter((event) => event.payload.nodeId === delay?.[0])
+    const continued = events.filter((event) => event.kind === 'run.resolved')
+    const completed = events.filter((event) => event.kind === 'node.completed').filter((event) => event.payload.nodeId === delay?.[0])
+    const result = events.find((event) => event.kind === 'run.completed')?.payload.result
+    if (
+      created.length !== 1 ||
+      created[0]?.payload.kind !== 'delay' ||
+      continued.length !== 1 ||
+      continued[0]?.payload.source !== 'automatic' ||
+      completed.length !== 1 ||
+      !isDeepStrictEqual(completed[0]?.payload.outputs, {})
+    )
+      errors.push('Complete one durable Delay automatically with no business outputs.')
+    if (result == null || typeof result !== 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, { done: true }))
+      errors.push('Continue downstream and return done=true.')
+    if (calls.length || modelCalls.length) errors.push('No external calls are needed.')
+    return errors
+  }
   if (id == 'wait-auto-continue') {
     const resolved = events.filter((event) => event.kind == 'run.resolved')
     const completed = events.find((event) => event.kind == 'run.completed')

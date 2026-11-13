@@ -611,7 +611,8 @@
       "input": "Вход",
       "output": "Выход",
       "outputs": "Выходы рабочего процесса",
-      "webhook-response": "Ответ Webhook"
+      "webhook-response": "Ответ Webhook",
+      "delay": "Задержка"
     },
     "units": {
       "minute": "мин.",

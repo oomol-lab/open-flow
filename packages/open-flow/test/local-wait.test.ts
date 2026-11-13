@@ -96,7 +96,7 @@ async function fixture(
         create: (wait: WaitRequest) =>
           Effect.sync(() => {
             requests.push(wait)
-            return wait.notify
+            return wait.kind !== 'delay' && wait.notify
               ? {
                   inputs: wait.value,
                   prompt: wait.prompt,

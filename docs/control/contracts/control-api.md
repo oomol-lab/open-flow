@@ -1309,6 +1309,12 @@ Rate-limited requests return `429 wait-action.rate-limited` with remaining wait 
 
 Independent resolution receipts survive event retention and are removed with Flow deletion. After another wait or terminal Run state, the old waitId still returns the winning action and original resolvedAt. The same decision returns `resolutionAccepted: true`; an opposing one returns `false`. Neither queues more execution. Canceled or expired unresolved waits create no resolution fact. Retained receipts do not extend expired external capabilities.
 
+### Delay
+
+The `delay` node accepts static `config: { durationMs }`, a positive safe integer in milliseconds. New nodes default to 5000 ms. Delay runs with no inputs, business outputs or prompt. It suspends only its branch and continues through ordinary execution edges. Each invocation persists its deadline once and recovery retains it. Server requires durations shorter than seven days.
+
+Delay uses the existing Run waiting lifecycle. Its `run.waits` entry adds `kind: "delay"`, has `actions: []`, an empty prompt and a required `autoContinueAt`. Existing interaction waits may omit `kind`. `wait.created` also carries the Delay marker. Manual resolution is rejected, no public capability links are issued, and cancellation prevents automatic continuation. Arrival at the deadline uses the same transactional automatic decision owner.
+
 ### Wait automatic continuation
 
 Only Wait accepts optional `autoContinue` business configuration, through both the node model and

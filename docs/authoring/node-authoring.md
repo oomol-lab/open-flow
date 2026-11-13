@@ -236,6 +236,10 @@ property panel. There is no error execution edge or canvas connection point. Use
 to distinguish null from an error object. Business output bindings must allow missing/null values
 if downstream processing also executes after a handled failure.
 
+## Delay
+
+Delay has public type `delay` and static configuration `{ durationMs: 5000 }`. New nodes default to five seconds. The duration is a positive safe integer in milliseconds. Workbench drafts retain an empty duration as null and invalid numbers for validation. Delay has no data ports or prompt and continues through ordinary execution edges. Each invocation registers its own durable deadline; recovery retains that deadline. Server requires the deadline to precede the seven-day expiry. Manual resolution is unavailable.
+
 ## Wait automatic continuation
 
 Wait supports optional `config.autoContinue`: `{ kind: 'after', durationMs: 86400000 }` or

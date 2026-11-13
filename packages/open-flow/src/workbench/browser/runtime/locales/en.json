@@ -713,7 +713,7 @@
     "connectorUnconfigured": "Connector is not configured for this deployment. Complete the configuration, then run the Flow again.",
     "connectorUnavailable": "The Connector request could not be completed. Run the Flow again; if it still fails, check the selected Connection.",
     "locateNode": "Locate {{name}} on the canvas",
-    "locateWait": "Locate Wait node",
+    "locateWait": "Locate node",
     "nodeError": "Node error",
     "nodeFailed": "The node could not be completed.",
     "nodeLog": "{{level}} log",
@@ -953,6 +953,9 @@
         "recursive": "Recursive workflow calls are not supported.",
         "interface-required": "The target workflow’s interface has not been loaded.",
         "dependency-invalid": "The target workflow contains an invalid workflow call."
+      },
+      "delay": {
+        "duration-invalid": "Enter a positive duration in whole milliseconds."
       }
     },
     "notChecked": "Not checked",
@@ -1838,5 +1841,23 @@
     "export": "Export",
     "hostUnsupported": "This host does not support workflow bundle imports yet.",
     "unnamed": "Untitled workflow"
+  },
+  "delay": {
+    "title": "Delay",
+    "description": "Pause this branch for a fixed duration.",
+    "duration": "Duration",
+    "unit": "Unit",
+    "invalid": "Enter a positive duration in whole milliseconds.",
+    "missing": "Set duration",
+    "units": {
+      "second": "Seconds",
+      "minute": "Minutes",
+      "hour": "Hours"
+    },
+    "summary": {
+      "second": "{{value}} s",
+      "minute": "{{value}} min",
+      "hour": "{{value}} h"
+    }
   }
 }

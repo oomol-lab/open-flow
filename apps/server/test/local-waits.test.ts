@@ -1,3 +1,4 @@
+import type { WaitAutoContinue } from '@oomol-lab/open-flow/flow-change'
 import type { FlowRunCheckpoint, WaitRequest } from '@oomol-lab/open-flow/scheduler'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -9,7 +10,7 @@ import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
-function fixture(autoContinue?: WaitRequest['autoContinue']) {
+function fixture(timing?: WaitAutoContinue | { readonly kind: 'delay'; readonly durationMs: number | null }) {
   let now = 1000
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
@@ -44,16 +45,19 @@ function fixture(autoContinue?: WaitRequest['autoContinue']) {
   expect(store.runs.claim()?.runId).toBe(runId)
   expect(store.runs.start(runId, { kind: 'run.started', payload: { flowId: 'flow', scopeId: runId } })).toBe(true)
   const waits = ['first', 'second'].map(
-    (waitId): WaitRequest => ({
-      waitId,
-      nodeId: waitId,
-      jobId: waitId,
-      actions: autoContinue != null && waitId == 'first' ? ['continue'] : ['approve', 'reject'],
-      autoContinue: waitId == 'first' ? autoContinue : undefined,
-      prompt: waitId,
-      value: {},
-      notify: true,
-    }),
+    (waitId): WaitRequest =>
+      timing?.kind === 'delay' && waitId === 'first'
+        ? { kind: 'delay', durationMs: timing.durationMs, waitId, nodeId: waitId, jobId: waitId }
+        : {
+            waitId,
+            nodeId: waitId,
+            jobId: waitId,
+            actions: timing != null && waitId == 'first' ? ['continue'] : ['approve', 'reject'],
+            autoContinue: waitId == 'first' && timing?.kind !== 'delay' ? timing : undefined,
+            prompt: waitId,
+            value: {},
+            notify: true,
+          },
   )
   const checkpoint: FlowRunCheckpoint = {
     version: 7,
@@ -73,7 +77,13 @@ function fixture(autoContinue?: WaitRequest['autoContinue']) {
     bindingValues: {},
     waits: waits.map((wait) => {
       const notification = store.runs.createWait(runId, wait, 'https://flows.example')!
-      return { jobId: wait.jobId, nodeId: wait.nodeId, waitId: wait.waitId, value: wait.value, pending: notification }
+      return {
+        jobId: wait.jobId,
+        nodeId: wait.nodeId,
+        waitId: wait.waitId,
+        value: wait.kind === 'delay' ? {} : wait.value,
+        ...(notification == null ? {} : { pending: notification }),
+      }
     }),
   }
   return {
@@ -88,6 +98,54 @@ function fixture(autoContinue?: WaitRequest['autoContinue']) {
     pause: () => store.runs.wait(runId, { kind: 'waiting', checkpoint }, 900),
   }
 }
+
+it('retains a Delay deadline across recovery, rejects manual decisions and wakes only once when due', () => {
+  const f = fixture({ kind: 'delay', durationMs: 1000 })
+  expect(f.store.runViews.waitReceipt(f.runId, 'first')).toMatchObject({ kind: 'delay', autoContinueAt: 2000 })
+  expect(f.checkpoint.waits[0]).not.toHaveProperty('pending')
+  expect(f.database.connection.prepare('SELECT capability_digest FROM wait_receipts WHERE wait_id = ?').get('first')).toEqual({ capability_digest: null })
+  expect(f.store.runs.resolveWait(f.runId, 'first', 'continue')).toEqual({ kind: 'invalid-action' })
+  f.setTime(1500)
+  expect(f.store.runs.createWait(f.runId, f.waits[0]!, undefined)).toBeUndefined()
+  expect(f.store.runViews.waitReceipt(f.runId, 'first')?.autoContinueAt).toBe(2000)
+  f.pause()
+  const reopened = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 2000)
+  expect(reopened.runs.maintain(1999, 100, 60_000).continuedWaits).toEqual([])
+  expect(reopened.runViews.waitReceipt(f.runId, 'first')?.autoContinueAt).toBe(2000)
+  expect(reopened.runs.maintain(2000, 100, 60_000).continuedWaits).toHaveLength(1)
+  expect(reopened.runs.maintain(2000, 100, 60_000).continuedWaits).toEqual([])
+  expect(reopened.runs.resolveWait(f.runId, 'first', 'continue')).toEqual({ kind: 'invalid-action' })
+  expect(reopened.runs.claim()?.resume?.checkpoint).toEqual(f.checkpoint)
+})
+
+it('does not wake a canceled Delay', () => {
+  const f = fixture({ kind: 'delay', durationMs: 1000 })
+  f.pause()
+  f.store.runs.cancelControlRun(f.runId)
+  f.setTime(2000)
+  expect(f.store.runs.maintain(2000, 100, 60_000).continuedWaits).toEqual([])
+  expect(f.store.runViews.run(f.runId)?.status).toBe('canceled')
+})
+
+it('requires a Delay deadline to precede the deployment expiry', () => {
+  expect(() => fixture({ kind: 'delay', durationMs: 7 * 24 * 60 * 60 * 1000 })).toThrow('before the Wait expires in 7 days')
+})
+
+it.each([null, 0, -1000, 0.1])('rejects incomplete or invalid Delay durations at registration: %j', (durationMs) => {
+  expect(() => fixture({ kind: 'delay', durationMs })).toThrow()
+})
+
+it('rejects a changed Delay duration or an interaction notification', () => {
+  const f = fixture({ kind: 'delay', durationMs: 1000 })
+  const wait = f.waits[0]!
+  if (wait.kind !== 'delay') throw new Error('Expected Delay')
+  expect(() => f.store.runs.createWait(f.runId, { ...wait, durationMs: 2000 }, undefined)).toThrow('Wait identity changed.')
+  expect(() => f.store.runs.createWait(f.runId, wait, 'https://flows.example', { action: 'test.notify', messageHandle: 'message', input: {} })).toThrow(
+    'Delay cannot send an interaction notification.',
+  )
+  expect(f.store.runViews.waitReceipt(f.runId, wait.waitId)?.autoContinueAt).toBe(2000)
+  expect(f.database.connection.prepare('SELECT * FROM wait_notifications').all()).toEqual([])
+})
 
 it('persists multiple waits immediately and resumes locally without a checkpoint', async () => {
   const f = fixture()
