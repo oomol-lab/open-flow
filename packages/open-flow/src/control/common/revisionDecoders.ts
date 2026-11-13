@@ -1,7 +1,7 @@
 import type { Draft, DraftChange, DraftSync, Presentation, RevisionMetadata } from './api.ts'
 
 import { decodeRevisionContent } from '../../flow/common/encoding.ts'
-import { integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
+import { decodeFlowContent, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 
 function revisionMetadata(value: unknown): RevisionMetadata {
   const source = record(value)
@@ -21,11 +21,7 @@ function revisionMetadata(value: unknown): RevisionMetadata {
 
 export function draft(value: unknown): Draft {
   const source = record(value)
-  try {
-    return { ...revisionMetadata(source), content: decodeRevisionContent(source.content) }
-  } catch {
-    return invalidResponse()
-  }
+  return decodeFlowContent(() => ({ ...revisionMetadata(source), content: decodeRevisionContent(source.content) }))
 }
 
 export function revisionTriggers(value: unknown) {

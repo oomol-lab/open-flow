@@ -16,7 +16,7 @@ import type { StoredTriggerActivity, StoredTriggerBinding } from '../storage/tri
 import type { StoredVariableListItem } from '../storage/variable-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { decodeRevision, revisionRepairKind } from '@oomol-lab/open-flow/flow-encoding'
+import { decodeRevision, revisionRepairKind, serializeRevisionContent } from '@oomol-lab/open-flow/flow-encoding'
 import { ControlError } from '../error.ts'
 import { presentationView } from '../storage/flow-store.ts'
 import { RevisionIntegrityError } from '../storage/revision-store.ts'
@@ -111,8 +111,9 @@ export function revisionMetadata(stored: StoredFlowRevision | StoredChangeRevisi
   }
 }
 
+/** The response view of a Revision. Its content uses the wire form, which carries the derived features list. */
 export function draft(stored: StoredFlowRevision): Draft {
-  return { ...revisionMetadata(stored), content: revisionContent(stored) }
+  return { ...revisionMetadata(stored), content: serializeRevisionContent(revisionContent(stored)) }
 }
 
 export function presentation(stored: StoredPresentation): Presentation {

@@ -129,7 +129,7 @@ it('creates, reads, partially updates, saves and validates through the public au
   })
   const prepared = await prepareFlow(reloaded, currentEngineContract)
   if (prepared.kind !== 'prepared') throw new Error(JSON.stringify(prepared))
-  expect(await prepareFlow(reloaded, 'open-flow-engine/v10')).toEqual({ kind: 'engine-unsupported' })
+  expect(await prepareFlow(reloaded, 'open-flow-engine/v10')).toEqual({ kind: 'engine-unsupported', capabilities: ['connector-proxy'] })
   const cleared = await compileAuthoring(
     reloaded,
     { baseRevision: 'updated', requestId: 'clear', edits: [{ op: 'input.set', node: id, input: 'body', source: { kind: 'unset' } }] },

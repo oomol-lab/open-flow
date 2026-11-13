@@ -511,6 +511,7 @@
       "connectorUnavailable": "Connector를 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.",
       "engineUnavailable": "실행 엔진을 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.",
       "engineUnsupported": "이 Flow는 지원되지 않는 실행 엔진을 사용합니다.",
+      "flowFeaturesUnsupported": "이 Flow는 이 버전에서 지원하지 않는 기능을 사용합니다: {{features}}. 열려면 업그레이드하세요.",
       "flowBusy": "다른 작업에서 이 Flow를 업데이트하고 있습니다. 작업이 끝난 뒤 다시 시도하세요.",
       "flowConflict": "불러온 뒤 이 Flow가 변경되었습니다. 다시 불러온 뒤 다시 시도하세요.",
       "flowInvalid": "이 Flow에 잘못된 데이터가 있습니다. 구성을 확인한 뒤 다시 시도하세요.",
@@ -956,6 +957,9 @@
       },
       "delay": {
         "duration-invalid": "양의 정수 밀리초로 환산되는 시간을 입력하세요."
+      },
+      "engine": {
+        "capability-unsupported": "실행 엔진이 다음 기능을 지원하지 않습니다: {{capabilities}}."
       }
     },
     "notChecked": "검사 안 됨",

@@ -105,7 +105,7 @@ describe('Code Connector capability', () => {
     expect(new Set(closures.map((closure) => closure.digest)).size).toBe(4)
     for (const content of contents) {
       const decoded = JSON.parse(new TextDecoder().decode(encodeRevision(content))) as RevisionContent
-      expect(decoded).toEqual({ ...content, kind: 'open-flow-flow-revision', version: 1 })
+      expect(decoded).toEqual({ ...content, features: [], kind: 'open-flow-flow-revision', version: 1 })
     }
   })
 })

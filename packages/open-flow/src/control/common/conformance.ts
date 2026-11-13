@@ -4,7 +4,7 @@ import type { ConnectorConnection, CreateEventSource, ResultInfo, PollTriggerTes
 import type { ProviderAccessIdentity } from './providerAccess.ts'
 
 import { dequal } from 'dequal/lite'
-import { upgradeRevisionContent } from '../../flow/common/change.ts'
+import { currentFlowModelVersion, upgradeRevisionContent } from '../../flow/common/change.ts'
 import { currentEngineContract as engineContract } from '../../runtime/common/engineContract.ts'
 import { ControlClient, decodeRunEvent } from './api.ts'
 import { allConnectorConnectionsQuery } from './connectorQueries.ts'
@@ -550,6 +550,42 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const retired = await json(await request(harness, `/v1/flows/${flowId}`, { method: 'DELETE' }), 202, 'Retire Flow')
       equal(retired.status, 'retiring', 'Retired Flow status')
       await error(await addValueNode(harness, flowId, draftRevisionId), 409, 'flow.busy', 'Mutation after retirement')
+    },
+  },
+  {
+    name: 'serializes every Revision content response with its derived features list',
+    async verify(harness) {
+      const flow = await createFlow(harness, 'Features flow', 'features-flow')
+      const flowId = requiredString(flow.flowId, 'Features Flow flowId')
+      const changed = await json(
+        await addValueNode(harness, flowId, requiredString(flow.draftRevisionId, 'Features Flow revisionId')),
+        200,
+        'Change features Draft',
+      )
+      const revisionId = changedRevisionId(changed, 'Changed features Draft')
+      const draft = await json(await request(harness, `/v1/flows/${flowId}/draft`), 200, 'Read features Draft')
+      const editor = await json(await request(harness, `/v1/flows/${flowId}/editor`), 200, 'Read features editor')
+      const sync = await json(await request(harness, `/v1/flows/${flowId}/draft/sync`), 200, 'Sync features Draft')
+      const revision = await json(await request(harness, `/v1/flows/${flowId}/revisions/${revisionId}`), 200, 'Read features Revision')
+      const exported = await json(await request(harness, `/v1/flows/${flowId}/export`), 200, 'Export features Flow')
+      const preview = await json(await request(harness, `/v1/flows/${flowId}/export-preview`), 200, 'Preview features export')
+      const previewFiles = Array.isArray(preview.workflows)
+        ? preview.workflows.map((entry, index) => record(record(entry, `Export preview workflow ${index}`).file, `Export preview file ${index}`))
+        : []
+      equal(previewFiles.length > 0, true, 'Export preview must contain the Flow.')
+      const contents: readonly [string, unknown][] = [
+        ['Draft', draft.content],
+        ['editor Draft', record(editor.draft, 'Editor Draft').content],
+        ['Draft sync', record(sync.draft, 'Draft sync snapshot').content],
+        ['Revision', revision.content],
+        ['export', exported.content],
+        ...previewFiles.map((file, index): [string, unknown] => [`export preview ${index}`, file.content]),
+      ]
+      for (const [label, value] of contents) {
+        const content = record(value, `${label} content`)
+        equal(content.modelVersion, currentFlowModelVersion, `${label} must use the current Flow model.`)
+        equal(dequal(content.features, []), true, `${label} must carry its derived features list.`)
+      }
     },
   },
   {

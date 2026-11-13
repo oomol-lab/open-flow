@@ -118,6 +118,25 @@ The interface returns save state and semantic validation separately. Drafts with
 Commits reuse whole-graph version checks and idempotency records. If a response is lost, an identical request checks the idempotent result first.
 A new request based on an old version must not merge automatically.
 
+## Register Flow features
+
+A new node kind, executor kind, Capability kind, or node field that older packages cannot read is a Flow feature.
+Register it in `packages/open-flow/src/flow/common/features.ts` with a permanent kebab-case name and a detection rule.
+Do not allocate a Flow model or Engine contract revision for it.
+
+- **Detection only matches new content.** A rule may only match content that every earlier package rejects. Never
+  change a published name or rule; otherwise existing documents would start requiring a feature they never declared.
+- **Model.** Mark the feature outside the Model v16 baseline, so documents that use it declare it in `features` and
+  older packages reject them instead of dropping content.
+- **Engine.** When execution needs Engine support, add the name to `engineCapabilityRevisions` in
+  `runtime/common/engineContract.ts` with the current contract revision. Older contracts then reject Flows that use it.
+- **When a revision is still required.** Allocate an Engine contract revision only when guest-visible interfaces or
+  existing execution results change, including a new unconditional `context` member; prefer exposing new Code
+  interfaces only through a declared Capability. Allocate a Flow model revision only to migrate existing document
+  structure.
+- **Retiring a kind.** Add it to the retired kinds in `flow/common/changeSchema.ts`, so repair keeps discarding it
+  instead of rejecting it as content from a newer package.
+
 ## Verify new nodes
 
 First complete a minimal task through the public interface. Confirm that callers do not need to know internal definitions.

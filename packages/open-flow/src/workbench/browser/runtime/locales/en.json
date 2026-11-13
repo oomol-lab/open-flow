@@ -511,6 +511,7 @@
       "connectorUnavailable": "Connector is temporarily unavailable. Try again later.",
       "engineUnavailable": "The execution engine is temporarily unavailable. Try again later.",
       "engineUnsupported": "This Flow uses an unsupported execution engine.",
+      "flowFeaturesUnsupported": "This Flow uses features this version does not support: {{features}}. Upgrade to open it.",
       "flowBusy": "Another operation is updating this Flow. Wait for it to finish, then try again.",
       "flowConflict": "This Flow changed since it was loaded. Reload it and try again.",
       "flowInvalid": "This Flow contains invalid data. Review its configuration and try again.",
@@ -956,6 +957,9 @@
       },
       "delay": {
         "duration-invalid": "Enter a positive duration in whole milliseconds."
+      },
+      "engine": {
+        "capability-unsupported": "The execution engine does not support: {{capabilities}}."
       }
     },
     "notChecked": "Not checked",

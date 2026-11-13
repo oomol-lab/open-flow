@@ -6,6 +6,7 @@ import { clearTriggerExternalConfig } from '../../trigger/common/config.ts'
 import { decodeRevisionContent } from './changeSchema.ts'
 import { clearConditionBindings } from './condition.ts'
 import { clearNodeConnections } from './connectionUsage.ts'
+import { serializeRevisionContent } from './features.ts'
 import { checkJsonDepth } from './json.ts'
 
 export interface WorkflowFile {
@@ -86,8 +87,13 @@ export function cleanWorkflowFile(value: unknown): { readonly file: WorkflowFile
   }
 }
 
+/** The wire form of a workflow file: its content carries the derived `features` list. */
+export function serializeWorkflowFile(file: WorkflowFile): WorkflowFile {
+  return { ...file, content: serializeRevisionContent(file.content) }
+}
+
 export function encodeWorkflowFile(file: WorkflowFile, options: { readonly clean?: boolean } = {}): string {
-  return `${JSON.stringify(options.clean === false ? decodeWorkflowFile(file) : cleanWorkflowFile(file).file, null, 2)}\n`
+  return `${JSON.stringify(serializeWorkflowFile(options.clean === false ? decodeWorkflowFile(file) : cleanWorkflowFile(file).file), null, 2)}\n`
 }
 
 export function workflowFileName(name: string): string {

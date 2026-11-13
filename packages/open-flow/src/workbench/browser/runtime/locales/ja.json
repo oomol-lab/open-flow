@@ -511,6 +511,7 @@
       "connectorUnavailable": "Connector は一時的に利用できません。しばらくしてから再試行してください。",
       "engineUnavailable": "実行エンジンは一時的に利用できません。しばらくしてから再試行してください。",
       "engineUnsupported": "この Flow はサポートされていない実行エンジンを使用しています。",
+      "flowFeaturesUnsupported": "この Flow は、このバージョンでサポートされていない機能を使用しています：{{features}}。開くにはアップグレードしてください。",
       "flowBusy": "別の操作がこの Flow を更新しています。完了してから再試行してください。",
       "flowConflict": "この Flow は読み込み後に変更されました。再読み込みしてから再試行してください。",
       "flowInvalid": "この Flow に無効なデータがあります。設定を確認してから再試行してください。",
@@ -956,6 +957,9 @@
       },
       "delay": {
         "duration-invalid": "正の整数ミリ秒に換算できる時間を入力してください。"
+      },
+      "engine": {
+        "capability-unsupported": "実行エンジンは次の機能をサポートしていません：{{capabilities}}。"
       }
     },
     "notChecked": "未検査",

@@ -1,6 +1,7 @@
 import type { ControlApiConformanceCase, ControlApiConformanceHarness } from './conformance.ts'
 
 import { dequal } from 'dequal/lite'
+import { serializeWorkflowFile } from '../../flow/common/workflowFile.ts'
 import { ControlClient } from './api.ts'
 import { mcpProtocolVersion, mcpTools } from './mcp.ts'
 
@@ -50,7 +51,7 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
       const original = await client.createFlow('Template source')
       const exported = await rpc(harness, 'tools/call', { name: 'flow_export', arguments: { flowId: original.flowId } })
       assert(exported.isError != true, 'MCP export failed.')
-      assert(dequal(exported.structuredContent, await client.exportFlow(original.flowId)), 'MCP and REST exports differ.')
+      assert(dequal(exported.structuredContent, serializeWorkflowFile(await client.exportFlow(original.flowId))), 'MCP and REST exports differ.')
       const args = { file: exported.structuredContent, name: 'Imported template', idempotencyKey: crypto.randomUUID() }
       const imported = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: args })
       assert(imported.isError != true, 'MCP import failed.')

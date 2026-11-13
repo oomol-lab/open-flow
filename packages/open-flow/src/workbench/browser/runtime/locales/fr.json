@@ -511,6 +511,7 @@
       "connectorUnavailable": "Le Connector est temporairement indisponible. Réessayez plus tard.",
       "engineUnavailable": "Le moteur d’exécution est temporairement indisponible. Réessayez plus tard.",
       "engineUnsupported": "Ce Flow utilise un moteur d’exécution non pris en charge.",
+      "flowFeaturesUnsupported": "Ce Flow utilise des fonctionnalités non prises en charge par cette version : {{features}}. Mettez à jour pour l’ouvrir.",
       "flowBusy": "Une autre opération met à jour ce Flow. Attendez qu’elle se termine, puis réessayez.",
       "flowConflict": "Ce Flow a changé depuis son chargement. Rechargez-le, puis réessayez.",
       "flowInvalid": "Ce Flow contient des données non valides. Vérifiez sa configuration, puis réessayez.",
@@ -956,6 +957,9 @@
       },
       "delay": {
         "duration-invalid": "Saisissez une durée positive en millisecondes entières."
+      },
+      "engine": {
+        "capability-unsupported": "Le moteur d’exécution ne prend pas en charge : {{capabilities}}."
       }
     },
     "notChecked": "Non vérifié",

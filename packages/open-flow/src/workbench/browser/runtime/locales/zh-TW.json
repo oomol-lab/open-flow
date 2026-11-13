@@ -511,6 +511,7 @@
       "connectorUnavailable": "Connector 暫時無法使用，請稍後再試一次。",
       "engineUnavailable": "執行引擎暫時無法使用，請稍後再試一次。",
       "engineUnsupported": "此 Flow 使用了不支援的執行引擎。",
+      "flowFeaturesUnsupported": "此 Flow 使用了目前版本不支援的功能：{{features}}。請升級後再開啟。",
       "flowBusy": "另一個操作正在更新此 Flow，請等待完成後再試一次。",
       "flowConflict": "此 Flow 已變更，請重新載入後再試一次。",
       "flowInvalid": "Flow 內容不符合要求，請檢查設定後再試一次。",
@@ -956,6 +957,9 @@
       },
       "delay": {
         "duration-invalid": "請輸入可換算為正整數毫秒的時長。"
+      },
+      "engine": {
+        "capability-unsupported": "執行引擎不支援：{{capabilities}}。"
       }
     },
     "notChecked": "尚未檢查",

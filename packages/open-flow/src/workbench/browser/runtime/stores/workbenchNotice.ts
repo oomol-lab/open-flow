@@ -4,6 +4,7 @@ import type { WorkbenchNotification } from '../contract.ts'
 
 import { InvalidResponseError } from '../../../../control/common/decoding.ts'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
+import { UnsupportedFlowFeaturesError } from '../../../../flow/common/features.ts'
 import { ApiError } from '../api.ts'
 
 export type Notice = WorkbenchNotification
@@ -67,6 +68,8 @@ const errorKeys = {
 } as const satisfies Readonly<Record<ControlErrorCode | 'connector.connection-required' | 'request.failed' | 'response.invalid', string>>
 
 export function errorNotice(error: unknown, t: TFunction): Notice {
+  if (error instanceof UnsupportedFlowFeaturesError)
+    return { kind: 'error', message: t('notice.error.flowFeaturesUnsupported', { features: error.features.join(', ') }) }
   if (error instanceof InvalidResponseError && error.detail != null) {
     return { kind: 'error', message: `${t('notice.error.responseInvalid')} (${error.detail})` }
   }

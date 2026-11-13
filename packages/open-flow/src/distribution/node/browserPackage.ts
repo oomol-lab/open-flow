@@ -104,6 +104,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['flow/common/edgeChanges', 'common/flow-authoring-edge'],
   ['flow/common/encoding', 'common/flow-encoding'],
   ['flow/common/errorHandling', 'common/flow-errorHandling'],
+  ['flow/common/features', 'common/flow-features'],
   ['flow/common/graph', 'common/flow-graph'],
   ['flow/common/inputValue', 'common/flow-input-value'],
   ['flow/common/json', 'common/flow-json'],

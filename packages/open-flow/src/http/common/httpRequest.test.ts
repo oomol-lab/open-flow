@@ -166,7 +166,7 @@ it('authors, reads, updates and executes using public inputs while hiding creden
   )
   expect(JSON.stringify(events)).not.toContain('secret')
   expect(() => decodeRevisionContent({ ...created.content, modelVersion: 10 })).toThrow('version 11')
-  expect(await prepareFlow(created.content, 'open-flow-engine/v7')).toEqual({ kind: 'engine-unsupported' })
+  expect(await prepareFlow(created.content, 'open-flow-engine/v7')).toEqual({ kind: 'engine-unsupported', capabilities: ['http-request'] })
   expect(() =>
     applyFlowChanges(created.content, [
       { kind: 'graph.node.input.set', nodeId: id, handle: 'auth.token', before: original.inputs['auth.token'], value: { kind: 'value', value: 'secret' } },

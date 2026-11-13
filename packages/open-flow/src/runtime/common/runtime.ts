@@ -3,7 +3,7 @@ import type { CodeModule, ConnectorCapability, TaskCapability, JsonValue } from 
 import { dequal } from 'dequal/lite'
 import { currentEngineContract } from './engineContract.ts'
 
-export { currentEngineContract, nodejsEngineContract, findEngineContract, type EngineContract } from './engineContract.ts'
+export { currentEngineContract, nodejsEngineContract, findEngineContract, type EngineCapability, type EngineContract } from './engineContract.ts'
 
 /** Serialized into the guest; keep validation and helpers self-contained. */
 export function createState(invoke: (kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>) {

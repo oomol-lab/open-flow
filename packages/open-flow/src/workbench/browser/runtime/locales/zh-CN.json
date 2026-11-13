@@ -511,6 +511,7 @@
       "connectorUnavailable": "Connector 暂时不可用，请稍后重试。",
       "engineUnavailable": "执行引擎暂时不可用，请稍后重试。",
       "engineUnsupported": "此工作流使用了不受支持的执行引擎。",
+      "flowFeaturesUnsupported": "此工作流使用了当前版本不支持的功能：{{features}}。请升级后再打开。",
       "flowBusy": "另一个操作正在更新此工作流，请等待完成后重试。",
       "flowConflict": "此工作流已发生变化，请重新加载后重试。",
       "flowInvalid": "工作流内容不符合要求，请检查配置后重试。",
@@ -956,6 +957,9 @@
       },
       "delay": {
         "duration-invalid": "请输入可换算为正整数毫秒的时长。"
+      },
+      "engine": {
+        "capability-unsupported": "执行引擎不支持：{{capabilities}}。"
       }
     },
     "notChecked": "尚未检查",

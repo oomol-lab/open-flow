@@ -363,7 +363,8 @@ interface RevisionMetadata {
 }
 
 interface Draft extends RevisionMetadata {
-  content: RevisionContent
+  // Model v16 and later always carry `features`; earlier models never do.
+  content: RevisionContent & { features?: string[] }
 }
 
 interface DraftChange {
@@ -377,6 +378,8 @@ interface DraftSync {
   version: 1
 }
 ```
+
+Revision `content` in Draft, Revision, editor, sync, export and export-preview responses, and in workflow files sent to import, is the wire form. From Flow model v16 it carries `features`: the sorted names of used Flow features outside the v16 baseline (currently always empty). Earlier models omit it and keep their historical bytes. Readers reject unknown feature names without offering repair; clients surface them as an upgrade request rather than an invalid response. A reader also rejects content that uses a feature it knows but the list omits. A list on a model before v16 is invalid. In-memory content inside one process may omit the list.
 
 `@oomol-lab/open-flow/flow-change` defines `RevisionContent`, top-level `FlowDocument`, and `ChangeOperation`. Graph operations act directly on the current Flow graph and accept no graph target. There is no nested Flow map or Flow create/delete operation.
 
@@ -596,7 +599,7 @@ interface FlowCheck {
 }
 ```
 
-Check bodies use `{ engineContract: 'open-flow-engine/v8', version: 1 }` and always validate the Flow Revision pinned in the path. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
+Check bodies use `{ engineContract: 'open-flow-engine/v12', version: 1 }` and always validate the Flow Revision pinned in the path. When the Revision uses Flow features the contract does not execute, diagnostics include `engine.capability-unsupported` at `/document/graph` with `values.capabilities` listing the missing capability names. Run and publication requests for such Revisions return `engine.unsupported`; Run errors add `details.capabilities`. A Trigger Run checks only the graph reachable from the selected Trigger. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
 
 Publication `liveEnd` records enabled state and end time when a new Live replaces that version. The ordinary publish/rollback transaction writes it atomically. Asynchronous preparation does not write it; failure and idempotent replay do not rewrite it. A new rollback Publication does not inherit its source’s end state. Current Publications and older records without history omit it. It does not indicate Trigger health.
 

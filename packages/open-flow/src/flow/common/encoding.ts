@@ -20,11 +20,13 @@ import type {
 
 import { isTriggerNode, currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { decodeRevisionEnvelope, repairRevisionEnvelope } from './changeSchema.ts'
+import { declaredFlowFeatures, flowFeaturesModelVersion } from './features.ts'
 export * from './workflowFile.ts'
 export * from './workflowBundle.ts'
 export { maxJsonDepth } from './json.ts'
 
 export { decodeFlowDocument, decodeRevisionContent, upgradeWorkflowInterfaceDocument } from './changeSchema.ts'
+export { serializeRevisionContent } from './features.ts'
 export { upgradeRevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 const encoder = new TextEncoder()
@@ -395,6 +397,7 @@ export function canonicalModule(module: CodeModule): JsonValue {
 function canonicalRevision(content: RevisionContent): JsonValue {
   return {
     document: canonicalRevisionDocument(content),
+    ...(content.modelVersion >= flowFeaturesModelVersion ? { features: [...declaredFlowFeatures(content)] } : {}),
     kind: 'open-flow-flow-revision',
     modelVersion: content.modelVersion,
     modules: Object.fromEntries(entries(content.modules).map(([id, module]) => [id, canonicalModule(module)])),

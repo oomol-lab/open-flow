@@ -1629,8 +1629,9 @@ describe('Server application service', () => {
     const service = await openService(file)
     const created = await service.control.flows.createFlow('test', 'Repairable', 'repairable')
     const source = service.control.drafts.getRevision('test', created.flow.flowId, created.flow.draftRevisionId)
+    const { features: _features, ...sourceContent } = source.content as typeof source.content & { features?: unknown }
     const legacy = JSON.stringify({
-      ...source.content,
+      ...sourceContent,
       kind: 'open-flow-flow-revision',
       modelVersion,
       version: 1,
@@ -1644,7 +1645,7 @@ describe('Server application service', () => {
             start: { kind: 'manual', name: 'Start' },
             other: { kind: 'manual', name: 'Other' },
             ...(modelVersion == 5 ? { llm: { kind: 'task', taskId: 'task', inputs: {} } } : {}),
-            broken: { kind: 'unknown' },
+            broken: { kind: 'value' },
             poll: {
               kind: 'poll',
               name: 'Mail',

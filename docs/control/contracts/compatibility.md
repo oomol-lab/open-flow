@@ -1,5 +1,35 @@
 # Public contracts and version evolution
 
+## Flow features: Flow model v16 and capability-based Engine admission
+
+The npm `next` baseline is `0.1.0-beta.94`, gitHead `f933d812`, with Model v15 and Engine v12.
+
+Flow features replace per-feature version bumps. One registry in `flow/common/features.ts` names each optional
+feature and detects its use from Revision content. Feature names and detection rules are permanent once published,
+and a new rule may only match content every earlier package rejects.
+
+**Engine.** `EngineContract.capabilities` lists the features a contract executes. The published contracts keep
+exactly their previous behavior: v7 adds `webhook-response` and `wait-auto-continue`; v8 `workflow-tools` and
+`http-request`; v9 `code-http`; v10 `skip-duplicates`; v11 `connector-proxy`; v12 `delay`. The public
+`EngineContract` fields `webhookResponses`, `waitAutoContinue`, `httpRequests`, `connectorProxy` and `delays` are
+removed; consumers read `capabilities`. `workflowTools`, `codeFetch` and `flowState` remain: they describe guest
+interfaces, which are execution semantics fixed by the contract. `prepareFlow` returns
+`{ kind: 'engine-unsupported', capabilities }` and now checks the graph reachable from the selected Trigger, so an
+unreachable branch no longer blocks a Trigger Run under an older contract. `validateFlow` reports missing
+capabilities as `engine.capability-unsupported`. Engine v12 stays current: later features that change neither guest
+interfaces nor existing results join its capabilities.
+
+**Model.** Flow model v16 is the last per-feature model revision. Serialized v16 content (Revision bytes, Control
+API content, workflow files and bundles) carries `features`, the used features outside the v16 baseline. Readers
+reject unknown names without repair; repair also refuses unknown node, executor and Capability kinds, while retired
+kinds such as `dedupe` are still discarded. Content up to v15 encodes byte-for-byte as before and is upgraded on the
+next write. The workflow file `version` stays 1. Packages up to beta.94 reject v16 content as a newer model, so once
+a Server or Cloud deployment writes v16 those clients cannot open edited Flows; this is the last such boundary.
+Later model revisions are reserved for structural migrations.
+
+Upgrade Server, Cloud and clients together for this release. Afterwards a client that knows Model v16 and Engine v12
+keeps working with newer deployments for Flows that do not use features it lacks.
+
 ## Explicit state authorities (after beta.93)
 
 The npm `next` baseline for this change is `0.1.0-beta.93`, gitHead `53efb3fa`.
@@ -399,6 +429,11 @@ For example, if Engine v5 is published and Engine v6 is pending, several executi
 together as v6. A later incompatible change requires v7 only after v6 has been published. Development
 snapshots do not require compatibility aliases or migrations unless support for those snapshots was
 explicitly agreed. Existing support obligations for older published releases still apply.
+
+Content-enabled functionality does not take a contract revision. A new node, executor, Capability kind or node
+field is a Flow feature: register its detection and, when execution needs it, its Engine capability. Allocate an
+Engine revision only when guest-visible interfaces or existing execution results change, and a Flow model revision
+only to migrate existing document structure.
 
 Runtime digests continue to identify the actual isolation protocol and environment; update them when
 those inputs change. Database migrations retain their storage upgrade rules. Neither is a per-feature

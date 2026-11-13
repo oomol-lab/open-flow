@@ -160,6 +160,9 @@ describe('Code fetch in a Run', () => {
   })
 
   it('requires Engine v9 for Code HTTP access', async () => {
-    await expect(prepareFlow(fetchFlow(['127.0.0.1'], '/echo'), 'open-flow-engine/v8/nodejs-compat-v1')).resolves.toEqual({ kind: 'engine-unsupported' })
+    await expect(prepareFlow(fetchFlow(['127.0.0.1'], '/echo'), 'open-flow-engine/v8/nodejs-compat-v1')).resolves.toEqual({
+      kind: 'engine-unsupported',
+      capabilities: ['code-http'],
+    })
   })
 })

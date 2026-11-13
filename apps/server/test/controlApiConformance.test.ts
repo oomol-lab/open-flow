@@ -649,14 +649,15 @@ it('Server unreadable Draft repair conformance', async () => {
       { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
     ])
     const draft = await api.getDraft(flow.flowId)
+    const { features: _features, ...draftContent } = draft.content as typeof draft.content & { features?: unknown }
     const stored = {
-      ...draft.content,
+      ...draftContent,
       modelVersion: 1,
       kind: 'open-flow-flow-revision',
       version: 1,
       document: {
         ...draft.content.document,
-        graph: { ...draft.content.document.graph, nodes: { ...draft.content.document.graph.nodes, broken: { kind: 'unknown' } } },
+        graph: { ...draft.content.document.graph, nodes: { ...draft.content.document.graph.nodes, broken: { kind: 'value' } } },
       },
     }
     const content = JSON.stringify(stored)
