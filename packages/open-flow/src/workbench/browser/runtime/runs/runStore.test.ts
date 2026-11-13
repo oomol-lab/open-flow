@@ -114,12 +114,89 @@ describe('RunStore', () => {
         expect(store.$.observationFailed.value).toBe(false)
       } else {
         await vi.waitFor(() => expect(store.$.observationFailed.value).toBe(true))
-        expect(store.$.result.value).toBeUndefined()
+        expect(store.$.result.value?.status).toBe('completed')
       }
       expect(store.$.events.value).toEqual([])
       expect(readEvents).toHaveBeenCalledTimes(1)
     } finally {
       store.dispose()
+    }
+  })
+
+  it.each(['run', 'events'] as const)('finishes cancellation while failed %s reads keep retrying', async (failure) => {
+    vi.useFakeTimers()
+    const client = new WorkbenchClient(vi.fn())
+    const readRun = vi.spyOn(client, 'getRun').mockResolvedValue({ ...details, status: 'running' })
+    const readEvents = vi.spyOn(client, 'getRunEvents').mockResolvedValue({
+      done: false,
+      events: [],
+      historyComplete: true,
+      nextAfter: 0,
+      runId: run.runId,
+      version: 1,
+    })
+    vi.spyOn(client, 'cancelRun').mockResolvedValue({ cancelAccepted: true, runId: run.runId, status: 'canceled', version: 1 })
+    vi.spyOn(client, 'getRunResult').mockResolvedValue({ finishedAt: timestamp, runId: run.runId, status: 'canceled', version: 1 })
+    const store = new RunStore(client, vi.fn())
+    try {
+      store.follow({ ...run, status: 'running' }, store.prepareStart())
+      await vi.advanceTimersByTimeAsync(0)
+      readRun.mockResolvedValue({ ...details, status: 'canceled' })
+      if (failure == 'run') readRun.mockRejectedValue(new Error('Offline'))
+      else readEvents.mockRejectedValue(new Error('Offline'))
+      let canceled = false
+      const cancellation = store.cancel().then(() => {
+        canceled = true
+      })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(canceled).toBe(true)
+      await cancellation
+      expect(store.$.cancelingRunId.value).toBeUndefined()
+      expect(store.$.observationFailed.value).toBe(true)
+      const attempts = readRun.mock.calls.length
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(readRun.mock.calls.length).toBeGreaterThan(attempts)
+    } finally {
+      store.dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('applies Run updates during event failures and resumes events from the saved cursor', async () => {
+    vi.useFakeTimers()
+    const client = new WorkbenchClient(vi.fn())
+    const readRun = vi.spyOn(client, 'getRun').mockResolvedValue({ ...details, status: 'running' })
+    const firstEvent = { createdAt: timestamp, kind: 'run.started', payload: { flowId: run.flowId, scopeId: 'scope' }, sequence: 1 } as const
+    const page = { done: false, events: [firstEvent], historyComplete: true, nextAfter: 1, runId: run.runId, version: 1 } as const
+    const readEvents = vi.spyOn(client, 'getRunEvents').mockResolvedValueOnce(page).mockRejectedValue(new Error('Offline'))
+    const readResult = vi
+      .spyOn(client, 'getRunResult')
+      .mockResolvedValue({ finishedAt: timestamp, result: null, runId: run.runId, status: 'completed', version: 1 })
+    const store = new RunStore(client, vi.fn())
+    try {
+      store.follow({ ...run, status: 'running' }, store.prepareStart())
+      await vi.advanceTimersByTimeAsync(0)
+      const waits = [
+        { actions: ['approve', 'reject'] as const, nodeId: 'approval', waitId: 'wait-1', waitingSince: timestamp, expiresAt: timestamp, prompt: 'Approve?' },
+      ]
+      readRun.mockResolvedValue({ ...details, status: 'waiting', waits })
+      await vi.advanceTimersByTimeAsync(1200)
+      expect(store.$.run.value).toMatchObject({ status: 'waiting', waits })
+      expect(store.$.events.value).toEqual([firstEvent])
+      expect(store.$.observationFailed.value).toBe(true)
+      readRun.mockResolvedValue(details)
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(store.$.run.value?.status).toBe('completed')
+      expect(store.$.result.value?.status).toBe('completed')
+      expect(readResult).toHaveBeenCalledOnce()
+      expect(readEvents.mock.calls.slice(1).every((call) => call[1]?.after == 1)).toBe(true)
+      readEvents.mockResolvedValue({ ...page, events: [{ ...terminalEvent, sequence: 2 }], nextAfter: 2 })
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(store.$.events.value).toEqual([firstEvent, { ...terminalEvent, sequence: 2 }])
+      expect(store.$.observationFailed.value).toBe(false)
+    } finally {
+      store.dispose()
+      vi.useRealTimers()
     }
   })
 

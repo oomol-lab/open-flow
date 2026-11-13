@@ -497,23 +497,25 @@ export class RunStore {
             if (!current() || this.#state.value.selectedRunId != run.runId) return
             if (permanentObservationFailure(runResponse.reason)) return yield* Effect.fail(runResponse.reason)
             this.#set({ observationFailed: true })
+            yield* Deferred.succeed(ready, undefined)
             idlePolls = Math.min(idlePolls + 1, 6)
             yield* Effect.sleep(Math.min(maxIdlePollDelay, startingPollDelay * 2 ** Math.max(0, idlePolls - 1)))
             continue
           }
           if (!current() || this.#state.value.selectedRunId != run.runId) return
           let nextRun = runResponse.value
-          this.#set({ observationFailed: false })
+          this.#set({ observationFailed: false, runById: replaceRun(this.#state.value, nextRun) })
           if (eventsResponse.status == 'rejected') {
+            yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error })
             if (!(eventsResponse.reason instanceof ApiError) || eventsResponse.reason.code != 'run.events-expired') {
               if (permanentObservationFailure(eventsResponse.reason)) return yield* Effect.fail(eventsResponse.reason)
               this.#set({ observationFailed: true })
+              yield* Deferred.succeed(ready, undefined)
               idlePolls = Math.min(idlePolls + 1, 6)
               yield* Effect.sleep(Math.min(maxIdlePollDelay, startingPollDelay * 2 ** Math.max(0, idlePolls - 1)))
               continue
             }
-            this.#set({ eventsExpiresAt: undefined, historyComplete: false, runById: replaceRun(this.#state.value, nextRun) })
-            yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error })
+            this.#set({ eventsExpiresAt: undefined, historyComplete: false })
             return
           }
           const page = eventsResponse.value
@@ -524,7 +526,6 @@ export class RunStore {
             events,
             eventsExpiresAt: page.eventsExpiresAt,
             historyComplete: page.historyComplete,
-            runById: replaceRun(this.#state.value, nextRun),
           })
           // Preserve the event page even if refreshing a stale parallel Run read fails.
           if (eventsFinished && !isRunTerminal(nextRun.status)) {

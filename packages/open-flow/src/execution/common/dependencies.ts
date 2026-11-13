@@ -549,8 +549,8 @@ export class Dependencies {
 
   begin(nodeId: string, jobId: string) {
     const state = this.state.nodes[nodeId]!
-    state.jobId = jobId
     this.setStatus(nodeId, 'running')
+    state.jobId = jobId
     this.candidates.delete(nodeId)
   }
 
@@ -562,10 +562,10 @@ export class Dependencies {
     systemOutputs?: Readonly<Record<string, JsonValue>>,
   ) {
     const state = this.state.nodes[nodeId]!
+    if (complete) this.setStatus(nodeId, 'completed')
     state.output = outputs
     state.systemOutputs = systemOutputs
     state.released = [...new Set([...state.released, ...handles])]
-    if (complete) this.setStatus(nodeId, 'completed')
     if (this.loops.size == 0) for (const edge of this.outgoing.get(nodeId) ?? []) this.candidates.add(edge.target)
   }
 

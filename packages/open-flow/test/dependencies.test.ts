@@ -100,7 +100,20 @@ it('rejects an illegal status transition instead of overwriting it', () => {
   expect(dependencies.ready()).toEqual(['first'])
   dependencies.begin('first', 'first')
   dependencies.release('first', {}, [], true)
+  const saved = dependencies.checkpoint()
   expect(() => dependencies.begin('first', 'again')).toThrow('cannot move from completed to running')
+  expect(dependencies.checkpoint()).toEqual(saved)
+})
+
+it('preserves the checkpoint when completing a skipped node is rejected', () => {
+  const source = graph(['skipped'], [{ source: 'start', sourceHandle: 'unused', target: 'skipped' }])
+  const dependencies = new Dependencies(source)
+  dependencies.start('start', {})
+  expect(dependencies.ready()).toEqual([])
+  const saved = dependencies.checkpoint()
+  expect(() => dependencies.release('skipped', { result: 42 }, ['result'], true, { metadata: 'changed' })).toThrow('cannot move from skipped to completed')
+  expect(dependencies.checkpoint()).toEqual(saved)
+  expect(new Dependencies(source, dependencies.checkpoint()).checkpoint()).toEqual(saved)
 })
 
 it('resolves distant ancestors in a long chain and restores the same checkpoint values', () => {
