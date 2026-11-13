@@ -194,3 +194,92 @@ it('shares one short Blob URL for a large sheet and releases it after the last i
   expect(decode).toHaveBeenCalledTimes(1)
   expect(fetchIcon).toHaveBeenCalledTimes(1)
 })
+
+it.each([source, imageIcon('https://example.test/original.svg', placeholderIcon, 'example')])(
+  'releases replaced Blob URLs after consumers switch artwork across repeated refreshes',
+  async (src) => {
+    const create = vi.spyOn(URL, 'createObjectURL')
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url) => {
+      for (const element of host.querySelectorAll<HTMLElement>('[style], img')) {
+        expect(element.style.backgroundImage).not.toContain(url)
+        expect(element.getAttribute('src')).not.toBe(url)
+      }
+    })
+    const cache = new ProviderIconCache({
+      scope: 'refresh-test',
+      mode: 'refresh',
+      fetch: async () => new Response('<svg/>', { headers: { 'content-type': 'image/svg+xml' } }),
+    })
+    const render = (generation: number) => (
+      <ProviderIconCacheContext.Provider value={cache}>
+        <ContentIcon src={src} />
+        {generation > 0 && <ContentIcon key={generation} src={src} />}
+      </ProviderIconCacheContext.Provider>
+    )
+    await act(async () => root.render(render(0)))
+    for (let generation = 1; generation <= 3; generation++) {
+      let finish!: () => void
+      decode.mockImplementationOnce(() => new Promise<void>((resolve) => (finish = resolve)))
+      await act(async () => root.render(render(generation)))
+      expect(create).toHaveBeenCalledTimes(generation + 1)
+      expect(revoke).toHaveBeenCalledTimes(generation - 1)
+      expect(host.querySelector('[data-render-pending]')).not.toBeNull()
+      await act(async () => finish())
+      expect(host.querySelector('[data-render-pending]')).toBeNull()
+      expect(revoke).toHaveBeenCalledTimes(generation)
+      expect(revoke).toHaveBeenLastCalledWith(create.mock.results[generation - 1]!.value)
+    }
+    await act(async () => root.render(null))
+    expect(revoke).toHaveBeenCalledTimes(create.mock.calls.length)
+  },
+)
+
+it('releases failed replacement URLs while retaining ready artwork', async () => {
+  const create = vi.spyOn(URL, 'createObjectURL')
+  const revoke = vi.spyOn(URL, 'revokeObjectURL')
+  const cache = new ProviderIconCache({
+    scope: 'failed-refresh-test',
+    mode: 'refresh',
+    fetch: async () => new Response('<svg/>', { headers: { 'content-type': 'image/svg+xml' } }),
+  })
+  const render = (generation: number) => (
+    <ProviderIconCacheContext.Provider value={cache}>
+      <ContentIcon src={source} />
+      {generation > 0 && <ContentIcon key={generation} src={source} />}
+    </ProviderIconCacheContext.Provider>
+  )
+  await act(async () => root.render(render(0)))
+  const ready = host.querySelector<HTMLElement>('[style]')!.style.backgroundImage
+  for (let generation = 1; generation <= 3; generation++) {
+    decode.mockRejectedValueOnce(new Error('Could not decode replacement artwork.'))
+    await act(async () => root.render(render(generation)))
+    expect(host.querySelector<HTMLElement>('[style]')!.style.backgroundImage).toBe(ready)
+    expect(host.querySelector('[data-render-pending]')).toBeNull()
+    expect(revoke).toHaveBeenCalledTimes(generation)
+    expect(revoke).toHaveBeenLastCalledWith(create.mock.results[generation]!.value)
+    expect(revoke).not.toHaveBeenCalledWith(create.mock.results[0]!.value)
+  }
+})
+
+it('retains a pending decode URL after unmount and releases it when decoding finishes', async () => {
+  const create = vi.spyOn(URL, 'createObjectURL')
+  const revoke = vi.spyOn(URL, 'revokeObjectURL')
+  let finish!: () => void
+  decode.mockImplementationOnce(() => new Promise<void>((resolve) => (finish = resolve)))
+  const cache = new ProviderIconCache({
+    scope: 'pending-decode-test',
+    fetch: async () => new Response('<svg/>', { headers: { 'content-type': 'image/svg+xml' } }),
+  })
+  await act(async () =>
+    root.render(
+      <ProviderIconCacheContext.Provider value={cache}>
+        <ContentIcon src={source} />
+      </ProviderIconCacheContext.Provider>,
+    ),
+  )
+  expect(create).toHaveBeenCalledTimes(1)
+  await act(async () => root.render(null))
+  expect(revoke).not.toHaveBeenCalled()
+  await act(async () => finish())
+  expect(revoke).toHaveBeenCalledExactlyOnceWith(create.mock.results[0]!.value)
+})

@@ -78,12 +78,17 @@ const loading: ResourceState = { status: 'loading' }
 function createIconResource(cache: ProviderIconSource, request: ProviderIconRequest, ready?: ReadyIcon) {
   const state = val<ResourceState>(ready ?? loading)
   const urls = new Map<Blob, string>()
+  const consumers = new Map<Blob, number>()
   let subscribers = 0
   let pending: Promise<void> | undefined
+  let pendingBlob: Blob | undefined
   function releaseUrls() {
-    if (subscribers) return
-    for (const url of urls.values()) URL.revokeObjectURL(url)
-    urls.clear()
+    const current = subscribers && state.value.status === 'loaded' ? state.value.blob : undefined
+    for (const [blob, url] of urls) {
+      if (consumers.has(blob) || blob === current || blob === pendingBlob) continue
+      URL.revokeObjectURL(url)
+      urls.delete(blob)
+    }
   }
   const resource = {
     state,
@@ -92,10 +97,16 @@ function createIconResource(cache: ProviderIconSource, request: ProviderIconRequ
       if (!url) urls.set(blob, (url = URL.createObjectURL(blob)))
       return url
     },
-    subscribe() {
+    subscribe(blob?: Blob) {
       subscribers++
+      if (blob) consumers.set(blob, (consumers.get(blob) ?? 0) + 1)
       return () => {
         subscribers--
+        if (blob) {
+          const remaining = consumers.get(blob)! - 1
+          if (remaining) consumers.set(blob, remaining)
+          else consumers.delete(blob)
+        }
         queueMicrotask(releaseUrls)
       }
     },
@@ -112,6 +123,7 @@ function createIconResource(cache: ProviderIconSource, request: ProviderIconRequ
             state.set({ ...previous, refreshing: false })
             return
           }
+          pendingBlob = blob
           image = new Image()
           image.src = resource.url(blob)
           await image.decode()
@@ -122,6 +134,7 @@ function createIconResource(cache: ProviderIconSource, request: ProviderIconRequ
         }
       })().finally(() => {
         pending = undefined
+        pendingBlob = undefined
         releaseUrls()
       })
       return pending
@@ -156,10 +169,11 @@ export function useProviderIconResource(request: ProviderIconRequest, crop?: { r
     return current.resource
   }, [cache, identity])
   const state = useVal(resource.state)
+  const blob = state.status === 'loaded' ? state.blob : undefined
+  // Retain committed artwork until each consumer has rendered its replacement.
+  useEffect(() => resource.subscribe(blob), [resource, blob])
   useEffect(() => {
-    const unsubscribe = resource.subscribe()
     void resource.refresh()
-    return unsubscribe
   }, [resource])
 
   // Crops are capture-local; the shared decoded sheet is reused by all of its icons.
