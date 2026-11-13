@@ -97,6 +97,12 @@
     "emptyObjectValue": "Objet vide",
     "unrestrictedFields": "Aucun champ prédéfini",
     "additionalFieldValues": "Valeurs des champs supplémentaires",
-    "schemaDefinedFields": "Champs contraints par le schéma"
+    "schemaDefinedFields": "Champs contraints par le schéma",
+    "durationUnit": "Unité",
+    "durationUnits": {
+      "second": "s",
+      "minute": "min",
+      "hour": "h"
+    }
   }
 }

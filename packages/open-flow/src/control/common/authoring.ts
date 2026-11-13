@@ -164,9 +164,6 @@ export function authoringNode(content: RevisionContent, ref: string) {
     texts.code = content.modules[node.task.moduleId]?.source ?? ''
   } else {
     switch (node.kind) {
-      case 'delay':
-        config = { durationMs: node.durationMs }
-        break
       case 'outputs':
         config = { outputDefs: fieldsView(node.outputDefs) }
         break
@@ -597,9 +594,6 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       next = { ...next, task } as GraphNode
     } else
       switch (node.kind) {
-        case 'delay':
-          next = { ...next, durationMs: config.durationMs } as GraphNode
-          break
         case 'condition':
           next = { ...next, ...prepareConditionConfiguration(config as unknown as AuthoringConditionConfiguration, source) } as GraphNode
           break

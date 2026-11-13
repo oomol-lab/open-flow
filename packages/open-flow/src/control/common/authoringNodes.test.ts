@@ -678,64 +678,74 @@ it('preserves explicit deferred accounts in public creation, reads, local update
 })
 
 describe('Delay authoring', () => {
-  it('creates a valid five-second Delay when configuration is omitted', async () => {
+  it('creates a valid five-second default input without configuration', async () => {
     const created = await edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause' }])
-    expect(authoringNode(created.content, created.nodes.pause!)).toMatchObject({ config: { durationMs: 5000 } })
+    expect(authoringNode(created.content, created.nodes.pause!)).toMatchObject({ config: {}, inputPorts: { durationMs: { default: 5000 } } })
     expect((await validateFlow(created.content, findEngineContract(currentEngineContract)!)).valid).toBe(true)
+    expect(authoringSchema('delay')).toMatchObject({ configuration: { properties: {} }, extensibleInputs: false })
+    await expect(edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 5000 } }])).rejects.toThrow()
   })
 
-  it('advertises and enforces the seven-day limit on creation and updates', async () => {
-    expect(authoringSchema('delay')).toMatchObject({ configuration: { properties: { durationMs: { exclusiveMaximum: 604_800_000 } } } })
-    const created = await edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 604_799_999 } }])
-    expect(authoringNode(created.content, created.nodes.pause!)).toMatchObject({ config: { durationMs: 604_799_999 } })
-    for (const durationMs of [604_800_000, 604_800_001]) {
-      await expect(edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs } }])).rejects.toThrow()
-      await expect(edit(created.content, [{ op: 'node.update', node: created.nodes.pause!, set: { config: { durationMs } } }])).rejects.toThrow()
-    }
-  })
-
-  it('creates and updates a port-free node while preserving unrelated nodes, and undoes edits', async () => {
+  it('edits the fixed duration input through ordinary input operations and preserves other nodes', async () => {
     const created = await edit(empty, [
-      { op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 5000 } },
+      { op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', inputs: { durationMs: { kind: 'value', value: 5000 } } },
       { op: 'node.add', type: 'wait', as: 'review', name: 'Review', prompt: 'Continue?' },
     ])
     const ref = created.nodes.pause!
     await roundTrip(created.content, ref)
-    expect(searchAuthoring(created.content, { query: '5000', type: 'delay' }).matches).toEqual([expect.objectContaining({ node: ref, field: 'config' })])
+    expect(searchAuthoring(created.content, { query: '5000', type: 'delay' }).matches).toEqual([expect.objectContaining({ node: ref, field: 'inputs' })])
     expect(decodeRevision(encodeRevision(created.content))).toEqual(created.content)
     const node = created.content.document.graph.nodes[ref]!
-    expect(nodeInputPorts(node)).toEqual({})
+    expect(nodeInputPorts(node)).toMatchObject({ durationMs: { value: 5000, nullable: false } })
     expect(nodeOutputPorts(node)).toEqual({})
-    const changed = await edit(created.content, [{ op: 'node.update', node: ref, set: { name: 'Pause updated', config: { durationMs: 20 } } }])
-    expect(authoringNode(changed.content, ref)).toMatchObject({ type: 'delay', name: 'Pause updated', config: { durationMs: 20 } })
+    const changed = await edit(created.content, [
+      { op: 'node.update', node: ref, set: { name: 'Pause updated' } },
+      { op: 'input.set', node: ref, input: 'durationMs', source: { kind: 'value', value: 20 } },
+    ])
+    expect(authoringNode(changed.content, ref)).toMatchObject({ name: 'Pause updated', inputs: { durationMs: { kind: 'value', value: 20 } } })
     expect(changed.content.document.graph.nodes[created.nodes.review!]).toEqual(created.content.document.graph.nodes[created.nodes.review!])
     expect(applyFlowChanges(changed.content, inverseFlowChanges(created.content, changed.operations)).document).toEqual(created.content.document)
+    const reset = await edit(changed.content, [{ op: 'input.set', node: ref, input: 'durationMs', source: { kind: 'default' } }])
+    expect(authoringNode(reset.content, ref)).toMatchObject({ inputs: {}, inputPorts: { durationMs: { default: 5000 } } })
+    await expect(edit(reset.content, [{ op: 'input.set', node: ref, input: 'other', source: { kind: 'value', value: 1 } }])).rejects.toThrow()
   })
 
-  it.each([null, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])('rejects invalid public duration %s while retaining draft values', async (durationMs) => {
-    await expect(edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs } }])).rejects.toThrow()
-    const content: RevisionContent = {
-      ...empty,
-      document: {
-        bindings: {},
-        graph: {
-          nodes: { pause: { kind: 'delay', inputs: {}, durationMs } },
-          edges: [],
-        },
-      },
-    }
-    expect(decodeRevision(encodeRevision(content))).toEqual(content)
-    const diagnostics = (await validateFlow(content, findEngineContract(currentEngineContract)!)).diagnostics
+  it.each([null, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])('retains and diagnoses invalid duration inputs: %s', async (durationMs) => {
+    const created = await edit(empty, [
+      { op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', inputs: { durationMs: { kind: 'value', value: durationMs } } },
+    ])
+    const nodeId = created.nodes.pause!
+    expect(decodeRevision(encodeRevision(created.content))).toEqual(created.content)
+    const diagnostics = (await validateFlow(created.content, findEngineContract(currentEngineContract)!)).diagnostics
     expect(diagnostics).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'delay.duration-invalid', path: '/document/graph/nodes/pause/durationMs' })]),
+      expect.arrayContaining([expect.objectContaining({ code: 'delay.duration-invalid', path: `/document/graph/nodes/${nodeId}/inputs/durationMs` })]),
     )
-    expect(authoringDiagnostics(content, diagnostics)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'delay.duration-invalid', nodes: ['pause'], field: 'config.durationMs' })]),
+    expect(authoringDiagnostics(created.content, diagnostics)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'delay.duration-invalid', nodes: [nodeId], field: 'inputs.durationMs' })]),
     )
   })
 
-  it('requires Model v15 and Engine v12', async () => {
-    const created = await edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', config: { durationMs: 1 } }])
+  it('accepts a numeric upstream duration and preserves it through read and local updates', async () => {
+    const created = await edit(empty, [
+      {
+        op: 'node.add',
+        type: 'start',
+        as: 'start',
+        name: 'Start',
+        config: { inputDefs: { hold: { schema: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER }, nullable: false } } },
+      },
+      { op: 'node.add', type: 'delay', as: 'pause', name: 'Pause', inputs: { durationMs: { kind: 'output', node: '$start', port: 'hold' } } },
+      { op: 'edge.connect', source: '$start', target: '$pause' },
+    ])
+    expect((await validateFlow(created.content, findEngineContract(currentEngineContract)!)).valid).toBe(true)
+    expect(authoringNode(created.content, created.nodes.pause!)).toMatchObject({
+      inputs: { durationMs: { kind: 'sources', sources: [{ kind: 'output', node: created.nodes.start!, port: 'hold' }] } },
+    })
+    await roundTrip(created.content, created.nodes.pause!)
+  })
+
+  it('retains the existing Model v15 and Engine v12 contract boundary', async () => {
+    const created = await edit(empty, [{ op: 'node.add', type: 'delay', as: 'pause', name: 'Pause' }])
     expect(() => decodeRevisionContent({ ...created.content, modelVersion: 14 })).toThrow('Delay requires Flow model v15')
     expect((await prepareFlow(created.content, 'open-flow-engine/v11')).kind).toBe('engine-unsupported')
     expect((await prepareFlow(created.content, currentEngineContract)).kind).toBe('prepared')

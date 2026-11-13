@@ -27,7 +27,6 @@ import { decisionTask } from '../../decision/common/decision.ts'
 import { isTriggerNode, applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 import { codeSharedPermissionsEnabled } from './codePermissions.ts'
 import { nodeInputMappings } from './condition.ts'
-import { defaultDelayDurationMs } from './delay.ts'
 import { fixedInputValue, inputValues } from './inputValue.ts'
 import { remapInputMappings, renamedPort, renameOutputMapping } from './portChanges.ts'
 
@@ -310,13 +309,7 @@ export function createWait(nodeId: string, name: string): readonly ChangeOperati
 }
 
 export function createDelay(nodeId: string, name: string): readonly ChangeOperation[] {
-  return [{ kind: 'graph.node.create', nodeId, node: { kind: 'delay', name, inputs: {}, durationMs: defaultDelayDurationMs } }]
-}
-
-export function updateDelay(content: RevisionContent, nodeId: string, durationMs: number | null): readonly ChangeOperation[] | undefined {
-  const node = content.document.graph.nodes[nodeId]
-  if (node?.kind !== 'delay') return
-  return node.durationMs === durationMs ? [] : [{ kind: 'graph.node.replace', nodeId, before: node, node: { ...node, durationMs } }]
+  return [{ kind: 'graph.node.create', nodeId, node: { kind: 'delay', name, inputs: {} } }]
 }
 
 export function createApproval(nodeId: string, name: string): readonly ChangeOperation[] {

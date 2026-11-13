@@ -97,6 +97,12 @@
     "emptyObjectValue": "빈 객체",
     "unrestrictedFields": "미리 정의된 필드 없음",
     "additionalFieldValues": "추가 필드 값",
-    "schemaDefinedFields": "스키마로 제한된 필드"
+    "schemaDefinedFields": "스키마로 제한된 필드",
+    "durationUnit": "단위",
+    "durationUnits": {
+      "second": "초",
+      "minute": "분",
+      "hour": "시간"
+    }
   }
 }

@@ -5,6 +5,7 @@ import type { RevisionView } from '../revisionView.ts'
 import type { AddNodeIntent } from './flowChanges.ts'
 
 import { decisionTask } from '../../../../decision/common/decision.ts'
+import { delayDurationInput } from '../../../../flow/common/delay.ts'
 import { httpRequestTask } from '../../../../http/common/httpRequest.ts'
 import { skipDuplicatesTask } from '../../../../state/common/state.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
@@ -153,7 +154,16 @@ function builtinOptions(_draft: Draft, t: TFunction): readonly AddNodeOption[] {
         { handle: 'true', jsonSchema: {} },
       ],
     },
-    { id: 'delay', kind: 'delay', group, label: t('delay.title'), description: t('delay.description'), icon: ':lucide-light:timer:', inputs: [], outputs: [] },
+    {
+      id: 'delay',
+      kind: 'delay',
+      group,
+      label: t('delay.title'),
+      description: t('delay.description'),
+      icon: ':lucide-light:timer:',
+      inputs: [delayDurationInput],
+      outputs: [],
+    },
     {
       description: t('flowState.warning'),
       group,

@@ -97,6 +97,12 @@
     "emptyObjectValue": "Пустой объект",
     "unrestrictedFields": "Нет предопределённых полей",
     "additionalFieldValues": "Значения дополнительных полей",
-    "schemaDefinedFields": "Поля ограничены схемой"
+    "schemaDefinedFields": "Поля ограничены схемой",
+    "durationUnit": "Единица времени",
+    "durationUnits": {
+      "second": "с",
+      "minute": "мин",
+      "hour": "ч"
+    }
   }
 }

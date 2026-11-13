@@ -81,7 +81,7 @@ function fixture(timing?: WaitAutoContinue | { readonly kind: 'delay'; readonly 
         jobId: wait.jobId,
         nodeId: wait.nodeId,
         waitId: wait.waitId,
-        value: wait.kind === 'delay' ? {} : wait.value,
+        value: wait.kind === 'delay' ? { durationMs: wait.durationMs } : wait.value,
         ...(notification == null ? {} : { pending: notification }),
       }
     }),

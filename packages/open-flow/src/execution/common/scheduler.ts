@@ -16,6 +16,7 @@ import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { isTriggerNode } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
+import { delayDurationSchema } from '../../flow/common/delay.ts'
 import { nodeSystemOutputPorts, supportsNodeErrorHandling } from '../../flow/common/errorHandling.ts'
 import { isResolutionNode, resolutionActions } from '../../flow/common/graph.ts'
 import { waitAutoContinueAt as automaticDeadline } from '../../flow/common/wait.ts'
@@ -381,7 +382,7 @@ function runGraph(
           const identity = { jobId, nodeId, waitId }
           const request: WaitRequest =
             node.kind === 'delay'
-              ? { ...identity, kind: 'delay', durationMs: node.durationMs }
+              ? { ...identity, kind: 'delay', durationMs: delayDurationSchema.parse((value as Readonly<Record<string, JsonValue>>).durationMs) }
               : {
                   ...identity,
                   value,

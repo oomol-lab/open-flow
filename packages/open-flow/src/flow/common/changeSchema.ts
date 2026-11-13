@@ -250,8 +250,6 @@ const node = z.union([
     .strictObject({
       ...base,
       kind: z.literal('delay'),
-      inputs: z.record(text, z.never()),
-      durationMs: z.number().nullable(),
       retry: z.never().optional(),
       onError: z.never().optional(),
     })

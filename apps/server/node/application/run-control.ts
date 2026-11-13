@@ -483,7 +483,13 @@ export class RunControl {
       case 'prepared':
         break
     }
-    if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind === 'delay' && node.durationMs != null && node.durationMs >= waitDurationMs))
+    if (
+      Object.values(fixed.flow.graph.nodes).some((node) => {
+        if (node.kind !== 'delay' || node.inputs.durationMs?.kind !== 'value') return false
+        const duration = node.inputs.durationMs.value
+        return typeof duration === 'number' && duration >= waitDurationMs
+      })
+    )
       throw new ControlError(controlErrorCode.flowInvalid, 'Delay must be shorter than seven days.')
     if (
       Object.values(fixed.flow.graph.nodes)

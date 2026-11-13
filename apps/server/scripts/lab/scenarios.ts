@@ -540,7 +540,8 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
     const out = entries.find(([, candidate]) => candidate.kind === 'outputs')
     const edges = current.document.graph.edges
     return pause?.[1].kind === 'delay' &&
-      pause[1].durationMs === 50 &&
+      pause[1].inputs.durationMs?.kind === 'value' &&
+      pause[1].inputs.durationMs.value === 50 &&
       start != null &&
       out != null &&
       edges.some((connection) => connection.source === start[0] && connection.target === pause[0] && connection.sourceHandle == null) &&

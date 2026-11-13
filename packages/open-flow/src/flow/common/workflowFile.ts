@@ -58,8 +58,7 @@ export function cleanWorkflowFile(value: unknown): { readonly file: WorkflowFile
   const nodes = Object.fromEntries(
     Object.entries(graph.nodes).map(([id, source]) => {
       let node: GraphNode = source
-      if ('inputs' in node && node.kind !== 'delay')
-        node = { ...node, inputs: Object.fromEntries(Object.entries(node.inputs).map(([key, input]) => [key, cleanInput(input)])) }
+      if ('inputs' in node) node = { ...node, inputs: Object.fromEntries(Object.entries(node.inputs).map(([key, input]) => [key, cleanInput(input)])) }
       if (node.kind == 'outputs')
         node = { ...node, outputMappings: Object.fromEntries(Object.entries(node.outputMappings).map(([key, input]) => [key, cleanInput(input)])) }
       if (node.kind == 'condition') node = clearConditionBindings(node)

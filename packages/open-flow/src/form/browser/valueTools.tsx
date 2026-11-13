@@ -15,6 +15,7 @@ export function ValueTools({
   onClear,
   onToggleJson,
   disclosure,
+  inline = false,
 }: {
   label: string
   container: HTMLElement | null
@@ -24,6 +25,7 @@ export function ValueTools({
   onClear?: () => void
   onToggleJson?: () => void
   disclosure?: FieldDisclosure & { disabled?: boolean }
+  inline?: boolean
 }) {
   const t = useTranslate()
   const toggleLabel = t(raw ? 'valueEditor.editAsForm' : 'valueEditor.editRawData')
@@ -93,7 +95,7 @@ export function ValueTools({
     </Tooltip>
   )
   return (
-    <div className={styles.valueTools}>
+    <div className={styles.valueTools} data-inline={inline || undefined}>
       {disclosure?.expanded ? [resetButton, disclosureButton, clearButton, jsonButton] : [resetButton, clearButton, jsonButton, disclosureButton]}
     </div>
   )

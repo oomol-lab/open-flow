@@ -7,7 +7,10 @@ import * as React from 'react'
 import { Input } from './input.tsx'
 import { cn } from './utils.ts'
 
-const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(function InputGroup({ className, ...props }, ref) {
+const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'> & { controlSize?: 'default' | 'field' }>(function InputGroup(
+  { className, controlSize = 'default', ...props },
+  ref,
+) {
   return (
     <div
       ref={ref}
@@ -15,6 +18,7 @@ const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>
       role="group"
       className={cn(
         'group/input-group relative flex h-8 w-full min-w-0 items-center rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] transition-colors outline-none in-data-[slot=combobox-content]:focus-within:border-inherit in-data-[slot=combobox-content]:focus-within:outline-none has-disabled:bg-[var(--ui-disabled-background,color-mix(in_srgb,var(--ui-input)_50%,transparent))] has-disabled:opacity-[var(--ui-disabled-opacity,0.5)] has-[[data-slot=input-group-control]:focus-visible]:text-field-focus has-[[data-slot][aria-invalid=true]]:has-[[data-slot=input-group-control]:focus-visible]:invalid-text-field-focus has-[[data-slot][aria-invalid=true]]:border-destructive has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>textarea]:h-auto dark:bg-[var(--ui-control-background,var(--ui-muted))] dark:has-disabled:bg-[var(--ui-disabled-background,color-mix(in_srgb,var(--ui-input)_80%,transparent))] has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5',
+        controlSize === 'field' && 'h-[30px]',
         className,
       )}
       {...props}
@@ -57,13 +61,13 @@ function InputGroupAddon({ className, align = 'inline-start', ...props }: React.
   )
 }
 
-const InputGroupInput = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(function InputGroupInput({ className, ...props }, ref) {
+const InputGroupInput = React.forwardRef<HTMLInputElement, React.ComponentProps<typeof Input>>(function InputGroupInput({ className, ...props }, ref) {
   return (
     <Input
       ref={ref}
       data-slot="input-group-control"
       className={cn(
-        'flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:outline-none disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent',
+        'h-full flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:outline-none disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent',
         className,
       )}
       {...props}

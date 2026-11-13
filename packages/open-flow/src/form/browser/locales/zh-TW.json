@@ -97,6 +97,12 @@
     "emptyObjectValue": "空物件",
     "unrestrictedFields": "未限定欄位",
     "additionalFieldValues": "額外欄位值類型",
-    "schemaDefinedFields": "欄位受 Schema 約束"
+    "schemaDefinedFields": "欄位受 Schema 約束",
+    "durationUnit": "單位",
+    "durationUnits": {
+      "second": "秒",
+      "minute": "分鐘",
+      "hour": "小時"
+    }
   }
 }

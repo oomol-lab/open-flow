@@ -8,9 +8,11 @@ import { Input } from '../../ui/browser/input.tsx'
 import { Switch } from '../../ui/browser/switch.tsx'
 import { Textarea } from '../../ui/browser/textarea.tsx'
 import { isDateFormat } from '../common/dateValue.ts'
+import { isDurationInput } from '../common/durationValue.ts'
 import { objectValue, valueType } from '../common/value.ts'
 import { ColorEditor } from './colorEditor.tsx'
 import { DateEditor } from './dateEditor.tsx'
+import { DurationInput } from './durationInput.tsx'
 
 /** Scalar input controls. The containing field owns validation and presentation state. */
 export function ValueEditor(props: ValueControlProps) {
@@ -73,6 +75,8 @@ export function ValueEditor(props: ValueControlProps) {
     <ColorEditor {...props} onDraftIssue={reportDraftIssue} value={value} invalid={invalid} />
   ) : type === 'string' && isDateFormat(source.format) ? (
     <DateEditor {...props} value={value} invalid={invalid} format={source.format} />
+  ) : isDurationInput(schema, value) ? (
+    <DurationInput {...props} />
   ) : type === 'number' || type === 'integer' ? (
     <NumberEditor {...props} onDraftIssue={reportDraftIssue} value={value} invalid={invalid} integer={type === 'integer'} />
   ) : (

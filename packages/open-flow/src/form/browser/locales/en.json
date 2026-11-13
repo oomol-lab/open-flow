@@ -97,6 +97,12 @@
     "emptyObjectValue": "Empty object",
     "unrestrictedFields": "No predefined fields",
     "additionalFieldValues": "Additional field values",
-    "schemaDefinedFields": "Fields constrained by schema"
+    "schemaDefinedFields": "Fields constrained by schema",
+    "durationUnit": "Duration unit",
+    "durationUnits": {
+      "second": "s",
+      "minute": "min",
+      "hour": "h"
+    }
   }
 }

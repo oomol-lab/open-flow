@@ -306,7 +306,8 @@ export function validateCheckpoint(
       if (!jsonEqual(waiting.value, approval)) throw new Error('Checkpoint Agent approval does not match its saved call.')
       if (!jsonEqual(resolveInputs(waiting.nodeId, node), saved.input)) throw new Error('Checkpoint Agent inputs changed.')
     } else if (node.kind === 'delay') {
-      if (saved != null || waiting.pending != null || !jsonEqual(waiting.value, {})) throw new Error('Checkpoint Delay state is invalid.')
+      if (saved != null || waiting.pending != null || !jsonEqual(waiting.value, resolveInputs(waiting.nodeId, node)))
+        throw new Error('Checkpoint Delay state is invalid.')
     } else {
       if (saved != null) throw new Error('Checkpoint Wait contains Agent state.')
       if (!isResolutionNode(node) || !jsonEqual(resolveInputs(waiting.nodeId, node), waiting.value)) throw new Error('Checkpoint resolution input changed.')

@@ -97,6 +97,12 @@
     "emptyObjectValue": "空のオブジェクト",
     "unrestrictedFields": "定義済みフィールドなし",
     "additionalFieldValues": "追加フィールドの値",
-    "schemaDefinedFields": "スキーマによるフィールド制約"
+    "schemaDefinedFields": "スキーマによるフィールド制約",
+    "durationUnit": "単位",
+    "durationUnits": {
+      "second": "秒",
+      "minute": "分",
+      "hour": "時間"
+    }
   }
 }
