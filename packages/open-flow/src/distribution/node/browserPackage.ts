@@ -72,6 +72,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['control/common/flowInspection', 'common/flowInspection'],
   ['control/common/flowNotifications', 'common/flow-notifications'],
   ['control/common/flowNotifications', 'browser/flow-notifications'],
+  ['control/common/health', 'common/health'],
   ['control/common/liveDetails', 'common/liveDetails'],
   ['control/common/mcp', 'common/mcp'],
   ['control/common/mcpConformance', 'common/mcp-conformance'],

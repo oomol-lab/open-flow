@@ -2,38 +2,40 @@ import type { TFunction } from 'val-i18n'
 import type { TriggerBinding } from '../api.ts'
 
 import { useTranslate } from 'val-i18n-react'
+import { displayHealth } from '../../../../control/common/health.ts'
 
 export function triggerLabel(binding: TriggerBinding, enabled: boolean, t: TFunction): string {
-  if (binding.currentPublicationId == null) return t('publication.retired')
-  if (!enabled) return t('publication.suspended')
-  if (binding.listener?.health == 'healthy' && (binding.health == 'failed' || binding.health == 'needs_reauth')) return t('publication.listenerDegraded')
-  switch (binding.listener?.health == 'failed' || binding.listener?.health == 'needs_reauth' ? binding.listener.health : binding.health) {
-    case 'healthy':
+  switch (displayHealth(binding, enabled)) {
+    case 'retired':
+      return t('publication.retired')
+    case 'suspended':
+      return t('publication.suspended')
+    case 'listener-degraded':
+      return t('publication.listenerDegraded')
+    case 'active':
       return t('publication.active')
     case 'failed':
       return t('publication.failed')
-    case 'needs_reauth':
+    case 'needs-reauth':
       return t('publication.needsReauth')
-    case 'initializing':
+    case 'reconciling':
       return t('publication.reconciling')
-    case 'suspended':
-      return t('publication.suspended')
   }
 }
 
 export function triggerClass(binding: TriggerBinding, enabled: boolean): string {
-  if (binding.currentPublicationId == null || !enabled) return 'neutral'
-  if (binding.listener?.health == 'healthy' && (binding.health == 'failed' || binding.health == 'needs_reauth')) return 'running'
-  switch (binding.listener?.health == 'failed' || binding.listener?.health == 'needs_reauth' ? binding.listener.health : binding.health) {
-    case 'healthy':
-      return 'success'
-    case 'failed':
-    case 'needs_reauth':
-      return 'danger'
-    case 'initializing':
-      return 'running'
+  switch (displayHealth(binding, enabled)) {
+    case 'retired':
     case 'suspended':
       return 'neutral'
+    case 'listener-degraded':
+    case 'reconciling':
+      return 'running'
+    case 'active':
+      return 'success'
+    case 'failed':
+    case 'needs-reauth':
+      return 'danger'
   }
 }
 

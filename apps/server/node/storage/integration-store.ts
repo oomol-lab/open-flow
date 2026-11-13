@@ -11,8 +11,9 @@ import type {
   TriggerOccurrenceInput,
 } from './trigger-store.ts'
 
-import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
+import { admitsListenerPage, decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
+import { insertPublishWork, preparingOperation, settlePublishWork } from './publish-work.ts'
 import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
 
 export interface IntegrationPublication {
@@ -126,43 +127,24 @@ export class IntegrationStore {
           now,
           JSON.stringify(providerAccess),
         )
-      this.#database
-        .prepare(
-          `INSERT INTO publish_work (
-             work_id, operation_id, node_id, action, status, next_at, created_at, updated_at
-           ) VALUES (?, ?, ?, 'integration.prepare', 'pending', ?, ?, ?)`,
-        )
-        .run('work_' + crypto.randomUUID().replaceAll('-', ''), operationId, integration.triggerNodeId, now, now, now)
+      insertPublishWork(this.#database, { action: 'integration.prepare', nodeId: integration.triggerNodeId, operationId }, now)
     }
     return true
   }
 
   dueCandidates(now: number, limit: number): readonly IntegrationCandidate[] {
-    return this.#transaction(() => {
-      this.#database
-        .prepare(
-          `UPDATE integration_candidates
-           SET status = 'cleanup', next_at = ?, updated_at = ?
-           WHERE status != 'cleanup' AND EXISTS (
-             SELECT 1 FROM publish_operations
-             WHERE publish_operations.operation_id = integration_candidates.operation_id
-               AND (publish_operations.status != 'pending' OR publish_operations.deadline_at <= ?)
-           )`,
-        )
-        .run(now, now, now)
-      return this.#database
-        .prepare(
-          `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson, connection_id AS connectionId,
-                  endpoint_id AS endpointId, flow_id AS flowId, node_id AS nodeId, operation_id AS operationId,
-                  reconcile_at AS reconcileAt, status, subscription_json AS subscriptionJson, trigger_json AS triggerJson,
-                  provider_access_snapshot AS providerAccessJson
-           FROM integration_candidates
-           WHERE status IN ('preparing', 'cleanup') AND next_at <= ?
-           ORDER BY next_at, operation_id, node_id
-           LIMIT ?`,
-        )
-        .all(now, limit) as unknown as readonly IntegrationCandidate[]
-    })
+    return this.#database
+      .prepare(
+        `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson, connection_id AS connectionId,
+                endpoint_id AS endpointId, flow_id AS flowId, node_id AS nodeId, operation_id AS operationId,
+                reconcile_at AS reconcileAt, status, subscription_json AS subscriptionJson, trigger_json AS triggerJson,
+                provider_access_snapshot AS providerAccessJson
+         FROM integration_candidates
+         WHERE next_at <= ? AND (status = 'cleanup' OR (status = 'preparing' AND ${preparingOperation('integration_candidates.operation_id')}))
+         ORDER BY next_at, operation_id, node_id
+         LIMIT ?`,
+      )
+      .all(now, now, limit) as unknown as readonly IntegrationCandidate[]
   }
 
   initializeCandidate(candidate: IntegrationCandidate, checkpoint: JsonValue, subscription: Readonly<Record<string, JsonValue>>, now: number): boolean {
@@ -218,13 +200,7 @@ export class IntegrationStore {
 
   failCandidate(candidate: IntegrationCandidate, code: string, message: string, now: number): void {
     this.#transaction(() => {
-      this.#database
-        .prepare(
-          `UPDATE publish_work
-           SET status = 'failed', next_at = NULL, issue_code = ?, issue_message = ?, updated_at = ?
-           WHERE operation_id = ? AND node_id = ? AND action = 'integration.prepare' AND status = 'pending'`,
-        )
-        .run(code, message.slice(0, 512), now, candidate.operationId, candidate.nodeId)
+      settlePublishWork(this.#database, integrationWork(candidate), { code, message }, now)
       this.#database
         .prepare(
           `UPDATE integration_candidates SET status = 'cleanup', next_at = ?, updated_at = ?
@@ -242,19 +218,11 @@ export class IntegrationStore {
            SET status = 'ready', next_at = NULL, updated_at = ?
            WHERE operation_id = ? AND node_id = ? AND status = 'preparing'
              AND checkpoint_json IS NOT NULL AND subscription_json IS NOT NULL
-             AND EXISTS (
-               SELECT 1 FROM publish_operations
-               WHERE operation_id = ? AND status = 'pending' AND deadline_at > ?
-             )`,
+             AND ${preparingOperation('integration_candidates.operation_id')}`,
         )
-        .run(now, candidate.operationId, candidate.nodeId, candidate.operationId, now).changes
+        .run(now, candidate.operationId, candidate.nodeId, now).changes
       if (changed != 1) return false
-      this.#database
-        .prepare(
-          `UPDATE publish_work SET status = 'ready', next_at = NULL, updated_at = ?
-           WHERE operation_id = ? AND node_id = ? AND action = 'integration.prepare' AND status = 'pending'`,
-        )
-        .run(now, candidate.operationId, candidate.nodeId)
+      settlePublishWork(this.#database, integrationWork(candidate), 'ready', now)
       return true
     })
   }
@@ -341,6 +309,7 @@ export class IntegrationStore {
               input.publishedAt,
               binding.bindingId,
             )
+          this.#pruneListenerWork(binding.bindingId)
         }
         desiredIntegrations.delete(binding.triggerNodeId)
       } else if (binding.currentPublicationId != null) {
@@ -352,6 +321,7 @@ export class IntegrationStore {
              WHERE binding_id = ?`,
           )
           .run(input.publishedAt, input.publishedAt, binding.bindingId)
+        this.#pruneListenerWork(binding.bindingId)
       }
     }
     for (const [triggerNodeId, integration] of desiredIntegrations) {
@@ -403,7 +373,7 @@ export class IntegrationStore {
       (sourceId == null || this.#eventSources.ready(sourceId, binding.bindingId)) &&
       binding.currentPublicationId == expectedLivePublicationId &&
       this.#matches(binding, integration) &&
-      (binding.health == 'healthy' || (integration.listener === true && this.listenerState(binding.bindingId, binding.runtimeVersion)?.health == 'healthy'))
+      admitsListenerPage(binding.health, integration.listener === true ? this.listenerState(binding.bindingId, binding.runtimeVersion)?.health : undefined)
     )
   }
 
@@ -543,7 +513,7 @@ export class IntegrationStore {
 
   #acceptIntegrationTarget(
     input: StoredIntegrationTarget & { readonly occurrenceId: string; readonly outputs: Readonly<Record<string, JsonValue>>; readonly requestDigest: string },
-    listener: boolean,
+    listenerPage: boolean,
   ): RunAdmission | undefined {
     const current = this.#database
       .prepare(
@@ -562,7 +532,7 @@ export class IntegrationStore {
              AND bindings.runtime_version = ?
              AND bindings.trigger_json = ?
              AND bindings.connection_id = ?
-             AND (bindings.health = 'healthy' OR ? = 1)
+             ${listenerPage ? '' : "AND bindings.health = 'healthy'"}
              AND publications.revision_id = ?
              AND publications.revision_digest = ?
              AND publications.closure_digest = ?
@@ -578,7 +548,6 @@ export class IntegrationStore {
         input.runtimeVersion,
         input.triggerJson,
         input.connectionId,
-        listener ? 1 : 0,
         input.revisionId,
         input.revisionDigest,
         input.closureDigest,
@@ -607,6 +576,12 @@ export class IntegrationStore {
         .run(accepted.runId, input.bindingId, input.runtimeVersion, input.currentPublicationId)
     }
     return accepted
+  }
+
+  #pruneListenerWork(bindingId: string): void {
+    this.#database
+      .prepare('DELETE FROM listener_work WHERE binding_id = ? AND runtime_version != (SELECT runtime_version FROM integration_bindings WHERE binding_id = ?)')
+      .run(bindingId, bindingId)
   }
 
   listenerState(
@@ -706,6 +681,14 @@ export class IntegrationStore {
         .run(lease.generation, now, nextAt, lease.bindingId, lease.token)
       return accepted ?? 'advanced'
     })
+  }
+
+  /** Defers the next Listener page without changing observed health. */
+  postponeListener(lease: ListenerLease, nextAt: number): void {
+    this.#database
+      .prepare(`UPDATE listener_work SET next_at = ?, lease_token = NULL, lease_until = NULL
+      WHERE binding_id = ? AND runtime_version = ? AND lease_token = ?`)
+      .run(nextAt, lease.bindingId, lease.runtimeVersion, lease.token)
   }
 
   retryListener(lease: ListenerLease, nextAt: number, health: 'failed' | 'needs_reauth' = 'failed'): void {
@@ -1011,4 +994,8 @@ export class IntegrationStore {
         .run(subscription, reconcileAt, now, bindingId, runtimeVersion, expected).changes == 1
     )
   }
+}
+
+function integrationWork(candidate: Pick<IntegrationCandidate, 'nodeId' | 'operationId'>) {
+  return { action: 'integration.prepare', nodeId: candidate.nodeId, operationId: candidate.operationId } as const
 }

@@ -45,3 +45,39 @@ it('rolls back reference projection persistence and rejects stale local revision
     database.close()
   }
 })
+
+it('guards resource subscription transitions against demands that return during deletion', () => {
+  const database = Database.open(':memory:')
+  try {
+    let now = 1_000
+    const store = new Store(database, runEnvironment(isolatedVmEngineDigest), () => now)
+    const sources = store.eventSources
+    const access = { version: 2, mode: 'implicit', sharedAccessDigest: 'implicit', sharedBindings: [], selectedBindings: [] } as const
+    const status = () => sources.subscription('source', 'resource')?.status
+    const demand = (bindingId: string) => sources.demand('source', 'resource', '{"key":"resource"}', bindingId, access, now)
+
+    expect(demand('first').status).toBe('creating')
+    expect(sources.beginSubscriptionDelete('source', 'resource', now)).toBe(false)
+    expect(sources.subscriptionReady('source', 'resource', now)).toBe(true)
+    sources.release('first')
+    expect(sources.unusedSubscriptions(now).map((subscription) => subscription.status)).toEqual(['ready'])
+    expect(sources.beginSubscriptionDelete('source', 'resource', now)).toBe(true)
+
+    expect(demand('second').status).toBe('creating')
+    expect(sources.deleteSubscription('source', 'resource')).toBe(false)
+    expect(status()).toBe('creating')
+
+    sources.release('second')
+    expect(sources.beginSubscriptionDelete('source', 'resource', now)).toBe(true)
+    expect(sources.subscriptionReady('source', 'resource', now)).toBe(false)
+    sources.subscriptionFailed('source', 'resource', 'deleting', now)
+    expect(status()).toBe('deleting')
+    expect(sources.unusedSubscriptions(now)).toEqual([])
+    now += 60_000
+    expect(sources.unusedSubscriptions(now).map((subscription) => subscription.status)).toEqual(['deleting'])
+    expect(sources.deleteSubscription('source', 'resource')).toBe(true)
+    expect(status()).toBeUndefined()
+  } finally {
+    database.close()
+  }
+})

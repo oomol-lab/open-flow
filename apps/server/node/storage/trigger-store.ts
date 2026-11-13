@@ -1,4 +1,4 @@
-import type { ConnectorAccessSnapshot, ErrorListener } from '@oomol-lab/open-flow/control-api'
+import type { BindingHealth, ConnectorAccessSnapshot, ErrorListener } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { RunAcceptance } from '@oomol-lab/open-flow/run-lifecycle'
 import type { DatabaseSync } from 'node:sqlite'
@@ -32,7 +32,7 @@ export interface StoredTriggerBinding {
   readonly currentRevisionId: string | null
   readonly endpointId: string | null
   readonly flowId: string
-  readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth'
+  readonly health: BindingHealth
   readonly kind: 'error' | 'cron' | 'integration' | 'poll' | 'webhook'
   readonly lastErrorCode: string | null
   readonly runtimeVersion: number
@@ -201,7 +201,7 @@ export class TriggerStore {
                   publications.revision_id AS currentRevisionId,
                   bindings.endpoint_id AS endpointId,
                   bindings.flow_id AS flowId,
-                  'healthy' AS health,
+                  'unobservable' AS health,
                   'webhook' AS kind,
                   NULL AS lastErrorCode,
                   bindings.runtime_version AS runtimeVersion,
@@ -234,7 +234,7 @@ export class TriggerStore {
            WHERE bindings.flow_id = ?
            UNION ALL
            SELECT bindings.binding_id, bindings.current_publication_id, publications.revision_id,
-                  NULL, bindings.flow_id, 'healthy', 'error', NULL,
+                  NULL, bindings.flow_id, 'unobservable', 'error', NULL,
                   bindings.runtime_version, bindings.trigger_node_id, bindings.updated_at
            FROM error_bindings AS bindings
            LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id

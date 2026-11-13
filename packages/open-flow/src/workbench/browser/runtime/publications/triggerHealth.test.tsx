@@ -31,6 +31,7 @@ describe('Listener health projection', () => {
   it.each([
     { input: binding, enabled: true, label: 'Scanning; notifications unavailable', detail: 'Periodic checks' },
     { enabled: true, input: { ...binding, health: 'healthy', listener: { health: 'failed' } }, label: 'Failed', detail: 'Saved progress' },
+    { enabled: true, input: { ...binding, currentPublicationId: 'live', health: 'unobservable', listener: undefined }, label: 'Active', detail: null },
     { input: binding, enabled: false, label: 'Suspended', detail: null },
     { enabled: true, input: { ...binding, currentPublicationId: undefined }, label: 'Retired', detail: null },
   ] as const)('shows $label with Flow-wide enablement', ({ input, enabled, label, detail }) => {

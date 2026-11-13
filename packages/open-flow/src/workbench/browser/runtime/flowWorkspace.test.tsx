@@ -62,7 +62,8 @@ vi.mock('./runs/runControl.tsx', () => ({
     )
   },
 }))
-vi.mock('./shell/workspacePublishIsland.tsx', () => ({
+vi.mock('./shell/workspacePublishIsland.tsx', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./shell/workspacePublishIsland.tsx')>()),
   WorkspacePublishIsland: (props: ComponentProps<typeof WorkspacePublishIsland>) => {
     boundary.publish = props
     return (
@@ -128,6 +129,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
     preferences: { getItem: (key: string) => preferences.get(key) ?? null, setItem: (key: string, stored: string) => preferences.set(key, stored) },
     $: {
       busy: value(busy),
+      authoringDisabled: value(busy != null && busy != 'designer' && busy != 'run'),
       runEventNodes: value({}),
       connectorSetupPending: value(false),
       variableNames: value([]),

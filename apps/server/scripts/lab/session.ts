@@ -7,6 +7,7 @@ import { isLabCliOffline } from '@oomol-lab/open-flow-command/lab'
 import { authoringNode } from '@oomol-lab/open-flow/control-requests'
 import { validateFlowInputs } from '@oomol-lab/open-flow/flow-semantics'
 import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
+import { runStatusSets } from '@oomol-lab/open-flow/run-lifecycle'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
@@ -370,7 +371,7 @@ export class LabSession {
     const verificationStart = performance.now()
     const taskEndedAt = new Date().toISOString()
     if (this.busy || this.active.size > 0) throw new Error('Wait for active commands before verifying.')
-    for (const status of ['queued', 'starting', 'running', 'waiting'] as const) {
+    for (const status of runStatusSets.active) {
       if (this.service.control.runs.listRuns('operator', this.manifest.flowId, 1, { status }).page.runs.length > 0)
         throw new Error('Finish, cancel, or reset the existing Run before verifying.')
     }
@@ -482,7 +483,7 @@ export class LabSession {
     if (this.busy || this.active.size > 0) throw new Error('Wait for active commands before advancing.')
     if (this.stage + 1 >= stageCount(this.scenarioId)) throw new Error('No next stage.')
     if (!this.attempt.passed || this.head() != this.attempt.endRevision) throw new Error('Verify the current draft successfully before advancing.')
-    for (const status of ['queued', 'starting', 'running', 'waiting'] as const)
+    for (const status of runStatusSets.active)
       if (this.service.control.runs.listRuns('operator', this.manifest.flowId, 1, { status }).page.runs.length > 0)
         throw new Error('Finish the active Run before advancing.')
     this.busy = true

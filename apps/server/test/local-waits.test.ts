@@ -1,5 +1,6 @@
 import type { WaitAutoContinue } from '@oomol-lab/open-flow/flow-change'
 import type { FlowRunCheckpoint, WaitRequest } from '@oomol-lab/open-flow/scheduler'
+import type { StoredRun } from '../node/storage/run-store.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { withWaitNotificationMessage } from '@oomol-lab/open-flow/scheduler'
@@ -9,6 +10,11 @@ import { WaitActions } from '../node/application/wait-actions.ts'
 import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
+
+function resumeCheckpoint(run: StoredRun | undefined): FlowRunCheckpoint {
+  if (run?.startState.kind != 'resume') throw new Error('Expected a resumable Run.')
+  return run.startState.checkpoint
+}
 
 function fixture(timing?: WaitAutoContinue | { readonly kind: 'delay'; readonly durationMs: number | null }) {
   let now = 1000
@@ -115,7 +121,7 @@ it('retains a Delay deadline across recovery, rejects manual decisions and wakes
   expect(reopened.runs.maintain(2000, 100, 60_000).continuedWaits).toHaveLength(1)
   expect(reopened.runs.maintain(2000, 100, 60_000).continuedWaits).toEqual([])
   expect(reopened.runs.resolveWait(f.runId, 'first', 'continue')).toEqual({ kind: 'invalid-action' })
-  expect(reopened.runs.claim()?.resume?.checkpoint).toEqual(f.checkpoint)
+  expect(resumeCheckpoint(reopened.runs.claim())).toEqual(f.checkpoint)
 })
 
 it('does not wake a canceled Delay', () => {
@@ -189,18 +195,19 @@ it('freezes a remaining legacy Wait after resuming and enriching its notificatio
   f.store.runs.resolveWait(f.runId, 'first', 'approve')
   const claimed = f.store.runs.claim()!
   expect(f.store.runs.resume(f.runId)).toBe(true)
+  const claimedCheckpoint = resumeCheckpoint(claimed)
   const checkpoint: FlowRunCheckpoint = {
-    ...claimed.resume!.checkpoint,
+    ...claimedCheckpoint,
     dependencies: {
-      ...claimed.resume!.checkpoint.dependencies,
+      ...claimedCheckpoint.dependencies,
       nodes: {
-        ...claimed.resume!.checkpoint.dependencies.nodes,
-        first: { ...claimed.resume!.checkpoint.dependencies.nodes.first!, status: 'completed', output: 0 },
+        ...claimedCheckpoint.dependencies.nodes,
+        first: { ...claimedCheckpoint.dependencies.nodes.first!, status: 'completed', output: 0 },
       },
       results: [{ nodeId: 'first', execution: 0, outputs: {} }],
     },
-    waits: claimed
-      .resume!.checkpoint.waits.filter((wait) => wait.waitId == 'second')
+    waits: claimedCheckpoint.waits
+      .filter((wait) => wait.waitId == 'second')
       .map((wait) => Object.assign({}, wait, { pending: withWaitNotificationMessage(wait.pending!) })),
   }
   expect(checkpoint.waits[0]!.pending).toEqual(f.checkpoint.waits[1]!.pending)
@@ -208,7 +215,7 @@ it('freezes a remaining legacy Wait after resuming and enriching its notificatio
   expect(f.store.runViews.run(f.runId)?.status).toBe('waiting')
   const reopened = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 1001)
   expect(reopened.runs.resolveWait(f.runId, 'second', 'reject')).toMatchObject({ status: 'queued', changed: true })
-  expect(reopened.runs.claim()?.resume?.checkpoint).toEqual(checkpoint)
+  expect(resumeCheckpoint(reopened.runs.claim())).toEqual(checkpoint)
   expect(reopened.runs.resume(f.runId)).toBe(true)
   expect(reopened.runs.resolutions(f.runId, ['first', 'second'])).toEqual({ first: resolution('approve'), second: resolution('reject', 1001) })
 })
@@ -231,7 +238,7 @@ it.each(['before', 'after'] as const)('cannot lose a decision committed %s the f
   if (order == 'after') f.store.runs.resolveWait(f.runId, 'first', 'approve')
   expect(f.store.runViews.run(f.runId)?.status).toBe('queued')
   const claimed = f.store.runs.claim()!
-  expect(claimed.resume?.checkpoint).toEqual(f.checkpoint)
+  expect(resumeCheckpoint(claimed)).toEqual(f.checkpoint)
   expect(f.store.runs.resume(f.runId)).toBe(true)
   expect(f.store.runs.resolutions(f.runId, ['first', 'second'])).toEqual({ first: resolution('approve') })
 })
@@ -278,7 +285,7 @@ it.each([false, true])('recovers only safe checkpoints, checkpoint saved: %s', (
   expect(reopened.runViews.run(f.runId)?.status).toBe(paused ? 'waiting' : 'indeterminate')
   if (paused) {
     reopened.runs.resolveWait(f.runId, 'first', 'approve')
-    expect(reopened.runs.claim()?.resume?.checkpoint).toEqual(f.checkpoint)
+    expect(resumeCheckpoint(reopened.runs.claim())).toEqual(f.checkpoint)
   }
 })
 
@@ -288,6 +295,18 @@ it('fails closed on corrupt stored checkpoint bytes', () => {
   f.database.connection.prepare("UPDATE run_checkpoints SET checkpoint_json = '{}' WHERE run_id = ?").run(f.runId)
   const recovered = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 1001)
   expect(recovered.runViews.run(f.runId)).toMatchObject({ status: 'indeterminate', result: { error: { code: 'execution.resume-unavailable' } } })
+})
+
+it('never re-claims an unusable stored checkpoint', () => {
+  const f = fixture()
+  f.pause()
+  f.database.connection.prepare("UPDATE run_checkpoints SET checkpoint_json = '{}' WHERE run_id = ?").run(f.runId)
+  f.database.connection.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ?").run(f.runId)
+  const claimed = f.store.runs.claim()
+  expect(claimed?.startState).toEqual({ kind: 'unavailable' })
+  expect(f.store.runs.failResume(f.runId, {})).toBe(true)
+  expect(f.store.runViews.run(f.runId)?.status).toBe('indeterminate')
+  expect(f.store.runs.claim()).toBeUndefined()
 })
 
 it('admits another Run from the same Flow while its predecessor is running', () => {
@@ -418,7 +437,7 @@ it('requeues an overdue frozen Wait after restart without recalculating its dead
   expect(reopened.runViews.run(f.runId)?.status).toBe('waiting')
   expect(reopened.runs.maintain(190_000, 100, 60_000).continuedWaits).toHaveLength(1)
   expect(reopened.runViews.run(f.runId)?.status).toBe('queued')
-  expect(reopened.runs.claim()?.resume?.checkpoint).toEqual(f.checkpoint)
+  expect(resumeCheckpoint(reopened.runs.claim())).toEqual(f.checkpoint)
   expect(reopened.runViews.waitReceipt(f.runId, 'first')?.autoContinueAt).toBe(181_000)
 })
 
@@ -475,6 +494,6 @@ it('preserves a 4 MiB input through checkpoint persistence and resume', () => {
   f.pause()
   f.store.runs.resolveWait(f.runId, 'first', 'approve')
   const claimed = f.store.runs.claim()
-  expect(claimed?.resume?.checkpoint.inputs).toEqual({ source: { quotes } })
+  expect(resumeCheckpoint(claimed).inputs).toEqual({ source: { quotes } })
   expect(f.store.runs.resume(f.runId)).toBe(true)
 })

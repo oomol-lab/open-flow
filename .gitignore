@@ -4,6 +4,7 @@ coverage/
 *.log
 .DS_Store
 /.claude/
+/.commandcode/
 .open-flow-dev/
 .wrangler/
 

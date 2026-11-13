@@ -479,6 +479,25 @@ describe('Workspace canvas history', () => {
     }
   })
 
+  it('keeps a failed resync visible and retryable instead of freezing silently', async () => {
+    const { store, update, getEditor } = await session()
+    update.mockRejectedValueOnce(new ApiError(500, 'request.failed', 'Failed'))
+    getEditor.mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(new Error('offline'))
+    try {
+      store.selectNodes(['code', 'note'])
+      await store.deleteSelectedNodes()
+      await vi.waitFor(() => expect(store.history$.value.failed).toBe(true))
+      await store.retryHistorySync()
+      expect(store.history$.value.failed).toBe(true)
+      expect(store.history$.value.canUndo).toBe(false)
+      expect(await store.nodes.saveNodeTitle('value', 'Blocked')).toBe(false)
+      await store.retryHistorySync()
+      expect(store.history$.value.failed).toBe(false)
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('clears history on a presentation conflict and does not revive late actions after target switches', async () => {
     const { store, update } = await session()
     try {

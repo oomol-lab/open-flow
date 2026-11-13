@@ -78,8 +78,19 @@ export interface SourceSubscription {
   readonly sourceId: string
   readonly resourceKey: string
   readonly resourceJson: string
+  // `uncertain` is only read from rows written before guarded transitions; it reconciles like `creating`.
   readonly status: 'creating' | 'ready' | 'deleting' | 'uncertain'
 }
+
+/**
+ * Resource subscription state authority.
+ *
+ * Demands are the desired state; `status` records the last confirmed remote state. A subscription is
+ * usable only when it is `ready`. A new demand moves an unfinished delete back to `creating`; a delete
+ * starts only without demands and removes the row only if no demand returned meanwhile. A failed
+ * remote change keeps its in-flight status and is retried after `subscriptionRetryMs`.
+ */
+export const subscriptionRetryMs = 60_000
 
 export class EventSourceStore {
   readonly #database: DatabaseSync
@@ -467,47 +478,84 @@ export class EventSourceStore {
       this.#database.prepare('INSERT OR IGNORE INTO source_demands VALUES (?, ?, ?)').run(sourceId, resourceKey, bindingId)
       this.#database
         .prepare(
-          `INSERT OR IGNORE INTO source_subscriptions
+          `INSERT INTO source_subscriptions
            (source_id, resource_key, resource_json, status, updated_at, provider_access_snapshot)
-           VALUES (?, ?, ?, 'creating', ?, ?)`,
+           VALUES (?, ?, ?, 'creating', ?, ?)
+           ON CONFLICT (source_id, resource_key) DO UPDATE SET status = 'creating', updated_at = excluded.updated_at
+           WHERE source_subscriptions.status = 'deleting'`,
         )
         .run(sourceId, resourceKey, resourceJson, now, JSON.stringify(providerAccess))
       return this.subscription(sourceId, resourceKey)!
     })
   }
 
-  subscriptionState(sourceId: string, resourceKey: string, status: SourceSubscription['status'], now: number): void {
+  /** Confirms an active remote resource unless a delete has started since the change began. */
+  subscriptionReady(sourceId: string, resourceKey: string, now: number): boolean {
+    return (
+      this.#database
+        .prepare(
+          `UPDATE source_subscriptions SET status = 'ready', updated_at = ?
+           WHERE source_id = ? AND resource_key = ? AND status != 'deleting'`,
+        )
+        .run(now, sourceId, resourceKey).changes == 1
+    )
+  }
+
+  /** Starts deleting a subscription only while no demand needs it. */
+  beginSubscriptionDelete(sourceId: string, resourceKey: string, now: number): boolean {
+    return (
+      this.#database
+        .prepare(
+          `UPDATE source_subscriptions SET status = 'deleting', updated_at = ?
+           WHERE source_id = ? AND resource_key = ? AND NOT EXISTS (
+             SELECT 1 FROM source_demands d WHERE d.source_id = source_subscriptions.source_id AND d.resource_key = source_subscriptions.resource_key
+           )`,
+        )
+        .run(now, sourceId, resourceKey).changes == 1
+    )
+  }
+
+  /** Records a failed remote change; the in-flight status keeps its direction and waits for a retry. */
+  subscriptionFailed(sourceId: string, resourceKey: string, status: SourceSubscription['status'], now: number): void {
     this.#database
-      .prepare('UPDATE source_subscriptions SET status = ?, updated_at = ? WHERE source_id = ? AND resource_key = ?')
-      .run(status, now, sourceId, resourceKey)
+      .prepare('UPDATE source_subscriptions SET updated_at = ? WHERE source_id = ? AND resource_key = ? AND status = ?')
+      .run(now, sourceId, resourceKey, status)
+  }
+
+  /** Removes a deleted subscription unless a demand moved it back to `creating`. */
+  deleteSubscription(sourceId: string, resourceKey: string): boolean {
+    return (
+      this.#database.prepare("DELETE FROM source_subscriptions WHERE source_id = ? AND resource_key = ? AND status = 'deleting'").run(sourceId, resourceKey)
+        .changes == 1
+    )
   }
 
   release(bindingId: string): void {
     this.#database.prepare('DELETE FROM source_demands WHERE binding_id = ?').run(bindingId)
   }
 
-  unusedSubscriptions(): readonly SourceSubscription[] {
+  /** Releases demands whose binding is neither live nor a pending Publish candidate. */
+  releaseOrphanDemands(): void {
     this.#database
       .prepare(`DELETE FROM source_demands WHERE NOT EXISTS
       (SELECT 1 FROM integration_bindings b WHERE b.binding_id = source_demands.binding_id AND b.current_publication_id IS NOT NULL)
       AND NOT EXISTS (SELECT 1 FROM integration_candidates c JOIN publish_operations p USING (operation_id)
       WHERE c.binding_id = source_demands.binding_id AND c.status != 'cleanup' AND p.status = 'pending')`)
       .run()
+  }
+
+  unusedSubscriptions(now: number): readonly SourceSubscription[] {
     const rows = this.#database
       .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status,
       provider_access_snapshot AS providerAccess
       FROM source_subscriptions s WHERE (s.status = 'ready' OR s.updated_at <= ?) AND NOT EXISTS (SELECT 1 FROM source_demands d WHERE d.source_id = s.source_id AND d.resource_key = s.resource_key)
       LIMIT 100`)
-      .all(this.#clock() - 60_000) as unknown as readonly (Omit<SourceSubscription, 'providerAccess'> & { readonly providerAccess: string })[]
+      .all(now - subscriptionRetryMs) as unknown as readonly (Omit<SourceSubscription, 'providerAccess'> & { readonly providerAccess: string })[]
     const subscriptions: SourceSubscription[] = []
     for (const { providerAccess, ...row } of rows) {
       subscriptions.push({ ...row, providerAccess: decodeConnectorAccessSnapshot(JSON.parse(providerAccess)) })
     }
     return subscriptions
-  }
-
-  deleteSubscription(sourceId: string, resourceKey: string): void {
-    this.#database.prepare('DELETE FROM source_subscriptions WHERE source_id = ? AND resource_key = ?').run(sourceId, resourceKey)
   }
 
   ready(sourceId: string, bindingId: string): boolean {
@@ -518,7 +566,7 @@ export class EventSourceStore {
       sourceReady(source, this.#clock()) &&
       this.#database
         .prepare(`SELECT 1 FROM source_demands d
-      JOIN source_subscriptions s USING (source_id, resource_key) WHERE d.binding_id = ? AND s.status != 'ready'`)
+      LEFT JOIN source_subscriptions s USING (source_id, resource_key) WHERE d.binding_id = ? AND (s.status IS NULL OR s.status != 'ready')`)
         .get(bindingId) == null
     )
   }

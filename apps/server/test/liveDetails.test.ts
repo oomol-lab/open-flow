@@ -57,7 +57,7 @@ it('reads authorized published entries independently of edits and unreadable Dra
     expect(await client.getLiveDetails(flowId)).toMatchObject({
       enabled: false,
       status: 'suspended',
-      entries: expect.arrayContaining([expect.objectContaining({ type: 'webhook', binding: expect.objectContaining({ health: 'healthy' }) })]),
+      entries: expect.arrayContaining([expect.objectContaining({ type: 'webhook', binding: expect.objectContaining({ health: 'unobservable' }) })]),
     })
     const changed = await service.control.drafts.changeDraft('operator', flowId, changedInputs.revision, [{ kind: 'graph.node.delete', nodeId: 'webhook' }])
     expect((await client.getLiveDetails(flowId)).entries.some((entry) => entry.nodeId == 'webhook')).toBe(true)

@@ -33,3 +33,13 @@ it('drops a queued admission when its invocation ends', async () => {
   slots.release('holder', 'job')
   expect(await settles(slots.acquire('next', 'job', signal))).toBe(true)
 })
+
+it('returns a permit that arrives after its lease lent itself out', async () => {
+  const slots = new ExecutionSlots(1)
+  await slots.acquire('holder', 'job', signal)
+  const racer = slots.acquire('racer', 'job', signal)
+  slots.suspend('racer', 'job')
+  slots.release('holder', 'job')
+  expect(await settles(racer)).toBe(true)
+  expect(await settles(slots.acquire('next', 'job', signal))).toBe(true)
+})

@@ -207,9 +207,9 @@ export class RunExecutor {
         try: () => projectEvent({ flowId: run.flowId, runId: run.runId, type: 'run.started' }),
         catch: (error) => error,
       })
-      if (run.resume != null) {
+      if (run.startState.kind == 'resume') {
         return {
-          bindingValues: run.resume.checkpoint.bindingValues,
+          bindingValues: run.startState.checkpoint.bindingValues,
           flow: prepared.flow,
           kind: 'prepared' as const,
           projectEvent,
@@ -239,7 +239,7 @@ export class RunExecutor {
     | undefined
   > {
     return Effect.gen({ self: this }, function* () {
-      if (run.resumeUnavailable) {
+      if (run.startState.kind == 'unavailable') {
         if (
           this.#store.runs.failResume(run.runId, {
             error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' },
@@ -254,7 +254,7 @@ export class RunExecutor {
           onFailure: (error) =>
             Effect.sync(() => {
               const committed =
-                run.resume == null
+                run.startState.kind != 'resume'
                   ? this.#store.runs.failStarting(run.runId, {
                       error:
                         error instanceof ConnectorTaskError
@@ -279,7 +279,7 @@ export class RunExecutor {
         return
       }
       if (start == null || start.started == null) return
-      const started = run.resume == null ? this.#store.runs.start(run.runId, start.started) : this.#store.runs.resume(run.runId)
+      const started = run.startState.kind != 'resume' ? this.#store.runs.start(run.runId, start.started) : this.#store.runs.resume(run.runId)
       if (!started) return
       return { bindingValues: start.bindingValues, flow: start.flow, projectEvent: start.projectEvent }
     })
@@ -294,16 +294,16 @@ export class RunExecutor {
     return Effect.gen({ self: this }, function* () {
       const startedAt = performance.now()
       const connectors = new ConnectorExecution(this.#resolveConnector)
-      const budgetMs = run.remainingMs ?? this.#runTimeoutMs
+      const budgetMs = run.startState.kind == 'resume' ? run.startState.remainingMs : this.#runTimeoutMs
       this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
 
       let indeterminate = false
       let launch: RunLaunch
-      if (run.resume != null) {
-        const calls = run.resume.checkpoint.calls
+      if (run.startState.kind == 'resume') {
+        const calls = run.startState.checkpoint.calls
         launch = {
           resume: {
-            checkpoint: run.resume.checkpoint,
+            checkpoint: run.startState.checkpoint,
             ...(calls != null && calls.length > 1 ? { readyWorkflowRunIds: this.#store.runs.readyWorkflowRuns(calls.map((call) => call.childRunId)) } : {}),
           },
         }

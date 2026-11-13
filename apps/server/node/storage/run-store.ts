@@ -19,10 +19,12 @@ import type { VariableStore } from './variable-store.ts'
 import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowDependencies, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { isRunActive, isRunTerminal, runStatusSets, runTransitionScope, runTransitionScopes } from '@oomol-lab/open-flow/run-lifecycle'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { decodeFlowRunCheckpoint, normalizeWaitComment, waitAutoContinueAt, withWaitNotificationMessage } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { AcceptanceError } from '../error.ts'
+import { statusIn } from './run-status-sql.ts'
 import { errorWorkflowTarget } from './trigger-store.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
@@ -40,6 +42,11 @@ export interface WorkflowCallAdmission {
 /** Direct calls supply their authenticated initiator; workflow calls derive it from the parent. */
 export type LiveRunOrigin = { readonly initiator: RunInitiator; readonly call?: never } | { readonly call: WorkflowCallAdmission; readonly initiator?: never }
 
+export type RunStartState =
+  | { readonly kind: 'fresh' }
+  | { readonly kind: 'resume'; readonly checkpoint: FlowRunCheckpoint; readonly remainingMs: number }
+  | { readonly kind: 'unavailable' }
+
 export interface StoredRun {
   readonly bindingValues?: Readonly<Record<string, string>>
   readonly connectorTeamId?: string
@@ -50,12 +57,10 @@ export interface StoredRun {
   readonly inputs: RunInputs
   readonly llmConfig?: LlmConfig
   readonly providerAccess: ConnectorAccessSnapshot
-  readonly remainingMs?: number
-  readonly resume?: { readonly checkpoint: FlowRunCheckpoint }
-  readonly resumeUnavailable?: true
   readonly revisionDigest: string
   readonly runId: string
   readonly source: StoredControlRun['source'] | null
+  readonly startState: RunStartState
   readonly trigger?: TriggerSeed
 }
 
@@ -293,12 +298,13 @@ export class RunStore {
   }
 
   readyWorkflowRuns(runIds: readonly string[]): readonly string[] {
+    const terminal = statusIn('runs.status', runStatusSets.terminal)
     return (
       this.#database
         .prepare(`SELECT pending.value AS runId FROM json_each(?) pending
         LEFT JOIN runs ON runs.run_id = pending.value
-        WHERE runs.run_id IS NULL OR runs.status IN ('completed', 'failed', 'canceled', 'indeterminate')`)
-        .all(JSON.stringify(runIds)) as { runId: string }[]
+        WHERE runs.run_id IS NULL OR ${terminal.sql}`)
+        .all(JSON.stringify(runIds), ...terminal.params) as { runId: string }[]
     ).map((row) => row.runId)
   }
 
@@ -335,13 +341,14 @@ export class RunStore {
   }
 
   #readyCalls(runId: string): boolean {
+    const terminal = statusIn('r.status', runStatusSets.terminal)
     return (
       this.#database
         .prepare(`SELECT 1 FROM workflow_calls c JOIN runs r ON r.run_id = c.child_run_id
-      WHERE c.parent_run_id = ? AND r.status IN ('completed', 'failed', 'canceled', 'indeterminate')
+      WHERE c.parent_run_id = ? AND ${terminal.sql}
       AND EXISTS (SELECT 1 FROM json_each((SELECT checkpoint_json FROM run_checkpoints WHERE run_id = ?), '$.calls') j
         WHERE json_extract(j.value, '$.childRunId') = c.child_run_id) LIMIT 1`)
-        .get(runId, runId) != null
+        .get(runId, ...terminal.params, runId) != null
     )
   }
 
@@ -390,19 +397,21 @@ export class RunStore {
         parentRunIds == null
           ? ''
           : `AND EXISTS (SELECT 1 FROM workflow_calls c WHERE c.child_run_id = runs.run_id AND c.parent_run_id IN (${parentRunIds.map(() => '?').join(', ')}))`
+      const claimable = statusIn('runs.status', runTransitionScopes.claim)
       const claimed = this.#database
         .prepare(
           `SELECT runs.run_id AS runId
            FROM work JOIN runs USING (run_id)
-           WHERE runs.status IN ('queued', 'starting')
+           WHERE ${claimable.sql}
              ${flowFilter}
              ${parentFilter}
            ORDER BY work.sequence
            LIMIT 1`,
         )
-        .get(...excludedFlowIds, ...(parentRunIds ?? [])) as { readonly runId: string } | undefined
+        .get(...claimable.params, ...excludedFlowIds, ...(parentRunIds ?? [])) as { readonly runId: string } | undefined
       if (claimed == null) return
-      this.#database.prepare("UPDATE runs SET status = 'starting' WHERE run_id = ? AND status = 'queued'").run(claimed.runId)
+      const starting = statusIn('status', runTransitionScopes.claim)
+      this.#database.prepare(`UPDATE runs SET status = 'starting' WHERE run_id = ? AND ${starting.sql}`).run(claimed.runId, ...starting.params)
       const row = this.#database
         .prepare(
           `SELECT revisions.content, runs.engine_contract AS engineContract, runs.engine_digest AS engineDigest,
@@ -439,13 +448,17 @@ export class RunStore {
         readonly triggerOutputs: string | null
         readonly checkpointRunId: string | null
       }
-      let resumeUnavailable = row.checkpointRunId != null && !this.#checkpointValid(row.checkpointJson, row.checkpointDigest, row.checkpointBytes)
-      let resume: StoredRun['resume']
-      if (!resumeUnavailable && row.checkpointJson != null) {
+      let startState: RunStartState = row.checkpointRunId == null ? { kind: 'fresh' } : { kind: 'unavailable' }
+      if (
+        row.checkpointRunId != null &&
+        row.checkpointJson != null &&
+        row.remainingMs != null &&
+        this.#checkpointValid(row.checkpointJson, row.checkpointDigest, row.checkpointBytes)
+      ) {
         try {
-          resume = { checkpoint: decodeFlowRunCheckpoint(JSON.parse(row.checkpointJson)) }
+          startState = { kind: 'resume', checkpoint: decodeFlowRunCheckpoint(JSON.parse(row.checkpointJson)), remainingMs: row.remainingMs }
         } catch {
-          resumeUnavailable = true
+          startState = { kind: 'unavailable' }
         }
       }
       return {
@@ -458,14 +471,10 @@ export class RunStore {
         flowId: row.flowId,
         inputs: JSON.parse(row.inputs) as RunInputs,
         providerAccess: decodeConnectorAccessSnapshot(JSON.parse(row.providerAccess)),
-        ...(resumeUnavailable
-          ? { resumeUnavailable: true as const }
-          : resume == null || row.remainingMs == null
-            ? {}
-            : { remainingMs: row.remainingMs, resume }),
         revisionDigest: row.revisionDigest,
         runId: row.runId,
         source: row.source,
+        startState,
         ...(row.triggerNodeId == null || row.triggerOutputs == null
           ? {}
           : { trigger: { nodeId: row.triggerNodeId, outputs: JSON.parse(row.triggerOutputs) as Readonly<Record<string, JsonValue>> } }),
@@ -475,13 +484,14 @@ export class RunStore {
 
   start(runId: string, event: ProjectedRunEvent): boolean {
     return this.#transaction(() => {
+      const scope = statusIn('status', runTransitionScopes.start)
       const changed = this.#database
         .prepare(
           `UPDATE runs SET status = 'running', started_at = ?
-           WHERE run_id = ? AND status = 'starting'
+           WHERE run_id = ? AND ${scope.sql}
              AND NOT EXISTS (SELECT 1 FROM run_checkpoints WHERE run_checkpoints.run_id = runs.run_id)`,
         )
-        .run(this.#clock(), runId)
+        .run(this.#clock(), runId, ...scope.params)
       if (changed.changes != 1) return false
       const bytes = encoder.encode(JSON.stringify(event)).byteLength
       this.#insertEvent(runId, event.kind, event.payload, 'value' in event ? event.value : undefined)
@@ -492,10 +502,13 @@ export class RunStore {
 
   resume(runId: string): boolean {
     return this.#transaction(() => {
+      const scope = statusIn('status', runTransitionScopes.resume)
       const changed = this.#database
-        .prepare(`UPDATE runs SET status = 'running' WHERE run_id = ? AND status = 'starting'
-        AND EXISTS (SELECT 1 FROM run_checkpoints WHERE run_checkpoints.run_id = runs.run_id AND checkpoint_json IS NOT NULL)`)
-        .run(runId)
+        .prepare(
+          `UPDATE runs SET status = 'running' WHERE run_id = ? AND ${scope.sql}
+        AND EXISTS (SELECT 1 FROM run_checkpoints WHERE run_checkpoints.run_id = runs.run_id AND checkpoint_json IS NOT NULL)`,
+        )
+        .run(runId, ...scope.params)
       if (changed.changes != 1) return false
       this.#database.prepare('UPDATE run_checkpoints SET checkpoint_json = NULL WHERE run_id = ?').run(runId)
       return true
@@ -503,15 +516,7 @@ export class RunStore {
   }
 
   commit(runId: string, status: RunTerminalStatus, result: unknown): boolean {
-    return this.#transaction(() => {
-      const condition =
-        status == 'canceled'
-          ? "status IN ('queued', 'starting', 'running', 'waiting')"
-          : status == 'failed'
-            ? "status IN ('queued', 'starting', 'running', 'waiting')"
-            : "status = 'running'"
-      return this.#finishRun(runId, status, result, condition, this.#clock())
-    })
+    return this.#transaction(() => this.#finishRun(runId, status, result, runTransitionScope({ kind: 'commit', status }), this.#clock()))
   }
 
   cancel(runId: string): boolean {
@@ -519,11 +524,11 @@ export class RunStore {
   }
 
   failStarting(runId: string, result: unknown): boolean {
-    return this.#transaction(() => this.#finishRun(runId, 'failed', result, "status = 'starting'", this.#clock()))
+    return this.#transaction(() => this.#finishRun(runId, 'failed', result, runTransitionScopes['fail-start'], this.#clock()))
   }
 
   failResume(runId: string, result: unknown): boolean {
-    return this.#transaction(() => this.#finishRun(runId, 'indeterminate', result, "status = 'starting'", this.#clock()))
+    return this.#transaction(() => this.#finishRun(runId, 'indeterminate', result, runTransitionScopes['fail-resume'], this.#clock()))
   }
 
   putArtifact(runId: string, artifact: StoredArtifact, content: Uint8Array): void {
@@ -799,14 +804,15 @@ export class RunStore {
         runId,
         outcome.checkpoint.waits.map((wait) => wait.waitId),
       )
-      let status = Object.keys(resolved).length > 0 ? 'queued' : 'waiting'
+      let status: RunStatus = Object.keys(resolved).length > 0 ? 'queued' : 'waiting'
       this.#database
         .prepare(
           `INSERT INTO run_checkpoints (run_id, checkpoint_json, checkpoint_digest, checkpoint_bytes, remaining_ms) VALUES (?, ?, ?, ?, ?) ON CONFLICT(run_id) DO UPDATE SET checkpoint_json = excluded.checkpoint_json, checkpoint_digest = excluded.checkpoint_digest, checkpoint_bytes = excluded.checkpoint_bytes, remaining_ms = excluded.remaining_ms`,
         )
         .run(runId, source, `sha256:${createHash('sha256').update(source).digest('hex')}`, bytes, remainingMs)
       if (this.#readyCalls(runId)) status = 'queued'
-      this.#database.prepare("UPDATE runs SET status = ? WHERE run_id = ? AND status = 'running'").run(status, runId)
+      const scope = statusIn('status', runTransitionScopes.wait)
+      this.#database.prepare(`UPDATE runs SET status = ? WHERE run_id = ? AND ${scope.sql}`).run(status, runId, ...scope.params)
       const payload = { waitIds: outcome.checkpoint.waits.map((wait) => wait.waitId) }
       this.#insertEvent(runId, 'run.waiting', payload)
       const eventBytes = encoder.encode(JSON.stringify({ kind: 'run.waiting', payload })).byteLength
@@ -877,7 +883,7 @@ export class RunStore {
         status: row.status,
       }
     }
-    if (!['running', 'waiting', 'queued', 'starting'].includes(row.status)) {
+    if (!isRunActive(row.status)) {
       return { action: null, comment: null, changed: false, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: row.status }
     }
     const resolvedAt = this.#clock()
@@ -886,12 +892,13 @@ export class RunStore {
         runId,
         'failed',
         { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } },
-        "status IN ('running', 'waiting', 'queued', 'starting')",
+        runTransitionScopes.fail,
         resolvedAt,
       )
       return { action: null, comment: null, changed: true, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: 'failed' as const }
     }
-    this.#database.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ? AND status = 'waiting'").run(runId)
+    const requeue = statusIn('status', runTransitionScopes.resolve)
+    this.#database.prepare(`UPDATE runs SET status = 'queued' WHERE run_id = ? AND ${requeue.sql}`).run(runId, ...requeue.params)
     this.#database
       .prepare('UPDATE wait_receipts SET action = ?, resolved_at = ?, comment = ?, resolution_source = ? WHERE run_id = ? AND wait_id = ?')
       .run(requested, resolvedAt, normalizedComment, source, runId, waitId)
@@ -916,16 +923,10 @@ export class RunStore {
     return this.#transaction(() => {
       const current = this.#database.prepare('SELECT status FROM runs WHERE run_id = ?').get(runId) as { readonly status: RunStatus } | undefined
       if (current == null) return
-      if (current.status == 'canceled' || current.status == 'completed' || current.status == 'failed' || current.status == 'indeterminate') {
+      if (isRunTerminal(current.status)) {
         return { accepted: false, run: this.#deps.views.controlRun(runId)! }
       }
-      this.#finishRun(
-        runId,
-        'canceled',
-        { error: { code: 'run.canceled', message: 'Run canceled.' } },
-        "status IN ('queued', 'starting', 'running', 'waiting')",
-        this.#clock(),
-      )
+      this.#finishRun(runId, 'canceled', { error: { code: 'run.canceled', message: 'Run canceled.' } }, runTransitionScopes.cancel, this.#clock())
       return { accepted: true, run: this.#deps.views.controlRun(runId)! }
     })
   }
@@ -933,17 +934,18 @@ export class RunStore {
   /** Cancels every live Run of a Flow so its retirement can proceed. */
   cancelByFlow(flowId: string, limit: number): readonly string[] {
     return this.#transaction(() => {
+      const active = statusIn('status', runTransitionScopes.cancel)
       const runs = this.#database
         .prepare(
           `SELECT run_id AS runId FROM runs
-           WHERE flow_id = ? AND status IN ('queued', 'starting', 'running', 'waiting')
+           WHERE flow_id = ? AND ${active.sql}
            ORDER BY created_at, run_id LIMIT ?`,
         )
-        .all(flowId, limit) as { readonly runId: string }[]
+        .all(flowId, ...active.params, limit) as { readonly runId: string }[]
       const result = { error: { code: 'run.canceled', message: 'Run canceled.' } }
       const finishedAt = this.#clock()
       for (const { runId } of runs) {
-        this.#finishRun(runId, 'canceled', result, "status IN ('queued', 'starting', 'running', 'waiting')", finishedAt)
+        this.#finishRun(runId, 'canceled', result, runTransitionScopes.cancel, finishedAt)
       }
       return runs.map(({ runId }) => runId)
     })
@@ -952,11 +954,12 @@ export class RunStore {
   /** Deletes one batch of a retired Flow's Run data, including its events and Waits. */
   deleteByFlow(flowId: string, limit: number): number {
     return this.#transaction(() => {
+      const activeParents = statusIn('p.status', runStatusSets.active)
       const runs = this.#database
         .prepare(
-          `SELECT run_id AS runId FROM runs WHERE flow_id = ? AND NOT EXISTS (SELECT 1 FROM workflow_calls c JOIN runs p ON p.run_id = c.parent_run_id WHERE c.child_run_id = runs.run_id AND p.status IN ('queued','starting','running','waiting')) ORDER BY created_at, run_id LIMIT ?`,
+          `SELECT run_id AS runId FROM runs WHERE flow_id = ? AND NOT EXISTS (SELECT 1 FROM workflow_calls c JOIN runs p ON p.run_id = c.parent_run_id WHERE c.child_run_id = runs.run_id AND ${activeParents.sql}) ORDER BY created_at, run_id LIMIT ?`,
         )
-        .all(flowId, limit) as {
+        .all(flowId, ...activeParents.params, limit) as {
         readonly runId: string
       }[]
       for (const { runId } of runs) {
@@ -989,54 +992,56 @@ export class RunStore {
   }
 
   nextMaintenanceAt(): number | undefined {
+    const childActive = statusIn('r.status', runStatusSets.active)
+    const active = statusIn('runs.status', runStatusSets.active)
     const row = this.#database
       .prepare(
         `SELECT MIN(dueAt) AS dueAt FROM (
            SELECT MIN(c.deadline_at) AS dueAt FROM workflow_calls c JOIN runs r ON r.run_id = c.child_run_id
-           WHERE r.status IN ('queued', 'starting', 'running', 'waiting')
+           WHERE ${childActive.sql}
            UNION ALL
            SELECT MIN(retry_at) AS dueAt FROM error_dispatches WHERE status = 'pending'
            UNION ALL
            SELECT MIN(wait_receipts.auto_continue_at) AS dueAt
            FROM wait_receipts JOIN runs USING (run_id)
-           WHERE runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL
+           WHERE ${active.sql} AND wait_receipts.action IS NULL
            UNION ALL
            SELECT MIN(wait_receipts.expires_at) AS dueAt
            FROM wait_receipts JOIN runs USING (run_id)
-           WHERE runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL
+           WHERE ${active.sql} AND wait_receipts.action IS NULL
            UNION ALL
            SELECT MIN(MAX(wait_notifications.retry_at, COALESCE(wait_notifications.claim_expires_at, wait_notifications.retry_at))) AS dueAt
            FROM wait_notifications JOIN runs USING (run_id) JOIN wait_receipts USING (run_id)
            WHERE wait_notifications.status = 'pending'
-             AND runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL
+             AND ${active.sql} AND wait_receipts.action IS NULL
              AND wait_receipts.wait_id = wait_notifications.wait_id
          )`,
       )
-      .get() as { readonly dueAt: number | null }
+      .get(...childActive.params, ...active.params, ...active.params, ...active.params) as { readonly dueAt: number | null }
     return row.dueAt ?? undefined
   }
 
   maintain(now: number, limit: number, notificationLeaseMs: number) {
     return this.#transaction(() => {
+      const childActive = statusIn('child.status', runStatusSets.active)
       const expiredCalls = this.#database
-        .prepare(`SELECT c.parent_run_id AS runId, c.parent_flow_id AS flowId FROM workflow_calls c
-        JOIN runs child ON child.run_id = c.child_run_id WHERE c.deadline_at <= ? AND child.status IN ('queued','starting','running','waiting') LIMIT ?`)
-        .all(now, limit) as { runId: string; flowId: string }[]
-      for (const call of expiredCalls)
-        this.#finishRun(
-          call.runId,
-          'failed',
-          { error: { code: 'run.timeout', message: 'Workflow call timed out.' } },
-          "status IN ('queued','starting','running','waiting')",
-          now,
+        .prepare(
+          `SELECT c.parent_run_id AS runId, c.parent_flow_id AS flowId FROM workflow_calls c
+        JOIN runs child ON child.run_id = c.child_run_id WHERE c.deadline_at <= ? AND ${childActive.sql} LIMIT ?`,
         )
+        .all(now, ...childActive.params, limit) as { runId: string; flowId: string }[]
+      for (const call of expiredCalls)
+        this.#finishRun(call.runId, 'failed', { error: { code: 'run.timeout', message: 'Workflow call timed out.' } }, runTransitionScopes.fail, now)
       const expiredWaits = [...expiredCalls, ...this.#expireWaits(now, limit)]
+      const active = statusIn('runs.status', runStatusSets.active)
       const due = this.#database
-        .prepare(`SELECT runs.flow_id AS flowId, runs.run_id AS runId, wait_id AS waitId
+        .prepare(
+          `SELECT runs.flow_id AS flowId, runs.run_id AS runId, wait_id AS waitId
         FROM wait_receipts JOIN runs USING (run_id)
-        WHERE runs.status IN ('running', 'waiting', 'queued', 'starting') AND action IS NULL
-          AND auto_continue_at <= ? AND expires_at > ? ORDER BY auto_continue_at, wait_id LIMIT ?`)
-        .all(now, now, limit) as { flowId: string; runId: string; waitId: string }[]
+        WHERE ${active.sql} AND action IS NULL
+          AND auto_continue_at <= ? AND expires_at > ? ORDER BY auto_continue_at, wait_id LIMIT ?`,
+        )
+        .all(...active.params, now, now, limit) as { flowId: string; runId: string; waitId: string }[]
       const continuedWaits: typeof due = []
       for (const wait of due) {
         const result = this.#resolveWait(wait.runId, wait.waitId, 'continue', null, 'automatic')
@@ -1114,20 +1119,21 @@ export class RunStore {
   }
 
   #expireWaits(now: number, limit: number): readonly { readonly flowId: string; readonly runId: string }[] {
+    const active = statusIn('runs.status', runStatusSets.active)
     const due = this.#database
       .prepare(
         `SELECT DISTINCT runs.flow_id AS flowId, runs.run_id AS runId
          FROM runs JOIN wait_receipts USING (run_id)
-         WHERE runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL AND wait_receipts.expires_at <= ?
+         WHERE ${active.sql} AND wait_receipts.action IS NULL AND wait_receipts.expires_at <= ?
          ORDER BY wait_receipts.expires_at, runs.run_id LIMIT ?`,
       )
-      .all(now, limit) as unknown as readonly { readonly flowId: string; readonly runId: string }[]
+      .all(...active.params, now, limit) as unknown as readonly { readonly flowId: string; readonly runId: string }[]
     for (const { runId } of due) {
       this.#finishRun(
         runId,
         'failed',
         { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } },
-        "status IN ('running', 'waiting', 'queued', 'starting')",
+        runTransitionScopes.fail,
         now,
       )
     }
@@ -1174,18 +1180,19 @@ export class RunStore {
         readonly waitId: string
       }
     | undefined {
+    const active = statusIn('runs.status', runStatusSets.active)
     this.#database
       .prepare(
         `DELETE FROM wait_notifications
          WHERE status = 'pending' AND NOT EXISTS (
            SELECT 1 FROM runs JOIN wait_receipts USING (run_id)
            WHERE runs.run_id = wait_notifications.run_id
-             AND runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL
+             AND ${active.sql} AND wait_receipts.action IS NULL
              AND wait_receipts.wait_id = wait_notifications.wait_id
              AND wait_receipts.expires_at > ?
          )`,
       )
-      .run(now)
+      .run(...active.params, now)
     const row = this.#database
       .prepare(
         `SELECT wait_notifications.action, wait_notifications.connection_id AS connectionId,
@@ -1197,12 +1204,12 @@ export class RunStore {
          WHERE wait_notifications.status = 'pending'
            AND wait_notifications.retry_at <= ?
            AND (wait_notifications.claim_id IS NULL OR wait_notifications.claim_expires_at <= ?)
-           AND runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL
+           AND ${active.sql} AND wait_receipts.action IS NULL
            AND wait_receipts.wait_id = wait_notifications.wait_id
            AND wait_receipts.expires_at > ?
          ORDER BY wait_notifications.created_at, wait_notifications.run_id LIMIT 1`,
       )
-      .get(now, now, now) as
+      .get(now, now, ...active.params, now) as
       | {
           readonly action: string
           readonly connectionId: string | null
@@ -1340,27 +1347,22 @@ export class RunStore {
       .run(runId, cursor, kind, JSON.stringify(payload), value === undefined ? null : JSON.stringify(value), this.#clock())
   }
 
-  #finishRun(runId: string, status: RunTerminalStatus, result: unknown, condition: string, finishedAt: number, ...conditionParams: readonly string[]): boolean {
+  #finishRun(runId: string, status: RunTerminalStatus, result: unknown, scope: readonly RunStatus[], finishedAt: number): boolean {
     if (status == 'failed') {
       const failure = this.#database.prepare('SELECT failure_detail AS detail FROM runs WHERE run_id = ?').get(runId) as { detail: string | null } | undefined
       const error = (result as { error?: { code?: string } }).error
       if (failure?.detail != null && error?.code == 'run.failed') result = { error: JSON.parse(failure.detail) }
     }
+    const predicate = statusIn('status', scope)
     const changed = this.#database
-      .prepare(`UPDATE runs SET status = ?, result = ?, finished_at = ?, events_expires_at = ? WHERE run_id = ? AND ${condition}`)
-      .run(status, JSON.stringify(result), finishedAt, finishedAt + this.#runEventRetentionMs, runId, ...conditionParams)
+      .prepare(`UPDATE runs SET status = ?, result = ?, finished_at = ?, events_expires_at = ? WHERE run_id = ? AND ${predicate.sql}`)
+      .run(status, JSON.stringify(result), finishedAt, finishedAt + this.#runEventRetentionMs, runId, ...predicate.params)
     if (changed.changes != 1) return false
     this.#deps.state.finishRun(runId, status === 'completed')
     if (status != 'completed') {
       this.#interrupts.add(runId)
       for (const call of this.workflowCalls(runId))
-        this.#finishRun(
-          call.runId,
-          'canceled',
-          { error: { code: 'run.canceled', message: 'Calling Run ended.' } },
-          "status IN ('queued','starting','running','waiting')",
-          finishedAt,
-        )
+        this.#finishRun(call.runId, 'canceled', { error: { code: 'run.canceled', message: 'Calling Run ended.' } }, runTransitionScopes.cancel, finishedAt)
     }
     const origin = this.workflowOrigin(runId)
     if (origin != null) {
@@ -1369,7 +1371,7 @@ export class RunStore {
           origin.runId,
           'indeterminate',
           { error: { code: 'execution.terminal-unknown', message: 'Called workflow outcome is unknown.' } },
-          "status IN ('queued','starting','running','waiting')",
+          runStatusSets.active,
           finishedAt,
         )
       else {
@@ -1377,14 +1379,11 @@ export class RunStore {
           deadline: number | null
         }
         if (call.deadline != null && finishedAt > call.deadline)
-          this.#finishRun(
-            origin.runId,
-            'failed',
-            { error: { code: 'run.timeout', message: 'Workflow call timed out.' } },
-            "status IN ('queued','starting','running','waiting')",
-            finishedAt,
-          )
-        else this.#database.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ? AND status = 'waiting'").run(origin.runId)
+          this.#finishRun(origin.runId, 'failed', { error: { code: 'run.timeout', message: 'Workflow call timed out.' } }, runStatusSets.active, finishedAt)
+        else {
+          const requeue = statusIn('status', runTransitionScopes.resolve)
+          this.#database.prepare(`UPDATE runs SET status = 'queued' WHERE run_id = ? AND ${requeue.sql}`).run(origin.runId, ...requeue.params)
+        }
       }
     }
     if (status == 'failed' || status == 'indeterminate') {
@@ -1432,12 +1431,10 @@ export class RunStore {
   }
 
   #backfillEventExpiry(): void {
+    const terminal = statusIn('status', runStatusSets.terminal)
     this.#database
-      .prepare(
-        `UPDATE runs SET events_expires_at = ?
-         WHERE events_expires_at IS NULL AND status IN ('canceled', 'completed', 'failed', 'indeterminate')`,
-      )
-      .run(this.#clock() + this.#runEventRetentionMs)
+      .prepare(`UPDATE runs SET events_expires_at = ? WHERE events_expires_at IS NULL AND ${terminal.sql}`)
+      .run(this.#clock() + this.#runEventRetentionMs, ...terminal.params)
   }
 
   /** Ends Runs whose execution outcome the previous process could not confirm. */
@@ -1448,11 +1445,12 @@ export class RunStore {
         error: { code: 'execution.terminal-unknown', message: 'The previous process stopped after user execution began.' },
       })
     }
+    const claimable = statusIn('runs.status', runTransitionScopes.claim)
     const paused = this.#database
       .prepare(
-        `SELECT runs.run_id AS runId, runs.status, c.checkpoint_json AS source, c.checkpoint_digest AS digest, c.checkpoint_bytes AS bytes FROM runs LEFT JOIN run_checkpoints c USING (run_id) WHERE runs.status = 'waiting' OR (runs.status IN ('queued', 'starting') AND c.run_id IS NOT NULL)`,
+        `SELECT runs.run_id AS runId, runs.status, c.checkpoint_json AS source, c.checkpoint_digest AS digest, c.checkpoint_bytes AS bytes FROM runs LEFT JOIN run_checkpoints c USING (run_id) WHERE runs.status = 'waiting' OR (${claimable.sql} AND c.run_id IS NOT NULL)`,
       )
-      .all() as { runId: string; status: RunStatus; source: string | null; digest: string | null; bytes: number | null }[]
+      .all(...claimable.params) as { runId: string; status: RunStatus; source: string | null; digest: string | null; bytes: number | null }[]
     for (const row of paused) {
       if (this.#checkpointValid(row.source, row.digest, row.bytes)) continue
       this.#transaction(() =>
@@ -1460,9 +1458,8 @@ export class RunStore {
           row.runId,
           'indeterminate',
           { error: { code: 'execution.resume-unavailable', message: 'The stored checkpoint is unavailable or uses an old Engine.' } },
-          'status = ?',
+          [row.status],
           this.#clock(),
-          row.status,
         ),
       )
     }

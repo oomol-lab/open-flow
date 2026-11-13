@@ -6,6 +6,7 @@ import type { Notice } from './workbenchNotice.ts'
 import { val } from 'value-enhancer'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
+import { Latest } from './latest.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
 interface ConnectorAccessState {
@@ -24,7 +25,7 @@ const initialState: ConnectorAccessState = { candidates: {}, candidateErrors: []
 export class ConnectorAccessStore {
   readonly #state: Val<ConnectorAccessState> = val(initialState)
   #flowId?: string
-  #generation = 0
+  readonly #load = new Latest()
   #disposed = false
   #candidatesController = new AbortController()
   readonly #candidateRequests = new Map<string, Promise<void>>()
@@ -40,7 +41,7 @@ export class ConnectorAccessStore {
 
   async load(flowId: string | undefined): Promise<void> {
     const refreshing = flowId != null && flowId == this.#flowId && this.#state.value.access != null
-    const generation = ++this.#generation
+    const current = this.#load.begin()
     this.#flowId = flowId
     if (!refreshing) {
       this.#candidatesController.abort()
@@ -51,13 +52,13 @@ export class ConnectorAccessStore {
     if (flowId == null) return
     try {
       const access = await this.client.getConnectorAccess(flowId)
-      if (!this.#disposed && generation == this.#generation) {
-        const current = this.#state.value
-        const latest = current.access != null && current.access.accessRevision > access.accessRevision ? current.access : access
-        this.#state.set({ ...current, access: latest, loading: false })
+      if (!this.#disposed && current()) {
+        const state = this.#state.value
+        const latest = state.access != null && state.access.accessRevision > access.accessRevision ? state.access : access
+        this.#state.set({ ...state, access: latest, loading: false })
       }
     } catch (error) {
-      if (!this.#disposed && generation == this.#generation) {
+      if (!this.#disposed && current()) {
         if (!refreshing) this.#state.set(initialState)
         this.setNotice(errorNotice(error, this.i18n.t))
       }
@@ -235,7 +236,7 @@ export class ConnectorAccessStore {
     this.#disposed = true
     this.#candidatesController.abort()
     this.#candidateRequests.clear()
-    this.#generation += 1
+    this.#load.invalidate()
     this.#state.dispose()
   }
 }

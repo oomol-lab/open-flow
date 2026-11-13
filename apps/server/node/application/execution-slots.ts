@@ -1,14 +1,15 @@
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
 
+type LeasePhase = 'ended' | 'held' | 'idle' | 'suspended' | 'taking'
+
 interface Lease {
   readonly runId: string
   readonly abort: AbortController
-  held: boolean
+  phase: LeasePhase
   /** Outstanding child waits; the lease holds no permit while any remain. */
-  suspended: number
+  suspensions: number
   taking: Promise<void> | undefined
-  ended: boolean
 }
 
 /** Deployment-wide Task budget, held per node invocation and lent out while it waits for children. */
@@ -26,7 +27,7 @@ export class ExecutionSlots {
     const key = JSON.stringify([runId, jobId])
     let lease = this.#leases.get(key)
     if (lease == null) {
-      lease = { runId, abort: new AbortController(), held: false, suspended: 0, taking: undefined, ended: false }
+      lease = { runId, abort: new AbortController(), phase: 'idle', suspensions: 0, taking: undefined }
       this.#leases.set(key, lease)
     }
     return this.#hold(lease, signal)
@@ -36,17 +37,17 @@ export class ExecutionSlots {
   suspend(runId: string, jobId: string): void {
     const lease = this.#leases.get(JSON.stringify([runId, jobId]))
     if (lease == null) return
-    lease.suspended++
-    if (lease.suspended == 1) this.#drop(lease)
+    lease.suspensions++
+    if (lease.suspensions == 1) this.#drop(lease)
   }
 
   /** Ends one child wait; the last one reacquires the permit before the invocation continues. */
   resume(runId: string, jobId: string, signal: AbortSignal): Promise<void> {
     const key = JSON.stringify([runId, jobId])
     const lease = this.#leases.get(key)
-    if (lease == null || lease.suspended == 0) return Promise.resolve()
-    lease.suspended--
-    return lease.suspended > 0 ? Promise.resolve() : this.#hold(lease, signal)
+    if (lease == null || lease.suspensions == 0) return Promise.resolve()
+    lease.suspensions--
+    return lease.suspensions > 0 ? Promise.resolve() : this.#hold(lease, signal)
   }
 
   release(runId: string, jobId: string): void {
@@ -61,16 +62,20 @@ export class ExecutionSlots {
 
   #hold(lease: Lease, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
-    if (lease.held || lease.suspended > 0) return Promise.resolve()
-    if (lease.taking != null) return lease.taking
+    if (lease.phase == 'held' || lease.suspensions > 0) return Promise.resolve()
+    if (lease.phase == 'taking') return lease.taking!
+    lease.phase = 'taking'
     const taking = Effect.runPromise(
       Effect.uninterruptibleMask((restore) =>
         restore(this.#semaphore.take(1)).pipe(
           Effect.andThen(
             Effect.suspend(() => {
               // A permit that arrives after the lease ended or lent itself out is returned immediately.
-              if (lease.ended || lease.suspended > 0) return Effect.asVoid(this.#semaphore.release(1))
-              lease.held = true
+              if (lease.phase == 'ended' || lease.suspensions > 0) {
+                lease.phase = lease.phase == 'ended' ? 'ended' : 'suspended'
+                return Effect.asVoid(this.#semaphore.release(1))
+              }
+              lease.phase = 'held'
               return Effect.void
             }),
           ),
@@ -84,6 +89,7 @@ export class ExecutionSlots {
       (error: unknown) => {
         // The lease itself ends only through release or releaseRun.
         if (lease.taking == taking) lease.taking = undefined
+        if (lease.phase == 'taking') lease.phase = lease.suspensions > 0 ? 'suspended' : 'idle'
         throw error
       },
     )
@@ -92,15 +98,19 @@ export class ExecutionSlots {
   }
 
   #drop(lease: Lease): void {
-    if (!lease.held) return
-    lease.held = false
+    if (lease.phase != 'held') {
+      if (lease.suspensions > 0 && lease.phase == 'idle') lease.phase = 'suspended'
+      return
+    }
+    lease.phase = lease.suspensions > 0 ? 'suspended' : 'idle'
     Effect.runSync(this.#semaphore.release(1))
   }
 
   #end(key: string, lease: Lease, reason: string): void {
     this.#leases.delete(key)
-    lease.ended = true
     lease.abort.abort(new Error(reason))
-    this.#drop(lease)
+    const held = lease.phase == 'held'
+    lease.phase = 'ended'
+    if (held) Effect.runSync(this.#semaphore.release(1))
   }
 }

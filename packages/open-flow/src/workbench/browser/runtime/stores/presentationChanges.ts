@@ -77,15 +77,16 @@ export class PresentationChanges {
       try {
         const saved = await this.#client.updatePresentation(flowId, committed.revision, nextValue)
         if (this.#disposed || !current()) return
+        this.#failed = false
         this.#finish(pending, saved)
         success = true
       } catch (error) {
         if (this.#disposed || !current()) return
-        this.#failed = true
         if (error instanceof ApiError && error.code == 'flow.presentation-conflict') {
           try {
             const latest = await this.#client.getPresentation(flowId)
             if (this.#disposed || !current()) return
+            this.#failed = false
             this.#finish(pending, latest)
             this.#setNotice({
               kind: 'error',
@@ -94,11 +95,13 @@ export class PresentationChanges {
           } catch (reloadError) {
             if (!this.#disposed && current()) this.#finish(pending, committed)
             if (!this.#disposed && current()) this.#setNotice(errorNotice(reloadError, this.#i18n.t))
+            if (!this.#disposed && current()) this.#failed = true
           }
-        } else {
-          this.#finish(pending, committed)
-          this.#setNotice(errorNotice(error, this.#i18n.t))
+          return
         }
+        this.#failed = true
+        this.#finish(pending, committed)
+        this.#setNotice(errorNotice(error, this.#i18n.t))
       }
     })
     await this.#changes

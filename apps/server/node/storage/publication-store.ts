@@ -5,6 +5,7 @@ import type { FlowResourceReferenceStore } from './flow-resource-reference-store
 import type { FlowStore, StoredFlow, StoredFlowRevision } from './flow-store.ts'
 import type { IntegrationPublication } from './integration-store.ts'
 import type { PollPublication } from './poll-store.ts'
+import type { PublishIssue } from './publish-work.ts'
 import type { RevisionStore } from './revision-store.ts'
 
 import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
@@ -18,6 +19,7 @@ import { presentationView } from './flow-store.ts'
 import { insert } from './insert.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
+import { discardPendingPublishWork, publishDeadlineIssue } from './publish-work.ts'
 import { errorSourcesAvailable } from './trigger-store.ts'
 import { VariableStore } from './variable-store.ts'
 
@@ -520,30 +522,35 @@ export class PublicationStore {
         operationId: row.operationId,
       }
     }
-    if (row.deadlineAt <= now) {
-      return {
-        code: 'publication.deadline-exceeded',
-        kind: 'failed',
-        message: 'The Publish operation exceeded its preparation deadline.',
-        operationId: row.operationId,
-      }
-    }
+    if (row.deadlineAt <= now) return { ...publishDeadlineIssue, kind: 'failed', operationId: row.operationId }
     return { input: row.input, kind: 'ready', operationId: row.operationId }
   }
 
-  failPublishOperation(operationId: string, issue: { readonly code: string; readonly message: string; readonly nodeId?: string }): void {
-    this.#transaction(() => {
-      const now = this.#clock()
-      this.#database
-        .prepare(
-          `UPDATE publish_operations
-           SET status = 'failed', issue_node_id = ?, issue_code = ?, issue_message = ?, updated_at = ?
-           WHERE operation_id = ? AND status = 'pending'`,
-        )
-        .run(issue.nodeId ?? null, issue.code, issue.message, now, operationId)
-      this.#integrations.cleanupCandidates(operationId, now)
-      this.#polls.cleanupCandidates(operationId)
-    })
+  failPublishOperation(operationId: string, issue: PublishIssue): void {
+    this.#transaction(() => this.#settleOperation(operationId, { issue }, this.#clock()))
+  }
+
+  // The only terminal transition of a Publish operation; its candidates leave preparation with it.
+  #settleOperation(operationId: string, outcome: { readonly publicationId: string } | { readonly issue: PublishIssue }, now: number): void {
+    const settled =
+      'publicationId' in outcome
+        ? this.#database
+            .prepare(
+              `UPDATE publish_operations SET status = 'succeeded', publication_id = ?, updated_at = ?
+               WHERE operation_id = ? AND status = 'pending'`,
+            )
+            .run(outcome.publicationId, now, operationId).changes
+        : this.#database
+            .prepare(
+              `UPDATE publish_operations
+               SET status = 'failed', issue_node_id = ?, issue_code = ?, issue_message = ?, updated_at = ?
+               WHERE operation_id = ? AND status = 'pending'`,
+            )
+            .run(outcome.issue.nodeId ?? null, outcome.issue.code, outcome.issue.message, now, operationId).changes
+    if (settled != 1) return
+    discardPendingPublishWork(this.#database, operationId)
+    this.#integrations.cleanupCandidates(operationId, now)
+    this.#polls.cleanupCandidates(operationId)
   }
 
   prunePublishOperations(now: number, limit: number): number {
@@ -590,14 +597,7 @@ export class PublicationStore {
         const existing = this.replayPublication(input.flowId, input.idempotencyKey, input.requestDigest)
         if (existing != null) {
           if (existing.kind == 'conflict') return existing
-          if (input.operationId != null) {
-            this.#database
-              .prepare(
-                `UPDATE publish_operations SET status = 'succeeded', publication_id = ?, updated_at = ?
-               WHERE operation_id = ? AND status = 'pending'`,
-              )
-              .run(existing.publicationId, input.publishedAt, input.operationId)
-          }
+          if (input.operationId != null) this.#settleOperation(input.operationId, { publicationId: existing.publicationId }, input.publishedAt)
           return existing
         }
 
@@ -716,14 +716,7 @@ export class PublicationStore {
         }
         if (!this.#polls.install(input, publicationId)) throw publishPending
         if (!this.#integrations.install(input, publicationId)) throw publishPending
-        if (input.operationId != null) {
-          this.#database
-            .prepare(
-              `UPDATE publish_operations SET status = 'succeeded', publication_id = ?, updated_at = ?
-             WHERE operation_id = ? AND status = 'pending'`,
-            )
-            .run(publicationId, input.publishedAt, input.operationId)
-        }
+        if (input.operationId != null) this.#settleOperation(input.operationId, { publicationId }, input.publishedAt)
         return { created: true, kind: 'published', publicationId }
       })
     } catch (error) {

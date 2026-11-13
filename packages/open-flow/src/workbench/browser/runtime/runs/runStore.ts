@@ -1,6 +1,7 @@
 import type * as Fiber from 'effect/Fiber'
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
+import type { RunActiveStatus } from '../../../../execution/common/runLifecycle.ts'
 import type { WorkbenchClient, Run, RunDetails, RunEvent, RunResult, WaitAction } from '../api.ts'
 import type { Current } from '../stores/latest.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
@@ -9,7 +10,7 @@ import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import { arrayShallowEqual, derive, val } from 'value-enhancer'
 import { isRunTerminalEvent } from '../../../../control/common/api.ts'
-import { isRunTerminal } from '../../../../execution/common/runLifecycle.ts'
+import { isRunActive, isRunTerminal } from '../../../../execution/common/runLifecycle.ts'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
 import { Latest } from '../stores/latest.ts'
@@ -103,8 +104,8 @@ const runningPollDelay = 1200
 const maxIdlePollDelay = 10_000
 const waitingPollDelay = 60_000
 
-export function canCancelRun(run: Run | undefined): run is Run & { readonly status: 'queued' | 'running' | 'starting' | 'waiting' } {
-  return run?.status == 'queued' || run?.status == 'starting' || run?.status == 'running' || run?.status == 'waiting'
+export function canCancelRun(run: Run | undefined): run is Run & { readonly status: RunActiveStatus } {
+  return run != null && isRunActive(run.status)
 }
 
 function selectedRun(state: RunState): Run | RunDetails | undefined {
@@ -492,15 +493,33 @@ export class RunStore {
               Promise.allSettled([this.#client.getRun(run.runId, signal), this.#client.getRunEvents(run.runId, { after, limit: eventPageLimit }, signal)]),
             catch: (error) => error,
           })
-          if (runResponse.status == 'rejected') return yield* Effect.fail(runResponse.reason)
+          if (runResponse.status == 'rejected') {
+            if (!current() || this.#state.value.selectedRunId != run.runId) return
+            if (permanentObservationFailure(runResponse.reason)) return yield* Effect.fail(runResponse.reason)
+            this.#set({ observationFailed: true })
+            yield* Deferred.succeed(ready, undefined)
+            idlePolls = Math.min(idlePolls + 1, 6)
+            yield* Effect.sleep(Math.min(maxIdlePollDelay, startingPollDelay * 2 ** Math.max(0, idlePolls - 1)))
+            continue
+          }
           if (!current() || this.#state.value.selectedRunId != run.runId) return
           let nextRun = runResponse.value
-          this.#set({ observationFailed: false })
+          this.#set({ observationFailed: false, runById: replaceRun(this.#state.value, nextRun) })
           if (eventsResponse.status == 'rejected') {
-            if (!(eventsResponse.reason instanceof ApiError) || eventsResponse.reason.code != 'run.events-expired')
-              return yield* Effect.fail(eventsResponse.reason)
-            this.#set({ eventsExpiresAt: undefined, historyComplete: false, runById: replaceRun(this.#state.value, nextRun) })
-            yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error })
+            const resultLoaded = yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error }).pipe(
+              Effect.as(true),
+              Effect.catch((error) => (permanentObservationFailure(error) ? Effect.fail(error) : Effect.succeed(false))),
+            )
+            const expired = eventsResponse.reason instanceof ApiError && eventsResponse.reason.code == 'run.events-expired'
+            if (expired) this.#set({ eventsExpiresAt: undefined, historyComplete: false })
+            else if (permanentObservationFailure(eventsResponse.reason)) return yield* Effect.fail(eventsResponse.reason)
+            if (!expired || !resultLoaded) {
+              this.#set({ observationFailed: true })
+              yield* Deferred.succeed(ready, undefined)
+              idlePolls = Math.min(idlePolls + 1, 6)
+              yield* Effect.sleep(Math.min(maxIdlePollDelay, startingPollDelay * 2 ** Math.max(0, idlePolls - 1)))
+              continue
+            }
             return
           }
           const page = eventsResponse.value
@@ -511,7 +530,6 @@ export class RunStore {
             events,
             eventsExpiresAt: page.eventsExpiresAt,
             historyComplete: page.historyComplete,
-            runById: replaceRun(this.#state.value, nextRun),
           })
           // Preserve the event page even if refreshing a stale parallel Run read fails.
           if (eventsFinished && !isRunTerminal(nextRun.status)) {
@@ -575,4 +593,9 @@ export class RunStore {
   #set(patch: Partial<RunState>): void {
     this.#state.set({ ...this.#state.value, ...patch })
   }
+}
+
+// Client errors other than timeouts and rate limits will not change by polling again.
+function permanentObservationFailure(error: unknown): boolean {
+  return error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status != 408 && error.status != 429
 }

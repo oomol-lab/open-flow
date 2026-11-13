@@ -1,6 +1,7 @@
 import type { WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { Store } from '../storage/store.ts'
 
+import { isRunActive } from '@oomol-lab/open-flow/run-lifecycle'
 import { createHash } from 'node:crypto'
 
 export class WaitActions {
@@ -29,7 +30,7 @@ export class WaitActions {
     if (receipt == null) return
     const wait = this.#store.runViews.waitReceipt(receipt.runId, receipt.waitId)
     if (wait == null || !wait.actions.some((action) => action == requested) || receipt.expiresAt <= this.#clock()) return
-    if (receipt.action == null && (!['running', 'waiting', 'queued', 'starting'].includes(receipt.status) || receipt.expiresAt <= this.#clock())) return
+    if (receipt.action == null && (!isRunActive(receipt.status) || receipt.expiresAt <= this.#clock())) return
     const retryAfter = admit(digest)
     if (retryAfter != null) return { retryAfter }
     if (receipt.action != null) {
@@ -71,7 +72,7 @@ export class WaitActions {
       comment: result.comment,
       resolutionAccepted: result.resolutionAccepted,
       resolvedAt: result.resolvedAt == null ? null : new Date(result.resolvedAt).toISOString(),
-      state: result.action != null ? 'resolved' : ['running', 'waiting', 'queued', 'starting'].includes(result.status) ? 'waiting' : 'unavailable',
+      state: result.action != null ? 'resolved' : isRunActive(result.status) ? 'waiting' : 'unavailable',
     }
   }
 }

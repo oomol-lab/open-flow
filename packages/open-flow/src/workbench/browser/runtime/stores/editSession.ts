@@ -329,7 +329,10 @@ export class EditSession {
         this.#setNotice({ kind: 'error', message: this.#i18n.t('history.resynced') })
         void this.checkDraft()
       } catch {
-        if (current() && !this.#disposed) this.#setNotice({ kind: 'error', message: this.#i18n.t('history.syncFailed') })
+        if (current() && !this.#disposed) {
+          this.#history.failRecovery()
+          this.#setNotice({ kind: 'error', message: this.#i18n.t('history.syncFailed') })
+        }
       }
     }
     this.#historyRecovery = recovery().finally(() => {

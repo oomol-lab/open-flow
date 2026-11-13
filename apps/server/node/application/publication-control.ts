@@ -107,12 +107,12 @@ export class PublicationControl {
     }
     const content = revisionContent(revision)
     const bindings = this.store.triggers.listTriggerBindings(flowId).map((item) => triggerBinding(item, endpointOrigin))
-    const enabled = currentFlow.live?.enabled === true
+    const live = liveState(currentFlow.live?.enabled === true, currentFlow.status, current.engineContract)
     return {
       flowId,
       publication: current,
-      enabled,
-      status: enabled ? liveStatus(currentFlow.status, current.engineContract) : 'suspended',
+      enabled: live.enabled,
+      status: live.status,
       inputDefs: flowInputDefinitions(content),
       entries: liveEntries(content, current, bindings),
       version: 1,
@@ -135,13 +135,14 @@ export class PublicationControl {
     }
     const draftClosure = await flowClosure(current.content)
     const providerAccess = this.connectorAccess.current(flowId)
+    const live = liveState(currentFlow.live?.enabled === true, currentFlow.status, stored.publication.engineContract)
     return {
       flowId,
       hasUnpublishedChanges:
         draftClosure.digest != stored.publication.closureDigest || providerAccess.sharedAccessDigest != stored.publication.sharedAccessDigest,
       publication: publication(stored.publication),
       revision: stored.revision,
-      status: currentFlow.live?.enabled == false ? 'suspended' : liveStatus(currentFlow.status, stored.publication.engineContract),
+      status: live.status,
       version: 1,
     }
   }
@@ -356,6 +357,13 @@ export class PublicationControl {
     if (stored == null) triggerNotFound()
     return stored
   }
+}
+function liveState(
+  enabled: boolean,
+  flowStatus: StoredFlow['status'],
+  engineContract: string,
+): { readonly enabled: boolean; readonly status: 'runnable' | 'suspended' } {
+  return { enabled, status: enabled ? liveStatus(flowStatus, engineContract) : 'suspended' }
 }
 function liveStatus(flowStatus: StoredFlow['status'], engineContract: string): 'runnable' | 'suspended' {
   return flowStatus == 'active' && findEngineContract(engineContract) != null ? 'runnable' : 'suspended'

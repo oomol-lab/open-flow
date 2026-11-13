@@ -38,6 +38,16 @@ interface DependencyState {
   seeded: boolean
 }
 
+type DependencyStatus = DependencyState['status']
+
+/** The only admissible node-status moves; checkpoint restore is validated separately. */
+const dependencyTransitions = {
+  pending: ['running', 'completed', 'skipped'],
+  running: ['completed'],
+  completed: [],
+  skipped: [],
+} as const satisfies Readonly<Record<DependencyStatus, readonly DependencyStatus[]>>
+
 const outputsSchema = z.record(z.string(), z.json() as z.ZodType<JsonValue>)
 const inputSchema = z.record(
   z.string(),
@@ -269,6 +279,14 @@ export class Dependencies {
     return { id: this.state.nextId++, status: 'pending', input: {}, previous: [], released: [], seeded: false }
   }
 
+  private setStatus(nodeId: string, next: DependencyStatus): void {
+    const state = this.state.nodes[nodeId]!
+    if (state.status == next) return
+    if (!(dependencyTransitions[state.status] as readonly DependencyStatus[]).includes(next))
+      throw new Error(`Dependency ${nodeId} cannot move from ${state.status} to ${next}.`)
+    state.status = next
+  }
+
   private validate() {
     const { nodes, nextId, iterations } = this.state
     if (Object.keys(nodes).length != Object.keys(this.graph.nodes).length) throw new Error('Checkpoint dependency nodes do not match the graph.')
@@ -300,11 +318,11 @@ export class Dependencies {
     for (const [id, node] of Object.entries(this.graph.nodes)) {
       if (!isTriggerNode(node)) continue
       const state = this.state.nodes[id]!
-      state.status = id == nodeId ? 'completed' : 'skipped'
       if (id == nodeId) {
         state.output = outputs
         state.released = Object.keys(outputs)
       }
+      this.setStatus(id, id == nodeId ? 'completed' : 'skipped')
     }
   }
 
@@ -449,7 +467,7 @@ export class Dependencies {
       const selected = this.selectedIncoming(id)
       if (selected == null) continue
       if (selected.length == 0) {
-        state.status = 'skipped'
+        this.setStatus(id, 'skipped')
         for (const edge of this.outgoing.get(id) ?? []) this.candidates.add(edge.target)
       } else {
         if (selected.length == 1) {
@@ -508,7 +526,7 @@ export class Dependencies {
       for (const [id, state] of Object.entries(this.state.nodes)) {
         if (state.status != 'pending' || state.seeded) continue
         if (this.selectedIncoming(id)?.length == 0) {
-          state.status = 'skipped'
+          this.setStatus(id, 'skipped')
           changed = true
         }
       }
@@ -531,7 +549,7 @@ export class Dependencies {
 
   begin(nodeId: string, jobId: string) {
     const state = this.state.nodes[nodeId]!
-    state.status = 'running'
+    this.setStatus(nodeId, 'running')
     state.jobId = jobId
     this.candidates.delete(nodeId)
   }
@@ -544,10 +562,10 @@ export class Dependencies {
     systemOutputs?: Readonly<Record<string, JsonValue>>,
   ) {
     const state = this.state.nodes[nodeId]!
+    if (complete) this.setStatus(nodeId, 'completed')
     state.output = outputs
     state.systemOutputs = systemOutputs
     state.released = [...new Set([...state.released, ...handles])]
-    if (complete) state.status = 'completed'
     if (this.loops.size == 0) for (const edge of this.outgoing.get(nodeId) ?? []) this.candidates.add(edge.target)
   }
 

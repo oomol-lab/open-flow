@@ -272,7 +272,7 @@ it.each(['pending', 'failed'] as const)('preserves historical Task revisions wit
   })
   if (accepted.kind !== 'accepted') throw new Error('Expected accepted operation')
   if (status === 'failed') store.publications.failPublishOperation(accepted.operation.operationId, { code: 'flow.invalid', message: 'Historical failure' })
-  expect(database.connection.prepare('SELECT COUNT(*) AS count FROM publish_work').get()).toEqual({ count: 2 })
+  expect(database.connection.prepare('SELECT COUNT(*) AS count FROM publish_work').get()).toEqual({ count: status === 'failed' ? 0 : 2 })
   closeLegacy()
   const upgraded = Database.open(file)
   try {

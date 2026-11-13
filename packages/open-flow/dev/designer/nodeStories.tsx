@@ -8,6 +8,7 @@ import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
 import { currentFlowModelVersion } from '../../src/flow/common/change.ts'
 import { skipDuplicatesTask } from '../../src/state/common/state.ts'
 import { canvasAnnotations } from '../../src/workbench/browser/runtime/editor/canvasAnnotations.ts'
+import { deriveSyncState } from '../../src/workbench/browser/runtime/stores/workspaceModel.ts'
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import { useStoryActions } from './storyActions.tsx'
 
@@ -464,9 +465,7 @@ function NodeContentStory({
               ? canvasAnnotations(
                   'lab-annotations',
                   { flowId: 'lab-annotations', revisionId: `lab-r${annotationRevision}` },
-                  'saved',
-                  annotationDirty ? 'dirty' : 'saved',
-                  false,
+                  deriveSyncState('saved', annotationDirty ? 'dirty' : 'saved', false),
                 )
               : undefined
           }
