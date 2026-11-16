@@ -536,13 +536,17 @@ const knownNodeKinds: ReadonlySet<string> = new Set(literalKinds(node))
 const knownExecutorKinds: ReadonlySet<string> = new Set(literalKinds(managedFields.shape.executor))
 const knownCapabilityKinds: ReadonlySet<string> = new Set(literalKinds(capability))
 /**
- * Kinds removed without a migration. Repair keeps discarding them as before; every other unknown kind may belong to a
- * newer package and is rejected instead. Add a kind here when retiring it.
+ * Kinds removed without a migration, per category. Repair keeps discarding them as before; every other unknown kind
+ * may belong to a newer package and is rejected instead. Add a kind to its own category when retiring it.
  */
-const retiredKinds: ReadonlySet<string> = new Set(['dedupe'])
+const retiredKinds = {
+  Capability: new Set<string>(),
+  executor: new Set(['dedupe']),
+  node: new Set<string>(),
+} as const satisfies Record<string, ReadonlySet<string>>
 
-function assertKnownKind(kind: unknown, known: ReadonlySet<string>, subject: string): void {
-  if (typeof kind == 'string' && !known.has(kind) && !retiredKinds.has(kind))
+function assertKnownKind(kind: unknown, known: ReadonlySet<string>, subject: keyof typeof retiredKinds): void {
+  if (typeof kind == 'string' && !known.has(kind) && !retiredKinds[subject].has(kind))
     throw new TypeError(`Unknown ${subject} kind ${JSON.stringify(kind)} cannot be repaired.`)
 }
 
@@ -671,7 +675,7 @@ function declaredFeatures(serialized: Record<string, unknown>): readonly string[
   if (typeof modelVersion != 'number' || modelVersion > currentFlowModelVersion || features === undefined) return undefined
   if (modelVersion < flowFeaturesModelVersion) throw new TypeError(`Flow features require Flow model version ${flowFeaturesModelVersion}.`)
   if (!Array.isArray(features) || features.some((name) => typeof name != 'string')) throw new TypeError('Flow features must be a list of names.')
-  const unknown = features.filter((name: string) => !isKnownFlowFeature(name))
+  const unknown = [...new Set(features.filter((name: string) => !isKnownFlowFeature(name)))]
   if (unknown.length > 0) throw new UnsupportedFlowFeaturesError(unknown)
   return features
 }

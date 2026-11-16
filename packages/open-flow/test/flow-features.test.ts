@@ -165,6 +165,9 @@ describe('Model v16 features', () => {
     const unknown = envelope({ pause: delay }, { features: ['future-feature'] })
     expect(() => decodeRevision(bytes(unknown))).toThrow(UnsupportedFlowFeaturesError)
     expect(() => decodeRevisionContent(unknown)).toThrow(expect.objectContaining({ features: ['future-feature'] }))
+    expect(() => decodeRevisionContent({ ...unknown, features: ['future-feature', 'future-feature'] })).toThrow(
+      expect.objectContaining({ features: ['future-feature'] }),
+    )
     expect(revisionRepairKind(bytes(unknown))).toBeUndefined()
     expect(() => repairRevision(bytes(unknown))).toThrow(UnsupportedFlowFeaturesError)
   })

@@ -414,6 +414,39 @@ describe('Server application service', () => {
     },
   )
 
+  it('reports Engine capabilities a Flow uses beyond its contract through check and Live Runs', async () => {
+    const service = await openService(await databaseFile())
+    const flow = fullFlow()
+    const stored = await storeRevision(
+      service,
+      {
+        ...flow,
+        document: { ...flow.document, graph: { ...flow.document.graph, nodes: { ...flow.document.graph.nodes, pause: { inputs: {}, kind: 'delay' } } } },
+      },
+      'capability-gate',
+    )
+    const unsupported = expect.objectContaining({ code: 'engine.capability-unsupported', message: expect.stringContaining('delay') })
+    const legacy = await service.control.drafts.checkFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v11')
+    expect(legacy.valid).toBe(false)
+    expect(legacy.diagnostics).toContainEqual(unsupported)
+    expect((await service.control.drafts.checkFlow('test', stored.flowId, stored.revisionId, currentEngineContract)).diagnostics).not.toContainEqual(
+      unsupported,
+    )
+
+    const revision = service.control.drafts.getRevision('test', stored.flowId, stored.revisionId)
+    const published = await service.publisher.publish({
+      ...stored,
+      revision: revision.content,
+      engineContract: 'open-flow-engine/v11',
+      expectedLivePublicationId: null,
+      idempotencyKey: 'capability-gate',
+    })
+    if (published.kind !== 'published') throw new Error('Expected a published Flow.')
+    await expect(
+      service.control.runs.createLiveRun('test', published.publicationId, {}, 'capability-live', { nodeId: 'start', outputs: {} }),
+    ).rejects.toMatchObject({ code: controlErrorCode.engineUnsupported, details: { capabilities: ['delay'] } })
+  })
+
   it.each([false, true])('runs a valid Draft branch across restart with unrelated incomplete nodes (wait: %s)', async (wait) => {
     const file = await databaseFile()
     let service = await openService(file)

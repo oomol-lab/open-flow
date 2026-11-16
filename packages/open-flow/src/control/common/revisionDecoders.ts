@@ -24,6 +24,11 @@ export function draft(value: unknown): Draft {
   return decodeFlowContent(() => ({ ...revisionMetadata(source), content: decodeRevisionContent(source.content) }))
 }
 
+/**
+ * Lists Trigger entry points without decoding the Flow model. The Server owns admission and execution, so a client
+ * must be able to start Runs of content newer than it can read: newer models, unknown `features`, and unknown kinds
+ * stay forward compatible here by design.
+ */
 export function revisionTriggers(value: unknown) {
   const source = record(value)
   const content = record(source.content)
