@@ -235,7 +235,7 @@ function Host(props: OpenFlowWorkbenchProps) {
 }
 ```
 
-`openImport({ text, fileName?, description? })` returns `opened` when confirmation opens,
+`openImport({ text, fileName?, description?, onImported? })` returns `opened` when confirmation opens,
 `invalid-file` when parsing fails (reported through `host.notify`), or `unavailable` when the
 Workbench is not on an initialized Flow list, is busy, or already has a creation/import dialog open.
 `opened` does not mean a Flow has been created. The optional `description` accepts a `ReactNode`
@@ -247,6 +247,10 @@ when neither exists.
 Cancel creates nothing. Confirmation uses the existing `importFlow` callback, or the deployment's
 Control API when no callback is supplied, and opens the new unpublished draft after success.
 The host owns download errors, login recovery, navigation, and processing a share link once.
+The optional `onImported({ flowId, idempotencyKey })` receives the saved entry Flow after a successful
+import, before navigation. It retains that confirmation's callback and submission identity across
+retries; canceling or failing an import does not call it. Bundle imports report their entry Flow.
+Synchronous callback errors and rejected promises are logged without failing the import.
 Do not cache handles across session changes; an old session's handle returns `unavailable`.
 
 ## Event source management

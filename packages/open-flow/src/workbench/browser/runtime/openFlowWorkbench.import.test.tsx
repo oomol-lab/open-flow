@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import type { ComponentProps } from 'react'
 import type { Root } from 'react-dom/client'
-import type { OpenFlowWorkbenchHandle, OpenFlowWorkbenchProps } from './openFlowWorkbench.tsx'
+import type { OpenFlowWorkbenchHandle, OpenFlowWorkbenchProps, WorkbenchImportInput } from './openFlowWorkbench.tsx'
 
 import { act, createRef } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -74,7 +74,7 @@ async function browser(overrides: Partial<ComponentProps<typeof FlowBrowser>> = 
   return { ref, store, onImportFlow, render }
 }
 
-async function open(ref: { current: OpenFlowWorkbenchHandle | null }, value = input) {
+async function open(ref: { current: OpenFlowWorkbenchHandle | null }, value: WorkbenchImportInput = input) {
   let result: ReturnType<OpenFlowWorkbenchHandle['openImport']> | undefined
   await act(async () => {
     result = ref.current?.openImport(value)
@@ -120,7 +120,7 @@ it('opens confirmation once, preserves its snapshot, and retries the same submis
   }
   expect(onImportFlow).toHaveBeenCalledTimes(2)
   expect(onImportFlow.mock.calls[0]).toEqual(onImportFlow.mock.calls[1])
-  expect(onImportFlow).toHaveBeenCalledWith(file, 'Example', expect.any(String), [])
+  expect(onImportFlow).toHaveBeenCalledWith(file, 'Example', expect.any(String), [], undefined)
 })
 
 it('imports a bundle through its own callback, preserving member names and the shared tag selection', async () => {
@@ -143,7 +143,7 @@ it('imports a bundle through its own callback, preserving member names and the s
   expect(modal.textContent).toContain('Tags')
   for (let attempt = 0; attempt < 2; attempt++)
     await act(async () => modal.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
-  expect(onImportFlowBundle).toHaveBeenCalledWith(bundle, 'Root', expect.any(String), [])
+  expect(onImportFlowBundle).toHaveBeenCalledWith(bundle, 'Root', expect.any(String), [], undefined)
   expect(onImportFlowBundle.mock.calls[0]).toEqual(onImportFlowBundle.mock.calls[1])
   expect(onImportFlow).not.toHaveBeenCalled()
 })
@@ -242,7 +242,8 @@ it('renders host-owned import content and preserves its interaction', async () =
 
 it('cancels without submitting and uses the same dialog for a local file', async () => {
   const { ref, onImportFlow } = await browser()
-  await open(ref)
+  const onImported = vi.fn()
+  await open(ref, { ...input, onImported })
   const modal = await dialog()
   await cancelDialog(modal)
   expect(onImportFlow).not.toHaveBeenCalled()
@@ -252,6 +253,9 @@ it('cancels without submitting and uses the same dialog for a local file', async
     picker.dispatchEvent(new Event('change', { bubbles: true }))
   })
   expect((await dialog()).querySelector('input')?.value).toBe('Local')
+  await act(async () => document.querySelector('[role="dialog"] form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
+  expect(onImportFlow).toHaveBeenCalledWith(file, 'Local', expect.any(String), [], undefined)
+  expect(onImported).not.toHaveBeenCalled()
 })
 
 it('does not close a newer confirmation when an earlier submission finishes', async () => {

@@ -10,7 +10,7 @@ import type { FlowCreationOptions } from '../api.ts'
 import type { ConnectorConnection, WorkbenchClient, Draft, Flow, FlowCheck, Run, RunEvent } from '../api.ts'
 import type { Point } from '../canvasPresentation.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
-import type { WorkflowBundleImporter } from '../contract.ts'
+import type { WorkbenchImportInput, WorkflowBundleImporter } from '../contract.ts'
 import type { FlowChangeEvent, WorkbenchHost, WorkbenchPreferences } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { DiagnosticItem } from '../editor/diagnostics.ts'
@@ -435,8 +435,11 @@ export class WorkbenchStore {
     key: string,
     importer?: (file: WorkflowFile, name: string, key: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
     tagIds?: readonly string[],
+    onImported?: WorkbenchImportInput['onImported'],
   ): Promise<boolean> {
-    return await this.#openNewFlow(await this.workspace.importFlow(file, name, key, importer, tagIds), 'notice.flowImported')
+    const result = await this.workspace.importFlow(file, name, key, importer, tagIds)
+    this.#reportImport(result, key, onImported)
+    return await this.#openNewFlow(result, 'notice.flowImported')
   }
 
   public async importFlowBundle(
@@ -445,10 +448,23 @@ export class WorkbenchStore {
     key: string,
     importer?: WorkflowBundleImporter,
     tagIds?: readonly string[],
+    onImported?: WorkbenchImportInput['onImported'],
   ): Promise<boolean> {
     const result = await this.workspace.importFlowBundle(file, name, key, importer, tagIds)
+    this.#reportImport(result, key, onImported)
     if (result != null) void this.tags.reload()
     return await this.#openNewFlow(result, 'notice.flowImported')
+  }
+
+  #reportImport(flow: Flow | undefined, idempotencyKey: string, onImported: WorkbenchImportInput['onImported']): void {
+    if (flow == null || onImported == null) return
+    try {
+      void Promise.resolve(onImported({ flowId: flow.flowId, idempotencyKey })).catch((error: unknown) => {
+        console.error('Import completion callback failed.', error)
+      })
+    } catch (error) {
+      console.error('Import completion callback failed.', error)
+    }
   }
 
   public async createFlow(
