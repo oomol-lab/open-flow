@@ -478,7 +478,11 @@ export class RunControl {
     const fixed = await preparedRevision(content, engineContract, triggerId)
     switch (fixed.kind) {
       case 'engine-unsupported':
-        throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
+        throw new ControlError(
+          controlErrorCode.engineUnsupported,
+          fixed.capabilities.length == 0 ? 'The Engine Contract is not supported.' : `The Engine Contract does not support: ${fixed.capabilities.join(', ')}.`,
+          { details: { capabilities: fixed.capabilities } },
+        )
       case 'flow-invalid':
         throw new ControlError(controlErrorCode.flowInvalid, 'The Flow is invalid.')
       case 'prepared':

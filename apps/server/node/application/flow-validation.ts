@@ -24,7 +24,12 @@ export async function validatedFlow(revision: RevisionContent): Promise<Validate
   }
   switch (prepared.kind) {
     case 'engine-unsupported':
-      throw new AcceptanceError(prepared.kind, 'Flow Revision requires an unsupported Engine Contract.')
+      throw new AcceptanceError(
+        prepared.kind,
+        prepared.capabilities.length == 0
+          ? 'Flow Revision requires an unsupported Engine Contract.'
+          : `Flow Revision requires unsupported Engine capabilities: ${prepared.capabilities.join(', ')}.`,
+      )
     case 'flow-invalid':
       throw new AcceptanceError(prepared.kind, 'Flow validation failed.')
     case 'prepared': {

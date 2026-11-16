@@ -140,7 +140,12 @@ describe('Flow Revision encoding', () => {
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:d4ba7a5ee54b189ceead404366a7d90aa9d90329cd62607c9b9c210feb9877d2')
+    expect(JSON.parse(decoder.decode(first))).toMatchObject({ features: [] })
+    await expect(digestBytes(first)).resolves.toBe('sha256:920c17f2dee3f1b4fd2124bb04b4999b230a8b72f09521448032edcb01c6b518')
+    // Model v15 and earlier keep their historical bytes: no features list is written.
+    await expect(digestBytes(encodeRevision({ ...revision(), modelVersion: 15 }))).resolves.toBe(
+      'sha256:d4ba7a5ee54b189ceead404366a7d90aa9d90329cd62607c9b9c210feb9877d2',
+    )
     await expect(digestBytes(encodeRevision({ ...revision(), modelVersion: 14 }))).resolves.toBe(
       'sha256:58bc26037512cdedd388851707cb8bb869aa4c1393350693e3844f023718a6bb',
     )
@@ -324,7 +329,7 @@ describe('Revision decoding', () => {
   })
 
   it('refuses malformed model v2 Resolution nodes instead of repairing by deletion', () => {
-    const legacy = JSON.parse(decoder.decode(encodeRevision(revision())))
+    const legacy = JSON.parse(decoder.decode(encodeRevision({ ...revision(), modelVersion: 15 })))
     legacy.modelVersion = 2
     legacy.document.graph.nodes.pause = {
       kind: 'wait',
@@ -341,7 +346,7 @@ describe('Revision decoding', () => {
   })
 
   it('repairs an older Trigger contract and drops invalid collection entries', () => {
-    const legacy = JSON.parse(decoder.decode(encodeRevision(revision())))
+    const legacy = JSON.parse(decoder.decode(encodeRevision({ ...revision(), modelVersion: 15 })))
     legacy.modelVersion = 1
     legacy.document.graph.nodes.hook = {
       kind: 'webhook',
@@ -364,7 +369,7 @@ describe('Revision decoding', () => {
         },
       },
     }
-    legacy.document.graph.nodes.broken = { kind: 'unknown' }
+    legacy.document.graph.nodes.broken = { kind: 'value' }
     legacy.modules.broken = { name: 1 }
     const bytes = new TextEncoder().encode(JSON.stringify(legacy))
 

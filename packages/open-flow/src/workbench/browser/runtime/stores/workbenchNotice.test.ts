@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ControlClient } from '../../../../control/common/api.ts'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
+import { UnsupportedFlowFeaturesError } from '../../../../flow/common/features.ts'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
 import { errorNotice } from './workbenchNotice.ts'
@@ -13,6 +14,27 @@ describe('Workbench notices', () => {
       kind: 'error',
       message: '当前部署尚未配置 Connector。',
     })
+  })
+
+  it('asks to upgrade when a Flow uses features this version does not support', async () => {
+    const i18n = createI18n('zh-CN')
+    expect(errorNotice(new UnsupportedFlowFeaturesError(['future-feature']), i18n.t)).toEqual({
+      kind: 'error',
+      message: '此工作流使用了当前版本不支持的功能：future-feature。请升级后再打开。',
+    })
+    const draft = {
+      actorId: 'actor',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      digest: 'sha256:draft',
+      flowId: 'flow',
+      modelVersion: 16,
+      parentRevisionId: null,
+      revisionId: 'revision',
+      version: 1,
+      content: { modelVersion: 16, features: ['future-feature'], document: { bindings: {}, graph: { nodes: {}, edges: [] } }, modules: {} },
+    }
+    const client = new ControlClient(async () => Response.json(draft))
+    await expect(client.getDraft('flow')).rejects.toThrow(UnsupportedFlowFeaturesError)
   })
 
   it('explains when a Connector Connection is required', () => {

@@ -508,7 +508,7 @@ export default () => value`,
   })
 
   it('reports unsupported Engine, invalid Flow, and invalid invocation inputs without platform errors', async () => {
-    await expect(prepareFlow(revision('export default () => true'), 'unsupported')).resolves.toEqual({ kind: 'engine-unsupported' })
+    await expect(prepareFlow(revision('export default () => true'), 'unsupported')).resolves.toEqual({ kind: 'engine-unsupported', capabilities: [] })
     await expect(prepareFlow(revision('export const value = true'), currentEngineContract)).resolves.toMatchObject({
       kind: 'flow-invalid',
       validation: { diagnostics: [expect.objectContaining({ code: 'task.missing-entry' })], valid: false },

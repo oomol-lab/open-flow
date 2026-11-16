@@ -61,8 +61,8 @@ import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type { WorkflowBundle, WorkflowExportPreview } from '../../flow/common/workflowBundle.ts'
 import type { WorkflowFile } from '../../flow/common/workflowFile.ts'
 
-import { decodeWorkflowExportPreview, workflowBundleFromPreview } from '../../flow/common/workflowBundle.ts'
-import { decodeWorkflowFile } from '../../flow/common/workflowFile.ts'
+import { decodeWorkflowExportPreview, serializeWorkflowBundle, workflowBundleFromPreview } from '../../flow/common/workflowBundle.ts'
+import { decodeWorkflowFile, serializeWorkflowFile } from '../../flow/common/workflowFile.ts'
 export type { WorkflowFile, WorkflowCleanupSummary } from '../../flow/common/workflowFile.ts'
 export type { WorkflowBundle, WorkflowExportPreview } from '../../flow/common/workflowBundle.ts'
 import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
@@ -88,7 +88,7 @@ import {
   connectorProvidersQuery,
 } from './connectorQueries.ts'
 export type { ControlCacheDelegate, ControlCacheOptions, ControlCacheRead } from './catalogCache.ts'
-import { requiredFields, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
+import { decodeFlowContent, requiredFields, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { errorListener, flow, flowPage, variable, variableListItem, variableReferences } from './flowDecoders.ts'
 import { live, publication, publicationPage, publishOperation } from './publicationDecoders.ts'
 import { draft, draftChange, draftSync, presentation, revisionTriggers } from './revisionDecoders.ts'
@@ -989,20 +989,12 @@ export class ControlClient {
 
   async exportFlow(flowId: string): Promise<WorkflowFile> {
     const value = await this.request(`/v1/flows/${segment(flowId)}/export`)
-    try {
-      return decodeWorkflowFile(value)
-    } catch {
-      return invalidResponse()
-    }
+    return decodeFlowContent(() => decodeWorkflowFile(value))
   }
 
   async getFlowExportPreview(flowId: string): Promise<WorkflowExportPreview> {
     const value = await this.request(`/v1/flows/${segment(flowId)}/export-preview`)
-    try {
-      return decodeWorkflowExportPreview(value)
-    } catch {
-      return invalidResponse()
-    }
+    return decodeFlowContent(() => decodeWorkflowExportPreview(value))
   }
 
   async exportFlowBundle(flowId: string): Promise<WorkflowBundle> {
@@ -1019,7 +1011,7 @@ export class ControlClient {
       await this.request('/v1/flows/import-bundle', {
         method: 'POST',
         headers: { 'Idempotency-Key': options.idempotencyKey ?? `flow-${randomId()}` },
-        body: JSON.stringify({ file, name: options.name, teamId: options.teamId, tagIds: options.tagIds, version: 1 }),
+        body: JSON.stringify({ file: serializeWorkflowBundle(file), name: options.name, teamId: options.teamId, tagIds: options.tagIds, version: 1 }),
       }),
     )
   }
@@ -1032,7 +1024,7 @@ export class ControlClient {
       await this.request('/v1/flows/import', {
         method: 'POST',
         headers: { 'Idempotency-Key': options.idempotencyKey ?? `flow-${randomId()}` },
-        body: JSON.stringify({ file, name: options.name, teamId: options.teamId, tagIds: options.tagIds, version: 1 }),
+        body: JSON.stringify({ file: serializeWorkflowFile(file), name: options.name, teamId: options.teamId, tagIds: options.tagIds, version: 1 }),
       }),
     )
   }

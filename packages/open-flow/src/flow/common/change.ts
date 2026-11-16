@@ -27,6 +27,7 @@ import { supportsNodeErrorHandling } from './errorHandling.ts'
 import { supportsNodeRetry } from './retry.ts'
 
 export { changeOperationsSchema, currentFlowModelVersion, decodeChangeOperations } from './changeSchema.ts'
+export { flowFeaturesModelVersion, UnsupportedFlowFeaturesError, usedFlowFeatures, type FlowFeature } from './features.ts'
 export type { RetryConfiguration } from './retry.ts'
 export { supportsNodeRetry } from './retry.ts'
 export { nodeSystemOutputPorts, supportsNodeErrorHandling, nodeErrorSchema } from './errorHandling.ts'
@@ -406,7 +407,7 @@ export interface FlowDocument {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 

@@ -60,7 +60,7 @@ it('downloads immediately without dependencies and lets a dependency bundle use 
   const { request, blob, click } = await setup(preview)
   expect(document.querySelector('[role="dialog"]')).toBeNull()
   expect(click).toHaveBeenCalledOnce()
-  expect(JSON.parse(await (blob.mock.calls[0]![0] as Blob).text())).toEqual(file)
+  expect(JSON.parse(await (blob.mock.calls[0]![0] as Blob).text())).toEqual({ ...file, content: { ...file.content, features: [] } })
   blob.mockClear()
   click.mockClear()
   request.mockResolvedValue(Response.json({ ...preview, workflows: [...preview.workflows, { flowId: 'child', file: { ...file, name: 'Child' } }] }))
@@ -88,7 +88,7 @@ it('blocks incomplete bundles, allows single-workflow export and cancels without
   await act(async () => (dialog.querySelector('[role="checkbox"]') as HTMLElement).click())
   expect(button.disabled).toBe(false)
   await act(async () => button.click())
-  expect(JSON.parse(await (blob.mock.calls[0]![0] as Blob).text())).toEqual(file)
+  expect(JSON.parse(await (blob.mock.calls[0]![0] as Blob).text())).toEqual({ ...file, content: { ...file.content, features: [] } })
   await act(async () => store.workspace.exportFlow('root'))
   dialog = document.querySelector('[role="dialog"]')!
   await act(async () => [...dialog.querySelectorAll('button')].find((item) => item.textContent == 'Cancel')!.click())

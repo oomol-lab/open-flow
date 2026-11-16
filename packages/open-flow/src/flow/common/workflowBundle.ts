@@ -2,7 +2,7 @@ import type { WorkflowFile } from './workflowFile.ts'
 
 import { z } from 'zod'
 import { checkJsonDepth } from './json.ts'
-import { cleanWorkflowFile, decodeWorkflowFile } from './workflowFile.ts'
+import { cleanWorkflowFile, decodeWorkflowFile, serializeWorkflowFile } from './workflowFile.ts'
 import { mapNodeWorkflowTargets, nodeWorkflowReferences } from './workflowReferences.ts'
 
 export interface WorkflowBundleEntry {
@@ -71,8 +71,13 @@ export function workflowBundleFromPreview(preview: WorkflowExportPreview): Workf
   return cleanWorkflowBundle({ kind: 'open-flow-workflow-bundle', version: 1, entryFlowId: preview.entryFlowId, workflows: preview.workflows })
 }
 
+/** The wire form of a bundle or export preview: every workflow file carries its derived `features` list. */
+export function serializeWorkflowBundle<Value extends { readonly workflows: readonly WorkflowBundleEntry[] }>(value: Value): Value {
+  return { ...value, workflows: value.workflows.map((entry) => ({ ...entry, file: serializeWorkflowFile(entry.file) })) }
+}
+
 export function encodeWorkflowBundle(bundle: WorkflowBundle): string {
-  return `${JSON.stringify(cleanWorkflowBundle(bundle), null, 2)}\n`
+  return `${JSON.stringify(serializeWorkflowBundle(cleanWorkflowBundle(bundle)), null, 2)}\n`
 }
 
 export type WorkflowImportFile = WorkflowFile | WorkflowBundle

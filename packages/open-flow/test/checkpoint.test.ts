@@ -129,3 +129,50 @@ it('resumes a published v6 checkpoint through the current Scheduler', async () =
   )
   expect(result).toMatchObject({ kind: 'node-results', nodes: [{ nodeId: 'wait', jobId: 'job' }] })
 })
+
+it.each([
+  {
+    name: 'changed resolution input',
+    node: { kind: 'wait', name: 'Wait', inputs: {}, inputDefinitions: [], prompt: 'Continue' },
+    value: { changed: true },
+    error: /resolution input changed/,
+  },
+  { name: 'node that cannot suspend', node: { kind: 'value', inputs: {}, values: [] }, value: {}, error: /cannot suspend/ },
+] as const)('rejects saved Wait state the current node could not have produced: $name', async ({ node, value, error }) => {
+  const source = {
+    modelVersion: currentFlowModelVersion,
+    modules: {},
+    document: {
+      bindings: {},
+      graph: { nodes: { start: { kind: 'start', inputDefs: [], name: 'Start' }, wait: node }, edges: [{ source: 'start', target: 'wait' }] },
+    },
+  } as RevisionContent
+  const prepared = await prepareFlow(source, currentEngineContract)
+  if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
+  const checkpoint = {
+    version: 6,
+    agents: {},
+    bindingValues: {},
+    inputs: {},
+    counts: { '': { wait: 1 } },
+    results: { start: { jobId: 'start', outputs: {} } },
+    dependencies: {
+      nextId: 2,
+      iterations: {},
+      nodes: {
+        start: { id: 0, status: 'completed', input: {}, output: {}, previous: [], released: [], seeded: false },
+        wait: { id: 1, status: 'running', input: { start: { execution: 0, outputs: {} } }, previous: ['start'], released: [], seeded: false, jobId: 'job' },
+      },
+    },
+    waits: [{ jobId: 'job', nodeId: 'wait', waitId: 'wait', value }],
+  }
+  const resumed = runFlow(prepared.flow, {
+    flowId: 'flow',
+    runId: 'run',
+    createId: () => 'unexpected',
+    resume: { checkpoint },
+    waits: waitHost({ wait: 'continue' }),
+    invokeTask: () => Effect.die('Unexpected task'),
+  })
+  await expect(Effect.runPromise(resumed)).rejects.toThrow(error)
+})

@@ -1093,6 +1093,11 @@ it('exports dependency bundles and imports files or stdin with tags applied to e
     { flowId: 'child', file: { ...file, name: 'Child' } },
   ]
   const bundle = { kind: 'open-flow-workflow-bundle', version: 1, entryFlowId: flow.flowId, workflows }
+  // The wire form carries each file's derived Flow features list.
+  const serializedBundle = {
+    ...bundle,
+    workflows: workflows.map((entry) => ({ ...entry, file: { ...entry.file, content: { ...entry.file.content, features: [] } } })),
+  }
   const imported = {
     version: 1,
     flow: { ...flow, flowId: 'new-root', tagIds: ['tag-a', 'tag-b'] },
@@ -1110,7 +1115,7 @@ it('exports dependency bundles and imports files or stdin with tags applied to e
   }
   const exported = runtime()
   expect(await runCli(['export', flow.flowId, '--include-dependencies'], { request }, exported.value)).toBe(0)
-  expect(JSON.parse(exported.stdout())).toEqual(bundle)
+  expect(JSON.parse(exported.stdout())).toEqual(serializedBundle)
   expect(exported.stderr()).toBe('')
   for (const fileName of ['bundle.openflow.json', '-']) {
     const output = runtime()
@@ -1120,7 +1125,7 @@ it('exports dependency bundles and imports files or stdin with tags applied to e
     ).toBe(0)
     const sent = requests.at(-1)!
     expect(sent.path).toBe('/v1/flows/import-bundle')
-    expect(JSON.parse(String(sent.init?.body))).toEqual({ file: bundle, name: 'Root', tagIds: ['tag-a', 'tag-b'], version: 1 })
+    expect(JSON.parse(String(sent.init?.body))).toEqual({ file: serializedBundle, name: 'Root', tagIds: ['tag-a', 'tag-b'], version: 1 })
     expect(new Headers(sent.init?.headers).get('idempotency-key')).toBe('bundle')
     expect(JSON.parse(output.stdout())).toMatchObject({ kind: 'flow.import', ...imported })
   }

@@ -7,7 +7,7 @@ import { parseResultQuery } from '@oomol-lab/open-flow/control-api'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { controlRequests } from '@oomol-lab/open-flow/control-requests'
 import { validVariableName } from '@oomol-lab/open-flow/flow-change'
-import { encodeWorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
+import { encodeWorkflowFile, serializeWorkflowBundle } from '@oomol-lab/open-flow/flow-encoding'
 import { resolveMetadataLanguage } from '@oomol-lab/open-flow/localization'
 import { localizeTrigger } from '@oomol-lab/open-flow/provider-triggers'
 import { runStatuses } from '@oomol-lab/open-flow/run-lifecycle'
@@ -315,7 +315,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.get('/flows/:flowId/export-preview', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(200, service.flows.getExportPreview(context.get('actorId'), context.req.param('flowId')))
+    return response(200, serializeWorkflowBundle(service.flows.getExportPreview(context.get('actorId'), context.req.param('flowId'))))
   })
   app.get('/flows/:flowId', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)

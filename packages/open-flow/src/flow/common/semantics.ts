@@ -13,7 +13,7 @@ import { matchesTriggerOutputs, normalizeTriggerOutputs } from '../../trigger/co
 import { nodeInputMappings } from './condition.ts'
 import { connectionUsage } from './connectionUsage.ts'
 export { matchesTriggerOutputs, normalizeTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
-import type { EngineContract } from '../../runtime/common/engineContract.ts'
+import type { EngineCapability, EngineContract } from '../../runtime/common/engineContract.ts'
 import type { RuntimeProgram } from '../../runtime/common/runtime.ts'
 import type {
   ConnectorActionCapability,
@@ -31,6 +31,7 @@ import { findEngineContract } from '../../runtime/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'
 import { decodeTaskCapabilities } from './change.ts'
 import { canonicalJsonBytes, canonicalModule, canonicalRevisionGraph, digestBytes } from './encoding.ts'
+import { missingEngineCapabilities } from './features.ts'
 import { nodeInputPorts, validateFlowGraph } from './graph.ts'
 import { inputValue } from './inputValue.ts'
 import { compareDiagnostics, validateModuleGraph } from './modules.ts'
@@ -39,6 +40,7 @@ export { availableOutputs, graphOrder, nodeInputPorts } from './graph.ts'
 export { validateModules } from './modules.ts'
 export { matchesSchema, schemaValidationErrors, variableInputCompatible } from './schema.ts'
 export { agentInput, agentToolInput, agentToolSchema } from './agent.ts'
+export { missingEngineCapabilities, requiredEngineCapabilities } from './features.ts'
 
 export interface SemanticClosure {
   readonly dependencies: {
@@ -238,6 +240,16 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
   const closure = await flowClosure(revision)
   const checked = validateModuleGraph(revision, [...closure.dependencies.modules], engine)
   checked.diagnostics.push(...validateFlowGraph(revision))
+  const missingCapabilities = missingEngineCapabilities(revision, engine)
+  if (missingCapabilities.length > 0)
+    checked.diagnostics.push({
+      code: 'engine.capability-unsupported',
+      column: 0,
+      line: 1,
+      message: `The Engine Contract does not support: ${missingCapabilities.join(', ')}.`,
+      path: '/document/graph',
+      values: { capabilities: missingCapabilities.join(', ') },
+    })
   const missingEntryModules = new Set<string>()
   for (const [nodeId, node] of Object.entries(revision.document.graph.nodes)) {
     if (node.kind != 'task' || !('moduleId' in node.task)) continue
@@ -435,7 +447,8 @@ export interface PreparedFlow {
 }
 
 export type PrepareFlowResult =
-  | { readonly kind: 'engine-unsupported' }
+  /** `capabilities` lists the Engine capabilities the selected graph needs but the contract lacks; empty for an unknown contract. */
+  | { readonly kind: 'engine-unsupported'; readonly capabilities: readonly EngineCapability[] }
   | { readonly kind: 'flow-invalid'; readonly validation: FlowValidation }
   | { readonly flow: PreparedFlow; readonly kind: 'prepared'; readonly validation: FlowValidation }
 
@@ -501,35 +514,7 @@ const httpPortContracts = (ports: import('./change.ts').ManagedTaskDefinition['i
 
 export async function prepareFlow(revision: RevisionContent, engineContract: string, triggerId?: string): Promise<PrepareFlowResult> {
   const engine = findEngineContract(engineContract)
-  if (engine == null) return { kind: 'engine-unsupported' }
-  if (
-    !engine.connectorProxy &&
-    Object.values(revision.document.graph.nodes).some(
-      (node) => node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'connector-proxy',
-    )
-  )
-    return { kind: 'engine-unsupported' }
-  if (
-    !engine.flowState &&
-    Object.values(revision.document.graph.nodes).some(
-      (node) => node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'skip-duplicates',
-    )
-  )
-    return { kind: 'engine-unsupported' }
-  if (
-    !engine.httpRequests &&
-    Object.values(revision.document.graph.nodes).some((node) => node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'http-request')
-  )
-    return { kind: 'engine-unsupported' }
-  if (
-    !engine.codeFetch &&
-    Object.values(revision.document.graph.nodes).some(
-      (node) => node.kind == 'task' && 'moduleId' in node.task && node.task.capabilities?.some((item) => item.kind == 'http'),
-    )
-  )
-    return { kind: 'engine-unsupported' }
-  if (!engine.workflowTools && Object.values(revision.document.graph.nodes).some((node) => nodeWorkflowReferences(node).some((ref) => ref.tool != null)))
-    return { kind: 'engine-unsupported' }
+  if (engine == null) return { kind: 'engine-unsupported', capabilities: [] }
   if (triggerId != null) {
     const trigger = revision.document.graph.nodes[triggerId]
     if (trigger == null || !isTriggerNode(trigger))
@@ -552,16 +537,8 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
       }
     revision = runRevision(revision, triggerId)
   }
-  if (
-    !engine.webhookResponses &&
-    Object.values(revision.document.graph.nodes).some(
-      (node) => node.kind === 'webhook-response' || (node.kind === 'webhook' && node.options?.responseBody?.kind === 'webhook-response'),
-    )
-  )
-    return { kind: 'engine-unsupported' }
-  if (!engine.waitAutoContinue && Object.values(revision.document.graph.nodes).some((node) => node.kind == 'wait' && node.autoContinue != null))
-    return { kind: 'engine-unsupported' }
-  if (!engine.delays && Object.values(revision.document.graph.nodes).some((node) => node.kind === 'delay')) return { kind: 'engine-unsupported' }
+  const missing = missingEngineCapabilities(revision, engine)
+  if (missing.length > 0) return { kind: 'engine-unsupported', capabilities: missing }
   const validation = await validateFlow(revision, engine)
   if (!validation.valid) return { kind: 'flow-invalid', validation }
   const { closure } = validation

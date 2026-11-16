@@ -1,5 +1,6 @@
 import type { JsonValue } from '../../flow/common/change.ts'
 
+import { UnsupportedFlowFeaturesError } from '../../flow/common/features.ts'
 import { ApiError } from './errors.ts'
 
 export class InvalidResponseError extends ApiError {
@@ -13,6 +14,19 @@ export class InvalidResponseError extends ApiError {
 
 export function invalidResponse(detail?: string): never {
   throw new InvalidResponseError(detail)
+}
+
+/**
+ * Decodes Flow content from a response. Content that uses features unknown to this package keeps its specific error,
+ * so callers can ask the user to upgrade instead of reporting a malformed response.
+ */
+export function decodeFlowContent<Value>(decode: () => Value): Value {
+  try {
+    return decode()
+  } catch (error) {
+    if (error instanceof UnsupportedFlowFeaturesError) throw error
+    return invalidResponse()
+  }
 }
 
 export function record(value: unknown): Readonly<Record<string, unknown>> {

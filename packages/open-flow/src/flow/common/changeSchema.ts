@@ -8,6 +8,7 @@ import { assertHttpAuthBindings } from '../../http/common/authBindings.ts'
 import { isHttpHost, maxHttpHosts } from '../../http/common/hosts.ts'
 import { httpRequestExecutorSchema } from '../../http/common/httpRequest.ts'
 import { skipDuplicatesExecutorSchema } from '../../state/common/state.ts'
+import { declaredFlowFeatures, flowFeaturesModelVersion, isKnownFlowFeature, UnsupportedFlowFeaturesError } from './features.ts'
 import { checkJsonDepth } from './json.ts'
 import { retryConfigurationSchema } from './retry.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
@@ -15,7 +16,7 @@ import { waitAutoContinueDraftSchema, waitAutoContinueSchema } from './wait.ts'
 import { webhookMethods } from './webhookMethod.ts'
 import { webhookResponseTimeout } from './webhookResponse.ts'
 
-export const currentFlowModelVersion = 15
+export const currentFlowModelVersion = 16
 const text = z.string()
 const actionConnection = text.describe(
   'Account selection: omit while unconfigured; use an account ID to select it; use "" to explicitly defer configuration. Deferred Actions fail if called; deferred Agent tools are excluded from the callable tool set. Not supported by Triggers.',
@@ -333,10 +334,12 @@ const revision = z.object({
     z.literal(12),
     z.literal(13),
     z.literal(14),
+    z.literal(15),
     z.literal(currentFlowModelVersion),
   ]),
   document,
   modules: z.record(text, module),
+  features: z.array(text).optional(),
 })
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
 
@@ -518,8 +521,49 @@ function repairTriggerNode(value: unknown): unknown {
   return candidate
 }
 
+function literalKinds(schema: z.ZodType): readonly string[] {
+  if (schema instanceof z.ZodUnion) return schema.options.flatMap((option) => literalKinds(option as z.ZodType))
+  if (schema instanceof z.ZodObject) {
+    const kind = schema.shape.kind
+    if (kind instanceof z.ZodOptional) return literalKinds(kind.unwrap() as z.ZodType)
+    if (kind instanceof z.ZodLiteral) return [...kind.values].map(String)
+  }
+  if (schema instanceof z.ZodLiteral) return [...schema.values].map(String)
+  throw new TypeError('Cannot list the kinds of this schema.')
+}
+
+const knownNodeKinds: ReadonlySet<string> = new Set(literalKinds(node))
+const knownExecutorKinds: ReadonlySet<string> = new Set(literalKinds(managedFields.shape.executor))
+const knownCapabilityKinds: ReadonlySet<string> = new Set(literalKinds(capability))
+/**
+ * Kinds removed without a migration, per category. Repair keeps discarding them as before; every other unknown kind
+ * may belong to a newer package and is rejected instead. Add a kind to its own category when retiring it.
+ */
+const retiredKinds = {
+  Capability: new Set<string>(),
+  executor: new Set(['dedupe']),
+  node: new Set<string>(),
+} as const satisfies Record<string, ReadonlySet<string>>
+
+function assertKnownKind(kind: unknown, known: ReadonlySet<string>, subject: keyof typeof retiredKinds): void {
+  if (typeof kind == 'string' && !known.has(kind) && !retiredKinds[subject].has(kind))
+    throw new TypeError(`Unknown ${subject} kind ${JSON.stringify(kind)} cannot be repaired.`)
+}
+
+/** Repair discards invalid entries, so it must refuse content that may only be unknown to this package. */
+function assertRepairableNodes(nodes: unknown): void {
+  for (const entry of Object.values(record(nodes))) {
+    const candidate = record(entry)
+    assertKnownKind(candidate.kind, knownNodeKinds, 'node')
+    const task = record(candidate.task)
+    assertKnownKind(record(task.executor).kind, knownExecutorKinds, 'executor')
+    if (Array.isArray(task.capabilities)) for (const item of task.capabilities) assertKnownKind(record(item).kind, knownCapabilityKinds, 'Capability')
+  }
+}
+
 function repairGraph(value: unknown, bindings: Record<string, unknown>): z.infer<typeof graph> {
   const candidate = record(value)
+  assertRepairableNodes(candidate.nodes)
   const nodes = repairedEntries(candidate.nodes, node, (entry) => {
     const repaired = record(repairTriggerNode(entry))
     if ((repaired.kind == 'poll' || repaired.kind == 'integration') && repaired.connectionId == null && typeof repaired.bindingId == 'string') {
@@ -592,6 +636,10 @@ export function repairRevisionEnvelope(value: unknown): RevisionContent {
   if (envelopeSource.kind != 'open-flow-flow-revision' || envelopeSource.version != 1) throw new TypeError('The value is not an Open Flow Revision envelope.')
   if (typeof envelopeSource.modelVersion == 'number' && envelopeSource.modelVersion > currentFlowModelVersion)
     throw new TypeError('The Flow model is newer than this package.')
+  if (Array.isArray(envelopeSource.features)) {
+    const unknown = envelopeSource.features.filter((name) => typeof name != 'string' || !isKnownFlowFeature(name))
+    if (unknown.length > 0) throw new UnsupportedFlowFeaturesError(unknown.map(String))
+  }
   let sourceDocument = record(
     envelopeSource.modelVersion == 1 || envelopeSource.modelVersion == 2 ? upgradeLegacyDocument(envelopeSource.document) : envelopeSource.document,
   )
@@ -599,14 +647,17 @@ export function repairRevisionEnvelope(value: unknown): RevisionContent {
   sourceDocument = record(normalizeDocument(sourceDocument))
   const bindings = record(sourceDocument.bindings)
   const sourceGraph = repairGraph(sourceDocument.graph, bindings)
-  return decodeRevisionContent({
-    modelVersion: currentFlowModelVersion,
-    document: {
-      bindings: repairedEntries(sourceDocument.bindings, binding),
-      graph: sourceGraph,
-    },
-    modules: repairedEntries(envelopeSource.modules, module),
-  })
+  return verifiedContent(
+    revision.parse({
+      modelVersion: currentFlowModelVersion,
+      document: {
+        bindings: repairedEntries(sourceDocument.bindings, binding),
+        graph: sourceGraph,
+      },
+      modules: repairedEntries(envelopeSource.modules, module),
+    }) as RevisionContent,
+    undefined,
+  )
 }
 
 export function decodeFlowDocument(value: unknown): FlowDocument {
@@ -614,22 +665,44 @@ export function decodeFlowDocument(value: unknown): FlowDocument {
   return document.parse(value) as FlowDocument
 }
 
-export function decodeRevisionContent(value: unknown): RevisionContent {
-  checkJsonDepth(value)
-  const content = revision.parse(value) as RevisionContent
+/**
+ * Reads the serialized `features` list. Model v16 and later serialize it; earlier models must not. Unknown names
+ * reject the document before any schema parsing, so this package never repairs or rewrites content it cannot read.
+ * In-memory content omits the list, so a missing list is accepted; serialized exits are held to it by conformance.
+ */
+function declaredFeatures(serialized: Record<string, unknown>): readonly string[] | undefined {
+  const { modelVersion, features } = serialized
+  if (typeof modelVersion != 'number' || modelVersion > currentFlowModelVersion || features === undefined) return undefined
+  if (modelVersion < flowFeaturesModelVersion) throw new TypeError(`Flow features require Flow model version ${flowFeaturesModelVersion}.`)
+  if (!Array.isArray(features) || features.some((name) => typeof name != 'string')) throw new TypeError('Flow features must be a list of names.')
+  const unknown = [...new Set(features.filter((name: string) => !isKnownFlowFeature(name)))]
+  if (unknown.length > 0) throw new UnsupportedFlowFeaturesError(unknown)
+  return features
+}
+
+function verifiedContent(parsed: RevisionContent & { readonly features?: readonly string[] }, declared: readonly string[] | undefined): RevisionContent {
+  const content: RevisionContent = { modelVersion: parsed.modelVersion, document: parsed.document, modules: parsed.modules }
   checkModelVersion(content)
+  if (declared != null) {
+    const undeclared = declaredFlowFeatures(content).filter((name) => !declared.includes(name))
+    if (undeclared.length > 0) throw new TypeError(`The Flow uses undeclared features: ${undeclared.join(', ')}.`)
+  }
   assertDocumentHttpAuthBindings(content.document)
   return content
+}
+
+export function decodeRevisionContent(value: unknown): RevisionContent {
+  checkJsonDepth(value)
+  const declared = declaredFeatures(record(value))
+  return verifiedContent(revision.parse(value) as RevisionContent, declared)
 }
 
 export function decodeRevisionEnvelope(value: unknown): RevisionContent {
   checkJsonDepth(value)
   const revisionSource = record(value)
+  const declared = declaredFeatures(revisionSource)
   const candidate = revisionSource.modelVersion == 2 ? { ...revisionSource, document: upgradeLegacyDocument(revisionSource.document) } : value
-  const content = envelope.parse(candidate) as RevisionContent
-  checkModelVersion(content)
-  assertDocumentHttpAuthBindings(content.document)
-  return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
+  return verifiedContent(envelope.parse(candidate) as RevisionContent, declared)
 }
 
 const shapes = {

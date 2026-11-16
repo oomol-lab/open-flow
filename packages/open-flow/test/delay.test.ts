@@ -157,3 +157,11 @@ it('resolves a duration from upstream once and retains its registered input on r
   expect(completed.kind).toBe('node-results')
   expect(f.events.filter((event) => event.type === 'node.completed' && event.nodeId === 'delay')).toHaveLength(1)
 })
+
+it('rejects a recovered Delay whose saved duration no longer matches its inputs', async () => {
+  const f = await fixture()
+  const first = await Effect.runPromise(runFlow(f.prepared, { ...f.options, trigger: { nodeId: 'start', outputs: {} } }))
+  if (first.kind !== 'waiting') throw new Error('Expected Delay suspension')
+  const checkpoint = { ...first.checkpoint, waits: [{ ...first.checkpoint.waits[0]!, value: { durationMs: 1 } }] }
+  await expect(Effect.runPromise(runFlow(f.prepared, { ...f.options, resume: { checkpoint } }))).rejects.toThrow(/Delay state is invalid/)
+})
