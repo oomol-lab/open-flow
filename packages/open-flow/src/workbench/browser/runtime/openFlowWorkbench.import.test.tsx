@@ -106,9 +106,10 @@ async function cancelDialog(modal: Element) {
 
 it('opens confirmation once, preserves its snapshot, and retries the same submission identity', async () => {
   const { ref, onImportFlow } = await browser()
+  const onImported = vi.fn()
   await act(async () => {
-    expect(ref.current?.openImport(input)).toBe('opened')
-    expect(ref.current?.openImport({ ...input, fileName: 'Replacement.json' })).toBe('unavailable')
+    expect(ref.current?.openImport({ ...input, onImported })).toBe('opened')
+    expect(ref.current?.openImport({ ...input, fileName: 'Replacement.json', onImported: vi.fn() })).toBe('unavailable')
   })
   const modal = await dialog()
   expect(modal.querySelector('input')?.value).toBe('Example')
@@ -120,11 +121,13 @@ it('opens confirmation once, preserves its snapshot, and retries the same submis
   }
   expect(onImportFlow).toHaveBeenCalledTimes(2)
   expect(onImportFlow.mock.calls[0]).toEqual(onImportFlow.mock.calls[1])
-  expect(onImportFlow).toHaveBeenCalledWith(file, 'Example', expect.any(String), [], undefined)
+  expect(onImportFlow).toHaveBeenCalledWith(file, 'Example', expect.any(String), [], onImported)
+  expect(onImported).not.toHaveBeenCalled()
 })
 
 it('imports a bundle through its own callback, preserving member names and the shared tag selection', async () => {
   const onImportFlowBundle = vi.fn(async () => false)
+  const onImported = vi.fn()
   const { ref, onImportFlow } = await browser({ onImportFlowBundle })
   const bundle = {
     kind: 'open-flow-workflow-bundle',
@@ -135,7 +138,7 @@ it('imports a bundle through its own callback, preserving member names and the s
       { flowId: 'child', file: { ...file, name: 'Dependency' } },
     ],
   }
-  expect(await open(ref, { text: JSON.stringify(bundle), fileName: 'bundle.openflow.json' })).toBe('opened')
+  expect(await open(ref, { text: JSON.stringify(bundle), fileName: 'bundle.openflow.json', onImported })).toBe('opened')
   const modal = await dialog()
   expect(modal.querySelector('input')?.value).toBe('Root')
   expect(modal.querySelector('summary')?.textContent).toContain('2')
@@ -143,9 +146,10 @@ it('imports a bundle through its own callback, preserving member names and the s
   expect(modal.textContent).toContain('Tags')
   for (let attempt = 0; attempt < 2; attempt++)
     await act(async () => modal.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
-  expect(onImportFlowBundle).toHaveBeenCalledWith(bundle, 'Root', expect.any(String), [], undefined)
+  expect(onImportFlowBundle).toHaveBeenCalledWith(bundle, 'Root', expect.any(String), [], onImported)
   expect(onImportFlowBundle.mock.calls[0]).toEqual(onImportFlowBundle.mock.calls[1])
   expect(onImportFlow).not.toHaveBeenCalled()
+  expect(onImported).not.toHaveBeenCalled()
 })
 
 it('rejects unavailable states before parsing and makes retained handles inert after unmount', async () => {
