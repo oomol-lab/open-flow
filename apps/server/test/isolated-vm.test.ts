@@ -465,6 +465,50 @@ ${fallback ? 'delete globalThis.AbortController; delete globalThis.AbortSignal;'
     ).resolves.toEqual({ base64: 'open-flow', clone: 2, decoded: '你好', microtask: true, performance: true, source: 1, ticks: 2 })
   })
 
+  it('matches TextEncoder.encodeInto and chunked TextDecoder.decode boundaries in the guest', async () => {
+    const cases: Array<[string, number]> = [
+      ['', 4],
+      ['abc', 0],
+      ['abcdef', 3],
+      ['你', 2],
+      ['a你', 3],
+      ['ab😀', 3],
+      ['😀', 3],
+      ['ab😀', 6],
+      ['\ud800', 1],
+      ['\ud800', 3],
+      ['ab\ud800', 3],
+    ]
+    const expected = cases.map(([text, size]) => {
+      const target = new Uint8Array(size).fill(0xee)
+      const outcome = new TextEncoder().encodeInto(text, target)
+      return { ...outcome, bytes: [...target] }
+    })
+    await expect(
+      host.invoke({
+        capability: async () => ({ body: null, status: 200 }),
+        input: cases,
+        invocationId: 'web-encoding-boundaries',
+        program: {
+          ...program(`export default (cases) => {
+  const encoder = new TextEncoder()
+  const results = cases.map(([text, size]) => {
+    const target = new Uint8Array(size).fill(0xee)
+    const outcome = encoder.encodeInto(text, target)
+    return { ...outcome, bytes: Array.from(target) }
+  })
+  const large = '你😀a'.repeat(50_000)
+  const encoded = encoder.encode(large)
+  const sliced = encoded.subarray(3, encoded.length - 1)
+  const decoded = new TextDecoder().decode(sliced)
+  return { results, chunked: decoded === large.slice(1, -1) }
+}`),
+          engineContract: currentEngineContract,
+        },
+      }),
+    ).resolves.toEqual({ results: expected, chunked: true })
+  })
+
   it('preserves user error messages', async () => {
     await expect(invoke("export default () => { throw new Error('Task failed with detail.') }")).rejects.toMatchObject({
       code: 'task-failed',

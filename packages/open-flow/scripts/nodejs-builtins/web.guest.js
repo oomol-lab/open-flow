@@ -120,6 +120,7 @@ class TextDecoder {
     const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
     const shareable =
       bytes.length > 0 &&
+      bytes.length <= transferUnits &&
       bytes.buffer.byteLength <= 1048576 &&
       (bytes.length === bytes.buffer.byteLength || bytes.buffer.byteLength <= 4096 || bytes.length * 2 >= bytes.buffer.byteLength)
     const stream = Boolean(options.stream)
