@@ -10,7 +10,8 @@ import { nodeInputPorts as nodePorts, isResolutionNode, resolutionActions } from
 import { matchesSchema } from '../../flow/common/schema.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
 import { decodeDependenciesCheckpoint } from './dependencies.ts'
-import { agentCheckpointSchema, agentConfig, agentApproval, jsonEqual, jsonValue, outputRecord, usesPending, validateOutputs } from './node-execution.ts'
+import { agentCheckpointSchema, jsonEqual, jsonValue, outputRecord, validateOutputs } from './node-execution.ts'
+import { suspensionKind, validateSavedSuspension } from './suspension.ts'
 
 export interface PendingWait {
   readonly jobId: string
@@ -175,95 +176,163 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
   return { agents, bindingValues, counts, dependencies, inputs, results, version: 7, waits: pendingWaits, ...(source.calls === undefined ? {} : { calls }) }
 }
 
+type CheckpointResultRecord = { readonly systemOutputs?: Readonly<Record<string, JsonValue>>; readonly handled?: true }
+
+/**
+ * Where an output being validated was saved. `committed` outputs are final results whose handled failures carry an
+ * explicit flag. `in-flight` outputs belong to dependency frames: a handled failure is implied by its error, and a
+ * resolution node may have released only its `pending` output.
+ */
+type CheckpointResultSource = 'committed' | 'in-flight'
+
+/**
+ * Checks that a decoded checkpoint could have been produced by running the prepared graph, before a Run resumes from
+ * it. Each phase checks one relation between the checkpoint and the graph; suspension rules belong to `suspension.ts`.
+ */
 export function validateCheckpoint(
   target: { readonly graph: Graph },
   checkpoint: FlowRunCheckpoint,
   dependencies: Dependencies,
   resolveInputs: (nodeId: string, node: ExecutableNode) => Readonly<Record<string, JsonValue>>,
 ): void {
-  const launch = checkpoint.inputs
-  const agents = checkpoint.agents
-  if ([...Object.keys(checkpoint.results), ...Object.keys(launch)].some((id) => target.graph.nodes[id] == null))
+  const { graph } = target
+  if ([...Object.keys(checkpoint.results), ...Object.keys(checkpoint.inputs)].some((id) => graph.nodes[id] == null))
     throw new Error('Checkpoint nodes do not match the prepared graph.')
-  for (const [scope, counts] of Object.entries(checkpoint.counts)) {
-    const graph = scope == '' ? target.graph : undefined
-    if (graph == null) throw new Error('Checkpoint execution counts reference an unknown graph.')
-    for (const [id, count] of Object.entries(counts)) {
-      const node = graph.nodes[id]
-      if (node == null || isTriggerNode(node) || count > (node.maxExecutions ?? 1000)) throw new Error('Checkpoint execution count is invalid.')
-    }
+  const counts = executionCounts(graph, checkpoint)
+  const validateResult = (
+    id: string,
+    outputs: Readonly<Record<string, JsonValue>>,
+    record: CheckpointResultRecord | undefined,
+    source: CheckpointResultSource,
+  ) => validateCheckpointResult(graph, counts, id, outputs, record, source)
+
+  for (const [id, result] of Object.entries(checkpoint.results)) validateResult(id, result.outputs, result, 'committed')
+  const triggerId = selectedTrigger(graph, checkpoint)
+  validatePendingCounts(checkpoint, counts)
+  validateLaunchInputs(graph, checkpoint)
+  for (const result of checkpoint.dependencies.results) validateResult(result.nodeId, result.outputs, result, 'in-flight')
+  validateDependencyStates(graph, checkpoint, dependencies, triggerId, validateResult)
+  validateCalls(graph, checkpoint, resolveInputs)
+  for (const waiting of checkpoint.waits) {
+    const node = graph.nodes[waiting.nodeId]
+    if (node == null || isTriggerNode(node)) throw new Error('Checkpoint waiting node is missing.')
+    const state = dependencies.state.nodes[waiting.nodeId]!
+    const expectedOutput = waiting.pending == null ? undefined : { pending: waiting.pending }
+    if ((state.output == null) != (expectedOutput == null) || (state.output != null && !jsonEqual(state.output, expectedOutput!)))
+      throw new Error('Checkpoint waiting dependency output is inconsistent.')
+    validateSavedSuspension(suspensionKind(node), {
+      graph,
+      nodeId: waiting.nodeId,
+      node,
+      wait: waiting,
+      agent: checkpoint.agents[waiting.jobId],
+      resolveInputs: () => resolveInputs(waiting.nodeId, node),
+    })
+    if (counts[waiting.nodeId] == null) throw new Error('Checkpoint waiting execution count is missing.')
   }
-  const validateResults = (
-    results: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>,
-    frame = false,
-    metadata: Readonly<Record<string, { readonly systemOutputs?: Readonly<Record<string, JsonValue>>; readonly handled?: true }>> = checkpoint.results,
-  ) => {
-    for (const [id, outputs] of Object.entries(results)) {
-      const result = metadata[id]
-      const node = target.graph.nodes[id]
-      if (node == null) throw new Error('Checkpoint result node is missing.')
-      const systemEnabled = nodeSystemOutputPorts(node).error != null
-      if (systemEnabled && result?.systemOutputs == null) throw new Error('Checkpoint system output is missing.')
-      if (!isTriggerNode(node) && checkpoint.counts['']?.[id] == null) throw new Error('Checkpoint execution count is missing.')
-      if (result?.systemOutputs != null) {
-        const error = result.systemOutputs.error
-        if (
-          !systemEnabled ||
-          Object.keys(result.systemOutputs).length != 1 ||
-          !Object.hasOwn(result.systemOutputs, 'error') ||
-          (error !== null && (!matchesSchema(error!, nodeErrorSchema) || typeof error != 'object' || !('nodeId' in error) || error.nodeId != id))
-        )
-          throw new Error('Checkpoint system output is invalid.')
-      }
-      const handled = frame ? result?.systemOutputs?.error != null : result?.handled === true
-      if (handled !== (result?.systemOutputs?.error != null)) throw new Error('Checkpoint failure status is inconsistent.')
-      if (handled) {
-        if (Object.keys(outputs).length || result.systemOutputs?.error == null) throw new Error('Checkpoint handled failure is invalid.')
-        continue
-      }
-      if (isTriggerNode(node)) {
-        if (!matchesTriggerOutputs(node, outputs)) throw new Error('Checkpoint Trigger output is invalid.')
-      } else {
-        if (!jsonEqual(validateOutputs(id, node, outputs), outputs)) throw new Error('Checkpoint node outputs are incomplete.')
-        const count = Object.keys(outputs).length
-        if (
-          (node.kind == 'condition' && count != 0) ||
-          (isResolutionNode(node) &&
-            (resolutionActions(node).filter((action) => Object.hasOwn(outputs, action)).length > 1 ||
-              (!resolutionActions(node).some((action) => Object.hasOwn(outputs, action)) && !(frame && Object.hasOwn(outputs, 'pending')))))
-        )
-          throw new Error('Checkpoint branch result is invalid.')
-      }
-    }
+}
+
+/** Execution counts live in the Run's only graph scope, `''`. */
+function executionCounts(graph: Graph, checkpoint: FlowRunCheckpoint): Readonly<Record<string, number>> {
+  if (Object.keys(checkpoint.counts).some((scope) => scope != '')) throw new Error('Checkpoint execution counts reference an unknown graph.')
+  const counts = checkpoint.counts[''] ?? {}
+  for (const [id, count] of Object.entries(counts)) {
+    const node = graph.nodes[id]
+    if (node == null || isTriggerNode(node) || count > (node.maxExecutions ?? 1000)) throw new Error('Checkpoint execution count is invalid.')
   }
-  validateResults(Object.fromEntries(Object.entries(checkpoint.results).map(([id, result]) => [id, result.outputs])))
-  const triggerIds = Object.keys(checkpoint.results).filter((id) => isTriggerNode(target.graph.nodes[id]!))
+  return counts
+}
+
+function validateCheckpointResult(
+  graph: Graph,
+  counts: Readonly<Record<string, number>>,
+  id: string,
+  outputs: Readonly<Record<string, JsonValue>>,
+  record: CheckpointResultRecord | undefined,
+  source: CheckpointResultSource,
+): void {
+  const node = graph.nodes[id]
+  if (node == null) throw new Error('Checkpoint result node is missing.')
+  const systemEnabled = nodeSystemOutputPorts(node).error != null
+  if (systemEnabled && record?.systemOutputs == null) throw new Error('Checkpoint system output is missing.')
+  if (!isTriggerNode(node) && counts[id] == null) throw new Error('Checkpoint execution count is missing.')
+  if (record?.systemOutputs != null) {
+    const error = record.systemOutputs.error
+    if (
+      !systemEnabled ||
+      Object.keys(record.systemOutputs).length != 1 ||
+      !Object.hasOwn(record.systemOutputs, 'error') ||
+      (error !== null && (!matchesSchema(error!, nodeErrorSchema) || typeof error != 'object' || !('nodeId' in error) || error.nodeId != id))
+    )
+      throw new Error('Checkpoint system output is invalid.')
+  }
+  const failed = record?.systemOutputs?.error != null
+  const handled = source == 'in-flight' ? failed : record?.handled === true
+  if (handled !== failed) throw new Error('Checkpoint failure status is inconsistent.')
+  if (handled) {
+    if (Object.keys(outputs).length) throw new Error('Checkpoint handled failure is invalid.')
+    return
+  }
+  if (isTriggerNode(node)) {
+    if (!matchesTriggerOutputs(node, outputs)) throw new Error('Checkpoint Trigger output is invalid.')
+    return
+  }
+  if (!jsonEqual(validateOutputs(id, node, outputs), outputs)) throw new Error('Checkpoint node outputs are incomplete.')
+  if (node.kind == 'condition' && Object.keys(outputs).length != 0) throw new Error('Checkpoint branch result is invalid.')
+  if (isResolutionNode(node)) {
+    const chosen = resolutionActions(node).filter((action) => Object.hasOwn(outputs, action)).length
+    if (chosen > 1 || (chosen == 0 && !(source == 'in-flight' && Object.hasOwn(outputs, 'pending')))) throw new Error('Checkpoint branch result is invalid.')
+  }
+}
+
+function selectedTrigger(graph: Graph, checkpoint: FlowRunCheckpoint): string {
+  const triggerIds = Object.keys(checkpoint.results).filter((id) => isTriggerNode(graph.nodes[id]!))
   if (triggerIds.length != 1) throw new Error('Checkpoint must contain exactly one selected Trigger.')
-  const pendingCounts = new Map<string, number>()
-  for (const waiting of [...checkpoint.waits, ...(checkpoint.calls ?? [])]) pendingCounts.set(waiting.nodeId, (pendingCounts.get(waiting.nodeId) ?? 0) + 1)
-  for (const [id, count] of pendingCounts) {
-    if ((checkpoint.counts['']?.[id] ?? 0) < count + (checkpoint.results[id] == null ? 0 : 1))
-      throw new Error('Checkpoint waiting execution count is incomplete.')
+  return triggerIds[0]!
+}
+
+/** Every suspended execution of a node must be counted, alongside its committed result if it has one. */
+function validatePendingCounts(checkpoint: FlowRunCheckpoint, counts: Readonly<Record<string, number>>): void {
+  const pending = new Map<string, number>()
+  for (const waiting of [...checkpoint.waits, ...(checkpoint.calls ?? [])]) pending.set(waiting.nodeId, (pending.get(waiting.nodeId) ?? 0) + 1)
+  for (const [id, count] of pending) {
+    if ((counts[id] ?? 0) < count + (checkpoint.results[id] == null ? 0 : 1)) throw new Error('Checkpoint waiting execution count is incomplete.')
   }
-  for (const [id, values] of Object.entries(launch)) {
-    const node = target.graph.nodes[id]!
+}
+
+function validateLaunchInputs(graph: Graph, checkpoint: FlowRunCheckpoint): void {
+  for (const [id, values] of Object.entries(checkpoint.inputs)) {
+    const node = graph.nodes[id]!
     if (isTriggerNode(node) || Object.keys(values).some((handle) => nodePorts(node)[handle] == null))
       throw new Error('Checkpoint launch inputs do not match the prepared graph.')
   }
+}
 
-  for (const result of checkpoint.dependencies.results) validateResults({ [result.nodeId]: result.outputs }, true, { [result.nodeId]: result })
-  const graphTriggers = Object.keys(target.graph.nodes).filter((id) => isTriggerNode(target.graph.nodes[id]!))
+/** Started nodes descend from the selected Trigger only, and completed ones agree with their committed results. */
+function validateDependencyStates(
+  graph: Graph,
+  checkpoint: FlowRunCheckpoint,
+  dependencies: Dependencies,
+  triggerId: string,
+  validateResult: (
+    id: string,
+    outputs: Readonly<Record<string, JsonValue>>,
+    record: CheckpointResultRecord | undefined,
+    source: CheckpointResultSource,
+  ) => void,
+): void {
+  const graphTriggers = Object.keys(graph.nodes).filter((id) => isTriggerNode(graph.nodes[id]!))
   for (const [nodeId, state] of Object.entries(dependencies.state.nodes)) {
-    if (!isTriggerNode(target.graph.nodes[nodeId]!) && (state.status == 'running' || state.status == 'completed')) {
+    if (!isTriggerNode(graph.nodes[nodeId]!) && (state.status == 'running' || state.status == 'completed')) {
       const triggers = graphTriggers.filter((id) => dependencies.input(nodeId, id) != null)
       if (
         triggers.length != 1 ||
-        triggers[0] != triggerIds[0] ||
-        !jsonEqual(dependencies.input(nodeId, triggers[0]!)!.outputs, checkpoint.results[triggers[0]!]!.outputs)
+        triggers[0] != triggerId ||
+        !jsonEqual(dependencies.input(nodeId, triggerId)!.outputs, checkpoint.results[triggerId]!.outputs)
       )
         throw new Error('Checkpoint input Trigger does not match the Run.')
     }
-    if (state.output != null) validateResults({ [nodeId]: state.output }, state.status == 'running')
+    if (state.output != null) validateResult(nodeId, state.output, checkpoint.results[nodeId], state.status == 'running' ? 'in-flight' : 'committed')
     if (state.status == 'completed') {
       const result = checkpoint.results[nodeId]
       if (
@@ -275,8 +344,15 @@ export function validateCheckpoint(
         throw new Error('Checkpoint completed dependency conflicts with its result.')
     }
   }
+}
+
+function validateCalls(
+  graph: Graph,
+  checkpoint: FlowRunCheckpoint,
+  resolveInputs: (nodeId: string, node: ExecutableNode) => Readonly<Record<string, JsonValue>>,
+): void {
   for (const call of checkpoint.calls ?? []) {
-    const node = target.graph.nodes[call.nodeId]
+    const node = graph.nodes[call.nodeId]
     if (
       node?.kind != 'task' ||
       !('executor' in node.task) ||
@@ -286,35 +362,5 @@ export function validateCheckpoint(
       checkpoint.dependencies.nodes[call.nodeId]?.output != null
     )
       throw new Error('Checkpoint workflow call does not match its node.')
-  }
-  for (const waiting of checkpoint.waits) {
-    const node = target.graph.nodes[waiting.nodeId]
-    if (node == null || isTriggerNode(node)) throw new Error('Checkpoint waiting node is missing.')
-    const state = dependencies.state.nodes[waiting.nodeId]!
-    const expectedOutput = waiting.pending == null ? undefined : { pending: waiting.pending }
-    if ((state.output == null) != (expectedOutput == null) || (state.output != null && !jsonEqual(state.output, expectedOutput!)))
-      throw new Error('Checkpoint waiting dependency output is inconsistent.')
-    const config = agentConfig(node)
-    const saved = agents[waiting.jobId]
-    if (!isResolutionNode(node) && node.kind !== 'delay' && config == null) throw new Error('Checkpoint waiting node cannot suspend.')
-    if (config != null) {
-      if (saved != null && saved.invocationId != waiting.jobId) throw new Error('Checkpoint Agent invocation identity changed.')
-      if (saved == null || (node.timeoutMs == null) != (saved.remainingMs == null) || (saved.remainingMs != null && saved.remainingMs > node.timeoutMs!)) {
-        throw new Error('Checkpoint Agent budget is invalid.')
-      }
-      const approval = agentApproval(config, saved.checkpoint, saved.input)
-      if (!jsonEqual(waiting.value, approval)) throw new Error('Checkpoint Agent approval does not match its saved call.')
-      if (!jsonEqual(resolveInputs(waiting.nodeId, node), saved.input)) throw new Error('Checkpoint Agent inputs changed.')
-    } else if (node.kind === 'delay') {
-      if (saved != null || waiting.pending != null || !jsonEqual(waiting.value, resolveInputs(waiting.nodeId, node)))
-        throw new Error('Checkpoint Delay state is invalid.')
-    } else {
-      if (saved != null) throw new Error('Checkpoint Wait contains Agent state.')
-      if (!isResolutionNode(node) || !jsonEqual(resolveInputs(waiting.nodeId, node), waiting.value)) throw new Error('Checkpoint resolution input changed.')
-      const notify = usesPending(target.graph, waiting.nodeId)
-      if (notify != (waiting.pending != null)) throw new Error('Checkpoint Wait pending output is missing or unexpected.')
-      if (waiting.pending != null) validateOutputs(waiting.nodeId, node, { pending: waiting.pending })
-    }
-    if (checkpoint.counts['']?.[waiting.nodeId] == null) throw new Error('Checkpoint waiting execution count is missing.')
   }
 }

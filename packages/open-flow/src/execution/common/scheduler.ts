@@ -16,7 +16,6 @@ import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { isTriggerNode } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
-import { delayDurationSchema } from '../../flow/common/delay.ts'
 import { nodeSystemOutputPorts, supportsNodeErrorHandling } from '../../flow/common/errorHandling.ts'
 import { isResolutionNode, resolutionActions } from '../../flow/common/graph.ts'
 import { waitAutoContinueAt as automaticDeadline } from '../../flow/common/wait.ts'
@@ -24,7 +23,8 @@ import { matchesTriggerOutputs, normalizeTriggerOutputs } from '../../trigger/co
 import { decodeFlowRunCheckpoint, validateCheckpoint } from './checkpoint.ts'
 import { Dependencies } from './dependencies.ts'
 import { projectExecutionId, sanitizeRuntimeErrorMessage } from './events.ts'
-import { agentNotice, executeNode, NodeValidationError, nodeFailure, nodeTitle, resolveNodeInputs, usesPending, validateOutputs } from './node-execution.ts'
+import { executeNode, NodeValidationError, nodeFailure, nodeTitle, resolveNodeInputs, usesPending, validateOutputs } from './node-execution.ts'
+import { suspendsOnInputs, suspensionKind, waitRequest } from './suspension.ts'
 import { normalizeWaitComment as normalizeComment, withWaitNotificationMessage as notificationMessage } from './wait.ts'
 
 export type { DependenciesCheckpoint } from './dependencies.ts'
@@ -377,31 +377,17 @@ function runGraph(
         Effect.gen(function* () {
           if (context.waits == null) return yield* Effect.fail(new Error('Wait host is unavailable.'))
           const node = target.graph.nodes[nodeId] as ExecutableNode
-          const waitId = nanoid()
-          const notify = isResolutionNode(node) && usesPending(target.graph, nodeId)
-          const identity = { jobId, nodeId, waitId }
-          const request: WaitRequest =
-            node.kind === 'delay'
-              ? { ...identity, kind: 'delay', durationMs: delayDurationSchema.parse((value as Readonly<Record<string, JsonValue>>).durationMs) }
-              : {
-                  ...identity,
-                  value,
-                  notify,
-                  ...(isResolutionNode(node)
-                    ? { actions: resolutionActions(node), prompt: node.prompt, ...(node.kind === 'wait' ? { autoContinue: node.autoContinue } : {}) }
-                    : {
-                        actions: ['approve', 'reject'] as const,
-                        prompt: JSON.stringify(value, null, 2),
-                        notification: agentNotice(node, agents[jobId]!.input),
-                      }),
-                }
+          const kind = suspensionKind(node)
+          if (kind == null) return yield* Effect.fail(new Error(`Node "${nodeId}" cannot suspend.`))
+          const notify = kind === 'resolution' && usesPending(target.graph, nodeId)
+          const request = waitRequest(kind, node, { jobId, nodeId, waitId: nanoid() }, value, notify, agents[jobId]?.input)
           const notification = yield* context.waits.create(request)
           const pending = notification == null ? notification : withWaitNotificationMessage(notification)
           if (notify) {
             validateOutputs(nodeId, node, { pending: pending! })
             dependencies.release(nodeId, { pending: pending! }, ['pending'], false)
           }
-          pendingWaits.set(jobId, { jobId, nodeId, value, waitId, ...(notify ? { pending: pending! } : {}) })
+          pendingWaits.set(jobId, { jobId, nodeId, value, waitId: request.waitId, ...(notify ? { pending: pending! } : {}) })
           yield* Queue.offer(changes, undefined)
         })
       const settleNode = (nodeId: string, jobId: string, result: NodeResult): Effect.Effect<void, Error> => {
@@ -465,7 +451,7 @@ function runGraph(
                   try: () => resolveInputs(nodeId, node),
                   catch: (error) => new NodeValidationError('node.input-invalid', error),
                 })
-                if (isResolutionNode(node) || node.kind === 'delay') {
+                if (suspendsOnInputs(node)) {
                   yield* context.emit({
                     inputs: Object.fromEntries(
                       Object.entries(nodeInputs).filter(([handle]) => {
@@ -519,24 +505,31 @@ function runGraph(
               saved.nodeId,
               saved.jobId,
               Effect.gen(function* () {
-                if (node.kind === 'delay') {
-                  if (action !== 'continue') return yield* Effect.fail(new Error('Delay requires automatic continuation.'))
-                  yield* commit(saved.nodeId, saved.jobId, {}, [])
-                } else if (isResolutionNode(node)) {
-                  if (!resolutionActions(node).some((candidate) => candidate == action))
-                    return yield* Effect.fail(new Error('Resolution does not match node actions.'))
-                  yield* commit(
-                    saved.nodeId,
-                    saved.jobId,
-                    validateOutputs(saved.nodeId, node, {
-                      ...(saved.pending == null ? {} : { pending: saved.pending }),
-                      [action]: { inputs: saved.value, action, resolvedAt, comment },
-                    }),
-                    [action],
-                  )
-                } else {
-                  if (action == 'continue') return yield* Effect.fail(new Error('Agent requires approve or reject.'))
-                  yield* settleNode(saved.nodeId, saved.jobId, yield* execute(saved.nodeId, node, saved.jobId, agents[saved.jobId]!.input, action))
+                const kind = suspensionKind(node)
+                switch (kind) {
+                  case 'delay':
+                    if (action !== 'continue') return yield* Effect.fail(new Error('Delay requires automatic continuation.'))
+                    return yield* commit(saved.nodeId, saved.jobId, {}, [])
+                  case 'resolution': {
+                    if (!isResolutionNode(node) || !resolutionActions(node).some((candidate) => candidate == action))
+                      return yield* Effect.fail(new Error('Resolution does not match node actions.'))
+                    return yield* commit(
+                      saved.nodeId,
+                      saved.jobId,
+                      validateOutputs(saved.nodeId, node, {
+                        ...(saved.pending == null ? {} : { pending: saved.pending }),
+                        [action]: { inputs: saved.value, action, resolvedAt, comment },
+                      }),
+                      [action],
+                    )
+                  }
+                  case 'agent':
+                    if (action == 'continue') return yield* Effect.fail(new Error('Agent requires approve or reject.'))
+                    return yield* settleNode(saved.nodeId, saved.jobId, yield* execute(saved.nodeId, node, saved.jobId, agents[saved.jobId]!.input, action))
+                  case undefined:
+                    return yield* Effect.fail(new Error(`Node "${saved.nodeId}" cannot suspend.`))
+                  default:
+                    return kind satisfies never
                 }
               }),
             ).pipe(Effect.ensuring(Queue.offer(changes, undefined))),
