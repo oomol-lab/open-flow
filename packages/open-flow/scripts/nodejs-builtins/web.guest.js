@@ -32,9 +32,14 @@ export function binary(value) {
   if (value instanceof ArrayBuffer) value = new Uint8Array(value)
   if (!ArrayBuffer.isView(value)) throw new TypeError('Expected an ArrayBuffer or ArrayBufferView.')
   if (value.byteLength > 1024 * 1024) throw new RangeError('Builtin payload too large.')
+  if (value.byteLength === 0) return { buffer: undefined, offset: 0, length: 0 }
   const view = new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
-  const buffer = view.byteLength === view.buffer.byteLength ? view.buffer : view.slice().buffer
-  return { buffer, offset: 0, length: view.byteLength }
+  const shareable =
+    view.byteLength === view.buffer.byteLength ||
+    (view.buffer.byteLength <= 1048576 && (view.buffer.byteLength <= 4096 || view.byteLength * 2 >= view.buffer.byteLength))
+  return shareable
+    ? { buffer: view.buffer, offset: view.byteOffset, length: view.byteLength }
+    : { buffer: view.slice().buffer, offset: 0, length: view.byteLength }
 }
 
 // Primitive calls carry at most 1 MiB, and JSON escaping can grow text sixfold, so text and bytes cross in 128 Ki pieces.
@@ -71,10 +76,14 @@ class TextEncoder {
   encodeInto(value, destination) {
     if (!(destination instanceof Uint8Array)) throw new TypeError('Expected a Uint8Array.')
     const text = String(value)
-    const encoded = this.encode(text)
+    if (destination.length === 0 || text.length === 0) return { read: 0, written: 0 }
+    let limit = Math.min(text.length, destination.length)
+    if (limit < text.length && (text.charCodeAt(limit - 1) & 0xfc00) === 0xd800) limit--
+    const prefix = text.slice(0, limit)
+    const encoded = limit === 0 ? new Uint8Array(0) : this.encode(prefix)
     let read = 0
     let written = 0
-    for (const character of text) {
+    for (const character of prefix) {
       const code = character.codePointAt(0)
       const size = code < 128 ? 1 : code < 2048 ? 2 : code < 65536 ? 3 : 4
       if (written + size > destination.length) break
@@ -109,6 +118,10 @@ class TextDecoder {
     const view = value instanceof ArrayBuffer ? new Uint8Array(value) : value
     if (!ArrayBuffer.isView(view)) throw new TypeError('Expected an ArrayBuffer or ArrayBufferView.')
     const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+    const shareable =
+      bytes.length > 0 &&
+      bytes.buffer.byteLength <= 1048576 &&
+      (bytes.length === bytes.buffer.byteLength || bytes.buffer.byteLength <= 4096 || bytes.length * 2 >= bytes.buffer.byteLength)
     const stream = Boolean(options.stream)
     let text = ''
     let offset = 0
@@ -119,13 +132,14 @@ class TextDecoder {
         label: this.#encoding,
         fatal: this.#fatal,
         ignoreBOM: this.#ignoreBOM,
-        offset: 0,
+        offset: shareable ? bytes.byteOffset + offset : 0,
         length,
         stream: stream || offset + length < bytes.length,
       }
+      const chunk = length === 0 ? undefined : shareable ? bytes.buffer : bytes.slice(offset, offset + length).buffer
       let result
       try {
-        result = primitive('decode', this.#id === undefined ? request : { ...request, id: this.#id }, bytes.slice(offset, offset + length).buffer)
+        result = primitive('decode', this.#id === undefined ? request : { ...request, id: this.#id }, chunk)
       } catch (error) {
         this.#id = undefined
         throw error
