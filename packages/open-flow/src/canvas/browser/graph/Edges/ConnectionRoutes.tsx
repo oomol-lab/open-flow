@@ -78,9 +78,7 @@ export function ConnectionRoutesProvider({ direction, routes$, children }: Conne
         },
       ]
     })
-    return new Map(
-      [...routeLayout(nodes, connections, { allowBlockedPorts: true })].map(([id, points]) => [id, points.map((point) => layoutAxes(point, 'vertical'))]),
-    )
+    return new Map([...routeLayout(nodes, connections)].map(([id, points]) => [id, points.map((point) => layoutAxes(point, 'vertical'))]))
   }, [direction, nodes, edges, planned])
   return <ConnectionRoutesContext.Provider value={routes}>{children}</ConnectionRoutesContext.Provider>
 }

@@ -384,6 +384,31 @@ it('arranges only the isolated vertical export when compact layout is requested'
   expect(document.querySelector('[aria-hidden="true"]')).toBeNull()
 })
 
+it('exports a compact PNG when a measured port blocks obstacle routing', async () => {
+  const input: FlowCanvasViewModel = {
+    viewport: model.viewport,
+    direction: 'vertical',
+    nodes: Array.from({ length: 5 }, (_, index) => Object.assign({}, model.nodes[0]!, { id: String(index), position: { x: 0, y: index * 200 } })),
+    edges: Array.from({ length: 4 }, (_, index) => ({
+      id: String(index),
+      source: String(index),
+      sourceHandle: '$out',
+      target: String(index + 1),
+      targetHandle: '$in',
+    })),
+  }
+  getInternalNode.mockImplementation((id: string) => ({
+    internals: {
+      handleBounds: {
+        source: [{ id: 'h:$out', x: 154, y: id === 'm:0' ? 162 : 108, width: 12, height: 6 }],
+        target: [{ id: 'h:$in', x: 154, y: 6, width: 12, height: 6 }],
+      },
+    },
+  }))
+  expect(await flowToPng(input, 'en', { layout: 'compact', aspectRatio: '16:9' })).toMatchObject({ blob: png })
+  expect(toSvg).toHaveBeenCalledOnce()
+})
+
 it('preserves saved positions by default and with explicit original layout', async () => {
   const arrange = vi.spyOn(CanvasStore.prototype, 'compactForExport')
   await flowToPng(model)

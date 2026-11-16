@@ -50,6 +50,31 @@ it('connects measured forward ports through the empty gap between levels', () =>
   expect(route.slice(1, -1).every((point) => point.x >= 116 && point.x <= 132)).toBe(true)
 })
 
+it('clears inset ports when folded runs have a narrow primary gap', () => {
+  const nodes: LayoutNode[] = [
+    { id: 'source', column: 6, x: 0, y: 600, width: 158, height: 336 },
+    { id: 'target', column: 1, x: 172, y: 0, width: 92, height: 336 },
+  ]
+  const route = routeLayout(nodes, [
+    { id: 'return', source: 'source', target: 'target', sourceOffset: { x: 152, y: 245 }, targetOffset: { x: 6, y: 168 } },
+  ]).get('return')!
+  expect(route[0]).toEqual({ x: 152, y: 845 })
+  expect(route.at(-1)).toEqual({ x: 178, y: 168 })
+  expect(route[1]!.x).toBeGreaterThanOrEqual(174)
+  expect(route.at(-2)!.x).toBeLessThanOrEqual(156)
+  for (let index = 1; index < route.length; index++) {
+    const a = route[index - 1]!
+    const b = route[index]!
+    expect(a.x === b.x || a.y === b.y).toBe(true)
+    for (const node of nodes) {
+      const crosses =
+        Math.max(Math.min(a.x, b.x), node.x + 8) <= Math.min(Math.max(a.x, b.x), node.x + node.width - 8) &&
+        Math.max(Math.min(a.y, b.y), node.y + 8) <= Math.min(Math.max(a.y, b.y), node.y + node.height - 8)
+      expect(crosses, `route crosses ${node.id}`).toBe(false)
+    }
+  }
+})
+
 it('keeps the coffee workflow feedback outside its branches without crossing cards or unrelated connections', () => {
   const graph = graphLayout(
     coffeeGroupsWorkflow.nodes.map((node) => ({
@@ -135,12 +160,18 @@ it('keeps independent feedback loops beside their own subgraphs', () => {
   expect(hasRouteCrossings(obstructed)).toBe(false)
 })
 
-it('allows interactive fallback for blocked ports while keeping strict export routing', () => {
+it('leaves blocked ports to standard edge rendering without losing clear routes', () => {
   const nodes: LayoutNode[] = [
     { id: 'source', column: 0, x: 0, y: 0, width: 100, height: 300 },
     { id: 'target', column: 1, x: 50, y: 0, width: 100, height: 300 },
+    { id: 'clear-source', column: 0, x: 0, y: 500, width: 100, height: 300 },
+    { id: 'clear-target', column: 1, x: 148, y: 500, width: 100, height: 300 },
   ]
-  const edges = [{ id: 'overlap', source: 'source', target: 'target' }]
-  expect(() => routeLayout(nodes, edges)).toThrow('Could not route')
-  expect(routeLayout(nodes, edges, { allowBlockedPorts: true }).has('overlap')).toBe(false)
+  const routes = routeLayout(nodes, [
+    { id: 'overlap', source: 'source', target: 'target' },
+    { id: 'clear', source: 'clear-source', target: 'clear-target' },
+  ])
+  expect(routes.has('overlap')).toBe(false)
+  expect(routes.get('clear')![0]).toEqual({ x: 100, y: 650 })
+  expect(routes.get('clear')!.at(-1)).toEqual({ x: 148, y: 650 })
 })

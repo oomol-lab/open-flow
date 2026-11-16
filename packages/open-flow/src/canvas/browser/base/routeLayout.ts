@@ -10,12 +10,9 @@ function componentIndex(sets: string[][]): Map<string, number> {
   return new Map(sets.flatMap((ids, index) => ids.map((id) => [id, index] as const)))
 }
 
-/** Orthogonal channels around the measured cards, in primary/cross coordinates. */
-export function routeLayout(
-  nodes: readonly LayoutNode[],
-  edges: readonly GraphLayoutEdge[],
-  options: { readonly allowBlockedPorts?: boolean } = {},
-): ReadonlyMap<string, readonly LayoutPoint[]> {
+/** Orthogonal channels around the measured cards, in primary/cross coordinates.
+ * Connections without a clear route use the edge renderer's standard path. */
+export function routeLayout(nodes: readonly LayoutNode[], edges: readonly GraphLayoutEdge[]): ReadonlyMap<string, readonly LayoutPoint[]> {
   const byId = new Map(nodes.map((node) => [node.id, node]))
   const graph = new graphlib.Graph()
   for (const node of nodes) graph.setNode(node.id)
@@ -34,7 +31,13 @@ export function routeLayout(
     const target = byId.get(edge.target)!
     const output = { x: source.x + (edge.sourceOffset?.x ?? source.width), y: source.y + (edge.sourceOffset?.y ?? source.height / 2) }
     const input = { x: target.x + (edge.targetOffset?.x ?? 0), y: target.y + (edge.targetOffset?.y ?? target.height / 2) }
-    const offset = output.x < input.x ? Math.min(portOffset, (input.x - output.x) / 2) : portOffset
+    // Folded runs can have nearby primary coordinates while remaining far apart
+    // on the cross axis. Each stub must still clear its own measured card.
+    const offset = Math.max(
+      output.x < input.x ? Math.min(portOffset, (input.x - output.x) / 2) : portOffset,
+      source.x + source.width + clearance - output.x,
+      input.x - target.x + clearance,
+    )
     const feedback = input.x <= output.x && cycles.get(edge.source) === cycles.get(edge.target)
     return {
       id: edge.id,
@@ -164,11 +167,7 @@ export function routeLayout(
         enqueue(queue, { state, score: distance + heuristic(next) })
       }
     }
-    if (finish < 0) {
-      // Overlapping cards can block a port while dragging; keep export failures explicit.
-      if (options.allowBlockedPorts) continue
-      throw new Error('Could not route the compact workflow connection.')
-    }
+    if (finish < 0) continue
     const points: LayoutPoint[] = []
     for (let state = finish; state >= 0; state = previous[state]!) {
       const vertex = Math.floor(state / 2)

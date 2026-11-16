@@ -58,6 +58,30 @@ describe('compact layout crossing fallback', () => {
     expect(result.positions['2']!.y).toBeLessThan(result.positions['1']!.y)
   })
 
+  it('keeps the compact arrangement when a measured port obstructs one connection', () => {
+    const graph = graphLayout(
+      Array.from({ length: 5 }, (_, index) => ({ id: String(index), width: 320, height: 120 })),
+      Array.from({ length: 4 }, (_, index) => ({
+        id: String(index),
+        source: String(index),
+        target: String(index + 1),
+        sourceOffset: { x: 160, y: 114 },
+        targetOffset: { x: 160, y: 6 },
+      })),
+      'vertical',
+    )
+    const compact = compactLayout(graph, { width: 104, height: 136 }, 16 / 9)
+    // A stale handle measurement can place a port inside the next card.
+    const obstructed = { ...graph, edges: graph.edges.map((edge, index) => (index ? edge : Object.assign({}, edge, { sourceOffset: { x: 160, y: 168 } }))) }
+    const before = structuredClone(obstructed)
+    const result = compactLayout(obstructed, { width: 104, height: 136 }, 16 / 9)
+    expect(result.positions).toEqual(compact.positions)
+    expect(result.positions['2']!.y).toBeLessThan(result.positions['1']!.y)
+    expect(result.routes.has('0')).toBe(false)
+    for (const id of ['1', '2', '3']) expect(result.routes.get(id)).toEqual(compact.routes.get(id))
+    expect(obstructed).toEqual(before)
+  })
+
   it('balances measured run heights when cards have different sizes', () => {
     const base = branchedPipeline(2)
     const graph = graphLayout(
@@ -96,20 +120,21 @@ describe('compact layout crossing fallback', () => {
     expect(Array.from({ length: 9 }, (_, index) => result.positions['long' + (index + 1)]!.y < result.positions['long' + index]!.y).some(Boolean)).toBe(true)
   })
 
-  it('uses the unfolded candidate after two compact candidates cross', () => {
+  it('keeps folding when neither compact candidate clears the crossings', () => {
     const route = vi.spyOn(routing, 'routeLayout')
     const base = branchedPipeline(1, 92, 8)
     const graph = graphLayout(base.nodes, [...base.edges, { id: 'skip', source: 'root', target: 'long7' }], 'vertical')
     const before = structuredClone(graph)
     const result = compactLayout(graph, undefined, 4 / 3)
-    expect(route).toHaveBeenCalledTimes(3)
-    expect(route.mock.results.slice(0, 2).every((attempt) => hasRouteCrossings(attempt.value))).toBe(true)
-    expect(hasRouteCrossings(result.routes)).toBe(false)
-    for (const edge of graph.edges) expect(result.positions[edge.target]!.y).toBeGreaterThan(result.positions[edge.source]!.y)
+    expect(route).toHaveBeenCalledTimes(2)
+    expect(route.mock.results.every((attempt) => hasRouteCrossings(attempt.value))).toBe(true)
+    expect(result.positions).toEqual(Object.fromEntries(route.mock.calls[0]![0].map((node) => [node.id, layoutAxes(node, 'vertical')])))
+    expect(Array.from({ length: 7 }, (_, index) => result.positions['long' + (index + 1)]!.y < result.positions['long' + index]!.y).some(Boolean)).toBe(true)
+    expect(result.routes.size).toBe(graph.edges.length)
     expect(graph).toEqual(before)
   })
 
-  it('stops after three attempts and keeps the best compact layout when unfolding also crosses', () => {
+  it('bounds routing attempts and keeps the best compact layout when crossings remain', () => {
     const route = vi.spyOn(routing, 'routeLayout')
     const roots = ['a', 'b', 'c']
     const targets = ['x', 'y', 'z']
@@ -125,7 +150,7 @@ describe('compact layout crossing fallback', () => {
       'vertical',
     )
     const result = compactLayout(graph)
-    expect(route).toHaveBeenCalledTimes(3)
+    expect(route).toHaveBeenCalledTimes(2)
     expect(route.mock.results.every((attempt) => hasRouteCrossings(attempt.value))).toBe(true)
     expect(result.positions).toEqual(Object.fromEntries(route.mock.calls[0]![0].map((node) => [node.id, layoutAxes(node, 'vertical')])))
     const firstRoutes: ReturnType<typeof routing.routeLayout> = route.mock.results[0]!.value

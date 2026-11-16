@@ -188,7 +188,6 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
     turns: number
   }
   const layouts: Candidate[] = []
-  let unfolded: Candidate | undefined
   for (const span of spans) {
     const placed = new Map<string, Placement>()
     const buckets = new Map<number, Placement[]>()
@@ -283,10 +282,9 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
     const area = width * height
     const score = Math.max(width / aspectRatio, height)
     const candidate = { nodes, score, area, turns }
-    if (span === Infinity) unfolded = candidate
     layouts.push(candidate)
     layouts.sort((a, b) => (Math.abs(a.score - b.score) >= 1e-9 ? a.score - b.score : a.area - b.area || a.turns - b.turns))
-    // Keep only two compact candidates; the third attempt is always unfolded.
+    // Bound routing work to the two best fitting candidates.
     if (layouts.length > 2) layouts.pop()
   }
   const edges = graph.edges.map((edge) =>
@@ -295,12 +293,13 @@ function compactComponent(graph: GraphLayout, insets: { readonly width: number; 
       targetOffset: edge.targetOffset && layoutAxes(edge.targetOffset, 'vertical'),
     }),
   )
-  if (!layouts.includes(unfolded!)) layouts.push(unfolded!)
+  // Keep folding when it improves the fit, even if connections still cross.
+  const candidates = layouts[0]!.turns ? layouts.filter((candidate) => candidate.turns > 0) : layouts
   let best: { nodes: LayoutNode[]; routes: ReturnType<typeof routeLayout> } | undefined
-  for (const candidate of layouts) {
+  for (const candidate of candidates) {
     const routes = routeLayout(candidate.nodes, edges)
     const crosses = hasRouteCrossings(routes)
-    // Some graphs cross even without folding. Retain compactness if no attempt helps.
+    // Remaining crossings do not displace the best fitting arrangement.
     if (!best || !crosses) best = { nodes: candidate.nodes, routes }
     if (!crosses) break
   }
