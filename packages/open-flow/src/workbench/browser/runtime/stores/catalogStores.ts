@@ -149,7 +149,8 @@ class ProxyStore {
     return this.#factory.cache(
       key,
       async () => {
-        if (ownerId != null) {
+        // Shared OOMOL caches have no Flow identity and must not retain a Flow-scoped loader.
+        if (ownerId != null && flowId == null) {
           if (this.kind == 'providers') {
             const cache = getProvidersCache({
               environment: this.#factory.environment,
@@ -192,7 +193,7 @@ class ProxyStore {
           )
         }
         const cache = createSessionCache<ProxyResponse, void>({
-          namespace: JSON.stringify(['open-flow:connector-proxy', this.#factory.environment, this.kind, flowId ?? null]),
+          namespace: JSON.stringify(['open-flow:connector-proxy', this.#factory.environment, ownerId ?? null, this.kind, flowId ?? null]),
           schemaVersion: 1,
           sessionId: this.#factory.sessionId,
           maxAge: this.kind == 'providers' ? catalogMaxAge.providers : catalogMaxAge.actions,
@@ -202,7 +203,7 @@ class ProxyStore {
         })
         return cache
       },
-      ownerId == null,
+      ownerId == null || flowId != null,
     )
   }
 
@@ -307,7 +308,7 @@ export class ConnectionStore {
     return this.#factory.cache(
       key,
       async () => {
-        if (ownerId != null) {
+        if (ownerId != null && flowId == null) {
           const cache = getConnectionsCache({
             environment: this.#factory.environment,
             sessionId: this.#factory.sessionId,
@@ -323,7 +324,7 @@ export class ConnectionStore {
           return mapCache(cache, connectionsAsProxy, connectionsAsProxy, () => undefined)
         }
         return createSessionCache<readonly ConnectorConnection[], void>({
-          namespace: JSON.stringify(['open-flow:connections', this.#factory.environment, flowId ?? null]),
+          namespace: JSON.stringify(['open-flow:connections', this.#factory.environment, ownerId ?? null, flowId ?? null]),
           schemaVersion: 1,
           sessionId: this.#factory.sessionId,
           maxAge: catalogMaxAge.connections,
@@ -335,7 +336,7 @@ export class ConnectionStore {
           load: async (_query, validation) => this.client.readCatalog(query, validation.etag, validation.signal),
         })
       },
-      ownerId == null,
+      ownerId == null || flowId != null,
     )
   }
   retryFailed(): void {
