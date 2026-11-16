@@ -11,11 +11,24 @@ class NativeHash extends Transform {
   constructor(algorithm, key, hmac) {
     super()
     this.#hmac = hmac
-    const data = binary(typeof key === 'string' ? Buffer.from(key) : key)
-    this.#id = primitive('hash.create', { algorithm, hmac, offset: data.offset, length: data.length }, data.buffer)
+    if (!hmac) {
+      this.#id = primitive('hash.create', { algorithm, hmac: false, offset: 0, length: 0 })
+    } else if (typeof key === 'string' && key.length <= 65536) {
+      this.#id = primitive('hash.create', { algorithm, hmac: true, text: key })
+    } else {
+      const data = binary(typeof key === 'string' ? Buffer.from(key) : key)
+      this.#id = primitive('hash.create', { algorithm, hmac: true, offset: data.offset, length: data.length }, data.buffer)
+    }
   }
   update(input, encoding) {
     if (this.#id === undefined) throw new Error('Digest already called or hash destroyed.')
+    if (typeof input === 'string') {
+      const enc = typeof encoding !== 'string' || encoding === '' ? 'utf8' : encoding.toLowerCase()
+      if (Buffer.isEncoding(enc) && input.length <= 131072) {
+        primitive('hash.update', { id: this.#id, text: input, encoding: enc })
+        return this
+      }
+    }
     const data = binary(typeof input === 'string' ? Buffer.from(input, encoding) : input)
     primitive('hash.update', { id: this.#id, offset: data.offset, length: data.length }, data.buffer)
     return this
@@ -25,6 +38,10 @@ class NativeHash extends Transform {
     if (this.#id === undefined) throw new Error('Digest already called or hash destroyed.')
     const id = this.#id
     this.#id = undefined
+    if (encoding) {
+      const enc = String(encoding).toLowerCase()
+      if (Buffer.isEncoding(enc)) return primitive('hash.digest', { id, encoding: enc })
+    }
     const result = Buffer.from(primitive('hash.digest', { id }))
     return encoding ? result.toString(encoding) : result
   }

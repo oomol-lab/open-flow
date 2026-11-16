@@ -5,13 +5,29 @@ import value from 'zlib'
 for (const name of ['gzip', 'gunzip', 'deflate', 'inflate', 'deflateRaw', 'inflateRaw', 'unzip']) {
   const method = name + 'Sync'
   const compress = (input, options = {}) => {
-    const data = binary(typeof input === 'string' ? Buffer.from(input) : input)
     options ??= {}
-    const dictionary = binary(options.dictionary ?? new ArrayBuffer(0))
+    const dictionary = options.dictionary == null ? undefined : binary(options.dictionary)
     const settings = {}
     for (const key of ['level', 'windowBits', 'memLevel', 'strategy', 'chunkSize', 'flush', 'finishFlush', 'maxOutputLength']) {
       if (options[key] !== undefined) settings[key] = options[key]
     }
+    const dictPayload = dictionary === undefined ? undefined : { offset: dictionary.offset, length: dictionary.length }
+    if (typeof input === 'string' && input.length <= 131072) {
+      return Buffer.from(
+        primitive(
+          'zlib',
+          {
+            method,
+            text: input,
+            options: settings,
+            dictionary: dictPayload,
+          },
+          undefined,
+          dictionary?.buffer,
+        ),
+      )
+    }
+    const data = binary(typeof input === 'string' ? Buffer.from(input) : input)
     return Buffer.from(
       primitive(
         'zlib',
@@ -20,10 +36,10 @@ for (const name of ['gzip', 'gunzip', 'deflate', 'inflate', 'deflateRaw', 'infla
           offset: data.offset,
           length: data.length,
           options: settings,
-          dictionary: options.dictionary === undefined ? undefined : { offset: dictionary.offset, length: dictionary.length },
+          dictionary: dictPayload,
         },
         data.buffer,
-        dictionary.buffer,
+        dictionary?.buffer,
       ),
     )
   }

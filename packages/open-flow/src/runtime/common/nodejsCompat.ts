@@ -1,6 +1,5 @@
 import type { EngineContract } from './engineContract.ts'
 
-import * as z from 'zod'
 import guestModules from './nodejsGuest.generated.json' with { type: 'json' }
 
 /**
@@ -59,56 +58,240 @@ export interface NodejsPrimitives {
 }
 
 const binaryLimit = 1024 * 1024
-const range = { offset: z.number().int().nonnegative(), length: z.number().int().min(0).max(binaryLimit) }
-const encoding = z.enum(['utf8', 'utf-8', 'hex', 'base64', 'ascii', 'latin1', 'binary', 'ucs2', 'ucs-2', 'utf16le', 'utf-16le'])
-const operation = z.discriminatedUnion('operation', [
-  z.object({
-    operation: z.literal('url'),
-    input: z.string(),
-    base: z.string().optional(),
-    change: z
-      .object({ key: z.enum(['href', 'protocol', 'username', 'password', 'host', 'hostname', 'port', 'pathname', 'search', 'hash']), value: z.string() })
-      .optional(),
-    entries: z.array(z.tuple([z.string(), z.string()])).optional(),
-  }),
-  z.object({ operation: z.literal('params.parse'), input: z.string() }),
-  z.object({ operation: z.literal('params.stringify'), entries: z.array(z.tuple([z.string(), z.string()])) }),
-  z.object({ operation: z.literal('encode'), text: z.string() }),
-  z.object({ operation: z.literal('decoder'), label: z.string(), fatal: z.boolean(), ignoreBOM: z.boolean() }),
-  z.object({
-    operation: z.literal('decode'),
-    id: z.number().int().positive().optional(),
-    label: z.string(),
-    fatal: z.boolean(),
-    ignoreBOM: z.boolean(),
-    ...range,
-    stream: z.boolean(),
-  }),
-  z.object({ operation: z.enum(['atob', 'btoa']), text: z.string() }),
-  z.object({ operation: z.literal('random'), length: z.number().int().min(0).max(65536) }),
-  z.object({ operation: z.literal('uuid') }),
-  z.object({ operation: z.enum(['buffer.from', 'buffer.byteLength']), text: z.string(), encoding }),
-  z.object({ operation: z.literal('buffer.toString'), encoding, ...range }),
-  z.object({ operation: z.literal('hash.create'), algorithm: z.string(), hmac: z.boolean(), ...range, length: z.number().int().min(0).max(65536) }),
-  z.object({ operation: z.literal('hash.update'), id: z.number().int().positive(), ...range }),
-  z.object({ operation: z.enum(['hash.digest', 'hash.dispose']), id: z.number().int().positive() }),
-  z.object({
-    operation: z.literal('zlib'),
-    method: z.enum(['gzipSync', 'gunzipSync', 'deflateSync', 'inflateSync', 'deflateRawSync', 'inflateRawSync', 'unzipSync']),
-    ...range,
-    dictionary: z.object(range).optional(),
-    options: z.object({
-      level: z.number().optional(),
-      windowBits: z.number().optional(),
-      memLevel: z.number().optional(),
-      strategy: z.number().optional(),
-      chunkSize: z.number().int().min(64).max(binaryLimit).optional(),
-      flush: z.number().optional(),
-      finishFlush: z.number().optional(),
-      maxOutputLength: z.number().int().min(1).max(binaryLimit).optional(),
-    }),
-  }),
-])
+const hmacKeyLimit = 65536
+const encodings: ReadonlySet<string> = new Set(['utf8', 'utf-8', 'hex', 'base64', 'ascii', 'latin1', 'binary', 'ucs2', 'ucs-2', 'utf16le', 'utf-16le'])
+const urlChangeKeys: ReadonlySet<string> = new Set(['href', 'protocol', 'username', 'password', 'host', 'hostname', 'port', 'pathname', 'search', 'hash'])
+const zlibMethods: ReadonlySet<string> = new Set(['gzipSync', 'gunzipSync', 'deflateSync', 'inflateSync', 'deflateRawSync', 'inflateRawSync', 'unzipSync'])
+const optionalZlibNumberKeys = ['level', 'windowBits', 'memLevel', 'strategy', 'flush', 'finishFlush'] as const
+
+type UrlChangeKey = 'href' | 'protocol' | 'username' | 'password' | 'host' | 'hostname' | 'port' | 'pathname' | 'search' | 'hash'
+
+interface Range {
+  readonly offset: number
+  readonly length: number
+}
+
+interface ZlibOptions {
+  readonly level?: number
+  readonly windowBits?: number
+  readonly memLevel?: number
+  readonly strategy?: number
+  readonly chunkSize?: number
+  readonly flush?: number
+  readonly finishFlush?: number
+  readonly maxOutputLength?: number
+}
+
+type PrimitiveRequest =
+  | {
+      readonly operation: 'url'
+      readonly input: string
+      readonly base?: string
+      readonly change?: { readonly key: UrlChangeKey; readonly value: string }
+      readonly entries?: [string, string][]
+    }
+  | { readonly operation: 'params.parse'; readonly input: string }
+  | { readonly operation: 'params.stringify'; readonly entries: [string, string][] }
+  | { readonly operation: 'encode'; readonly text: string }
+  | { readonly operation: 'decoder'; readonly label: string; readonly fatal: boolean; readonly ignoreBOM: boolean }
+  | {
+      readonly operation: 'decode'
+      readonly id?: number
+      readonly label: string
+      readonly fatal: boolean
+      readonly ignoreBOM: boolean
+      readonly offset: number
+      readonly length: number
+      readonly stream: boolean
+    }
+  | { readonly operation: 'atob' | 'btoa'; readonly text: string }
+  | { readonly operation: 'random'; readonly length: number }
+  | { readonly operation: 'uuid' }
+  | { readonly operation: 'buffer.from' | 'buffer.byteLength'; readonly text: string; readonly encoding: Encoding }
+  | { readonly operation: 'buffer.toString'; readonly encoding: Encoding; readonly offset: number; readonly length: number }
+  | {
+      readonly operation: 'hash.create'
+      readonly algorithm: string
+      readonly hmac: boolean
+      readonly text?: string
+      readonly offset?: number
+      readonly length?: number
+    }
+  | {
+      readonly operation: 'hash.update'
+      readonly id: number
+      readonly text?: string
+      readonly encoding?: Encoding
+      readonly offset?: number
+      readonly length?: number
+    }
+  | { readonly operation: 'hash.digest'; readonly id: number; readonly encoding?: Encoding }
+  | { readonly operation: 'hash.dispose'; readonly id: number }
+  | {
+      readonly operation: 'zlib'
+      readonly method: ZlibMethod
+      readonly text?: string
+      readonly offset?: number
+      readonly length?: number
+      readonly dictionary?: Range
+      readonly options: ZlibOptions
+    }
+
+function invalidRequest(message: string): never {
+  throw new TypeError(message)
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (value == null || typeof value != 'object' || Array.isArray(value)) invalidRequest('Expected primitive request object.')
+  return value as Record<string, unknown>
+}
+
+function asString(value: unknown): string {
+  if (typeof value != 'string') invalidRequest('Expected string field.')
+  return value
+}
+
+function asBoolean(value: unknown): boolean {
+  if (typeof value != 'boolean') invalidRequest('Expected boolean field.')
+  return value
+}
+
+function asInt(value: unknown, min: number, max: number): number {
+  if (typeof value != 'number' || !Number.isInteger(value) || value < min || value > max) invalidRequest('Numeric field out of range.')
+  return value
+}
+
+function asEncoding(value: unknown): Encoding {
+  if (typeof value != 'string' || !encodings.has(value)) invalidRequest('Unsupported encoding.')
+  return value as Encoding
+}
+
+function asRange(value: Record<string, unknown>, maxLength = binaryLimit): Range {
+  return {
+    offset: asInt(value.offset, 0, Number.MAX_SAFE_INTEGER),
+    length: asInt(value.length, 0, maxLength),
+  }
+}
+
+function asEntries(value: unknown): [string, string][] {
+  if (!Array.isArray(value)) invalidRequest('Expected entries array.')
+  for (const pair of value) {
+    if (!Array.isArray(pair) || pair.length != 2 || typeof pair[0] != 'string' || typeof pair[1] != 'string') {
+      invalidRequest('Expected string pair.')
+    }
+  }
+  return value as [string, string][]
+}
+
+function asZlibOptions(value: unknown): ZlibOptions {
+  const raw = asObject(value)
+  const options: Record<string, number> = {}
+  for (const key of optionalZlibNumberKeys) {
+    const field = raw[key]
+    if (field !== undefined) {
+      if (typeof field != 'number') invalidRequest('Expected numeric zlib option.')
+      options[key] = field
+    }
+  }
+  if (raw.chunkSize !== undefined) options.chunkSize = asInt(raw.chunkSize, 64, binaryLimit)
+  if (raw.maxOutputLength !== undefined) options.maxOutputLength = asInt(raw.maxOutputLength, 1, binaryLimit)
+  return options as ZlibOptions
+}
+
+function parseOperation(source: unknown): PrimitiveRequest {
+  const raw = asObject(source)
+  const kind = asString(raw.operation)
+  switch (kind) {
+    case 'url': {
+      const changeRaw = raw.change === undefined ? undefined : asObject(raw.change)
+      let change: { readonly key: UrlChangeKey; readonly value: string } | undefined
+      if (changeRaw !== undefined) {
+        const key = asString(changeRaw.key)
+        if (!urlChangeKeys.has(key)) invalidRequest('Unsupported URL field.')
+        change = { key: key as UrlChangeKey, value: asString(changeRaw.value) }
+      }
+      return {
+        operation: 'url',
+        input: asString(raw.input),
+        base: raw.base === undefined ? undefined : asString(raw.base),
+        change,
+        entries: raw.entries === undefined ? undefined : asEntries(raw.entries),
+      }
+    }
+    case 'params.parse':
+      return { operation: 'params.parse', input: asString(raw.input) }
+    case 'params.stringify':
+      return { operation: 'params.stringify', entries: asEntries(raw.entries) }
+    case 'encode':
+      return { operation: 'encode', text: asString(raw.text) }
+    case 'decoder':
+      return { operation: 'decoder', label: asString(raw.label), fatal: asBoolean(raw.fatal), ignoreBOM: asBoolean(raw.ignoreBOM) }
+    case 'decode':
+      return {
+        operation: 'decode',
+        id: raw.id === undefined ? undefined : asInt(raw.id, 1, Number.MAX_SAFE_INTEGER),
+        label: asString(raw.label),
+        fatal: asBoolean(raw.fatal),
+        ignoreBOM: asBoolean(raw.ignoreBOM),
+        ...asRange(raw),
+        stream: asBoolean(raw.stream),
+      }
+    case 'atob':
+    case 'btoa':
+      return { operation: kind, text: asString(raw.text) }
+    case 'random':
+      return { operation: 'random', length: asInt(raw.length, 0, hmacKeyLimit) }
+    case 'uuid':
+      return { operation: 'uuid' }
+    case 'buffer.from':
+    case 'buffer.byteLength':
+      return { operation: kind, text: asString(raw.text), encoding: asEncoding(raw.encoding) }
+    case 'buffer.toString':
+      return { operation: 'buffer.toString', encoding: asEncoding(raw.encoding), ...asRange(raw) }
+    case 'hash.create': {
+      const algorithm = asString(raw.algorithm)
+      const hmac = asBoolean(raw.hmac)
+      if (raw.text !== undefined) {
+        const text = asString(raw.text)
+        if (text.length > hmacKeyLimit) invalidRequest('HMAC key too large.')
+        return { operation: 'hash.create', algorithm, hmac, text }
+      }
+      return { operation: 'hash.create', algorithm, hmac, ...asRange(raw, hmacKeyLimit) }
+    }
+    case 'hash.update': {
+      const id = asInt(raw.id, 1, Number.MAX_SAFE_INTEGER)
+      if (raw.text !== undefined) {
+        return {
+          operation: 'hash.update',
+          id,
+          text: asString(raw.text),
+          encoding: raw.encoding === undefined ? 'utf8' : asEncoding(raw.encoding),
+        }
+      }
+      return { operation: 'hash.update', id, ...asRange(raw) }
+    }
+    case 'hash.digest':
+      return {
+        operation: 'hash.digest',
+        id: asInt(raw.id, 1, Number.MAX_SAFE_INTEGER),
+        encoding: raw.encoding === undefined ? undefined : asEncoding(raw.encoding),
+      }
+    case 'hash.dispose':
+      return { operation: 'hash.dispose', id: asInt(raw.id, 1, Number.MAX_SAFE_INTEGER) }
+    case 'zlib': {
+      const method = asString(raw.method)
+      if (!zlibMethods.has(method)) invalidRequest('Unsupported zlib method.')
+      const dictionary = raw.dictionary === undefined ? undefined : asRange(asObject(raw.dictionary))
+      const options = asZlibOptions(raw.options)
+      if (raw.text !== undefined) {
+        return { operation: 'zlib', method: method as ZlibMethod, text: asString(raw.text), dictionary, options }
+      }
+      return { operation: 'zlib', method: method as ZlibMethod, ...asRange(raw), dictionary, options }
+    }
+    default:
+      invalidRequest('Unsupported primitive operation.')
+  }
+}
 
 /** Creates the per-Task primitive state behind the guest bridge, bounded by call count, bytes, and live instances. */
 export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): NodejsPrimitives {
@@ -127,7 +310,11 @@ export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): Nodej
   const binaryResult = (bytes: Uint8Array): ArrayBuffer => {
     if (bytes.byteLength > binaryLimit) throw new RangeError('Builtin result too large.')
     spend(bytes.byteLength)
-    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    return (
+      bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+        ? bytes.buffer
+        : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+    ) as ArrayBuffer
   }
   const binaryView = (buffer: ArrayBuffer | undefined, offset: number, length: number): Uint8Array => {
     const byteLength = buffer?.byteLength ?? 0
@@ -135,8 +322,15 @@ export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): Nodej
     spend(length)
     return new Uint8Array(buffer ?? new ArrayBuffer(0), offset, length)
   }
+  const textToInput = (text: string, encoding: Encoding, maxBytes = binaryLimit): Uint8Array => {
+    spend(text.length * 2)
+    const bytes = platform.Buffer.from(text, encoding)
+    if (bytes.byteLength > maxBytes) throw new RangeError('Builtin payload too large.')
+    spend(bytes.byteLength)
+    return bytes
+  }
   const serve = (source: string, buffer: ArrayBuffer | undefined, extra: ArrayBuffer | undefined): unknown => {
-    const request = operation.parse(JSON.parse(source))
+    const request = parseOperation(JSON.parse(source))
     switch (request.operation) {
       case 'buffer.from':
         spend(request.text.length * 2)
@@ -152,7 +346,7 @@ export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): Nodej
       }
       case 'hash.create': {
         if (hashes.size >= 256) throw new Error('Hash instance limit exceeded.')
-        const key = binaryView(buffer, request.offset, request.length)
+        const key = request.text !== undefined ? textToInput(request.text, 'utf8', hmacKeyLimit) : binaryView(buffer, request.offset!, request.length!)
         hashes.set(++nextHash, request.hmac ? platform.createHmac(request.algorithm, key) : platform.createHash(request.algorithm))
         return { value: nextHash }
       }
@@ -160,7 +354,8 @@ export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): Nodej
         const hash = hashes.get(request.id)
         if (hash == null) throw new Error('Digest already called or hash destroyed.')
         try {
-          hash.update(binaryView(buffer, request.offset, request.length))
+          const data = request.text !== undefined ? textToInput(request.text, request.encoding ?? 'utf8') : binaryView(buffer, request.offset!, request.length!)
+          hash.update(data)
         } catch (error) {
           hashes.delete(request.id)
           hash.destroy()
@@ -173,7 +368,13 @@ export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): Nodej
         if (hash == null) throw new Error('Digest already called or hash destroyed.')
         hashes.delete(request.id)
         try {
-          return binaryResult(hash.digest())
+          const digest = hash.digest()
+          if (request.encoding === undefined) return binaryResult(digest)
+          if (digest.byteLength > binaryLimit) throw new RangeError('Builtin result too large.')
+          spend(digest.byteLength)
+          const value = platform.Buffer.from(digest.buffer as ArrayBuffer, digest.byteOffset, digest.byteLength).toString(request.encoding)
+          spend(value.length * 2)
+          return { value }
         } finally {
           hash.destroy()
         }
@@ -183,7 +384,7 @@ export function createNodejsPrimitives(platform: NodejsPrimitivePlatform): Nodej
         hashes.delete(request.id)
         return { value: undefined }
       case 'zlib': {
-        const input = binaryView(buffer, request.offset, request.length)
+        const input = request.text !== undefined ? textToInput(request.text, 'utf8') : binaryView(buffer, request.offset!, request.length!)
         const options = {
           ...request.options,
           maxOutputLength: request.options.maxOutputLength ?? binaryLimit,
