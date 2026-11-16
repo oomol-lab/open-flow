@@ -72,6 +72,8 @@ export interface WorkbenchImportInput {
   readonly fileName?: string
   /** Host-rendered content below the import dialog title. The host owns its links and presentation. */
   readonly description?: ReactNode
+  /** Reports the saved entry Flow before navigation. Failures in this callback never fail the import. */
+  readonly onImported?: (result: { readonly flowId: string; readonly idempotencyKey: string }) => void | Promise<void>
 }
 
 export interface OpenFlowWorkbenchHandle {

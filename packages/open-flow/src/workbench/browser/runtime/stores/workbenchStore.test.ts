@@ -1304,6 +1304,7 @@ it.each([false, true])('opens an imported draft and reports resource reconfigura
   }
   const importer = vi.fn(async () => editor.flow.flowId)
   const imported = vi.spyOn(client, 'importFlow').mockResolvedValue(editor.flow)
+  const onImported = vi.fn()
   vi.spyOn(client, 'getConnectorAccess').mockResolvedValue({ accessRevision: 0, bindings: [], mode: 'implicit', sharedAccessDigest: 'implicit', version: 1 })
   const readFlow = vi.spyOn(client, 'getFlow').mockResolvedValue(editor.flow)
   try {
@@ -1312,7 +1313,9 @@ it.each([false, true])('opens an imported draft and reports resource reconfigura
     const stopNotices = store.$.notice.reaction((notice) => {
       if (notice != null) notices.push(notice.message)
     })
-    expect(await navigation.importFlow(file, 'Selected name', 'stable-import', hosted ? importer : undefined)).toBe(true)
+    expect(await navigation.importFlow(file, 'Selected name', 'stable-import', hosted ? importer : undefined, undefined, onImported)).toBe(true)
+    expect(onImported).toHaveBeenCalledExactlyOnceWith({ flowId: 'imported', idempotencyKey: 'stable-import' })
+    expect(onImported.mock.invocationCallOrder[0]).toBeLessThan(navigate.mock.invocationCallOrder.at(-1)!)
     expect(store.workspace.$.flowId.value).toBe('imported')
     expect(store.workspace.$.draft.value?.content).toEqual(file.content)
     expect(store.workspace.$.presentation.value?.value).toEqual(file.presentation)
@@ -1325,6 +1328,35 @@ it.each([false, true])('opens an imported draft and reports resource reconfigura
       expect(importer).toHaveBeenCalledWith(file, 'Selected name', 'stable-import')
       expect(imported).not.toHaveBeenCalled()
     } else expect(imported).toHaveBeenCalledWith(file, { name: 'Selected name', idempotencyKey: 'stable-import' })
+  } finally {
+    navigation.dispose()
+    store.dispose()
+  }
+})
+
+it.each([false, true])('reports the saved bundle entry only after success and isolates completion callback errors (async=%s)', async (asynchronous) => {
+  const { client, store, navigation } = catalogSession()
+  const editor = await client.getEditor('imported')
+  const file = { kind: 'open-flow-workflow' as const, version: 1 as const, content: editor.draft.content }
+  const bundle = { kind: 'open-flow-workflow-bundle' as const, version: 1 as const, entryFlowId: 'entry', workflows: [{ flowId: 'entry', file }] }
+  const imported = vi
+    .spyOn(client, 'importFlowBundle')
+    .mockRejectedValueOnce(new Error('Unavailable'))
+    .mockResolvedValue({ version: 1, flow: editor.flow, flows: [editor.flow] })
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const onImported = vi.fn(() => {
+    if (asynchronous) return Promise.reject(new Error('Telemetry unavailable'))
+    throw new Error('Telemetry unavailable')
+  })
+  try {
+    await navigation.start()
+    expect(await navigation.importFlowBundle(bundle, 'Template', 'stable-import', undefined, undefined, onImported)).toBe(false)
+    expect(onImported).not.toHaveBeenCalled()
+    expect(await navigation.importFlowBundle(bundle, 'Template', 'stable-import', undefined, undefined, onImported)).toBe(true)
+    expect(onImported).toHaveBeenCalledExactlyOnceWith({ flowId: 'imported', idempotencyKey: 'stable-import' })
+    expect(imported.mock.calls.map(([, options]) => options?.idempotencyKey)).toEqual(['stable-import', 'stable-import'])
+    await vi.waitFor(() => expect(logged).toHaveBeenCalledOnce())
+    expect(store.workspace.$.flowId.value).toBe('imported')
   } finally {
     navigation.dispose()
     store.dispose()

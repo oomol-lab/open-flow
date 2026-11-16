@@ -374,7 +374,13 @@ function FlowSkeleton(): ReactElement {
 
 type FlowCreation =
   | { readonly kind: 'create' }
-  | { readonly kind: 'import'; readonly file: WorkflowImportFile; readonly key: string; readonly description?: WorkbenchImportInput['description'] }
+  | {
+      readonly kind: 'import'
+      readonly file: WorkflowImportFile
+      readonly key: string
+      readonly description?: WorkbenchImportInput['description']
+      readonly onImported?: WorkbenchImportInput['onImported']
+    }
 
 interface FlowBrowserProps extends LanguageSelectProps {
   readonly catalogWidth?: OpenFlowWorkbenchProps['catalogWidth']
@@ -382,8 +388,16 @@ interface FlowBrowserProps extends LanguageSelectProps {
   readonly createFlowField?: ComponentProps<typeof CreateResourceDialog>['field']
   readonly hrefForFlow: (flow: Pick<Flow, 'flowId'>, view?: WorkbenchView) => string
   readonly initializing?: boolean
-  readonly onImportFlow?: (file: WorkflowFile, name: string, key: string, tagIds?: readonly string[]) => Promise<boolean>
-  readonly onImportFlowBundle?: ((file: WorkflowBundle, name: string, key: string, tagIds?: readonly string[]) => Promise<boolean>) | undefined
+  readonly onImportFlow?: (
+    file: WorkflowFile,
+    name: string,
+    key: string,
+    tagIds?: readonly string[],
+    onImported?: WorkbenchImportInput['onImported'],
+  ) => Promise<boolean>
+  readonly onImportFlowBundle?:
+    | ((file: WorkflowBundle, name: string, key: string, tagIds?: readonly string[], onImported?: WorkbenchImportInput['onImported']) => Promise<boolean>)
+    | undefined
   readonly onCreateFlow: (name: string, tagIds?: readonly string[]) => Promise<boolean>
   readonly onSelectFlow: (flow: Pick<Flow, 'flowId'>, view?: WorkbenchView) => void
   readonly store: WorkbenchStore
@@ -460,7 +474,7 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
     setCreationTags([])
     setCreatingTag(false)
     setName(entry.name ?? (input.fileName == null ? importedWorkflowName(language) : workflowNameFromFile(input.fileName)))
-    creation$.set({ kind: 'import', file, key: randomId(), description: input.description })
+    creation$.set({ kind: 'import', file, key: randomId(), description: input.description, onImported: input.onImported })
     return 'opened'
   }
 
@@ -481,8 +495,8 @@ export const FlowBrowser = forwardRef<OpenFlowWorkbenchHandle, FlowBrowserProps>
       request.kind == 'create'
         ? await onCreateFlow(nextName, creationTags)
         : request.file.kind == 'open-flow-workflow-bundle'
-          ? await onImportFlowBundle?.(request.file, nextName, request.key, creationTags)
-          : await onImportFlow?.(request.file, nextName, request.key, creationTags)
+          ? await onImportFlowBundle?.(request.file, nextName, request.key, creationTags, request.onImported)
+          : await onImportFlow?.(request.file, nextName, request.key, creationTags, request.onImported)
     if (!success || command.current == null || creation$.value !== request) return
     creation$.set(undefined)
     setName('')

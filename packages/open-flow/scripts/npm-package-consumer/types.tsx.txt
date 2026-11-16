@@ -178,6 +178,10 @@ const importInput: WorkbenchImportInput = {
   text: '{}',
   fileName: 'demo.openflow.json',
   description: <a href="https://github.com/oomol-lab/open-flow">Open Flow templates</a>,
+  onImported: ({ flowId, idempotencyKey }) => {
+    const saved: readonly [string, string] = [flowId, idempotencyKey]
+    void saved
+  },
 }
 export const importResult: 'opened' | 'unavailable' | 'invalid-file' | undefined = workbenchRef.current?.openImport(importInput)
 export const workbench = createElement(OpenFlowWorkbench, {

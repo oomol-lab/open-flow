@@ -3,7 +3,7 @@ import type { WorkflowBundle } from '../../../flow/common/workflowBundle.ts'
 import type { WorkflowFile } from '../../../flow/common/workflowFile.ts'
 import type { FlowCreationOptions } from './api.ts'
 import type { Flow } from './api.ts'
-import type { WorkflowBundleImporter } from './contract.ts'
+import type { WorkbenchImportInput, WorkflowBundleImporter } from './contract.ts'
 import type { WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchView } from './contract.ts'
 import type { WorkbenchStore } from './stores/workbenchStore.ts'
 
@@ -71,8 +71,9 @@ export class NavigationStore {
     key: string,
     importer?: (file: WorkflowFile, name: string, key: string, options?: { readonly tagIds?: readonly string[] }) => Promise<string>,
     tagIds?: readonly string[],
+    onImported?: WorkbenchImportInput['onImported'],
   ): Promise<boolean> {
-    return await this.#openNewFlow(() => this.#store.importFlow(file, name, key, importer, tagIds))
+    return await this.#openNewFlow(() => this.#store.importFlow(file, name, key, importer, tagIds, onImported))
   }
 
   public async importFlowBundle(
@@ -81,8 +82,9 @@ export class NavigationStore {
     key: string,
     importer?: WorkflowBundleImporter,
     tagIds?: readonly string[],
+    onImported?: WorkbenchImportInput['onImported'],
   ): Promise<boolean> {
-    return await this.#openNewFlow(() => this.#store.importFlowBundle(file, name, key, importer, tagIds))
+    return await this.#openNewFlow(() => this.#store.importFlowBundle(file, name, key, importer, tagIds, onImported))
   }
 
   public async createFlow(

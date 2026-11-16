@@ -188,11 +188,11 @@ function Workbench({
           initializing={initializing}
           language={language}
           onCreateFlow={(name, tagIds) => navigation.createFlow(name, createFlow, tagIds)}
-          onImportFlow={(file, name, key, tagIds) => navigation.importFlow(file, name, key, importFlow, tagIds)}
+          onImportFlow={(file, name, key, tagIds, onImported) => navigation.importFlow(file, name, key, importFlow, tagIds, onImported)}
           onImportFlowBundle={
             importFlow != null && importFlowBundle == null
               ? undefined
-              : (file, name, key, tagIds) => navigation.importFlowBundle(file, name, key, importFlowBundle, tagIds)
+              : (file, name, key, tagIds, onImported) => navigation.importFlowBundle(file, name, key, importFlowBundle, tagIds, onImported)
           }
           onLanguageChange={onLanguageChange}
           onSelectFlow={(flow, view) => void navigation.selectFlow(flow, view)}
