@@ -538,7 +538,12 @@ export default async () => {
   return {
     oneShot,
     maxChunkIsInfinity,
-    subclassOk: tagged.marker() && tagged instanceof TaggedGzip && tagged instanceof Gzip,
+    subclassOk:
+      tagged.marker() &&
+      tagged instanceof TaggedGzip &&
+      tagged instanceof Gzip &&
+      !(gzip instanceof TaggedGzip) &&
+      !(constructed instanceof TaggedGzip),
     instanceCheck: gzip instanceof Gzip && gzip instanceof zlib.Gzip && constructed instanceof Gzip && called instanceof Gzip,
     streamed: Buffer.concat(chunks).toString(),
   }
