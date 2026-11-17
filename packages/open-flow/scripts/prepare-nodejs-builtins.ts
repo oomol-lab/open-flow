@@ -220,7 +220,7 @@ for (const [name, value] of Object.entries(inspected.zlib)) {
     if (isConstructor) {
       const linked = `${local}Linked`
       entries.zlib += `let ${linked} = false;
-        function ${local}(...args) { const Target = loadBuiltin('zlib').default[${JSON.stringify(name)}]; if (!${linked}) { Object.setPrototypeOf(${local}.prototype, Target.prototype); ${linked} = true; } return new.target ? Reflect.construct(Target, args, new.target === ${local} ? Target : new.target) : Reflect.apply(Target, this, args); }
+        function ${local}(...args) { const Target = loadBuiltin('zlib').default[${JSON.stringify(name)}]; if (!${linked}) { Object.setPrototypeOf(${local}.prototype, Target.prototype); ${linked} = true; } return new.target ? Reflect.construct(Target, args, new.target) : Reflect.apply(Target, this, args); }
         Object.defineProperties(${local}, { name: {value: ${JSON.stringify(value.name)}}, length: {value: ${value.length}}, [Symbol.hasInstance]: {value(instance) { return this === ${local} ? instance instanceof loadBuiltin('zlib').default[${JSON.stringify(name)}] : ordinaryHasInstance.call(this, instance) }} });`
     } else {
       entries.zlib += `function ${local}(...args) { return Reflect.apply(loadBuiltin('zlib').default[${JSON.stringify(name)}], this, args); }
