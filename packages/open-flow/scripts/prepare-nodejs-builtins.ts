@@ -192,12 +192,21 @@ const oneShotZlib = new Set([
   'unzip',
   'unzipSync',
 ])
+const serializeZlibConstant = (value: unknown): string => {
+  if (typeof value === 'number') return Number.isFinite(value) ? JSON.stringify(value) : String(value)
+  if (value == null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map((item) => (item === undefined ? 'undefined' : serializeZlibConstant(item))).join(',')}]`
+  return `{${Object.entries(value)
+    .filter(([, item]) => item !== undefined)
+    .map(([key, item]) => `${JSON.stringify(key)}:${serializeZlibConstant(item)}`)
+    .join(',')}}`
+}
 const zlibFunctions = new Map<object, string>()
 entries.zlib = "import { loadBuiltin } from 'guest:primitives'; import { installOneShotZlib } from './compat-zlib.js'; const value = {};"
 for (const [name, value] of Object.entries(inspected.zlib)) {
   if (oneShotZlib.has(name)) continue
   if (typeof value !== 'function') {
-    entries.zlib += `value[${JSON.stringify(name)}] = ${JSON.stringify(value)};`
+    entries.zlib += `value[${JSON.stringify(name)}] = ${serializeZlibConstant(value)};`
     continue
   }
   let local = zlibFunctions.get(value)
@@ -208,7 +217,9 @@ for (const [name, value] of Object.entries(inspected.zlib)) {
       Object.getOwnPropertyNames(value.prototype ?? {}).some((key) => key !== 'constructor') ||
       /^(?:Zlib|Deflate|Inflate|Gzip|Gunzip|DeflateRaw|InflateRaw|Unzip)$/.test(name)
     if (isConstructor) {
-      entries.zlib += `function ${local}(...args) { const Target = loadBuiltin('zlib').default[${JSON.stringify(name)}]; return new.target ? Reflect.construct(Target, args, new.target === ${local} ? Target : new.target) : Reflect.apply(Target, this, args); }
+      const linked = `${local}Linked`
+      entries.zlib += `let ${linked} = false;
+        function ${local}(...args) { const Target = loadBuiltin('zlib').default[${JSON.stringify(name)}]; if (!${linked}) { Object.setPrototypeOf(${local}.prototype, Target.prototype); ${linked} = true; } return new.target ? Reflect.construct(Target, args, new.target === ${local} ? Target : new.target) : Reflect.apply(Target, this, args); }
         Object.defineProperties(${local}, { name: {value: ${JSON.stringify(value.name)}}, length: {value: ${value.length}}, [Symbol.hasInstance]: {value: (instance) => instance instanceof loadBuiltin('zlib').default[${JSON.stringify(name)}]} });`
     } else {
       entries.zlib += `function ${local}(...args) { return Reflect.apply(loadBuiltin('zlib').default[${JSON.stringify(name)}], this, args); }
