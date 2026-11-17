@@ -509,6 +509,37 @@ ${fallback ? 'delete globalThis.AbortController; delete globalThis.AbortSignal;'
     ).resolves.toEqual({ results: expected, chunked: true })
   })
 
+  it('lazily loads streaming zlib constructors while preserving instanceof and one-shot compression', async () => {
+    await expect(
+      host.invoke({
+        capability: async () => ({ body: null, status: 200 }),
+        input: null,
+        invocationId: 'zlib-lazy-streaming',
+        program: {
+          ...program(`import zlib, { createGzip, createGunzip, Gzip, gzipSync, gunzipSync } from 'node:zlib'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+export default async () => {
+  const oneShot = gunzipSync(gzipSync('hello')).toString()
+  const gzip = createGzip()
+  const constructed = new Gzip()
+  const called = Gzip()
+  const chunks = []
+  const gunzip = createGunzip()
+  gunzip.on('data', (chunk) => chunks.push(chunk))
+  await pipeline(Readable.from(['hello ', 'stream']), gzip, gunzip)
+  return {
+    oneShot,
+    instanceCheck: gzip instanceof Gzip && gzip instanceof zlib.Gzip && constructed instanceof Gzip && called instanceof Gzip,
+    streamed: Buffer.concat(chunks).toString(),
+  }
+}`),
+          engineContract: currentEngineContract,
+        },
+      }),
+    ).resolves.toEqual({ oneShot: 'hello', instanceCheck: true, streamed: 'hello stream' })
+  })
+
   it('preserves user error messages', async () => {
     await expect(invoke("export default () => { throw new Error('Task failed with detail.') }")).rejects.toMatchObject({
       code: 'task-failed',
