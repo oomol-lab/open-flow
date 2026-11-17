@@ -1,6 +1,6 @@
 import type { BuildOptions } from 'esbuild'
 
-import { build } from 'esbuild'
+import { build, transform } from 'esbuild'
 import packages from 'node-stdlib-browser'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
@@ -86,8 +86,11 @@ const options: BuildOptions = {
         plugin.onResolve({ filter: /^guest:primitives$/ }, () => ({ path: 'guest:primitives', external: true }))
         plugin.onResolve({ filter: /^environment:/ }, (args) => ({ path: args.path.slice(12), namespace: 'environment' }))
         plugin.onLoad({ filter: /.*/, namespace: 'environment' }, (args) => ({ contents: globals[args.path], resolveDir: sources }))
-        plugin.onResolve({ filter: /^deferred:crypto$/ }, () => ({ path: 'crypto', namespace: 'deferred' }))
-        plugin.onLoad({ filter: /.*/, namespace: 'deferred' }, () => ({ contents: `${legacyCrypto} export default value;`, resolveDir: sources }))
+        plugin.onResolve({ filter: /^deferred:(crypto|zlib)$/ }, (args) => ({ path: args.path.slice(9), namespace: 'deferred' }))
+        plugin.onLoad({ filter: /.*/, namespace: 'deferred' }, (args) => ({
+          contents: `${args.path == 'crypto' ? legacyCrypto : legacyZlib} export default value;`,
+          resolveDir: sources,
+        }))
         plugin.onResolve({ filter: /^compat:/ }, (args) => ({ path: args.path.slice(7), namespace: 'compat' }))
         plugin.onLoad({ filter: /.*/, namespace: 'compat' }, (args) => ({
           contents:
@@ -142,11 +145,12 @@ const sandbox = {
   console,
 }
 const inspected = runInNewContext(
-  `${source}; ({ crypto: __compat.modules.crypto, globals: __compat.globals, modules: Object.fromEntries(Object.entries(__compat.modules).map(([name, value]) => { if (value == null) throw new Error(name); return [name, Object.keys(value)] })) })`,
+  `${source}; ({ crypto: __compat.modules.crypto, zlib: __compat.modules.zlib, globals: __compat.globals, modules: Object.fromEntries(Object.entries(__compat.modules).map(([name, value]) => { if (value == null) throw new Error(name); return [name, Object.keys(value)] })) })`,
   sandbox,
-) as { crypto: Record<string, unknown>; globals: Record<string, string[]>; modules: Record<string, string[]> }
+) as { crypto: Record<string, unknown>; zlib: Record<string, unknown>; globals: Record<string, string[]>; modules: Record<string, string[]> }
 exportedNames = inspected.modules
 const legacyCrypto = entries.crypto
+const legacyZlib = entries.zlib
 const functions = new Map<object, string>()
 entries.crypto = "import { loadBuiltin } from 'guest:primitives'; import { createHash, createHmac } from './compat-hash.js'; const value = {};"
 for (const [name, value] of Object.entries(inspected.crypto)) {
@@ -172,7 +176,60 @@ for (const [name, value] of Object.entries(inspected.crypto)) {
 entries.crypto +=
   'Object.assign(value, {createHash, createHmac, Hash: createHash, Hmac: createHmac, randomUUID: globalThis.crypto.randomUUID, getRandomValues: globalThis.crypto.getRandomValues});'
 
-entries.zlib = "import value from './compat-zlib.js';"
+const oneShotZlib = new Set([
+  'gzip',
+  'gzipSync',
+  'gunzip',
+  'gunzipSync',
+  'deflate',
+  'deflateSync',
+  'inflate',
+  'inflateSync',
+  'deflateRaw',
+  'deflateRawSync',
+  'inflateRaw',
+  'inflateRawSync',
+  'unzip',
+  'unzipSync',
+])
+const serializeZlibConstant = (value: unknown): string => {
+  if (typeof value === 'number') return Number.isFinite(value) ? JSON.stringify(value) : String(value)
+  if (value == null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map((item) => (item === undefined ? 'undefined' : serializeZlibConstant(item))).join(',')}]`
+  return `{${Object.entries(value)
+    .filter(([, item]) => item !== undefined)
+    .map(([key, item]) => `${JSON.stringify(key)}:${serializeZlibConstant(item)}`)
+    .join(',')}}`
+}
+const zlibFunctions = new Map<object, string>()
+entries.zlib =
+  "import { loadBuiltin } from 'guest:primitives'; import { installOneShotZlib } from './compat-zlib.js'; const value = {}; const ordinaryHasInstance = Function.prototype[Symbol.hasInstance];"
+for (const [name, value] of Object.entries(inspected.zlib)) {
+  if (oneShotZlib.has(name)) continue
+  if (typeof value !== 'function') {
+    entries.zlib += `value[${JSON.stringify(name)}] = ${serializeZlibConstant(value)};`
+    continue
+  }
+  let local = zlibFunctions.get(value)
+  if (!local) {
+    local = `lazyZlib${zlibFunctions.size}`
+    zlibFunctions.set(value, local)
+    const isConstructor =
+      Object.getOwnPropertyNames(value.prototype ?? {}).some((key) => key !== 'constructor') ||
+      /^(?:Zlib|Deflate|Inflate|Gzip|Gunzip|DeflateRaw|InflateRaw|Unzip)$/.test(name)
+    if (isConstructor) {
+      const linked = `${local}Linked`
+      entries.zlib += `let ${linked} = false;
+        function ${local}(...args) { const Target = loadBuiltin('zlib').default[${JSON.stringify(name)}]; if (!${linked}) { Object.setPrototypeOf(${local}.prototype, Target.prototype); ${linked} = true; } return new.target ? Reflect.construct(Target, args, new.target) : Reflect.apply(Target, this, args); }
+        Object.defineProperties(${local}, { name: {value: ${JSON.stringify(value.name)}}, length: {value: ${value.length}}, [Symbol.hasInstance]: {value(instance) { return this === ${local} ? instance instanceof loadBuiltin('zlib').default[${JSON.stringify(name)}] : ordinaryHasInstance.call(this, instance) }} });`
+    } else {
+      entries.zlib += `function ${local}(...args) { return Reflect.apply(loadBuiltin('zlib').default[${JSON.stringify(name)}], this, args); }
+        Object.defineProperties(${local}, { name: {value: ${JSON.stringify(value.name)}}, length: {value: ${value.length}} });`
+    }
+  }
+  entries.zlib += `value[${JSON.stringify(name)}] = ${local};`
+}
+entries.zlib += 'installOneShotZlib(value);'
 Object.assign(options.alias!, {
   'buffer': path.join(sources, 'compat-buffer.js'),
   'node:buffer': path.join(sources, 'compat-buffer.js'),
@@ -202,6 +259,7 @@ const output = await build({
   chunkNames: 'chunks/[name]-[hash]',
   entryPoints: Object.fromEntries([
     ['deferred/crypto', 'deferred:crypto'],
+    ['deferred/zlib', 'deferred:zlib'],
     ...Object.keys(globals)
       .filter((name) => name != 'abort')
       .map((name) => [`globals/${name}`, `environment:${name}`]),
@@ -227,12 +285,13 @@ const abort = await build({
   minify: true,
   keepNames: true,
 })
+const minifyGuest = async (sourceText: string) => (await transform(sourceText, { loader: 'js', minify: true, keepNames: true, target: 'es2022' })).code
+
 modules['engine/globals/abort.mjs'] = abort.outputFiles![0]!.text
-modules['engine/globals/url.mjs'] = await readFile(path.join(sources, 'url.guest.js'), 'utf8')
-modules['engine/web.mjs'] = await readFile(path.join(sources, 'web.guest.js'), 'utf8')
-modules['engine/globals.mjs'] = (await readFile(path.join(sources, 'globals.guest.js'), 'utf8')).replace(
-  '// Global groups.',
-  `const groups = ${JSON.stringify(inspected.globals)};`,
+modules['engine/globals/url.mjs'] = await minifyGuest(await readFile(path.join(sources, 'url.guest.js'), 'utf8'))
+modules['engine/web.mjs'] = await minifyGuest(await readFile(path.join(sources, 'web.guest.js'), 'utf8'))
+modules['engine/globals.mjs'] = await minifyGuest(
+  (await readFile(path.join(sources, 'globals.guest.js'), 'utf8')).replace('// Global groups.', `const groups = ${JSON.stringify(inspected.globals)};`),
 )
 const generated = `${JSON.stringify(Object.fromEntries(Object.entries(modules).toSorted(([left], [right]) => left.localeCompare(right))), null, 2)}\n`
 if (check) {

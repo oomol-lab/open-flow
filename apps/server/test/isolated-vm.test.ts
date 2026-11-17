@@ -509,6 +509,56 @@ ${fallback ? 'delete globalThis.AbortController; delete globalThis.AbortSignal;'
     ).resolves.toEqual({ results: expected, chunked: true })
   })
 
+  it('lazily loads streaming zlib constructors while preserving instanceof, subclasses, Z_MAX_CHUNK, and one-shot compression', async () => {
+    await expect(
+      host.invoke({
+        capability: async () => ({ body: null, status: 200 }),
+        input: null,
+        invocationId: 'zlib-lazy-streaming',
+        program: {
+          ...program(`import zlib, { createGzip, createGunzip, Gzip, gzipSync, gunzipSync, Z_MAX_CHUNK } from 'node:zlib'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+class TaggedGzip extends Gzip {
+  marker() {
+    return true
+  }
+}
+class SiblingGzip extends Gzip {}
+export default async () => {
+  Gzip.prototype.protoMarker = () => true
+  const oneShot = gunzipSync(gzipSync('hello')).toString()
+  const maxChunkIsInfinity = Z_MAX_CHUNK === Infinity && zlib.Z_MAX_CHUNK === Infinity
+  const gzip = createGzip()
+  const constructed = new Gzip()
+  const called = Gzip()
+  const tagged = new TaggedGzip()
+  const sibling = new SiblingGzip()
+  const chunks = []
+  const gunzip = createGunzip()
+  gunzip.on('data', (chunk) => chunks.push(chunk))
+  await pipeline(Readable.from(['hello ', 'stream']), gzip, gunzip)
+  return {
+    oneShot,
+    maxChunkIsInfinity,
+    protoOk: constructed.protoMarker() && tagged.protoMarker(),
+    subclassOk:
+      tagged.marker() &&
+      tagged instanceof TaggedGzip &&
+      tagged instanceof Gzip &&
+      !(gzip instanceof TaggedGzip) &&
+      !(constructed instanceof TaggedGzip) &&
+      !(sibling instanceof TaggedGzip),
+    instanceCheck: gzip instanceof Gzip && gzip instanceof zlib.Gzip && constructed instanceof Gzip && called instanceof Gzip,
+    streamed: Buffer.concat(chunks).toString(),
+  }
+}`),
+          engineContract: currentEngineContract,
+        },
+      }),
+    ).resolves.toEqual({ oneShot: 'hello', maxChunkIsInfinity: true, protoOk: true, subclassOk: true, instanceCheck: true, streamed: 'hello stream' })
+  })
+
   it('preserves user error messages', async () => {
     await expect(invoke("export default () => { throw new Error('Task failed with detail.') }")).rejects.toMatchObject({
       code: 'task-failed',

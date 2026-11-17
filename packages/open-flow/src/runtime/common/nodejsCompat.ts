@@ -14,12 +14,12 @@ export const nodejsGuestModules: Readonly<Record<string, string>> = guestModules
 export const nodejsWebModule = 'engine/web.mjs'
 export const nodejsGlobalsModule = 'engine/globals.mjs'
 
-const builtinGroups: ReadonlySet<string> = new Set(['abort', 'buffer', 'crypto', 'process', 'streams', 'url'])
+const builtinGroups: ReadonlySet<string> = new Set(['abort', 'buffer', 'crypto', 'process', 'streams', 'url', 'zlib'])
 
 /** Returns the engine module of a lazily loaded builtin group requested through `__hostBuiltin`. */
 export function nodejsBuiltinGroupModule(group: string): string {
   if (!builtinGroups.has(group)) throw new TypeError('Unknown builtin group.')
-  return group == 'crypto' ? 'engine/deferred/crypto.mjs' : `engine/globals/${group}.mjs`
+  return group == 'crypto' || group == 'zlib' ? `engine/deferred/${group}.mjs` : `engine/globals/${group}.mjs`
 }
 
 /** Resolves a builtin specifier or an import between engine modules; other specifiers belong to the Host closure. */
