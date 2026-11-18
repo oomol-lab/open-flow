@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import UnoCSS from '@unocss/vite'
 import react from '@vitejs/plugin-react'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { defineConfig } from 'vite'
 import { generateScopedName } from '../../src/build/node/cssModules.ts'
@@ -15,6 +16,19 @@ export default defineConfig({
   publicDir: path.resolve(import.meta.dirname, '../../../../assets/logo'),
   css: { modules: { generateScopedName } },
   plugins: [
+    {
+      name: 'lab-deployment-assets',
+      generateBundle() {
+        // Keep indexing rules local to the Lab instead of the shared logo directory.
+        for (const fileName of ['_headers', 'robots.txt']) {
+          this.emitFile({
+            type: 'asset',
+            fileName,
+            source: readFileSync(path.resolve(import.meta.dirname, fileName), 'utf8'),
+          })
+        }
+      },
+    },
     triggerLocalesPlugin(),
     {
       name: 'lab-trigger-snapshots',
