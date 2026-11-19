@@ -117,6 +117,12 @@ We follow a coordinated disclosure process:
   Flow data, or consume its own deployment's Run limits is not a vulnerability. The isolated
   runtime is a boundary between user code and the host, not between operators of the same
   deployment.
+- Server-side requests to network destinations chosen by an authenticated account, including
+  accounts without the administrator role. HTTP Request and OpenAPI nodes, Code `fetch` to hosts the
+  Flow declares, and OpenAPI document loading reach whatever the Server's network can reach, such as
+  loopback, private ranges, or a cloud metadata service. Open Flow does not filter destinations by
+  address; restrict egress at the network layer as described in
+  [Hardening your deployment](#hardening-your-deployment).
 - Insecure **self-hosted configuration** that this project documents how to avoid, for example
   running without `OPEN_FLOW_TOKEN`, exposing the Server to an untrusted network without TLS,
   leaving `OPEN_FLOW_SESSION_COOKIE_SECURE` unset behind a TLS ingress, using an HTTP Connector
@@ -167,6 +173,15 @@ responsibility for securing their deployment. At minimum:
   and read all Variable values, and the self-hosted Server stores them as plaintext in SQLite.
   Variables do not provide encryption at rest, per-value ACLs, automatic rotation, or an
   unexportable Secret Manager boundary. A Flow may explicitly return, log, or send a bound value.
+- **Restrict Server egress at the network layer.** Every authenticated account can make the Server
+  send HTTP(S) requests to any destination its network can reach and read the responses. If the
+  Server shares a network with services that accounts should not reach, or hosts accounts you do
+  not fully trust, limit egress with container networks, Kubernetes NetworkPolicy, or firewall
+  rules. These controls do not isolate services that share the Server's network namespace, such
+  as sidecars in the same Pod reachable at loopback; keep sensitive services out of it or require
+  their own authentication. On cloud hosts, block the instance metadata service from the Server.
+  If the Server runs in a container, also require session-based metadata access with a hop limit
+  of 1; this does not protect a Server that runs directly on the instance.
 - **Keep resource limits in place.** Tune `OPEN_FLOW_MAX_PENDING_RUNS`,
   `OPEN_FLOW_MAX_CONCURRENT_RUNS`, `OPEN_FLOW_RUN_TIMEOUT_MS`, `OPEN_FLOW_TASK_CPU_MS`,
   `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`, `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE`, and
