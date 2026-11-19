@@ -415,16 +415,16 @@ export function buildRequest(config: OpenApiExecutor, input: Readonly<Record<str
   const url = new URL(httpUrl(config.serverUrl).replace(/\/$/, '') + '/' + path.replace(/^\//, ''))
   for (const [key, value] of query) url.searchParams.append(key, value)
   for (const auth of config.auth) {
-    const token = (part: string): string => {
+    const token = (part: string, allowEmpty = false): string => {
       const value = input[`auth.${auth.id}.${part}`]
-      if (typeof value != 'string' || !value) throw new Error('Authentication source is missing.')
+      if (typeof value != 'string' || (!value && !allowEmpty)) throw new Error('Authentication source is missing.')
       return value
     }
     if (auth.type == 'bearer') headers.set('authorization', `Bearer ${token('token')}`)
     else if (auth.type == 'basic') {
-      const username = token('username')
+      const username = token('username', true)
       if (username.includes(':')) throw new Error('Basic authentication username cannot contain a colon.')
-      const bytes = new TextEncoder().encode(`${username}:${token('password')}`)
+      const bytes = new TextEncoder().encode(`${username}:${token('password', true)}`)
       headers.set('authorization', `Basic ${btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''))}`)
     } else if (auth.in == 'header') headers.set(auth.name!, token('token'))
     else {

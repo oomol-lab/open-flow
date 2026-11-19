@@ -134,9 +134,9 @@ export function buildHttpRequest(config: HttpRequestConfig, input: Readonly<Reco
     headers.set(name, value)
   }
   const auth = config.authentication
-  const credential = (part: string) => {
+  const credential = (part: string, allowEmpty = false) => {
     const value = input[`auth.${part}`]
-    if (typeof value != 'string' || !value) throw new Error('Authentication source is required.')
+    if (typeof value != 'string' || (!value && !allowEmpty)) throw new Error('Authentication source is required.')
     return value
   }
   if (auth.type != 'none') {
@@ -147,9 +147,9 @@ export function buildHttpRequest(config: HttpRequestConfig, input: Readonly<Reco
     } else {
       if (headers.has(name)) throw new Error('Authentication conflicts with a header.')
       if (auth.type == 'basic') {
-        const username = credential('username')
+        const username = credential('username', true)
         if (username.includes(':')) throw new Error('Basic username cannot contain a colon.')
-        const bytes = new TextEncoder().encode(`${username}:${credential('password')}`)
+        const bytes = new TextEncoder().encode(`${username}:${credential('password', true)}`)
         headers.set(name, `Basic ${btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''))}`)
       } else headers.set(name, auth.type == 'bearer' ? `Bearer ${credential('token')}` : credential('token'))
     }
