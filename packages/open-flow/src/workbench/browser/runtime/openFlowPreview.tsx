@@ -5,14 +5,15 @@ import type { ProviderIconSource } from '../../../connector/common/providerIconC
 import type { Draft, Presentation } from '../../../control/common/api.ts'
 import type { UiLanguage } from '../../../localization/common/languages.ts'
 
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
 import { IconThemeContext } from '../../../ui/browser/icons/iconTheme.ts'
 import { ProviderIconCacheContext } from '../../../ui/browser/icons/providerIconResource.ts'
 import { cn } from '../../../ui/browser/utils.ts'
-import { RevisionCanvas } from './editor/revisionCanvas.tsx'
 import { createI18n } from './i18n.ts'
+
+const RevisionCanvas = lazy(() => import('./editor/revisionCanvas.tsx').then((module) => ({ default: module.RevisionCanvas })))
 
 export type { Draft, Presentation } from '../../../control/common/api.ts'
 export type { UiLanguage } from '../../../localization/common/languages.ts'
@@ -75,21 +76,23 @@ export function OpenFlowPreview({
         <IconifyProvider>
           <I18nProvider i18n={i18n}>
             <div className={cn('open-flow-theme open-flow-workbench open-flow-preview', className)} data-theme={theme}>
-              <RevisionCanvas
-                draft={draft}
-                presentation={presentation}
-                theme={theme}
-                defaultInteractiveMode={defaultInteractiveMode}
-                defaultDirection={defaultDirection}
-                defaultMiniMapExpanded={defaultMiniMapExpanded}
-                defaultInspectorOpen={defaultInspectorOpen}
-                defaultSelectedNodeIds={defaultSelectedNodeIds}
-                nodesDraggable={nodesDraggable}
-                layoutMotion={layoutMotion}
-                label={label}
-                background={dottedBackground ? 'dotted' : 'none'}
-                showHeader={false}
-              />
+              <Suspense fallback={<div aria-busy="true" className="h-full w-full" />}>
+                <RevisionCanvas
+                  draft={draft}
+                  presentation={presentation}
+                  theme={theme}
+                  defaultInteractiveMode={defaultInteractiveMode}
+                  defaultDirection={defaultDirection}
+                  defaultMiniMapExpanded={defaultMiniMapExpanded}
+                  defaultInspectorOpen={defaultInspectorOpen}
+                  defaultSelectedNodeIds={defaultSelectedNodeIds}
+                  nodesDraggable={nodesDraggable}
+                  layoutMotion={layoutMotion}
+                  label={label}
+                  background={dottedBackground ? 'dotted' : 'none'}
+                  showHeader={false}
+                />
+              </Suspense>
             </div>
           </I18nProvider>
         </IconifyProvider>

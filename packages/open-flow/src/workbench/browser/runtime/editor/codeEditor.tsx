@@ -100,9 +100,11 @@ export function CodeEditor({
     darkMode.current = darkMode$
     setFailed(false)
     setLoading(true)
-    const extension = import('../../typeScriptSession.ts')
-      .then(({ loadTypeScriptExtension }) => loadTypeScriptExtension(uri, typingRef.current, () => prepareCompletionRef.current?.()))
-      .catch(() => undefined)
+    const extension = disabledRef.current
+      ? undefined
+      : import('../../typeScriptSession.ts')
+          .then(({ loadTypeScriptExtension }) => loadTypeScriptExtension(uri, typingRef.current, () => prepareCompletionRef.current?.()))
+          .catch(() => undefined)
     void claimEditor(uri)
       .then((nextRelease) => {
         release = nextRelease
@@ -201,8 +203,9 @@ export function CodeEditor({
   }, [ariaDescribedBy])
 
   useEffect(() => {
+    if (disabled) return
     void import('../../typeScriptSession.ts').then(({ updateTypeScriptTyping }) => updateTypeScriptTyping(uri, typing)).catch(noop)
-  }, [typing, uri])
+  }, [disabled, typing, uri])
 
   useEffect(() => {
     if (location != null) editor.current?.revealPosition?.(location.line, location.column)

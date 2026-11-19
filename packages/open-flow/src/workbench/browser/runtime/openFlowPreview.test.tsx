@@ -24,9 +24,16 @@ vi.mock('../../../canvas/browser/graph/FlowCanvas/FlowCanvas.tsx', () => ({
 }))
 
 afterEach(() => {
+  boundary.props = undefined
   for (const store of boundary.stores) store.dispose()
   boundary.stores.clear()
 })
+
+async function renderPreview(props: OpenFlowPreviewProps) {
+  const view = render(<OpenFlowPreview {...props} />)
+  await vi.waitFor(() => expect(boundary.props).toBeDefined(), { timeout: 10_000 })
+  return view
+}
 
 function previewProps(overrides: Partial<OpenFlowPreviewProps> = {}): OpenFlowPreviewProps {
   return { ...publicationFixture('preview', 'revision'), language: 'en', theme: 'light', ...overrides }
@@ -37,7 +44,7 @@ it('loads Provider metadata for an offline proxy without reporting a connection 
   await catalog.cache.clear()
   const props = previewProps({ ...previewProviderFixture(), language: 'fr', defaultSelectedNodeIds: ['proxy'] })
   const original = structuredClone(props)
-  render(<OpenFlowPreview {...props} />)
+  await renderPreview(props)
   const store = boundary.props!.flowCanvasStore
   const proxy = [...store.$.nodes.values()].find((node) => node.nodeId === 'proxy')!
   expect(proxy.content$.value).toMatchObject({ connectionRequired: false, diagnostics: 0, executorName: 'Connector · sample-files' })
@@ -84,7 +91,7 @@ it('localizes saved Provider fields and switches language without loading editab
     },
   }
   const original = structuredClone(draft)
-  const view = render(<OpenFlowPreview {...props} draft={draft} />)
+  const view = await renderPreview({ ...props, draft })
   const chinese = await localizeTrigger(definition, 'zh-CN')
   await act(async () => {
     await localizeTrigger(definition, 'zh-CN')
@@ -136,7 +143,7 @@ async function completeLayout(store: CanvasStore) {
 
 it.each([undefined, 'horizontal', 'vertical'] as const)(
   'keeps saved positions when the default direction is %s or matches the presentation',
-  (defaultDirection) => {
+  async (defaultDirection) => {
     const direction = defaultDirection ?? 'vertical'
     const sample = publicationFixture('preview', 'revision')
     const saved = savedPositions(sample.presentation.value)
@@ -145,7 +152,7 @@ it.each([undefined, 'horizontal', 'vertical'] as const)(
       presentation: { ...sample.presentation, value: setCanvasLayout(sample.presentation.value, direction, saved) },
       defaultDirection,
     })
-    const view = render(<OpenFlowPreview {...props} />)
+    const view = await renderPreview(props)
     const store = boundary.props!.flowCanvasStore
 
     expect(store.$.direction.value).toBe(direction)
@@ -172,7 +179,7 @@ it.each(['horizontal', 'vertical'] as const)(
       defaultDirection: direction,
     })
     const original = structuredClone(props)
-    const view = render(<OpenFlowPreview {...props} />)
+    const view = await renderPreview(props)
     const store = boundary.props!.flowCanvasStore
 
     expect(store.$.direction.value).toBe(direction)
@@ -203,7 +210,7 @@ it.each(['horizontal', 'vertical'] as const)(
 
 it('keeps session choices when default props change and applies new defaults after a key reset', async () => {
   const props = previewProps({ defaultInteractiveMode: 'mouse', defaultDirection: 'vertical' })
-  const view = render(<OpenFlowPreview {...props} />)
+  const view = await renderPreview(props)
   const store = boundary.props!.flowCanvasStore
   await completeLayout(store)
 
@@ -241,7 +248,7 @@ it('keeps session choices when default props change and applies new defaults aft
 })
 
 it('supports an initial direction without a saved presentation', async () => {
-  render(<OpenFlowPreview {...previewProps({ presentation: null, defaultDirection: 'vertical' })} />)
+  await renderPreview(previewProps({ presentation: null, defaultDirection: 'vertical' }))
   const store = boundary.props!.flowCanvasStore
   expect(store.$.direction.value).toBe('vertical')
   expect(await completeLayout(store)).toBe('relayout')
@@ -264,7 +271,7 @@ it.each([
       presentation: value == null ? null : { ...sample.presentation, value },
     })
     const original = structuredClone(props)
-    const view = render(<OpenFlowPreview {...props} />)
+    const view = await renderPreview(props)
     const store = boundary.props!.flowCanvasStore
     const estimates = positions(store)
     expect(await completeLayout(store)).toBe('relayout')
@@ -289,10 +296,10 @@ it.each([
   },
 )
 
-it('preserves partial layouts including a saved origin instead of rearranging existing coordinates', () => {
+it('preserves partial layouts including a saved origin instead of rearranging existing coordinates', async () => {
   const sample = publicationFixture('preview', 'revision')
   const value = setCanvasLayout({}, 'vertical', { prepare: { x: 0, y: 0 } })
-  render(<OpenFlowPreview {...previewProps({ ...sample, presentation: { ...sample.presentation, value } })} />)
+  await renderPreview(previewProps({ ...sample, presentation: { ...sample.presentation, value } }))
   const store = boundary.props!.flowCanvasStore
   expect(store.completeLayout()).toBe(true)
   expect(positions(store).prepare).toEqual({ x: 0, y: 0 })
@@ -306,7 +313,7 @@ it.each(['drag', 'direction'] as const)('retains the original fallback after mea
     defaultDirection: 'horizontal',
   })
   const original = structuredClone(props)
-  const view = render(<OpenFlowPreview {...props} />)
+  const view = await renderPreview(props)
   const store = boundary.props!.flowCanvasStore
   const fallback = positions(store)
   expect(store.$.direction.value).toBe('horizontal')
@@ -339,7 +346,7 @@ it.each(['drag', 'direction'] as const)('retains the original fallback after mea
 
 it('initializes mini map and inspector once, preserves user toggles and applies defaults again after a key reset', async () => {
   const props = previewProps({ defaultMiniMapExpanded: true, defaultInspectorOpen: true })
-  const view = render(<OpenFlowPreview {...props} />)
+  const view = await renderPreview(props)
   const store = boundary.props!.flowCanvasStore
   expect(store.$.miniMapExpanded.value).toBe(true)
   expect(boundary.props!.inspectorOpen).toBe(true)
@@ -371,8 +378,8 @@ it.each([
   { ids: ['customer'], title: 'Customer details' },
   { ids: ['note'], title: 'Release notes' },
   { ids: ['start', 'prepare'], title: '2 nodes selected' },
-])('initializes selected IDs $ids with the matching inspector', ({ ids, title }) => {
-  const view = render(<OpenFlowPreview {...previewProps({ defaultSelectedNodeIds: ids, defaultInspectorOpen: true })} />)
+])('initializes selected IDs $ids with the matching inspector', async ({ ids, title }) => {
+  const view = await renderPreview(previewProps({ defaultSelectedNodeIds: ids, defaultInspectorOpen: true }))
   expect(selectedIds(boundary.props!.flowCanvasStore)).toEqual(ids.toSorted())
   const panel = view.container.querySelector('[role="dialog"], [role="complementary"]')!
   expect(document.getElementById(panel.getAttribute('aria-labelledby')!)?.textContent).toBe(title)
@@ -404,7 +411,7 @@ it('uses the canvas title and custom icon in the inspector and updates them with
     },
   }
   const original = structuredClone(props)
-  const view = render(<OpenFlowPreview {...props} />)
+  const view = await renderPreview(props)
   const panel = view.container.querySelector('[role="dialog"], [role="complementary"]')!
   const title = () => document.getElementById(panel.getAttribute('aria-labelledby')!)?.textContent
   const headerIcon = () => panel.querySelector('header img')?.getAttribute('src')
@@ -418,9 +425,9 @@ it('uses the canvas title and custom icon in the inspector and updates them with
   expect(props).toEqual(original)
 })
 
-it('ignores missing and duplicate initial selection IDs without mutating the input', () => {
+it('ignores missing and duplicate initial selection IDs without mutating the input', async () => {
   const ids = Object.freeze(['missing', 'customer', 'customer'])
-  const view = render(<OpenFlowPreview {...previewProps({ defaultSelectedNodeIds: ids, defaultInspectorOpen: true })} />)
+  const view = await renderPreview(previewProps({ defaultSelectedNodeIds: ids, defaultInspectorOpen: true }))
   expect(selectedIds(boundary.props!.flowCanvasStore)).toEqual(['customer'])
   expect(view.container.querySelector('[role="dialog"], [role="complementary"]')!.textContent).toContain('Customer details')
   expect(ids).toEqual(['missing', 'customer', 'customer'])
@@ -428,7 +435,7 @@ it('ignores missing and duplicate initial selection IDs without mutating the inp
 
 it('keeps user selection across default and canvas flag changes and reapplies defaults after a key reset', async () => {
   const props = previewProps({ defaultSelectedNodeIds: ['start'] })
-  const view = render(<OpenFlowPreview {...props} />)
+  const view = await renderPreview(props)
   const store = boundary.props!.flowCanvasStore
   view.rerender(<OpenFlowPreview {...props} defaultSelectedNodeIds={['note']} />)
   expect(selectedIds(store)).toEqual(['start'])

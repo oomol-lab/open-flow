@@ -287,6 +287,12 @@ async function buildRuntime(
       UnoCSS(designerUnoConfig),
     ],
     root: options.sourceRoot,
+    worker: {
+      rolldownOptions: {
+        // Inline workers are embedded as string literals that host bundlers cannot minify later.
+        output: { minify: true },
+      },
+    },
   })
   if (entryPath == workbenchEntryPath || entryPath == previewEntryPath) await extractFonts(path.join(outputPath, `${outputName}.css`), outputPath)
 }
