@@ -48,6 +48,17 @@ it('injects authentication and rejects parameter conflicts and embedded credenti
   const key = config({ authentication: { type: 'apiKey', name: 'key', in: 'query' } })
   expect(() => buildHttpRequest(key, { 'url': 'https://example.test?key=old', 'auth.token': 'secret' })).toThrow('conflicts')
 })
+it('accepts empty Basic credentials but rejects missing credentials and empty tokens', () => {
+  const basic = config({ authentication: { type: 'basic' } })
+  const authorization = (input: Record<string, unknown>) =>
+    new Headers(buildHttpRequest(basic, { url: 'https://example.test', ...input } as never).init.headers).get('authorization')
+  expect(authorization({ 'auth.username': 'api-key', 'auth.password': 'secret' })).toBe('Basic YXBpLWtleTpzZWNyZXQ=')
+  expect(authorization({ 'auth.username': 'api-key', 'auth.password': '' })).toBe('Basic YXBpLWtleTo=')
+  expect(authorization({ 'auth.username': '', 'auth.password': 'secret' })).toBe('Basic OnNlY3JldA==')
+  expect(() => authorization({ 'auth.username': 'api-key' })).toThrow('required')
+  expect(() => authorization({ 'auth.password': '' })).toThrow('required')
+  expect(() => buildHttpRequest(config({ authentication: { type: 'bearer' } }), { 'url': 'https://example.test', 'auth.token': '' })).toThrow('required')
+})
 it('preserves array results, rejects malformed JSON and supports explicit status handling', () => {
   const headers = new Headers({ 'content-type': 'application/problem+json', 'set-cookie': 'secret' })
   expect(parseHttpResponse(config(), 200, headers, '[1,2]')).toEqual({ body: [1, 2], statusCode: 200, headers: { 'content-type': 'application/problem+json' } })

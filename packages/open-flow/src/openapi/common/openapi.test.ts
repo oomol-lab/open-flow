@@ -92,6 +92,12 @@ describe('OpenAPI fixed operations', () => {
     const request = buildRequest(selected, { 'body': null, 'auth.basic.username': 'user', 'auth.basic.password': 'pass' })
     expect(request.init.body).toBe('null')
     expect(new Headers(request.init.headers).get('authorization')).toBe('Basic dXNlcjpwYXNz')
+    const authorization = (input: Record<string, unknown>) => new Headers(buildRequest(selected, { body: null, ...input }).init.headers).get('authorization')
+    expect(authorization({ 'auth.basic.username': 'user', 'auth.basic.password': '' })).toBe('Basic dXNlcjo=')
+    expect(authorization({ 'auth.basic.username': '', 'auth.basic.password': 'pass' })).toBe('Basic OnBhc3M=')
+    expect(() => authorization({ 'auth.basic.username': 'user' })).toThrow('missing')
+    const bearer = { ...selected, auth: [{ id: 'bearer', type: 'bearer' as const }] }
+    expect(() => buildRequest(bearer, { 'body': null, 'auth.bearer.token': '' })).toThrow('missing')
     expect(() => parseResponse(selected, 401, new Headers(), 'secret')).toThrow('HTTP 401')
     expect(() => parseResponse(selected, 200, new Headers({ 'content-type': 'application/json' }), '12')).toThrow('schema')
     expect(parseResponse(config(), 204, new Headers(), '').body).toBe(null)
