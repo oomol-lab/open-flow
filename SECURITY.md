@@ -177,8 +177,11 @@ responsibility for securing their deployment. At minimum:
   send HTTP(S) requests to any destination its network can reach and read the responses. If the
   Server shares a network with services that accounts should not reach, or hosts accounts you do
   not fully trust, limit egress with container networks, Kubernetes NetworkPolicy, or firewall
-  rules. On cloud hosts, block the instance metadata service from the Server or require
-  session-based metadata access with a hop limit of 1.
+  rules. These controls do not isolate services that share the Server's network namespace, such
+  as sidecars in the same Pod reachable at loopback; keep sensitive services out of it or require
+  their own authentication. On cloud hosts, block the instance metadata service from the Server.
+  If the Server runs in a container, also require session-based metadata access with a hop limit
+  of 1; this does not protect a Server that runs directly on the instance.
 - **Keep resource limits in place.** Tune `OPEN_FLOW_MAX_PENDING_RUNS`,
   `OPEN_FLOW_MAX_CONCURRENT_RUNS`, `OPEN_FLOW_RUN_TIMEOUT_MS`, `OPEN_FLOW_TASK_CPU_MS`,
   `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`, `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE`, and
