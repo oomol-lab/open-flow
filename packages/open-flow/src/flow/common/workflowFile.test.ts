@@ -227,7 +227,7 @@ describe('shareable workflow files', () => {
       kind: 'poll',
       name: 'Linear',
       pollTimes: [],
-      definition: pollDefinitions.find((definition) => definition.snapshot.key === 'linear.on_issue_changed')!.snapshot,
+      definition: pollDefinitions.find((item) => item.snapshot.key === 'linear.on_issue_changed')!.snapshot,
       connectionId: 'account',
       config,
     }
