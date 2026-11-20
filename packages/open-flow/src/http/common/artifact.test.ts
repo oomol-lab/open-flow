@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { connectorProxyArtifactContent, connectorProxyConfigSchema, connectorProxyTask } from '../../connector/common/proxy.ts'
+import { ConnectorProxyResponseInvalid, connectorProxyArtifactContent, connectorProxyConfigSchema, connectorProxyTask } from '../../connector/common/proxy.ts'
 import { artifactContentDisposition, artifactMediaType, artifactName, isArtifactRef } from './artifact.ts'
 import { buildHttpRequest, httpRequestArtifactIds, httpRequestConfigSchema, httpRequestInputs, httpRequestIssues, httpRequestTask } from './httpRequest.ts'
 
@@ -85,5 +85,7 @@ describe('Provider API Artifact responses', () => {
       mediaType: 'application/json',
     })
     expect(connectorProxyArtifactContent({ data: null, status: 204 }, '/')).toEqual({ bytes: new Uint8Array(0), name: 'response' })
+    for (const data of [{ bytes: [0] }, 'not base64!', null])
+      expect(() => connectorProxyArtifactContent({ data, status: 200, bodyEncoding: 'base64' }, '/')).toThrow(ConnectorProxyResponseInvalid)
   })
 })

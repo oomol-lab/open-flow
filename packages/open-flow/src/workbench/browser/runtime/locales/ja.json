@@ -1768,6 +1768,7 @@
     "authenticationType": "認証方式",
     "responseSettings": "レスポンス設定",
     "binary": "バイナリファイル",
+    "multipart": "マルチパートフォーム",
     "file": "ファイル",
     "multipartFields": "フォームフィールド",
     "multipartFieldName": "フィールド名",

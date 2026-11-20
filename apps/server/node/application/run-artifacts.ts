@@ -97,22 +97,8 @@ export class RunArtifacts {
   ): Promise<StoredArtifact & { readonly kind: 'artifact' }> {
     if (content.bytes.length > this.#limits.maxArtifactBytes)
       throw new ArtifactHostError('runtime.limit-exceeded', 'Artifact exceeds the configured size limit.')
-    let pending = 0
-    for (const upload of this.#uploads.values()) if (upload.runId == runId) pending += upload.bytes
-    if (this.#runs.artifactBytes(runId) + pending + content.bytes.length > this.#limits.maxRunBytes)
-      throw new ArtifactHostError('runtime.limit-exceeded', 'Run Artifacts exceed the configured size limit.')
-    const bytes = Buffer.from(content.bytes)
-    const artifact: StoredArtifact = {
-      digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
-      id: randomUUID(),
-      ...(content.mediaType === undefined ? {} : { mediaType: content.mediaType }),
-      name: content.name,
-      size: bytes.length,
-    }
-    this.#runs.putArtifact(runId, artifact, bytes)
-    const ref = { kind: 'artifact' as const, ...artifact }
-    await emit({ artifact: ref, jobId: owner.jobId, nodeId: owner.nodeId, runId, type: 'node.artifact' })
-    return ref
+    this.#checkRunBytes(runId, content.bytes.length)
+    return await this.#persist(runId, owner, Buffer.from(content.bytes), content.name, content.mediaType, emit)
   }
 
   /** Resolves Artifact identities of this Run from storage; metadata comes from storage, never from the reference. */
@@ -150,12 +136,38 @@ export class RunArtifacts {
     if (part.length > chunkBytes) throw new ArtifactHostError('capability.invalid', 'Artifact chunks must not exceed 512 KiB.')
     upload.bytes += part.length
     if (upload.bytes > this.#limits.maxArtifactBytes) throw new ArtifactHostError('runtime.limit-exceeded', 'Artifact exceeds the configured size limit.')
-    // Unfinished uploads are retained in memory, so they count toward the Run limit before they are stored.
-    let pending = 0
-    for (const other of this.#uploads.values()) if (other.runId == upload.runId && other !== upload) pending += other.bytes
-    if (this.#runs.artifactBytes(upload.runId) + pending + upload.bytes > this.#limits.maxRunBytes)
-      throw new ArtifactHostError('runtime.limit-exceeded', 'Run Artifacts exceed the configured size limit.')
+    this.#checkRunBytes(upload.runId, upload.bytes, upload)
     upload.parts.push(part)
+  }
+
+  /** Unfinished uploads are retained in memory, so they count toward the Run limit before they are stored. */
+  #checkRunBytes(runId: string, bytes: number, except?: Upload): void {
+    let pending = 0
+    for (const upload of this.#uploads.values()) if (upload.runId == runId && upload !== except) pending += upload.bytes
+    if (this.#runs.artifactBytes(runId) + pending + bytes > this.#limits.maxRunBytes)
+      throw new ArtifactHostError('runtime.limit-exceeded', 'Run Artifacts exceed the configured size limit.')
+  }
+
+  /** The single place that assigns Artifact identity, stores the bytes and announces the Artifact. */
+  async #persist(
+    runId: string,
+    owner: { readonly jobId: string; readonly nodeId: string },
+    bytes: Buffer,
+    name: string,
+    mediaType: string | undefined,
+    emit: (event: ArtifactEvent) => Promise<void>,
+  ) {
+    const artifact: StoredArtifact = {
+      digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+      id: randomUUID(),
+      ...(mediaType === undefined ? {} : { mediaType }),
+      name,
+      size: bytes.length,
+    }
+    this.#runs.putArtifact(runId, artifact, bytes)
+    const ref = { kind: 'artifact' as const, ...artifact }
+    await emit({ artifact: ref, jobId: owner.jobId, nodeId: owner.nodeId, runId, type: 'node.artifact' })
+    return ref
   }
 
   async #put(
@@ -175,17 +187,7 @@ export class RunArtifacts {
     const upload = this.#upload(runId, call, payload.upload)
     this.#uploads.delete(upload.id)
     this.#append(upload, payload.data)
-    const content = Buffer.concat(upload.parts)
-    const artifact: StoredArtifact = {
-      digest: `sha256:${createHash('sha256').update(content).digest('hex')}`,
-      id: randomUUID(),
-      ...(mediaType === undefined ? {} : { mediaType }),
-      name,
-      size: content.length,
-    }
-    this.#runs.putArtifact(runId, artifact, content)
-    const ref = { kind: 'artifact' as const, ...artifact }
-    await emit({ artifact: ref, jobId: call.jobId!, nodeId: call.nodeId!, runId, type: 'node.artifact' })
+    const ref = await this.#persist(runId, { jobId: call.jobId!, nodeId: call.nodeId! }, Buffer.concat(upload.parts), name, mediaType, emit)
     return { body: ref, status: 200 }
   }
 

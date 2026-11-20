@@ -670,6 +670,12 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
           next = { ...fields, ...config } as unknown as GraphNode
         }
       }
+    // Same rule as the Workbench switch: a literal body can never be an Artifact, so switching to Artifact drops it.
+    // Source bindings stay, and inputs set by this edit are applied afterwards.
+    if (node.kind == 'webhook-response' && next.kind == 'webhook-response' && next.bodyFormat == 'artifact' && node.bodyFormat != 'artifact') {
+      const { body, ...others } = next.inputs
+      if (body?.kind == 'value') next = { ...next, inputs: others }
+    }
     replace(ref, next)
   }
   async function setText(ref: string, field: 'code' | 'prompt', text: string) {

@@ -123,7 +123,7 @@ export function HttpRequestSection({
               ['json', 'JSON'],
               ['text', t('httpRequest.text')],
               ['form', 'URL-encoded'],
-              ['multipart', 'Multipart'],
+              ['multipart', t('httpRequest.multipart')],
               ['binary', t('httpRequest.binary')],
             ],
             (bodyFormat) =>

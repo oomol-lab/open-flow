@@ -316,7 +316,8 @@ it('switches the Provider response to a file and removes the setting when switch
       const node = session.store.$.draft.value!.content.document.graph.nodes.request!
       return node.kind === 'task' ? node.task.outputs.find((port) => 'handle' in port && port.handle === 'body') : undefined
     }
-    const select = container.querySelector<HTMLSelectElement>('select[id$="-responseFormat"]')!
+    const label = [...container.querySelectorAll<HTMLLabelElement>('label')].find((element) => element.textContent === 'Response format')!
+    const select = document.getElementById(label.htmlFor) as HTMLSelectElement
     const choose = async (value: string) =>
       act(async () => {
         select.value = value

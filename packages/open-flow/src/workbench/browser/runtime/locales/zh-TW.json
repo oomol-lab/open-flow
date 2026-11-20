@@ -1768,6 +1768,7 @@
     "authenticationType": "驗證方式",
     "responseSettings": "回應設定",
     "binary": "二進位檔案",
+    "multipart": "多部分表單",
     "file": "檔案",
     "multipartFields": "表單欄位",
     "multipartFieldName": "欄位名稱",

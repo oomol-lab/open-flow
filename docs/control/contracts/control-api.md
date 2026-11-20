@@ -1748,8 +1748,8 @@ use source-only `auth.token` or Basic `auth.username`/`auth.password`; literals 
 start events omit these inputs. Credential injection conflicts with ordinary parameters fail.
 
 Body formats are `none`, `json`, `text`, `form` (URL-encoded field object), `binary` and
-`multipart`. Selected body formats other than `multipart`, whose fields are separate `body.<name>` inputs, require an
-explicitly supplied `body`; JSON null encodes as
+`multipart`. `json`, `text`, `form` and `binary` require an explicitly supplied `body`; `none` has no body and
+`multipart` uses separate `body.<name>` inputs instead; JSON null encodes as
 `null`, empty text remains empty, and no body remains absent. GET/HEAD bodies are rejected. JSON/Form
 supply Content-Type and reject conflicting media types; text defaults to text/plain and accepts an
 explicit Content-Type.

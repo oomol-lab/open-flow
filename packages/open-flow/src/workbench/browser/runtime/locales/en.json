@@ -1768,6 +1768,7 @@
     "authenticationType": "Type",
     "responseSettings": "Response settings",
     "binary": "Binary file",
+    "multipart": "Multipart form",
     "file": "File",
     "multipartFields": "Form fields",
     "multipartFieldName": "Field name",

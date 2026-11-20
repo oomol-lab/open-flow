@@ -1463,6 +1463,21 @@ describe('Server Connector client', () => {
   })
 
   it.each([
+    ['non-string', { bytes: [0, 1] }],
+    ['malformed', 'not base64!'],
+  ] as const)('rejects a %s base64 body instead of substituting other bytes', async (_label, data) => {
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/providers') return send(response, 200, success([{ service: 'public', displayName: 'Public', authTypes: ['no_auth'] }]))
+      send(response, 200, success({ data, status: 200, bodyEncoding: 'base64' }))
+    })
+    const { service } = await startService(origin)
+    const runId = await run(service, proxyFlow({ providerId: 'public', connectionId: undefined, responseFormat: 'artifact' }))
+    expect(service.run(runId)).toMatchObject({ status: 'failed' })
+    expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({ payload: { error: { code: 'connector.unavailable' } } })
+    expect(service.events(runId).some((event) => event.kind == 'node.artifact')).toBe(false)
+  })
+
+  it.each([
     ['omitted', undefined],
     ['unset', undefined],
     ['null', null],

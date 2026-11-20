@@ -1768,6 +1768,7 @@
     "authenticationType": "Type",
     "responseSettings": "Paramètres de réponse",
     "binary": "Fichier binaire",
+    "multipart": "Formulaire multipart",
     "file": "Fichier",
     "multipartFields": "Champs du formulaire",
     "multipartFieldName": "Nom du champ",

@@ -1768,6 +1768,7 @@
     "authenticationType": "认证方式",
     "responseSettings": "响应配置",
     "binary": "二进制文件",
+    "multipart": "多部分表单",
     "file": "文件",
     "multipartFields": "表单字段",
     "multipartFieldName": "字段名",

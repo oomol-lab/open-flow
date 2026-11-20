@@ -130,16 +130,25 @@ export function connectorProxyInputs(
   return inputs
 }
 
+export class ConnectorProxyResponseInvalid extends Error {}
+
+/** Declared base64 must be a well-formed string; anything else is a Connector protocol error, never substituted bytes. */
+function base64Bytes(data: unknown): Uint8Array {
+  if (typeof data !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(data))
+    throw new ConnectorProxyResponseInvalid('The Connector returned an invalid base64 response body.')
+  return Uint8Array.from(atob(data), (character) => character.charCodeAt(0))
+}
+
 /**
  * Response bytes for Artifact mode. Base64 data keeps its exact bytes; text the Connector already decoded is stored as
- * UTF-8, parsed JSON is re-serialized and a missing body is empty.
+ * UTF-8, parsed JSON is re-serialized and a missing body is empty. Invalid base64 throws `ConnectorProxyResponseInvalid`.
  */
 export function connectorProxyArtifactContent(result: ConnectorProxyResult, endpoint: string): ArtifactContent {
   const header = (name: string) => Object.entries(result.headers ?? {}).find(([key]) => key.toLowerCase() === name)?.[1]
   const media = artifactMediaType(header('content-type'))
   const bytes =
-    result.bodyEncoding === 'base64' && typeof result.data === 'string'
-      ? Uint8Array.from(atob(result.data), (character) => character.charCodeAt(0))
+    result.bodyEncoding === 'base64'
+      ? base64Bytes(result.data)
       : new TextEncoder().encode(result.data == null ? '' : typeof result.data === 'string' ? result.data : JSON.stringify(result.data))
   const mediaType =
     media ?? (result.bodyEncoding === 'base64' || result.data == null ? undefined : typeof result.data === 'string' ? 'text/plain' : 'application/json')

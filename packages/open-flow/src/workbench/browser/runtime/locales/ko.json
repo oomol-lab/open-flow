@@ -1768,6 +1768,7 @@
     "authenticationType": "인증 방식",
     "responseSettings": "응답 설정",
     "binary": "바이너리 파일",
+    "multipart": "멀티파트 양식",
     "file": "파일",
     "multipartFields": "양식 필드",
     "multipartFieldName": "필드 이름",

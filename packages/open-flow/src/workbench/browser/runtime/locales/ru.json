@@ -1768,6 +1768,7 @@
     "authenticationType": "Тип",
     "responseSettings": "Настройки ответа",
     "binary": "Двоичный файл",
+    "multipart": "Multipart-форма",
     "file": "Файл",
     "multipartFields": "Поля формы",
     "multipartFieldName": "Имя поля",

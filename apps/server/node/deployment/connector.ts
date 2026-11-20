@@ -39,6 +39,7 @@ import {
   resolveProviderAccessBinding,
 } from './provider-access.ts'
 
+const base64Body = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 const maxActionResponseBytes = 32 * 1024 * 1024
 const maxActionCatalogBytes = 8 * 1024 * 1024
 const catalogConcurrency = 16
@@ -699,7 +700,8 @@ export class ConnectorClient implements ConnectorHost {
         Number(status) <= 599 &&
         Object.hasOwn(response.data, 'data') &&
         (headers === undefined || (record(headers) && Object.values(headers).every((value) => typeof value === 'string'))) &&
-        (bodyEncoding === undefined || bodyEncoding === 'base64')
+        // Declared base64 must be well-formed text, so Artifact mode can never store substituted bytes.
+        (bodyEncoding === undefined || (bodyEncoding === 'base64' && typeof response.data.data === 'string' && base64Body.test(response.data.data)))
       ) {
         return {
           data: response.data.data,
