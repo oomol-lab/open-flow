@@ -2,7 +2,7 @@ import type { GraphNode, InputMapping, JsonValue, RevisionContent } from './chan
 
 import { dequal } from 'dequal/lite'
 import { z } from 'zod'
-import { clearTriggerExternalConfig } from '../../trigger/common/config.ts'
+import { clearTriggerEventSource } from '../../trigger/common/config.ts'
 import { decodeRevisionContent } from './changeSchema.ts'
 import { clearConditionBindings } from './condition.ts'
 import { clearNodeConnections } from './connectionUsage.ts'
@@ -64,7 +64,7 @@ export function cleanWorkflowFile(value: unknown): { readonly file: WorkflowFile
         node = { ...node, outputMappings: Object.fromEntries(Object.entries(node.outputMappings).map(([key, input]) => [key, cleanInput(input)])) }
       if (node.kind == 'condition') node = clearConditionBindings(node)
       if (node.kind == 'error' && node.sourceFlowIds != null) node = { ...node, sourceFlowIds: [] }
-      if (node.kind == 'poll' || node.kind == 'integration') node = { ...node, config: clearTriggerExternalConfig(node.definition.key, node.config) }
+      if (node.kind == 'integration') node = { ...node, config: clearTriggerEventSource(node.definition.key, node.config) }
       return [id, node]
     }),
   )

@@ -24,6 +24,7 @@ import {
   updateTriggerSchedule,
   updateStartInputDefs,
   setConnectorConnection as changeConnectorConnection,
+  setTriggerConnection as changeTriggerConnection,
   setServiceConnections as changeServiceConnections,
   setCodeActions as changeCodeActions,
 } from '../../../../flow/common/nodeChanges.ts'
@@ -44,7 +45,6 @@ import {
   updateWebhook,
   updateTriggerConfig,
   setTriggerEventSource,
-  setTriggerConnection as changeTriggerConnection,
   setInputVariable as changeInputVariable,
   setInputValue as changeInputValue,
 } from '../editor/flowChanges.ts'
@@ -284,7 +284,7 @@ export class NodeEdits {
   public async setTriggerConnection(triggerId: string, connectionId: string | undefined): Promise<boolean> {
     const revision = this.revision.value
     if (revision == null) return false
-    const changes = changeTriggerConnection(revision, triggerId, connectionId)
+    const changes = changeTriggerConnection(revision.revision.content, triggerId, connectionId)
     return changes != null && (await this.save(changes))
   }
 }

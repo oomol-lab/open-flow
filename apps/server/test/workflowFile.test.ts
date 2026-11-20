@@ -2,6 +2,7 @@ import type { WorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { runEnvironment } from '../node/application/run-environment.ts'
 import { ConnectorClient } from '../node/deployment/connector.ts'
@@ -42,6 +43,30 @@ it('creates a Flow with its initial layout atomically and includes it in idempot
   expect((await client.getEditor(imported.flowId)).presentation.value).toEqual(layout)
   const legacy = await client.createFlow('Legacy', 'legacy')
   expect((await client.getEditor(legacy.flowId)).presentation.value).toEqual({})
+})
+
+it('imports and exports shared-source Trigger selections without carrying their bindings', async () => {
+  const service = await openService(':memory:')
+  const app = createServerApp(service, { resolveControlActor: () => 'alice' })
+  const client = new ControlClient(async (path, init) => app.request(`http://test${path}`, init))
+  const definition = integrationDefinitions.find((item) => item.snapshot.key === 'jira.on_issue_event')!.snapshot
+  const trigger = {
+    kind: 'integration',
+    name: 'Watch Jira',
+    definition,
+    connectionId: 'old-account',
+    config: {
+      sourceId: { kind: 'value', value: 'source_0123456789abcdef0123456789abcdef' },
+      eventTypes: { kind: 'value', value: ['jira:issue_created'] },
+    },
+  } as const
+  const imported = await client.importFlow({
+    ...file,
+    content: { ...file.content, document: { bindings: {}, graph: { nodes: { trigger }, edges: [] } } },
+  })
+  const expected = { kind: 'integration', name: trigger.name, definition, config: { ...trigger.config, sourceId: { kind: 'unset' } } }
+  expect((await client.getEditor(imported.flowId)).draft.content.document.graph.nodes.trigger).toEqual(expected)
+  expect((await client.exportFlow(imported.flowId)).content.document.graph.nodes.trigger).toEqual(expected)
 })
 
 it('imports once, keeps layout and node identities, and isolates actor scopes on HTTP', async () => {

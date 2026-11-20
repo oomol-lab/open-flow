@@ -395,7 +395,7 @@ describe('TriggerStore', () => {
     ['zoom.on_recording_ready', 'recording.completed'],
     ['fireflies.on_meeting_ready', 'meeting.transcribed'],
     ['jira.on_issue_event', 'jira:issue_created'],
-  ])('selects a source for %s without introducing foreign config fields', async (key, eventType) => {
+  ])('keeps saved event types when rebinding %s to a different source', async (key, eventType) => {
     const { workspace, triggers, request } = createSetup()
     const definition = integrationDefinitions.find((item) => item.snapshot.key === key)!.snapshot
     const original = request.getMockImplementation()!
@@ -408,7 +408,7 @@ describe('TriggerStore', () => {
         name: 'Events',
         definition,
         connectionId: 'old-connection',
-        config: inputValues({ sourceId: 'source_0123456789abcdef0123456789abcdef', eventTypes: [eventType], resource: {}, chatIds: ['legacy'] }),
+        config: inputValues({ sourceId: 'source_0123456789abcdef0123456789abcdef', eventTypes: [eventType] }),
       }
       return Response.json(data)
     })
@@ -418,7 +418,7 @@ describe('TriggerStore', () => {
       expect(
         await workspace.nodes.setTriggerEventSource('linear', {
           version: 1,
-          sourceId: 'source_0123456789abcdef0123456789abcdef',
+          sourceId: 'source_fedcba9876543210fedcba9876543210',
           revision: 1,
           name: 'Events',
           provider: definition.provider as 'slackbot',
@@ -437,16 +437,13 @@ describe('TriggerStore', () => {
           consumers: [],
         }),
       ).toBe(true)
-      await workspace.nodes.saveTriggerConfig('linear', 'eventTypes', [eventType])
       const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
       if (node.kind !== 'integration') throw new Error('Expected integration')
       expect(node.connectionId).toBe('new-connection')
       expect(resolveTriggerConfig(node.definition.configInputs, node.config)).toMatchObject({
-        sourceId: 'source_0123456789abcdef0123456789abcdef',
+        sourceId: 'source_fedcba9876543210fedcba9876543210',
         eventTypes: [eventType],
       })
-      expect(node.config).not.toHaveProperty('resource')
-      expect(node.config).not.toHaveProperty('chatIds')
       const after = workspace.$.draft.value!.content
       await workspace.undo()
       expect(workspace.$.draft.value!.content).toEqual(before)
@@ -458,7 +455,7 @@ describe('TriggerStore', () => {
     }
   })
 
-  it('keeps Feishu filters compatible when changing sources and event types', async () => {
+  it('preserves Feishu filters when rebinding and reconciles them on explicit event edits', async () => {
     const { workspace, triggers, request } = createSetup()
     const original = request.getMockImplementation()!
     request.mockImplementation(async (path, init) => {
@@ -499,12 +496,7 @@ describe('TriggerStore', () => {
       ).toBe(true)
       const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
       if (node.kind != 'integration') throw new Error('Expected integration.')
-      expect(node.config).toEqual({
-        ...inputValues({ sourceId: 'new-source' }),
-        eventTypes: { kind: 'unset' },
-        resource: { kind: 'unset' },
-        chatIds: { kind: 'unset' },
-      })
+      expect(node.config).toEqual(inputValues({ sourceId: 'new-source', eventTypes: ['drive.file.edit_v1'], resource: { kind: 'document', id: 'doc' } }))
       expect(node.connectionId).toEqual('app-connection')
       expect(request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))).toHaveLength(1)
       const after = workspace.$.draft.value!.content
@@ -512,6 +504,7 @@ describe('TriggerStore', () => {
       expect(workspace.$.draft.value!.content).toEqual(before)
       await workspace.redo()
       expect(workspace.$.draft.value!.content).toEqual(after)
+      await workspace.nodes.saveTriggerConfig('linear', 'eventTypes', ['im.message.receive_v1'])
       await workspace.nodes.saveTriggerConfig('linear', 'chatIds', ['chat'])
       await workspace.nodes.saveTriggerConfig('linear', 'eventTypes', ['drive.file.edit_v1'])
       expect(workspace.$.draft.value!.content.document.graph.nodes.linear).toHaveProperty('config.chatIds.kind', 'unset')
@@ -552,7 +545,7 @@ describe('TriggerStore', () => {
     }
   })
 
-  it.each(['team', 'connection'] as const)('clears dependent Linear selections in the same save when changing %s', async (change) => {
+  it.each(['team', 'connection'] as const)('changes the Linear %s while only resetting statuses for an explicit team edit', async (change) => {
     const { workspace, triggers, request } = createSetup()
     try {
       await workspace.start(flow.flowId)
@@ -561,11 +554,12 @@ describe('TriggerStore', () => {
       else await workspace.nodes.setTriggerConnection('linear', 'connection-new')
       const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
       if (node.kind != 'poll') throw new Error('Expected Poll.')
-      expect(node.config).toEqual({ teamId: change == 'team' ? { kind: 'value', value: 'team-new' } : { kind: 'unset' }, stateIds: { kind: 'unset' } })
-      const saves = request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))
-      expect(saves).toHaveLength(1)
-      const body = JSON.parse(String(saves[0]![1]?.body))
-      expect(body.operations).toHaveLength(change == 'team' ? 2 : 3)
+      if (change == 'team') expect(node.config).toEqual({ ...inputValues({ teamId: 'team-new' }), stateIds: { kind: 'unset' } })
+      else {
+        expect(node.connectionId).toBe('connection-new')
+        expect(node.config).toEqual(inputValues({ teamId: 'team-old', stateIds: ['state-old'] }))
+      }
+      expect(request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))).toHaveLength(1)
       const after = workspace.$.draft.value!.content
       await workspace.undo()
       expect(workspace.$.draft.value!.content).toEqual(before)

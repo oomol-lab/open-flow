@@ -16,6 +16,14 @@ The authentication secret binding joins the Flow closure, so Publication require
 listings include it. Server and Cloud must upgrade together before either writes such content, and both must pass the
 new `webhookConformanceCases` (fixtures may now carry `bindings` and `variables`).
 
+## Portable Trigger configuration (after beta.95)
+
+Portable files preserve Trigger business configuration while clearing Open Flow Connection and
+event source bindings. Older cleanup implementations can still discard selections when encoding
+or importing a file, so upgrade the exporting client and importing deployment to retain them.
+Local file authoring permits unset Trigger configuration in template checks; runtime and publication
+validation keep their existing requirements. The file format, Flow model, and Engine contract are unchanged.
+
 ## Flow features: Flow model v16 and capability-based Engine admission
 
 The npm `next` baseline is `0.1.0-beta.94`, gitHead `f933d812`, with Model v15 and Engine v12.

@@ -21,6 +21,7 @@ import { val } from 'value-enhancer'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '../../../../flow/common/edgeChanges.ts'
+import { setTriggerConnection } from '../../../../flow/common/nodeChanges.ts'
 import { flowResourceReferences } from '../../../../flow/common/semantics.ts'
 import { encodeWorkflowBundle, workflowBundleFromPreview } from '../../../../flow/common/workflowBundle.ts'
 import { encodeWorkflowFile, workflowFileName } from '../../../../flow/common/workflowFile.ts'
@@ -39,7 +40,7 @@ import {
 import { connectionCatalog } from '../connectionCatalog.ts'
 import { addNodeIntent } from '../editor/addNodeOptions.ts'
 import { CanvasClipboard } from '../editor/canvasClipboard.ts'
-import { applyFlowChanges, deleteSelection, addNode as addFlowNode, selectWebhookResponse, setTriggerConnection } from '../editor/flowChanges.ts'
+import { applyFlowChanges, deleteSelection, addNode as addFlowNode, selectWebhookResponse } from '../editor/flowChanges.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { designerGraph } from '../workspace.ts'
@@ -528,7 +529,7 @@ export class WorkspaceStore {
       if (connection == null) return
       const revision = this.$.revision.value
       if (revision == null) return
-      const changes = setTriggerConnection(revision, nodeId, connection.connectionId)
+      const changes = setTriggerConnection(revision.revision.content, nodeId, connection.connectionId)
       if (changes != null) await this.#edits.finishNodeCreation(nodeId, changes)
     } catch (error) {
       if (unchanged()) this.#setNotice(errorNotice(error, this.#i18n.t))

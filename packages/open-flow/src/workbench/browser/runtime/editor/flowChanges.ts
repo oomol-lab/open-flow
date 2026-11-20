@@ -76,18 +76,7 @@ export function setTriggerEventSource(revision: RevisionView, triggerId: string,
   const content = revision.revision.content
   const changes = changeTriggerConnection(content, triggerId, source.connectionId)
   if (changes == null) return
-  const changed = inputValue(trigger.config.sourceId, undefined) != source.sourceId
-  return [
-    ...changes,
-    ...(changeTriggerConfig(content, triggerId, 'sourceId', source.sourceId) ?? []),
-    ...['eventTypes', 'resource', 'chatIds', 'channelIds'].flatMap((handle): readonly ChangeOperation[] => {
-      if (trigger.definition.configInputs.some((input) => 'handle' in input && input.handle === handle))
-        return changed ? (changeTriggerConfig(content, triggerId, handle, undefined) ?? []) : []
-      return Object.hasOwn(trigger.config, handle)
-        ? [{ kind: 'graph.trigger.config.set', nodeId: triggerId, name: handle, before: trigger.config[handle], value: undefined }]
-        : []
-    }),
-  ]
+  return [...changes, ...(changeTriggerConfig(content, triggerId, 'sourceId', source.sourceId) ?? [])]
 }
 
 export function updateTriggerConfig(revision: RevisionView, triggerId: string, name: string, value: JsonValue | undefined): FlowChanges | undefined {
@@ -105,17 +94,6 @@ export function updateTriggerConfig(revision: RevisionView, triggerId: string, n
   }
   if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed' && name == 'teamId') {
     return [...changes, ...(changeTriggerConfig(content, triggerId, 'stateIds', undefined) ?? [])]
-  }
-  return changes
-}
-
-export function setTriggerConnection(revision: RevisionView, triggerId: string, connectionId: string | undefined): FlowChanges | undefined {
-  const content = revision.revision.content
-  const changes = changeTriggerConnection(content, triggerId, connectionId)
-  if (changes == null) return
-  const trigger = revision.graph().nodes[triggerId]
-  if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed') {
-    return [...changes, ...['teamId', 'stateIds'].flatMap((field) => changeTriggerConfig(content, triggerId, field, undefined) ?? [])]
   }
   return changes
 }
