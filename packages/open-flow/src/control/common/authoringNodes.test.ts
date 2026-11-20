@@ -390,6 +390,31 @@ describe('business configuration authoring contracts', () => {
     ])
     expect(Object.values(rebound.content.document.bindings)).toEqual([{ kind: 'variable', target: 'NEW_TOKEN' }])
 
+    // Switching a header policy to bearer clears only the header name, so the stored secret reference stays.
+    const headerPolicy = await edit(created.content, [
+      {
+        op: 'node.update',
+        node: ref,
+        set: { config: { options: { authentication: { type: 'header', name: 'X-Relay-Secret', secret: { kind: 'variable', name: 'WEBHOOK_TOKEN' } } } } },
+      },
+    ])
+    const headerNode = headerPolicy.content.document.graph.nodes[ref]
+    if (headerNode?.kind != 'webhook') throw new Error('Expected Webhook')
+    const headerBinding = headerNode.options?.authentication?.secret.bindingId
+    const orphanedHeader = { ...headerPolicy.content, document: { ...headerPolicy.content.document, bindings: {} } }
+    const switched = await edit(orphanedHeader, [
+      {
+        op: 'node.update',
+        node: ref,
+        set: { config: { options: { authentication: { type: 'bearer' } } } },
+        clear: [['config', 'options', 'authentication', 'name']],
+      },
+    ])
+    expect(switched.content.document.bindings).toEqual({})
+    expect(switched.content.document.graph.nodes[ref]).toMatchObject({
+      options: { authentication: { type: 'bearer', secret: { kind: 'binding', bindingId: headerBinding } } },
+    })
+
     const cleared = await edit(created.content, [{ op: 'node.update', node: ref, clear: [['config', 'options', 'authentication']] }])
     expect(cleared.content.document.bindings).toEqual({})
   })

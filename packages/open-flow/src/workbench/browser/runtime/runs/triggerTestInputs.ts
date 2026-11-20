@@ -3,7 +3,7 @@ import type { JsonValue, TriggerNode } from '../../../../flow/common/change.ts'
 import { isJsonValue } from '../../../../base/common/json.ts'
 import { matchesSchema, schemaObject } from '../../../../flow/common/schema.ts'
 import { initialValue, valueType } from '../../../../form/common/value.ts'
-import { sampleErrorOutputs, triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
+import { matchesWebhookBody, sampleErrorOutputs, triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 
 /** Best-effort test data. Unsupported constraints stay unset for the user to fill in. */
 function sampleValue(schema: JsonValue): JsonValue | undefined {
@@ -82,7 +82,7 @@ export function defaultTriggerTestOutputs(trigger: TriggerNode): Readonly<Record
           ...schemaObject(value ?? {}),
           ...Object.fromEntries(trigger.bodyFields.flatMap((field) => (field.value === undefined ? [] : [[field.handle, structuredClone(field.value)]]))),
         }
-        value = matchesSchema(body, port.jsonSchema) ? body : undefined
+        value = matchesWebhookBody(trigger, body) ? body : undefined
       }
       return value === undefined ? (port.nullable ? [[port.handle, null]] : []) : [[port.handle, value]]
     }),

@@ -3,7 +3,7 @@ import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { HttpRequestConfig } from '../../../../http/common/httpRequest.ts'
 
 import { dequal } from 'dequal/lite'
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { httpMultipartHandle, httpRequestIssues, httpRequestTask } from '../../../../http/common/httpRequest.ts'
@@ -315,7 +315,10 @@ function MultipartFields({
                 </div>
               )}
             </ValueEditorFeedback>
-            {name.trim() !== '' && name === fields[index] && fields.indexOf(name) === index && input(httpMultipartHandle(name), name)}
+            {/* Keyed by handle: removing an earlier field must not hand its editor state to the next one. */}
+            {name.trim() !== '' && name === fields[index] && fields.indexOf(name) === index && (
+              <Fragment key={httpMultipartHandle(name)}>{input(httpMultipartHandle(name), name)}</Fragment>
+            )}
           </div>
         ))}
         {!disabled && (

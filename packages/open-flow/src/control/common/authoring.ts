@@ -632,7 +632,11 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
           // secret, so unrelated updates never bind the placeholder.
           const secretEdited =
             Object.hasOwn(record(record(record(patch.config).options).authentication), 'secret') ||
-            clear.some((path) => path[0] == 'config' && path[1] == 'options' && (path.length == 2 || path[2] == 'authentication'))
+            // Only a clear of the secret or one of its ancestors replaces it; clearing the header name keeps it.
+            clear.some(
+              (path) =>
+                path[0] == 'config' && path[1] == 'options' && (path.length == 2 || (path[2] == 'authentication' && (path.length == 3 || path[3] == 'secret'))),
+            )
           const storedSecret = node.options?.authentication?.secret
           if (secret.kind === 'variable' && typeof secret.name === 'string')
             settings.options = {

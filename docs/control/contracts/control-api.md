@@ -1748,7 +1748,8 @@ use source-only `auth.token` or Basic `auth.username`/`auth.password`; literals 
 start events omit these inputs. Credential injection conflicts with ordinary parameters fail.
 
 Body formats are `none`, `json`, `text`, `form` (URL-encoded field object), `binary` and
-`multipart`. Selected body formats require an explicitly supplied `body`; JSON null encodes as
+`multipart`. Selected body formats other than `multipart`, whose fields are separate `body.<name>` inputs, require an
+explicitly supplied `body`; JSON null encodes as
 `null`, empty text remains empty, and no body remains absent. GET/HEAD bodies are rejected. JSON/Form
 supply Content-Type and reject conflicting media types; text defaults to text/plain and accepts an
 explicit Content-Type.
@@ -1770,7 +1771,8 @@ including an empty one, under the Run's per-Artifact and per-Run limits instead 
 limit. The name comes from Content-Disposition (`filename*` first), then the last URL path segment,
 then `response`; path separators and control characters are replaced. The media type is the
 Content-Type essence when it is well formed. JSON parse errors fail rather than
-fall back to text. Empty bodies and HEAD/204/205/304 yield null. JSON arrays are not expanded into
+fall back to text. In the parsed formats, empty bodies and HEAD/204/205/304 yield null; Artifact mode still stores a
+0-byte file and returns its reference. JSON arrays are not expanded into
 multiple node executions. The node does not infer a permanent schema from response samples.
 
 Only 2xx succeeds by default. `statusPolicy: "all"` accepts any HTTP status, without changing network

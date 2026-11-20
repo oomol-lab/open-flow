@@ -14,6 +14,10 @@ describe('Artifact metadata', () => {
     expect(artifactName(null, 'https://example.com/files/report%20final.pdf?download=1')).toBe('report final.pdf')
     expect(artifactName(null, 'https://example.com/')).toBe('response')
     expect(artifactName(`filename="${'x'.repeat(300)}"`, undefined)).toHaveLength(255)
+    // 255 code points of emoji are 510 UTF-16 units; the name must not end in half of a surrogate pair.
+    const emoji = artifactName(`filename*=UTF-8''${encodeURIComponent('😀'.repeat(300))}`, undefined)!
+    expect([...emoji]).toHaveLength(255)
+    expect(() => encodeURIComponent(emoji)).not.toThrow()
     expect(artifactMediaType('Application/PDF; charset=binary')).toBe('application/pdf')
     expect(artifactMediaType('text/html\r\nx-injected: 1')).toBeUndefined()
     expect(artifactMediaType(undefined)).toBeUndefined()

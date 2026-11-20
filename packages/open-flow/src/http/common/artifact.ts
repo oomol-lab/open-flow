@@ -68,5 +68,6 @@ function cleanName(value: string | undefined): string | undefined {
   // oxlint-disable-next-line no-control-regex
   const cleaned = value?.replace(/[\u0000-\u001f\u007f/\\]/g, '_').trim()
   if (cleaned == null || cleaned.length == 0 || cleaned == '.' || cleaned == '..') return
-  return [...cleaned].slice(0, maximumNameLength).join('').slice(0, maximumNameLength)
+  // Count code points so a long name never ends in half of a surrogate pair.
+  return [...cleaned].slice(0, maximumNameLength).join('')
 }
