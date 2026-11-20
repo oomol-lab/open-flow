@@ -19,16 +19,13 @@
 
 **Créez vos automatisations avec votre agent IA. Voyez exactement ce qui sera exécuté.**
 
-Open Flow est une plateforme de workflows au code source accessible qui associe la rapidité de la création assistée par IA à la clarté d'un workflow visuel. Demandez à Codex, Claude Code ou à un autre agent de créer un Flow, ouvrez-le dans le Workbench et continuez à améliorer ensemble ce même workflow.
+Open Flow est la plateforme d’automatisation de workflows d’OOMOL destinée aux équipes qui utilisent des agents de programmation. Son code source est accessible sous licence Open Flow. Votre agent peut créer et modifier un workflow via la CLI ou MCP, puis votre équipe peut le vérifier et le tester dans Workbench.
 
 Combinez JavaScript, applications connectées, IA, embranchements et validation humaine sur un même canevas. Inspectez les entrées, suivez l'exécution et choisissez la version à mettre en production. Utilisez OOMOL Hosted ou votre propre infrastructure.
 
 [Explorer la démo interactive](https://openflow.run) · [Utiliser OOMOL Hosted](https://console.openflow.run) · [Auto-héberger avec Docker](#exécutez-open-flow-où-vous-voulez)
 
 ![Un workflow vertical de veille IA dans le Workbench Open Flow, avec collecte parallèle sur X, GitHub et Hugging Face, et le prompt, les outils, les entrées et la sortie du nœud de recherche et de rédaction dans le panneau de propriétés à droite](assets/readme-workbench.png)
-
-> [!IMPORTANT]
-> Open Flow est en bêta. Le produit et ses contrats versionnés continuent d'évoluer.
 
 ## Votre agent construit. Vous gardez la main.
 
@@ -104,7 +101,7 @@ docker run --rm \
 
 Ouvrez [http://127.0.0.1:3000](http://127.0.0.1:3000) et connectez-vous avec `OPEN_FLOW_TOKEN`. Les Flows et l'historique d'exécution sont stockés dans le volume Docker. Le jeton opérateur sert aussi à authentifier les accès CLI et API.
 
-Vous préférez une image préconstruite ? Suivez le [guide des images GHCR](server/docker-ghcr/README.fr.md) et choisissez un tag de version explicite pendant la bêta. Le tag `latest` est réservé aux versions stables.
+Vous préférez une image préconstruite ? Suivez le [guide des images GHCR](server/docker-ghcr/README.fr.md) et choisissez un tag de version explicite. Le tag `latest` est réservé aux versions stables.
 
 Les actions Connector et les LLM Tasks nécessitent la configuration des services correspondants. Le Server ne bascule pas silencieusement vers un autre fournisseur. Avant d'exposer un déploiement sur Internet, suivez le [guide de déploiement](server/container-delivery.md) et la [liste de vérification de sécurité](../SECURITY.md#hardening-your-deployment).
 
