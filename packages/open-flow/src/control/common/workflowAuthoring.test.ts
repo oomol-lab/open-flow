@@ -4,10 +4,11 @@ import type { AuthoringRequest } from './authoring.ts'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it, vi } from 'vitest'
 import { runFlow } from '../../execution/common/scheduler.ts'
-import { prepareFlow } from '../../flow/common/semantics.ts'
+import { prepareFlow, validateFlow } from '../../flow/common/semantics.ts'
 import { encodeWorkflowFile, parseWorkflowFile } from '../../flow/common/workflowFile.ts'
+import { findEngineContract } from '../../runtime/common/engineContract.ts'
 import { currentEngineContract, snapshotRuntimeResult } from '../../runtime/common/runtime.ts'
-import { triggerDefinitions } from '../../trigger/providers/definitions.ts'
+import { integrationDefinitions, triggerDefinitions } from '../../trigger/providers/definitions.ts'
 import { ControlClient } from './api.ts'
 import { createWorkflowAuthoring } from './workflowAuthoring.ts'
 
@@ -148,6 +149,45 @@ describe('local WorkflowFile authoring', () => {
     })
     expect(result.file.content.document.graph.nodes[result.nodes.trigger!]!).toMatchObject({ definition })
     expect(request).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows unbound Trigger config in a portable template without relaxing runtime validation', async () => {
+    const definition = integrationDefinitions.find((item) => item.snapshot.key === 'jira.on_issue_event')!.snapshot
+    const authoring = createWorkflowAuthoring({ client: new ControlClient(async () => Response.json({ version: 1, definition })) })
+    const file = authoring.create()
+    const result = await authoring.edit(file, {
+      baseRevision: (await authoring.read(file)).revision,
+      requestId: 'jira',
+      edits: [
+        {
+          op: 'node.add',
+          as: 'trigger',
+          type: 'integration',
+          name: 'Watch Jira',
+          config: { key: definition.key, connectionId: 'account' },
+          inputs: {
+            sourceId: { kind: 'value', value: 'source_0123456789abcdef0123456789abcdef' },
+            eventTypes: { kind: 'value', value: ['jira:issue_created'] },
+          },
+        },
+      ],
+    })
+    const portable = parseWorkflowFile(encodeWorkflowFile(result.file))
+    const node = result.nodes.trigger!
+    expect(portable.content.document.graph.nodes[node]).toMatchObject({
+      config: { sourceId: { kind: 'unset' }, eventTypes: { kind: 'value', value: ['jira:issue_created'] } },
+    })
+    const checked = await authoring.check(portable)
+    expect(checked.diagnostics.map(({ code }) => code)).toEqual(['trigger.connection-missing'])
+    const runtime = await validateFlow(portable.content, findEngineContract(currentEngineContract)!)
+    expect(runtime.diagnostics).toContainEqual(expect.objectContaining({ code: 'trigger.config-incomplete', fields: ['sourceId'] }))
+
+    const edited = await authoring.edit(portable, {
+      baseRevision: checked.revision,
+      requestId: 'invalid-jira-events',
+      edits: [{ op: 'input.set', node, input: 'eventTypes', source: { kind: 'value', value: null } }],
+    })
+    expect(edited.validation.diagnostics.map(({ code }) => code)).toContain('trigger.config-invalid')
   })
 
   it.each(['name', 'output'])('follows a Flow response advertising the named %s port even for an open schema', async (field) => {

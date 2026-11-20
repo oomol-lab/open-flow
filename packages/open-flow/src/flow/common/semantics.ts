@@ -26,6 +26,7 @@ import type {
   RevisionContent,
   SchemaMismatch,
 } from './change.ts'
+import type { FlowGraphValidationOptions } from './graph.ts'
 
 import { findEngineContract } from '../../runtime/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'
@@ -36,7 +37,7 @@ import { nodeInputPorts, validateFlowGraph } from './graph.ts'
 import { inputValue } from './inputValue.ts'
 import { compareDiagnostics, validateModuleGraph } from './modules.ts'
 import { hasRetiredRef, matchesSchema } from './schema.ts'
-export { availableOutputs, graphOrder, nodeInputPorts } from './graph.ts'
+export { availableOutputs, graphOrder, nodeInputPorts, type FlowGraphValidationOptions } from './graph.ts'
 export { validateModules } from './modules.ts'
 export { matchesSchema, schemaValidationErrors, variableInputCompatible } from './schema.ts'
 export { agentInput, agentToolInput, agentToolSchema } from './agent.ts'
@@ -238,10 +239,11 @@ export function validateFlowInputs(revision: RevisionContent, value: unknown): F
   return 'valid'
 }
 
-export async function validateFlow(revision: RevisionContent, engine: EngineContract): Promise<FlowValidation> {
+/** Validates flow closure, modules, capabilities, and graph rules. Pass `{ mode: 'template' }` to allow `unset` Trigger config fields in shared templates. */
+export async function validateFlow(revision: RevisionContent, engine: EngineContract, options: FlowGraphValidationOptions = {}): Promise<FlowValidation> {
   const closure = await flowClosure(revision)
   const checked = validateModuleGraph(revision, [...closure.dependencies.modules], engine)
-  checked.diagnostics.push(...validateFlowGraph(revision))
+  checked.diagnostics.push(...validateFlowGraph(revision, options))
   const missingCapabilities = missingEngineCapabilities(revision, engine)
   if (missingCapabilities.length > 0)
     checked.diagnostics.push({

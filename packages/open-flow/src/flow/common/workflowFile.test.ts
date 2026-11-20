@@ -2,8 +2,10 @@ import type { GraphNode } from './change.ts'
 import type { WorkflowFile } from './workflowFile.ts'
 
 import { describe, expect, it } from 'vitest'
+import { pollDefinitions } from '../../trigger/providers/definitions.ts'
 import { currentFlowModelVersion } from './change.ts'
 import { decodeRevision, encodeRevision } from './encoding.ts'
+import { inputValues } from './inputValue.ts'
 import { cleanWorkflowFile, decodeWorkflowFile, encodeWorkflowFile, parseWorkflowFile, workflowFileName } from './workflowFile.ts'
 
 const value = (literal: null | string) => ({ kind: 'value' as const, value: literal })
@@ -183,7 +185,13 @@ describe('shareable workflow files', () => {
     expect(nodes.condition).toMatchObject({ cases: [{ groups: [{ expressions: [{ left: { kind: 'value' }, right: { kind: 'value', value: null } }] }] }] })
     expect(nodes.error).toMatchObject({ sourceFlowIds: [] })
     expect(nodes.trigger).toMatchObject({
-      config: { sourceId: { kind: 'unset' }, resource: { kind: 'unset' }, eventTypes: { kind: 'unset' }, chatIds: { kind: 'unset' }, other: value(null) },
+      config: {
+        sourceId: { kind: 'unset' },
+        resource: value('document'),
+        eventTypes: { kind: 'value', value: ['event'] },
+        chatIds: value('chat'),
+        other: value(null),
+      },
     })
     expect(JSON.stringify(nodes)).not.toContain('"connectionId"')
     expect(nodes.code).toMatchObject({ task: { moduleId: 'shared', capabilities: [{ mode: 'independent', actions: [{ action: 'mail.send' }] }] } })
@@ -194,40 +202,41 @@ describe('shareable workflow files', () => {
     expect(parseWorkflowFile(encodeWorkflowFile(original))).toEqual(file)
     expect(decodeRevision(encodeRevision(file.content))).toEqual(file.content)
   })
-  it('clears Jira deployment references on export and import', () => {
+  it('preserves a business field named sourceId on an Integration without an Open Flow event source', () => {
     const file = fixture()
     const trigger: GraphNode = {
       kind: 'integration',
       name: 'Jira',
       definition: {
         ...definition,
-        key: 'jira.on_issue_event',
-        type: 'integration',
-        endpoint: { methods: ['POST'], successStatus: 200, body: { formats: ['json'], allowArray: false, allowEmpty: false } },
+        key: 'example.on_event',
+        provider: 'example',
+        configInputs: [{ handle: 'sourceId', jsonSchema: { type: 'string' }, nullable: false }],
       },
-      config: { sourceId: value('source_' + 'a'.repeat(32)), eventTypes: { kind: 'value', value: ['jira:issue_created'] } },
+      config: { sourceId: value('source_' + 'a'.repeat(32)) },
     }
     const original = { ...file, content: { ...file.content, document: { ...file.content.document, graph: { nodes: { trigger }, edges: [] } } } }
     const exported = parseWorkflowFile(encodeWorkflowFile(original))
-    expect(exported.content.document.graph.nodes.trigger).toMatchObject({ config: { sourceId: { kind: 'unset' }, eventTypes: { kind: 'unset' } } })
+    expect(exported.content.document.graph.nodes.trigger).toEqual(trigger)
     expect(cleanWorkflowFile(original).file).toEqual(exported)
   })
-  it('clears account-dependent Linear selections without discarding other trigger config', () => {
+  it('keeps Linear team and status selections when clearing the connection', () => {
     const file = fixture()
+    const config = inputValues({ teamId: '7bcad108-09c2-4cc5-9daa-a6b25654fd48', stateIds: ['431c1f9d-a6d5-4003-869e-df74fc5d4f8f'] })
     const trigger: GraphNode = {
       kind: 'poll',
       name: 'Linear',
       pollTimes: [],
-      definition: { ...definition, key: 'linear.on_issue_changed', type: 'poll' },
-      config: { teamId: value('team'), stateIds: value('state'), other: value(null) },
+      definition: pollDefinitions.find((definition) => definition.snapshot.key === 'linear.on_issue_changed')!.snapshot,
+      connectionId: 'account',
+      config,
     }
     const result = cleanWorkflowFile({
       ...file,
       content: { ...file.content, document: { ...file.content.document, graph: { nodes: { trigger }, edges: [] } } },
     }).file
-    expect(result.content.document.graph.nodes.trigger).toMatchObject({
-      config: { teamId: { kind: 'unset' }, stateIds: { kind: 'unset' }, other: value(null) },
-    })
+    expect(result.content.document.graph.nodes.trigger).toMatchObject({ config })
+    expect(result.content.document.graph.nodes.trigger).not.toHaveProperty('connectionId')
   })
   it('accepts unnamed incomplete drafts but rejects malformed, retired and unsupported content without repair', () => {
     const { name: _, ...file } = fixture()

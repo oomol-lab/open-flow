@@ -44,7 +44,7 @@ export function createWorkflowAuthoring(options: WorkflowAuthoringOptions = {}) 
 
   async function check(file: WorkflowFile) {
     const decoded = decodeWorkflowFile(file)
-    const validation = await validateFlow(decoded.content, engine!)
+    const validation = await validateFlow(decoded.content, engine!, { mode: 'template' })
     return {
       revision: await revision(decoded),
       valid: validation.valid,

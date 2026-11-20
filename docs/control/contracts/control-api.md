@@ -148,8 +148,10 @@ Engine contract and deterministic ID generator. `create(metadata)` returns a sta
 Local revisions are canonical file digests, including metadata and presentation. Reads with a
 revision and edits with `baseRevision` reject another file version with
 `AuthoringError.code: "flow.revision-conflict"`. Edits are pure and atomic; they reuse the
-shared node compiler and preserve unrelated definitions and snapshots. Local checks perform
-semantic validation, without deployment account, permission or service-readiness checks.
+shared node compiler and preserve unrelated definitions and snapshots. Local checks validate in
+template mode: Trigger configuration fields may be unset even when required, but provided values
+must match their definitions. Missing Connection selections still produce diagnostics. Local
+checks do not verify account access, permissions or service readiness.
 The caller owns persistence; a returned file has not been saved to disk or uploaded.
 
 `encodeWorkflowFile(file, { clean: false })` structurally validates and serializes a full local
@@ -229,8 +231,11 @@ in Connector, Agent tools/notifications, Code capabilities (including supported 
 forms), and Triggers. Action declarations remain. Variable bindings and their input
 sources are removed; mixed sources retain node outputs, and an input without sources
 becomes unset. Condition operands follow the same rule. Error Trigger source Flow lists
-are emptied. Shared event source IDs and event selections (including Jira), Feishu resource/chat filters, Slack channel filters, and Linear
-team/state selections become unset under their Trigger configuration contracts. External business resource selections, including Tally and Typeform `formId`, are preserved. After importing, select a Connection authorized to access those resources; saved resource IDs do not confer access.
+are emptied. Open Flow event source references (`sourceId` in shared-source Triggers) are cleared.
+Node business configuration is preserved, including selected event types, resource IDs,
+and filters. Select a Connection or event source authorized to use the saved resources after
+importing. Rebinding preserves the saved configuration; update any selections that are unavailable
+under the new binding.
 
 Node and Module IDs, edges, shared Module relationships, ports, code, prompts, fixed
 inputs, model selections, Flow icons and descriptions, and Presentation values remain. Flow/Revision IDs are newly

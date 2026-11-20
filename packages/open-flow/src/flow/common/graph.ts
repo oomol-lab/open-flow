@@ -16,7 +16,7 @@ import type {
 import type { Diagnostic } from './semantics.ts'
 
 import { httpHeaderNameIssue } from '../../http/common/headers.ts'
-import { missingTriggerConfig, resolveTriggerConfig } from '../../trigger/common/config.ts'
+import { missingTriggerConfig, resolveTriggerConfig, validateTemplateTriggerConfig } from '../../trigger/common/config.ts'
 import { triggerOutputDefinitions, triggerOutputPorts, webhookAuthenticationHeaderValid, webhookSupportsBody } from '../../trigger/common/contract.ts'
 import { isTriggerNode, portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
@@ -183,7 +183,16 @@ export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path
   return diagnostics
 }
 
-function validateTrigger(triggerId: string, trigger: TriggerNode, path: string, diagnostics: Diagnostic[]): void {
+/**
+ * Controls whether Trigger config can be incomplete.
+ * - `'runtime'` (default): requires all non-nullable Trigger config fields to be set.
+ * - `'template'`: allows `unset` Trigger config fields (such as those cleared on export) while still validating any provided values.
+ */
+export interface FlowGraphValidationOptions {
+  readonly mode?: 'runtime' | 'template'
+}
+
+function validateTrigger(triggerId: string, trigger: TriggerNode, path: string, diagnostics: Diagnostic[], options: FlowGraphValidationOptions): void {
   if (trigger.kind == 'start') return
   const outputs = triggerOutputDefinitions(trigger)
   if (outputs.some((port) => hasRetiredRef(port.jsonSchema)))
@@ -214,7 +223,7 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, path: string, 
   if (trigger.kind == 'error' || trigger.kind == 'cron' || trigger.kind == 'manual') return
   if (trigger.connectionId == null)
     diagnostics.push(graphDiagnostic('trigger.connection-missing', 'Select a connection account for this Trigger.', `${path}/connectionId`))
-  const missingConfig = missingTriggerConfig(trigger.definition.configInputs, trigger.config)
+  const missingConfig = options.mode === 'template' ? [] : missingTriggerConfig(trigger.definition.configInputs, trigger.config)
   if (missingConfig.length > 0) {
     diagnostics.push({
       ...graphDiagnostic('trigger.config-incomplete', `Complete the required Trigger config fields: ${missingConfig.join(', ')}.`, `${path}/config`, {
@@ -224,7 +233,8 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, path: string, 
     })
   } else {
     try {
-      resolveTriggerConfig(trigger.definition.configInputs, trigger.config)
+      if (options.mode === 'template') validateTemplateTriggerConfig(trigger.definition.configInputs, trigger.config)
+      else resolveTriggerConfig(trigger.definition.configInputs, trigger.config)
     } catch {
       diagnostics.push(
         graphDiagnostic('trigger.config-invalid', `Trigger "${triggerId}" config does not match its fixed definition.`, `${path}/config`, { triggerId }),
@@ -737,7 +747,7 @@ function validateResolution(nodeId: string, node: Extract<GraphNode, { readonly 
   }
 }
 
-function validateGraph(graph: Graph, document: FlowDocument, path: string, diagnostics: Diagnostic[]): void {
+function validateGraph(graph: Graph, document: FlowDocument, path: string, diagnostics: Diagnostic[], options: FlowGraphValidationOptions): void {
   const analysis = graphPaths(graph)
   const errorTriggers = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'error')
   if (errorTriggers.length > 1)
@@ -821,7 +831,7 @@ function validateGraph(graph: Graph, document: FlowDocument, path: string, diagn
         diagnostics.push(graphDiagnostic('node.retry-invalid', 'Retries must be 0–5 with an interval of 1–60 whole seconds.', `${nodePath}/retry`))
     }
     if (isTriggerNode(node)) {
-      validateTrigger(nodeId, node, nodePath, diagnostics)
+      validateTrigger(nodeId, node, nodePath, diagnostics, options)
       continue
     }
     for (const [handle, mapping] of Object.entries(nodeInputMappings(node))) {
@@ -917,7 +927,7 @@ function validateGraph(graph: Graph, document: FlowDocument, path: string, diagn
   }
 }
 
-export function validateFlowGraph(revision: RevisionContent): readonly Diagnostic[] {
+export function validateFlowGraph(revision: RevisionContent, options: FlowGraphValidationOptions = {}): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = []
   for (const [id, node] of Object.entries(revision.document.graph.nodes)) {
     if (node.kind != 'start' && node.kind != 'outputs') continue
@@ -938,6 +948,6 @@ export function validateFlowGraph(revision: RevisionContent): readonly Diagnosti
       )
     }
   }
-  validateGraph(revision.document.graph, revision.document, '/document/graph', diagnostics)
+  validateGraph(revision.document.graph, revision.document, '/document/graph', diagnostics, options)
   return diagnostics
 }
