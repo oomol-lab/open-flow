@@ -1,4 +1,4 @@
-import type { Group, InputPort, InputValues, Port } from '../../flow/common/model.ts'
+import type { BindingSource, Group, InputPort, InputValues, Port } from '../../flow/common/model.ts'
 import type { WebhookMethod } from '../../flow/common/webhookMethod.ts'
 
 /** Trigger node shapes. The graph node union and its operations belong to flow/common/change.ts. */
@@ -38,8 +38,16 @@ export type TriggerKeySnapshot =
 
 export interface WebhookBodyField extends InputPort {}
 
+/** Request admission check applied before a Webhook Run is created. The secret is a Variable binding. */
+export type WebhookAuthentication =
+  | { readonly secret: BindingSource; readonly type: 'bearer' }
+  | { readonly name: string; readonly secret: BindingSource; readonly type: 'header' }
+
 export interface WebhookOptions {
   readonly allowedOrigins?: readonly string[]
+  readonly authentication?: WebhookAuthentication
+  /** `fields` (default) accepts only declared body fields; `any` accepts any JSON object or array. */
+  readonly bodyMode?: 'any' | 'fields'
   readonly responseBody?:
     | { readonly kind: 'workflow-outputs'; readonly output?: string; readonly timeoutMs?: number }
     | { readonly kind: 'webhook-response'; readonly nodeId?: string; readonly timeoutMs?: number }

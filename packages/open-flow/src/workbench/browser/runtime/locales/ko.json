@@ -936,7 +936,8 @@
         "webhook-response-header-name": "유효하고 중복되지 않는 HTTP 헤더 이름을 입력하세요.",
         "webhook-response-header-output-missing": "워크플로 출력 \"{{output}}\"이 없습니다.",
         "webhook-response-header-output-type": "텍스트, 숫자, 불리언 또는 이러한 값만 포함하는 객체를 선택하세요.",
-        "webhook-response-status-output-type": "상태 코드에는 숫자 형식의 워크플로 출력을 선택하세요."
+        "webhook-response-status-output-type": "상태 코드에는 숫자 형식의 워크플로 출력을 선택하세요.",
+        "webhook-authentication-header-name": "Webhook 전송 계층에서 예약하지 않은 유효한 HTTP 헤더 이름을 사용하세요."
       },
       "leina": {
         "robot-required": "Leina 로봇을 선택하거나 식별자의 입력 소스를 연결하세요."
@@ -1189,7 +1190,19 @@
     "webhookSelectResponse": "Webhook 응답 노드 선택",
     "webhookResponseDisconnected": "Webhook 응답 노드가 연결되지 않았습니다",
     "webhookConnectResponse": "캔버스에서 Webhook 응답 노드를 선택하여 연결하세요.",
-    "webhookMissingResponse": "선택한 Webhook 응답 노드가 없습니다"
+    "webhookMissingResponse": "선택한 Webhook 응답 노드가 없습니다",
+    "webhookBodyMode": "요청 본문",
+    "webhookBodyModeFields": "선언된 필드",
+    "webhookBodyModeAny": "모든 JSON",
+    "webhookBodyModeAnyHint": "모든 JSON 객체 또는 배열을 받습니다. 선언된 필드는 유지되지만 사용되지 않습니다.",
+    "webhookAuthentication": "인증",
+    "webhookAuthenticationNone": "없음",
+    "webhookAuthenticationBearer": "Bearer 토큰",
+    "webhookAuthenticationHeader": "사용자 지정 헤더",
+    "webhookAuthenticationHint": "비밀 값이 없는 요청은 401로 거부되며 실행이 시작되지 않습니다. 자격 증명 헤더는 headers 출력에서 제거됩니다.",
+    "webhookAuthenticationHeaderName": "비밀 헤더 이름",
+    "webhookAuthenticationHeaderInvalid": "Host, Content-Type, Content-Length, Idempotency-Key를 제외한 유효한 HTTP 헤더 이름을 입력하세요.",
+    "webhookAuthenticationSecret": "비밀 변수"
   },
   "conditionEditor": {
     "addCondition": "조건 추가",

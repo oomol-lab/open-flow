@@ -689,7 +689,7 @@ The published top-level `inputDefs` reads the fixed Publication Revision using t
 Each entry contains `nodeId`, `name`, optional `description`, `type`, and `config`
 using the existing authoring business configuration. Webhook `config` includes
 `method`, named `body` fields (schema, nullable, optional default/description) and
-optional response `options`. Methods without bodies return `body: {}` even if
+optional request and response `options`. Methods without bodies return `body: {}` even if
 unused field definitions remain stored. Cron includes schedules; Error includes
 source Flow IDs. Poll and Integration additionally expose `provider` and `inputs`
 as their fixed configuration assignments, preserving explicit value/unset and
@@ -836,10 +836,12 @@ Webhook declares four required outputs in this order: `headers`, `query`, `body`
 
 - headers: a string map with lowercase names.
 - query: a string for one value, an ordered string array for repeated values.
-- body: a strict JSON object defined by `bodyFields`.
+- body: a strict JSON object defined by `bodyFields`, or with `options.bodyMode: "any"` any JSON object or top-level array. Other JSON values return 400; stored `bodyFields` stay inactive.
 - webhookUrl: the absolute server Request URL without query or fragment.
 
-Empty bodies validate as `{}` without field defaults. Headers are retained in full without Trigger-layer redaction.
+Empty bodies validate as `{}` without field defaults. Headers are retained in full without Trigger-layer redaction, except the credential header of a configured authentication policy.
+
+`options.authentication` is `{ type: "bearer", secret }` (`Authorization: Bearer <secret>`, scheme case-insensitive) or `{ type: "header", name, secret }` (exact header value). In stored content `secret` is a `{ kind: "binding", bindingId }` Variable binding; public authoring and published entry reads expose `{ kind: "variable", name }`. The check follows CORS preflight and method validation and precedes body reading and admission: a missing or wrong credential returns 401 (Bearer adds `WWW-Authenticate: Bearer`) and creates no Run or occurrence; an unavailable or empty secret returns 503. Comparison is constant-time over SHA-256 digests. The secret Variable belongs to the Flow closure, so Publication requires it. `content-length`, `content-type`, `host` and `idempotency-key` cannot be custom authentication headers. Hosts implement this with `verifyWebhookAuthentication`, `webhookOutputHeaders` and `webhookAuthenticationVariable` from `@oomol-lab/open-flow/webhook-trigger`.
 
 Webhook HTTP admission uses idempotency rules separate from Control API. Without `Idempotency-Key`, each request creates a Run. With a key, admission deduplicates within endpoint and runtime-version scope.
 

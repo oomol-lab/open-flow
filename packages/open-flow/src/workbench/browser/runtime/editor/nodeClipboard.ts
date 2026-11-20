@@ -2,7 +2,9 @@ import type { ChangeOperation, CodeModule, Draft, GraphNode, InputMapping } from
 import type { RevisionView } from '../revisionView.ts'
 import type { FlowChanges } from './flowChanges.ts'
 
+import { isTriggerNode } from '../../../../flow/common/change.ts'
 import { nodeInputMappings, mapConditionSources } from '../../../../flow/common/condition.ts'
+import { triggerBindingIds } from '../../../../trigger/common/contract.ts'
 import { nameCreatedNodes } from './flowChanges.ts'
 
 export interface NodeClipboard {
@@ -25,6 +27,11 @@ export function copyNodes(revision: RevisionView, nodeIds: readonly string[]): N
     edges: (revision.graph()?.edges ?? []).filter((edge) => copied[edge.source] != null && copied[edge.target] != null),
     bindings: Object.fromEntries(
       Object.values(copied).flatMap((node) => {
+        if (isTriggerNode(node))
+          return triggerBindingIds(node).flatMap((bindingId) => {
+            const binding = revision.binding(bindingId)
+            return binding?.kind == 'variable' ? [[bindingId, binding]] : []
+          })
         if (!('inputs' in node) && node.kind != 'outputs') return []
         const inputs = Object.values(nodeInputMappings(node))
         return inputs.flatMap((mapping) =>
@@ -65,6 +72,11 @@ export function pasteNodes(revision: RevisionView, clipboard: NodeClipboard, ide
   const operations: ChangeOperation[] = []
   const bindingIds = new Map<string, string>()
   for (const [, node] of entries) {
+    if (isTriggerNode(node)) {
+      for (const bindingId of triggerBindingIds(node))
+        if (clipboard.bindings[bindingId]?.kind == 'variable' && !bindingIds.has(bindingId)) bindingIds.set(bindingId, identity())
+      continue
+    }
     if (!('inputs' in node) && node.kind != 'outputs') continue
     const inputs = Object.values(nodeInputMappings(node))
     for (const mapping of inputs) {
@@ -83,9 +95,26 @@ export function pasteNodes(revision: RevisionView, clipboard: NodeClipboard, ide
     const nodeId = ids.get(sourceId)!
     if (!('inputs' in node) && node.kind != 'outputs') {
       const response = node.kind === 'webhook' ? node.options?.responseBody : undefined
+      const authentication = node.kind === 'webhook' ? node.options?.authentication : undefined
       const copy =
-        node.kind === 'webhook' && response?.kind === 'webhook-response' && response.nodeId != null
-          ? { ...node, options: { ...node.options, responseBody: { ...response, nodeId: ids.get(response.nodeId) ?? response.nodeId } } }
+        node.kind === 'webhook' && ((response?.kind === 'webhook-response' && response.nodeId != null) || authentication != null)
+          ? {
+              ...node,
+              options: {
+                ...node.options,
+                ...(response?.kind === 'webhook-response' && response.nodeId != null
+                  ? { responseBody: { ...response, nodeId: ids.get(response.nodeId) ?? response.nodeId } }
+                  : {}),
+                ...(authentication == null
+                  ? {}
+                  : {
+                      authentication: {
+                        ...authentication,
+                        secret: { ...authentication.secret, bindingId: bindingIds.get(authentication.secret.bindingId) ?? authentication.secret.bindingId },
+                      },
+                    }),
+              },
+            }
           : node
       operations.push({ kind: 'graph.node.create', node: copy, nodeId })
       continue

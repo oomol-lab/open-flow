@@ -163,6 +163,23 @@ Drafts may retain an unselected robot for editing, but `flow_check` reports `lei
 
 Action account selections use an omitted `connectionId` for unconfigured, a nonempty ID for selected, and `""` for explicitly deferred. Deferral is supported by Connector Tasks, Provider API requests, independent Code Actions, Agent tools and notifications, but not Provider Triggers. It bypasses only account readiness checks. A deferred Action or API request fails if called; deferred Agent tools are excluded from the callable tool set. Preserve this distinction in public reads, edits and exports.
 
+## Webhook requests
+
+`config.options.bodyMode: "any"` accepts any JSON object or top-level array as `body` for relays
+whose payload shape is not known in advance. Declared `body` fields stay saved but inactive, so
+switching back restores them. Other JSON values, such as strings, numbers, booleans and null, return 400 without
+starting a Run. The default `"fields"` keeps the strict declared-field contract.
+
+`config.options.authentication` rejects unauthenticated requests before Run admission. Use
+`{ "type": "bearer", "secret": { "kind": "variable", "name": "WEBHOOK_TOKEN" } }` or
+`{ "type": "header", "name": "X-Webhook-Secret", "secret": { "kind": "variable", "name": "WEBHOOK_TOKEN" } }`.
+The secret is always a Variable; the Revision stores a binding like any other Variable reference,
+and removing the policy removes an unused binding. A missing or wrong secret returns 401 (with
+`WWW-Authenticate: Bearer` for bearer), and a missing or empty Variable returns 503; neither starts a Run.
+Rejected requests count toward the endpoint's rate limit, so repeated guessing is answered with 429. The credential
+header is dropped from the `headers` output. Both settings are Flow features (`webhook-any-body`, `webhook-authentication`), so
+earlier readers reject such content instead of dropping the policy.
+
 ## Webhook HTTP responses
 
 Webhook response configuration is static business configuration applied after Run admission, not

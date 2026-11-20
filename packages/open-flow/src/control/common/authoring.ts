@@ -191,7 +191,7 @@ export function authoringNode(content: RevisionContent, ref: string) {
       case 'error':
       case 'poll':
       case 'integration':
-        config = triggerConfiguration(node)
+        config = triggerConfiguration(node, content.document)
         break
     }
   }
@@ -623,6 +623,10 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
           const responsePolicy = record(responseOptions.responseBody)
           if (responsePolicy.kind === 'webhook-response' && typeof responsePolicy.nodeId === 'string')
             settings.options = { ...responseOptions, responseBody: { ...responsePolicy, nodeId: resolve(responsePolicy.nodeId) } }
+          const authentication = record(record(settings.options).authentication)
+          const secret = record(authentication.secret)
+          if (secret.kind === 'variable' && typeof secret.name === 'string')
+            settings.options = { ...record(settings.options), authentication: { ...authentication, secret: source({ kind: 'variable', name: secret.name }) } }
           const { options: _options, ...withoutOptions } = next as Extract<GraphNode, { kind: 'webhook' }>
           next = { ...withoutOptions, ...settings, bodyFields: fieldsToPorts(body, node.bodyFields) } as GraphNode
           break

@@ -155,6 +155,23 @@ it('hides retired bindings and ignores body fields for bodyless methods', () => 
   expect(entries[0]).toHaveProperty('config.body', {})
 })
 
+it('names the Webhook authentication Variable instead of its binding identity', () => {
+  const webhook = nodes.webhook
+  if (webhook?.kind != 'webhook') throw new Error('Missing fixture')
+  const options = { bodyMode: 'any' as const, authentication: { type: 'bearer' as const, secret: { kind: 'binding' as const, bindingId: 'secret' } } }
+  const changed = {
+    ...content,
+    document: {
+      bindings: { secret: { kind: 'variable' as const, target: 'WEBHOOK_TOKEN' } },
+      graph: { edges: [], nodes: { webhook: { ...webhook, options } } },
+    },
+  }
+  const entries = liveEntries(changed, publication, bindings)
+  expect(decodeLiveDetails({ ...details(), entries }).entries[0]).toMatchObject({
+    config: { options: { bodyMode: 'any', authentication: { type: 'bearer', secret: { kind: 'variable', name: 'WEBHOOK_TOKEN' } } } },
+  })
+})
+
 it('preserves listener health separately from subscription health', () => {
   const entries = liveEntries(
     content,

@@ -574,6 +574,10 @@ export class ServerService {
     return this.#webhookTargets.target(endpointId)
   }
 
+  webhookAuthenticationSecret(target: WebhookTarget): string | undefined {
+    return this.#webhookTargets.authenticationSecret(target)
+  }
+
   webhookEndpoint(flowId: string, triggerNodeId: string): string | undefined {
     return this.#store.triggers.webhookEndpoint(flowId, triggerNodeId)
   }

@@ -26,6 +26,10 @@ describe('Trigger test defaults', () => {
     const get: TriggerNode = { ...trigger, method: 'GET' }
     expect(defaultTriggerTestOutputs(get)).not.toHaveProperty('body')
     expect(matchesTriggerOutputs(get, defaultTriggerTestOutputs(get))).toBe(true)
+    const any: TriggerNode = { ...trigger, options: { bodyMode: 'any' } }
+    const anyOutputs = defaultTriggerTestOutputs(any)
+    expect(anyOutputs.body).not.toHaveProperty('count')
+    expect(matchesTriggerOutputs(any, anyOutputs)).toBe(true)
   })
 
   it('fills required Start parameters and keeps nullable parameters omitted', () => {

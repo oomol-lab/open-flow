@@ -1,6 +1,6 @@
 import type { JsonValue } from '../../flow/common/model.ts'
 import type { WebhookMethod } from '../../flow/common/webhookMethod.ts'
-import type { WebhookBodyField, WebhookOptions } from './model.ts'
+import type { WebhookAuthentication, WebhookBodyField, WebhookOptions } from './model.ts'
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../base/common/json.ts'
@@ -61,6 +61,52 @@ function workflowOutputValue(result: unknown, output?: string): JsonValue | unde
   return output == null ? result.outputs : Object.hasOwn(result.outputs, output) ? result.outputs[output] : undefined
 }
 
+/** Flow document bindings by identity, as stored in Revision content. */
+export type WebhookBindings = Readonly<Record<string, { readonly kind: 'variable'; readonly target: string }>>
+
+/** The Variable name holding the authentication secret, or undefined when the binding is not a Variable. */
+export function webhookAuthenticationVariable(bindings: WebhookBindings, authentication: WebhookAuthentication): string | undefined {
+  const binding = bindings[authentication.secret.bindingId]
+  return binding?.kind == 'variable' ? binding.target : undefined
+}
+
+/** The request header that carries the credential for an authentication policy. */
+export function webhookAuthenticationHeader(authentication: WebhookAuthentication): string {
+  return authentication.type == 'bearer' ? 'authorization' : authentication.name.toLowerCase()
+}
+
+/**
+ * Check a request against the Webhook authentication policy. Comparison runs over SHA-256 digests in constant time so
+ * the response time does not reveal how much of the credential matched. An empty secret never authenticates.
+ */
+export async function verifyWebhookAuthentication(headers: Headers, authentication: WebhookAuthentication, secret: string): Promise<boolean> {
+  if (secret.length == 0) return false
+  const value = headers.get(webhookAuthenticationHeader(authentication))
+  if (value == null) return false
+  const credential = authentication.type == 'bearer' ? bearerToken(value) : value
+  if (credential == null) return false
+  const [actual, expected] = await Promise.all([digest(credential), digest(secret)])
+  let difference = 0
+  for (let index = 0; index < expected.length; index++) difference |= actual[index]! ^ expected[index]!
+  return difference == 0
+}
+
+/** Request headers exposed to the Run. The authentication credential header is never stored with Run outputs. */
+export function webhookOutputHeaders(headers: Headers, options: WebhookOptions | undefined): Readonly<Record<string, string>> {
+  const values = Object.fromEntries(headers)
+  if (options?.authentication != null) delete values[webhookAuthenticationHeader(options.authentication)]
+  return values
+}
+
+function bearerToken(value: string): string | undefined {
+  const match = /^Bearer[ ]+(\S+)[ ]*$/i.exec(value)
+  return match?.[1]
+}
+
+async function digest(value: string): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)))
+}
+
 const endpointPattern = /^\/v1\/webhooks\/(endpoint_[0-9a-f]{32})$/
 const encoder = new TextEncoder()
 
@@ -77,9 +123,13 @@ export async function webhookOccurrenceId(endpointId: string, runtimeVersion: nu
 }
 
 export interface WebhookConformanceFixture {
+  /** Flow document bindings, such as the Variable binding an authentication policy references. */
+  readonly bindings?: WebhookBindings
   readonly bodyFields: readonly WebhookBodyField[]
   readonly method: WebhookMethod
   readonly options?: WebhookOptions
+  /** Variable values the Flow owner holds before the first publication. */
+  readonly variables?: Readonly<Record<string, string>>
 }
 
 export interface WebhookConformanceHarness {
@@ -142,7 +192,85 @@ const messageInputs: readonly WebhookBodyField[] = [
 
 const messagePayload = { event: { message: 'hello' } } as const
 
+const secretBinding = { secret: { kind: 'variable', target: 'WEBHOOK_SECRET' } } as const
+const secretValue = 'conformance-secret-value'
+
 export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
+  {
+    fixture: {
+      bindings: secretBinding,
+      bodyFields: noInputs,
+      method: 'POST',
+      options: { authentication: { secret: { bindingId: 'secret', kind: 'binding' }, type: 'bearer' } },
+      variables: { WEBHOOK_SECRET: secretValue },
+    },
+    name: 'rejects requests without the bearer secret before admission and hides the credential',
+    async verify(harness) {
+      const challenge = { body: '', headers: { 'www-authenticate': 'Bearer' }, status: 401 }
+      await response(await call(harness), challenge, 'Missing credential')
+      await response(await call(harness, { headers: { Authorization: 'Bearer wrong' } }), challenge, 'Wrong credential')
+      await response(await call(harness, { headers: { Authorization: `Basic ${secretValue}` } }), challenge, 'Wrong scheme')
+      await response(await call(harness, { headers: { Authorization: `Bearer ${secretValue}x` } }), challenge, 'Credential with suffix')
+      equal(await harness.outputs(), [], 'Rejected requests admit no Run')
+      await response(
+        await call(harness, { headers: { 'Authorization': `bearer ${secretValue}`, 'X-Request-ID': 'kept' } }),
+        { status: 200 },
+        'Valid credential',
+      )
+      const stored = await harness.outputs()
+      equal(stored.length, 1, 'One admitted Run')
+      const headers = stored[0]!.headers as Record<string, JsonValue>
+      equal(headers.authorization, undefined, 'Credential header removed from outputs')
+      equal(headers['x-request-id'], 'kept', 'Other headers kept')
+    },
+  },
+  {
+    fixture: {
+      bindings: secretBinding,
+      bodyFields: noInputs,
+      method: 'POST',
+      options: {
+        allowedOrigins: ['https://client.example'],
+        authentication: { name: 'X-Webhook-Secret', secret: { bindingId: 'secret', kind: 'binding' }, type: 'header' },
+      },
+      variables: { WEBHOOK_SECRET: secretValue },
+    },
+    name: 'checks a custom secret header after CORS preflight',
+    async verify(harness) {
+      const origin = 'https://client.example'
+      await response(
+        await call(harness, { headers: { 'Access-Control-Request-Method': 'POST', 'Origin': origin }, method: 'OPTIONS' }),
+        { headers: { 'access-control-allow-origin': origin }, status: 204 },
+        'Preflight without credential',
+      )
+      await response(
+        await call(harness, { headers: { 'Origin': origin, 'X-Webhook-Secret': 'wrong' } }),
+        { headers: { 'access-control-allow-origin': origin, 'www-authenticate': null }, status: 401 },
+        'Wrong header secret',
+      )
+      await response(await call(harness, { headers: { Authorization: `Bearer ${secretValue}` } }), { status: 401 }, 'Bearer is not the configured header')
+      equal(await harness.outputs(), [], 'Rejected requests admit no Run')
+      await response(await call(harness, { headers: { 'x-webhook-secret': secretValue } }), { status: 200 }, 'Valid header secret')
+      const stored = await harness.outputs()
+      equal(stored.length, 1, 'One admitted Run')
+      equal((stored[0]!.headers as Record<string, JsonValue>)['x-webhook-secret'], undefined, 'Secret header removed from outputs')
+    },
+  },
+  {
+    fixture: { bodyFields: messageInputs, method: 'POST', options: { bodyMode: 'any' } },
+    name: 'accepts any JSON object or array body and ignores inactive declared fields',
+    async verify(harness) {
+      const accepted = [{ undeclared: { nested: [1, 2] } }, [{ id: 1 }, 'two'], []]
+      for (const body of accepted) await response(await call(harness, { body: JSON.stringify(body) }), { status: 200 }, `Body ${JSON.stringify(body)}`)
+      await response(await call(harness), { status: 200 }, 'Empty body')
+      for (const body of ['"text"', '5', 'null', 'true', '{']) await response(await call(harness, { body }), { status: 400 }, `Rejected body ${body}`)
+      equal(
+        (await harness.outputs()).map((outputs) => outputs.body),
+        [...accepted, {}],
+        'Admitted bodies',
+      )
+    },
+  },
   {
     fixture: { bodyFields: messageInputs, method: 'POST' },
     name: 'stores complete outputs and compares query and body for idempotency',

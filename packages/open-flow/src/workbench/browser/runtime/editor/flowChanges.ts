@@ -126,6 +126,11 @@ export interface WebhookSettings {
   readonly options: WebhookOptions
 }
 
+/** Authentication chosen in the Workbench, naming its secret Variable instead of a binding identity. */
+export type WebhookAuthenticationChoice =
+  | { readonly type: 'bearer'; readonly variable: string }
+  | { readonly name: string; readonly type: 'header'; readonly variable: string }
+
 export interface ValueSettings {
   readonly description?: string
   readonly handle: string
@@ -527,7 +532,33 @@ export function updateWebhook(revision: RevisionView, triggerId: string, setting
   const before = { bodyFields: trigger.bodyFields, method: trigger.method, options: trigger.options }
   const value = { bodyFields: settings.bodyFields, method: settings.method, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
   if (dequal(before, value)) return []
-  return [{ before, kind: 'graph.node.webhook.set', nodeId: triggerId, value }]
+  return cleanVariableBindings(revision.revision.content, [{ before, kind: 'graph.node.webhook.set', nodeId: triggerId, value }])
+}
+
+/** Bind the authentication secret to a Variable, reusing an existing binding for the same Variable. */
+export function setWebhookAuthentication(
+  revision: RevisionView,
+  triggerId: string,
+  choice: WebhookAuthenticationChoice | undefined,
+  bindingId: string,
+): FlowChanges | undefined {
+  const trigger = revision.trigger(triggerId)
+  if (trigger?.kind !== 'webhook') return
+  const options = { ...trigger.options }
+  const settings = { bodyFields: trigger.bodyFields, method: trigger.method, options }
+  if (choice == null) {
+    delete options.authentication
+    return updateWebhook(revision, triggerId, settings)
+  }
+  const bindings = revision.revision.content.document.bindings
+  const existing = Object.entries(bindings).find(([, binding]) => binding.kind == 'variable' && binding.target == choice.variable)?.[0]
+  const secret = { bindingId: existing ?? bindingId, kind: 'binding' as const }
+  options.authentication = choice.type == 'bearer' ? { secret, type: 'bearer' } : { name: choice.name, secret, type: 'header' }
+  const before = { bodyFields: trigger.bodyFields, method: trigger.method, options: trigger.options }
+  return cleanVariableBindings(revision.revision.content, [
+    ...(existing == null ? [{ binding: { kind: 'variable' as const, target: choice.variable }, bindingId, kind: 'binding.create' as const }] : []),
+    { before, kind: 'graph.node.webhook.set', nodeId: triggerId, value: settings },
+  ])
 }
 
 /** Choosing a response node deactivates only workflow-output references. */

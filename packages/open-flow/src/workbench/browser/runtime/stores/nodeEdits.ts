@@ -4,7 +4,16 @@ import type { WaitAutoContinue } from '../../../../flow/common/change.ts'
 import type { TaskCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { GraphNode, InputPort, Port, JsonValue, TriggerSchedule } from '../api.ts'
-import type { RequestParameterEdit, ConditionSettings, TaskPorts, FlowChanges, TaskSettings, ValueSettings, WebhookSettings } from '../editor/flowChanges.ts'
+import type {
+  RequestParameterEdit,
+  ConditionSettings,
+  TaskPorts,
+  FlowChanges,
+  TaskSettings,
+  ValueSettings,
+  WebhookAuthenticationChoice,
+  WebhookSettings,
+} from '../editor/flowChanges.ts'
 import type { PropertyDeletion } from '../editor/propertyDeletion.ts'
 import type { RevisionView } from '../revisionView.ts'
 
@@ -31,6 +40,7 @@ import {
   updateTask,
   updateValue,
   updateResolution,
+  setWebhookAuthentication as changeWebhookAuthentication,
   updateWebhook,
   updateTriggerConfig,
   setTriggerEventSource,
@@ -262,6 +272,13 @@ export class NodeEdits {
     if (revision == null) return false
     const changes = updateWebhook(revision, triggerId, settings)
     return changes != null && (await this.save(changes, deletion))
+  }
+
+  public async setWebhookAuthentication(triggerId: string, choice: WebhookAuthenticationChoice | undefined): Promise<boolean> {
+    const revision = this.revision.value
+    if (revision == null) return false
+    const changes = changeWebhookAuthentication(revision, triggerId, choice, this.identity())
+    return changes != null && (await this.save(changes))
   }
 
   public async setTriggerConnection(triggerId: string, connectionId: string | undefined): Promise<boolean> {

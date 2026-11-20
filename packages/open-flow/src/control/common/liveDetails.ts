@@ -57,7 +57,7 @@ export function liveEntries(content: RevisionContent, current: Publication, bind
         node.kind != 'integration'
       )
         return []
-      const config = triggerConfiguration(node)
+      const config = triggerConfiguration(node, content.document)
       const value = {
         nodeId,
         name: node.name,

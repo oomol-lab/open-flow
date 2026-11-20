@@ -749,6 +749,20 @@ export function NodeInspector({
             onChange={(settings, deletion) => {
               void store?.nodes.saveWebhook(selection.id, settings, deletion)
             }}
+            authenticationVariable={
+              selection.trigger.options?.authentication == null
+                ? undefined
+                : revision.binding(selection.trigger.options.authentication.secret.bindingId)?.target
+            }
+            variables={variables}
+            requestDiagnostics={revision.webhookRequestDiagnostics(selection.id)}
+            onAuthenticationChange={
+              readOnly
+                ? undefined
+                : (choice) => {
+                    void store?.nodes.setWebhookAuthentication(selection.id, choice)
+                  }
+            }
           />
         )}
         {selection?.kind === 'trigger' && (selection.trigger.kind === 'cron' || selection.trigger.kind === 'poll') && (

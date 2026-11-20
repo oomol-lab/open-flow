@@ -5,7 +5,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useCallback, useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { webhookResponseDiagnostics } from '../../src/flow/common/graph.ts'
+import { webhookRequestDiagnostics, webhookResponseDiagnostics } from '../../src/flow/common/graph.ts'
 import { applyFlowChanges } from '../../src/workbench/browser/runtime/editor/flowChanges.ts'
 import { addNode } from '../../src/workbench/browser/runtime/editor/flowChanges.ts'
 import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
@@ -14,6 +14,9 @@ import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { revisionView } from '../../src/workbench/browser/runtime/revisionView.ts'
 import { useStoryActions } from './storyActions.tsx'
 import { triggerDraft } from './triggerFixtures.ts'
+
+const secretSource = { bindingId: 'secret', kind: 'binding' } as const
+const storyVariables = { enabled: true, loaded: true, loading: false, names: ['WEBHOOK_TOKEN', 'RELAY_SECRET'] }
 
 function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
@@ -25,8 +28,10 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
     method: 'POST',
     options: {},
   })
+  const [secretVariable, setSecretVariable] = useState('WEBHOOK_TOKEN')
   const setSample = useCallback(
     (next: WebhookSettings) => {
+      setSecretVariable('WEBHOOK_TOKEN')
       setOutputState('ready')
       setCreatedOutputs(undefined)
       setWebhook(next)
@@ -56,6 +61,27 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
           },
         },
         { label: 'Default POST', onClick: () => setSample({ bodyFields: [], method: 'POST', options: {} }) },
+        {
+          label: 'Any JSON body',
+          onClick: () =>
+            setSample({ bodyFields: [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }], method: 'POST', options: { bodyMode: 'any' } }),
+        },
+        {
+          label: 'Bearer authentication',
+          onClick: () => setSample({ bodyFields: [], method: 'POST', options: { authentication: { secret: secretSource, type: 'bearer' } } }),
+        },
+        {
+          label: 'Header authentication',
+          onClick: () =>
+            setSample({ bodyFields: [], method: 'POST', options: { authentication: { name: 'X-Relay-Secret', secret: secretSource, type: 'header' } } }),
+        },
+        {
+          label: 'Missing secret Variable',
+          onClick: () => {
+            setSample({ bodyFields: [], method: 'POST', options: { authentication: { secret: secretSource, type: 'bearer' } } })
+            setSecretVariable('REMOVED_SECRET')
+          },
+        },
         { label: 'GET', onClick: () => setSample({ bodyFields: [], method: 'GET', options: {} }) },
         {
           label: 'Request fields',
@@ -206,6 +232,20 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
             }}
             workflowOutputs={graph.nodes.outputs?.kind === 'outputs' ? graph.nodes.outputs : undefined}
             responseDiagnostics={webhookResponseDiagnostics(graph, 'webhook')}
+            authenticationVariable={webhook.options.authentication == null ? undefined : secretVariable}
+            variables={storyVariables}
+            requestDiagnostics={webhookRequestDiagnostics(graph, { bindings: { secret: { kind: 'variable', target: secretVariable } }, graph }, 'webhook')}
+            onAuthenticationChange={(choice) => {
+              const options = { ...webhook.options }
+              if (choice == null) delete options.authentication
+              else {
+                setSecretVariable(choice.variable)
+                options.authentication =
+                  choice.type === 'bearer' ? { secret: secretSource, type: 'bearer' } : { name: choice.name, secret: secretSource, type: 'header' }
+              }
+              setWebhook({ ...webhook, options })
+              log('Save webhook authentication', choice)
+            }}
             onAddWorkflowOutputs={() => {
               const { draft } = triggerDraft({ kind: 'webhook', name: 'Webhook', ...webhook })
               const current = { ...draft, content: { ...draft.content, document: { bindings: {}, graph } } }
@@ -243,7 +283,7 @@ export const webhookStory: FrontendStory = {
   propertyPanel: true,
   title: 'Webhook Editor',
   description:
-    'Choose fixed content, workflow outputs or an early Webhook Response node. Compare body, status and whole/per-field header sources, standard object disclosure and child indentation, node submenus with incompatible fields, long names, missing or disconnected outputs, quick creation, and read-only settings.',
+    'Choose declared or any-JSON request bodies and Bearer or custom-header authentication backed by a Variable, including a missing Variable. Choose fixed content, workflow outputs or an early Webhook Response node. Compare body, status and whole/per-field header sources, standard object disclosure and child indentation, node submenus with incompatible fields, long names, missing or disconnected outputs, quick creation, and read-only settings.',
   standalone: true,
   render: (log, dark, language) => <WebhookStory dark={dark} language={language} log={log} />,
 }

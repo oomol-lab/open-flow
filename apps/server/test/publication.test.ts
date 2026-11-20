@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
+import { createServerApp } from '../node/transport/http.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
 const directories: string[] = []
@@ -97,6 +98,52 @@ function publish(
 }
 
 describe('Server Publication and Webhook target', () => {
+  it('requires the Webhook authentication Variable at publication and refuses requests once it is gone', async () => {
+    const service = await openService(await databaseFile())
+    services.add(service)
+    const created = await service.control.flows.createFlow('operator', 'Authenticated webhook', 'authenticated-webhook')
+    const base = revision()
+    const content: RevisionContent = {
+      ...base,
+      document: {
+        bindings: { secret: { kind: 'variable', target: 'WEBHOOK_TOKEN' } },
+        graph: {
+          ...base.document.graph,
+          nodes: {
+            ...base.document.graph.nodes,
+            incoming: {
+              ...(base.document.graph.nodes.incoming as Extract<RevisionContent['document']['graph']['nodes'][string], { kind: 'webhook' }>),
+              options: { authentication: { secret: { bindingId: 'secret', kind: 'binding' }, type: 'bearer' } },
+            },
+          },
+        },
+      },
+    }
+    const input = {
+      flowId: created.flow.flowId,
+      expectedLivePublicationId: null,
+      idempotencyKey: 'authenticated-webhook-publication',
+      revision: content,
+      revisionId: 'revision-authenticated-webhook',
+    } as const
+
+    await expect(publish(service, input)).resolves.toEqual({ kind: 'binding-unresolved' })
+    service.control.variables.putVariable('operator', 'WEBHOOK_TOKEN', 'token-value')
+    expect((await publish(service, input)).kind).toBe('published')
+    const endpointId = service.webhookEndpoint(created.flow.flowId, 'incoming')
+    const app = createServerApp(service)
+    const send = (token: string) =>
+      app.request(`http://server.local/v1/webhooks/${endpointId}`, {
+        body: JSON.stringify({ message: 'hello' }),
+        headers: { authorization: `Bearer ${token}` },
+        method: 'POST',
+      })
+
+    expect((await send('token-value')).status).toBe(200)
+    service.control.variables.deleteVariable('operator', 'WEBHOOK_TOKEN')
+    expect((await send('token-value')).status).toBe(503)
+  })
+
   it('checks Variable eligibility after Publish idempotency replay', async () => {
     const service = await openService(await databaseFile())
     services.add(service)

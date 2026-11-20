@@ -936,7 +936,8 @@
         "webhook-response-header-name": "請輸入有效且不重複的 HTTP 回應標頭名稱。",
         "webhook-response-header-output-missing": "工作流程輸出「{{output}}」不存在。",
         "webhook-response-header-output-type": "請選擇文字、數值、布林值，或僅包含這些值的物件。",
-        "webhook-response-status-output-type": "請選擇數字類型的工作流程輸出欄位作為狀態碼。"
+        "webhook-response-status-output-type": "請選擇數字類型的工作流程輸出欄位作為狀態碼。",
+        "webhook-authentication-header-name": "請使用有效且未被 Webhook 傳輸層保留的 HTTP 標頭名稱。"
       },
       "leina": {
         "robot-required": "請選擇 Leina 機器人，或綁定機器人識別碼的資料來源。"
@@ -1189,7 +1190,19 @@
     "webhookSelectResponse": "請選擇 Webhook 回應節點",
     "webhookResponseDisconnected": "未連接 Webhook 回應節點",
     "webhookConnectResponse": "請在畫布上選擇 Webhook 回應節點進行連接。",
-    "webhookMissingResponse": "所選 Webhook 回應節點已不存在"
+    "webhookMissingResponse": "所選 Webhook 回應節點已不存在",
+    "webhookBodyMode": "請求內容",
+    "webhookBodyModeFields": "宣告的欄位",
+    "webhookBodyModeAny": "任意 JSON",
+    "webhookBodyModeAnyHint": "接受任意 JSON 物件或陣列。已宣告的欄位會保留，但不再生效。",
+    "webhookAuthentication": "驗證",
+    "webhookAuthenticationNone": "無",
+    "webhookAuthenticationBearer": "Bearer 權杖",
+    "webhookAuthenticationHeader": "自訂標頭",
+    "webhookAuthenticationHint": "未攜帶密鑰的請求會回傳 401，且不會啟動執行。憑證所在的標頭不會出現在 headers 輸出中。",
+    "webhookAuthenticationHeaderName": "密鑰標頭名稱",
+    "webhookAuthenticationHeaderInvalid": "請輸入有效的 HTTP 標頭名稱，不能使用 Host、Content-Type、Content-Length 或 Idempotency-Key。",
+    "webhookAuthenticationSecret": "密鑰變數"
   },
   "conditionEditor": {
     "addCondition": "新增條件",
