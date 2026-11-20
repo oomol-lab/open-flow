@@ -273,3 +273,136 @@ it.each(['recover', 'handled', 'indeterminate'] as const)('uses node-level retry
     expect(calls).toBe(2)
   }
 })
+
+function artifactHost(maxBytes = 1024) {
+  const stored = new Map<string, { bytes: Uint8Array; name: string; mediaType?: string }>()
+  return {
+    stored,
+    host: {
+      maxBytes,
+      resolve: (ids: readonly string[]) => new Map(ids.flatMap((id) => (stored.has(id) ? [[id, stored.get(id)!] as const] : []))),
+      store: async (content: { bytes: Uint8Array; name: string; mediaType?: string }) => {
+        const id = `artifact-${stored.size + 1}`
+        stored.set(id, content)
+        return {
+          kind: 'artifact',
+          id,
+          name: content.name,
+          size: content.bytes.length,
+          digest: 'sha256:test',
+          ...(content.mediaType == null ? {} : { mediaType: content.mediaType }),
+        }
+      },
+    },
+  }
+}
+
+it('stores downloaded responses as Run Artifacts and uploads Artifacts as binary and multipart bodies', async () => {
+  const received: { contentType?: string; body: Buffer }[] = []
+  const server = createServer(async (request, response) => {
+    const chunks = []
+    for await (const chunk of request) chunks.push(chunk)
+    received.push({ contentType: request.headers['content-type'], body: Buffer.concat(chunks) })
+    const url = new URL(request.url!, 'http://local')
+    if (url.pathname == '/files/report%20final.pdf') {
+      response.writeHead(200, { 'Content-Type': 'application/pdf; charset=binary' })
+      response.end(Buffer.from([0, 1, 2, 255]))
+      return
+    }
+    if (url.pathname == '/named') {
+      response.writeHead(200, { 'Content-Disposition': `attachment; filename*=UTF-8''%E6%8A%A5%E5%91%8A.csv`, 'Content-Type': 'text/csv' })
+      response.end('a,b')
+      return
+    }
+    if (url.pathname == '/large') {
+      response.end(Buffer.alloc(2048))
+      return
+    }
+    if (url.pathname == '/empty') {
+      response.writeHead(204).end()
+      return
+    }
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end('{"ok":true}')
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const address = server.address()
+    if (address == null || typeof address == 'string') throw new Error('No server address')
+    const origin = `http://127.0.0.1:${address.port}`
+    const { host, stored } = artifactHost()
+    const download = await executeHttpRequest(config({ responseFormat: 'artifact' }), { url: `${origin}/files/report%20final.pdf` }, signal(), fetch, host)
+    expect(download).toMatchObject({
+      statusCode: 200,
+      body: { kind: 'artifact', id: 'artifact-1', name: 'report final.pdf', mediaType: 'application/pdf', size: 4 },
+    })
+    expect([...stored.get('artifact-1')!.bytes]).toEqual([0, 1, 2, 255])
+    expect(await executeHttpRequest(config({ responseFormat: 'artifact' }), { url: `${origin}/named` }, signal(), fetch, host)).toMatchObject({
+      body: { name: '报告.csv', mediaType: 'text/csv', size: 3 },
+    })
+    expect(await executeHttpRequest(config({ responseFormat: 'artifact' }), { url: `${origin}/empty` }, signal(), fetch, host)).toMatchObject({
+      body: { kind: 'artifact', name: 'empty', size: 0 },
+      statusCode: 204,
+    })
+    await expect(executeHttpRequest(config({ responseFormat: 'artifact' }), { url: `${origin}/large` }, signal(), fetch, host)).rejects.toMatchObject({
+      code: 'http-request.limit-exceeded',
+    })
+
+    const ref = download.body
+    received.length = 0
+    await executeHttpRequest(config({ method: 'PUT', bodyFormat: 'binary' }), { url: `${origin}/upload`, body: ref }, signal(), fetch, host)
+    expect(received[0]).toEqual({ contentType: 'application/pdf', body: Buffer.from([0, 1, 2, 255]) })
+
+    await executeHttpRequest(
+      config({ method: 'POST', bodyFormat: 'multipart', bodyFields: ['purpose', 'file', 'tags'] }),
+      { 'url': `${origin}/upload`, 'body.purpose': 'fine-tune', 'body.file': ref, 'body.tags': ['a', 2] },
+      signal(),
+      fetch,
+      host,
+    )
+    const form = await new Response(new Uint8Array(received[1]!.body), { headers: { 'content-type': received[1]!.contentType! } }).formData()
+    expect(form.get('purpose')).toBe('fine-tune')
+    expect(form.getAll('tags')).toEqual(['a', '2'])
+    const file = form.get('file') as File
+    expect({ name: file.name, type: file.type, bytes: [...new Uint8Array(await file.arrayBuffer())] }).toEqual({
+      name: 'report final.pdf',
+      type: 'application/pdf',
+      bytes: [0, 1, 2, 255],
+    })
+
+    const forged = { kind: 'artifact', id: 'another-run', name: 'x', size: 1, digest: 'sha256:x' }
+    await expect(
+      executeHttpRequest(config({ method: 'PUT', bodyFormat: 'binary' }), { url: `${origin}/upload`, body: forged }, signal(), fetch, host),
+    ).rejects.toMatchObject({ code: 'http-request.input-invalid' })
+    await expect(
+      executeHttpRequest(
+        config({ method: 'POST', bodyFormat: 'multipart', bodyFields: ['file'], headers: { names: ['content-type'] } }),
+        { 'url': `${origin}/upload`, 'body.file': 'x', 'header.content-type': 'multipart/form-data' },
+        signal(),
+        fetch,
+        host,
+      ),
+    ).rejects.toMatchObject({ code: 'http-request.input-invalid' })
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+it('declares Artifact ports for binary, multipart and artifact response formats', () => {
+  const task = httpRequestTask(config({ method: 'POST', bodyFormat: 'multipart', bodyFields: ['file', 'note'], responseFormat: 'artifact' }))
+  expect(task.inputs.filter((port) => 'handle' in port && port.handle.startsWith('body.'))).toEqual([
+    { handle: 'body.file', jsonSchema: {}, nullable: true },
+    { handle: 'body.note', jsonSchema: {}, nullable: true },
+  ])
+  expect(task.outputs.find((port) => 'handle' in port && port.handle == 'body')).toEqual({
+    handle: 'body',
+    jsonSchema: { contentMediaType: 'oomol/artifact' },
+    nullable: false,
+  })
+  expect(httpRequestTask(config({ method: 'PUT', bodyFormat: 'binary' })).inputs).toContainEqual({
+    handle: 'body',
+    jsonSchema: { contentMediaType: 'oomol/artifact' },
+    nullable: false,
+  })
+})

@@ -14,7 +14,7 @@ import { nodeInputMappings, selectConditionBranches } from '../../flow/common/co
 import { nodeInputPorts as nodePorts, isResolutionNode, nodeOutputPorts, resolutionOutputPorts } from '../../flow/common/graph.ts'
 import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
-import { validWebhookStatus, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
+import { validWebhookStatus, webhookArtifactId, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
 
 interface NodeExecutionContext {
   readonly createId: FlowRunOptions['createId']
@@ -351,6 +351,11 @@ export function executeNode(
         if (!validWebhookStatus(status)) return yield* Effect.fail(new NodeValidationError('webhook.response-status-invalid', 'Invalid HTTP response status.'))
         const headers = webhookHeaderValues(nodeInputs.headers)
         if (headers == null) return yield* Effect.fail(new NodeValidationError('webhook.response-headers-invalid', 'Invalid HTTP response headers.'))
+        if (node.bodyFormat === 'artifact') {
+          const artifactId = webhookArtifactId(nodeInputs.body)
+          if (artifactId == null) return yield* Effect.fail(new NodeValidationError('node.input-invalid', 'The response body must be a Run Artifact.'))
+          return { kind: 'completed' as const, outputs: {}, response: { artifactId, body: '', contentType: 'application/octet-stream', status, headers } }
+        }
         return { kind: 'completed' as const, outputs: {}, response: { ...encodeWebhookBody(nodeInputs.body!), status, headers } }
       }
       case 'outputs': {

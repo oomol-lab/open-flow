@@ -394,6 +394,8 @@ export function isTriggerNode(node: GraphNode): node is TriggerNode {
 }
 
 export interface WebhookResponseNode extends GraphNodeBase {
+  /** `artifact` sends the bytes of a Run Artifact given as `body` instead of JSON or text. */
+  readonly bodyFormat?: 'artifact'
   readonly kind: 'webhook-response'
   readonly retry?: never
   readonly onError?: never

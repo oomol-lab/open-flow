@@ -20,7 +20,7 @@ function content(): RevisionContent {
     document: {
       bindings: { token: { kind: 'variable', target: 'API_TOKEN' } },
       graph: {
-        edges: ['get', 'post', 'object', 'invalid'].map((target) => ({ source: 'parameters', target })),
+        edges: ['get', 'post', 'object', 'files', 'invalid'].map((target) => ({ source: 'parameters', target })),
         nodes: {
           parameters: {
             kind: 'value',
@@ -91,6 +91,15 @@ function content(): RevisionContent {
               headers: { kind: 'value', value: { Accept: 'application/json' } },
             },
           },
+          files: {
+            kind: 'task',
+            name: 'Files',
+            task: task({ method: 'POST', bodyFormat: 'multipart', bodyFields: ['file', 'note'], responseFormat: 'artifact' }),
+            inputs: {
+              'url': { kind: 'value', value: 'https://example.test/convert' },
+              'body.note': { kind: 'value', value: 'Convert to PDF' },
+            },
+          },
           invalid: {
             kind: 'task',
             name: 'Incomplete',
@@ -120,7 +129,7 @@ function HttpRequestStory({ dark, language, log }: { dark: boolean; language: Ui
     return () => next.dispose()
   }, [language])
   useStoryActions([
-    ...['get', 'post', 'object', 'invalid'].map((id) => ({
+    ...['get', 'post', 'object', 'files', 'invalid'].map((id) => ({
       label: id,
       onClick: () => {
         setSelected(id)
@@ -190,7 +199,7 @@ export const httpRequestStories: FrontendStory[] = [
     group: 'Node HTTP Request',
     title: 'Properties',
     description:
-      'Request, Authentication, and Response settings are separate sections. URL comes before Method; Request body stays beside its format and credentials beside their authentication type. Edit Query and Headers as objects. Bind the whole object or individual fields to Request data, add and rename fields, and reopen the panel. The invalid sample checks editing and saving with configuration errors. Check that Request body and Response outputs distinguish sent and received data. Focus Method, then hover Request body format to inspect its attached error.',
+      'Request, Authentication, and Response settings are separate sections. URL comes before Method; Request body stays beside its format and credentials beside their authentication type. Edit Query and Headers as objects. Bind the whole object or individual fields to Request data, add and rename fields, and reopen the panel. The files sample sends a multipart form with a file field and stores the response as a file; add, rename and remove form fields and check that renames keep their values. The invalid sample checks editing and saving with configuration errors. Check that Request body and Response outputs distinguish sent and received data. Focus Method, then hover Request body format to inspect its attached error.',
     standalone: true,
     render: (log, dark, language) => <HttpRequestStory dark={dark} language={language} log={log} />,
   },

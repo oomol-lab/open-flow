@@ -60,6 +60,10 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
             setOutputState('disconnected')
           },
         },
+        {
+          label: 'File response',
+          onClick: () => setSample({ bodyFields: [], method: 'POST', options: { responseBody: { kind: 'workflow-outputs', bodyFormat: 'artifact' } } }),
+        },
         { label: 'Default POST', onClick: () => setSample({ bodyFields: [], method: 'POST', options: {} }) },
         {
           label: 'Any JSON body',

@@ -38,8 +38,13 @@ Outputs. The operation determines the generated ports; unconfigured nodes omit t
 HTTP Request uses separate Request, Authentication, and Response settings sections before Response
 outputs. URL comes first, followed by Method, Query, Headers, Body format, and request body.
 Authentication keeps its type and credential sources together; Response settings owns response
-format and status policy. Query and Headers use object editors with whole-object and field sources.
+format and status policy. Multipart bodies list Form fields in Request, each name followed by its
+value input; renames commit on blur or Enter and keep the field's source. Response format File stores
+the response as a Run Artifact; Binary request bodies take one Artifact input. Query and Headers use object editors with whole-object and field sources.
 Each input appears once alongside its related settings; the node has no separate Inputs table.
+
+Webhook Response nodes and workflow-output Webhook responses place Response body type before the
+response content. File requires a Run Artifact; the workflow-output selector then hides All outputs.
 
 Provider triggers place their Options section immediately before Outputs so provider-specific
 configuration precedes the data it produces.

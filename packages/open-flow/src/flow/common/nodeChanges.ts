@@ -787,3 +787,17 @@ export function renameFlowOutputSources(
     return dequal(node.outputMappings, outputMappings) ? [] : [{ kind: 'graph.node.replace', nodeId, before: node, node: { ...node, outputMappings } }]
   })
 }
+
+/** Switches a Webhook Response node between JSON and Artifact bodies; a literal body value cannot be an Artifact and is dropped. */
+export function setWebhookResponseBodyFormat(content: RevisionContent, nodeId: string, bodyFormat: 'artifact' | undefined): readonly ChangeOperation[] {
+  const node = content.document.graph.nodes[nodeId]
+  if (node?.kind !== 'webhook-response' || node.bodyFormat === bodyFormat) return []
+  const { bodyFormat: _previous, inputs, ...rest } = node
+  const { body, ...others } = inputs
+  const next = {
+    ...rest,
+    ...(bodyFormat == null ? {} : { bodyFormat }),
+    inputs: body == null || (bodyFormat != null && body.kind === 'value') ? others : inputs,
+  }
+  return [{ kind: 'graph.node.replace', nodeId, before: node, node: next }]
+}

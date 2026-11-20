@@ -2,10 +2,12 @@ import type { ComponentProps } from 'react'
 import type { NodeInputField } from './nodeInputs.tsx'
 import type { InputVariables, NodeInputUpstreamSources } from './sourceValueEditor.tsx'
 
+import { useId } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { FieldTable } from '../../../../form/browser/fieldTable.tsx'
 import { httpHeaderNameIssue } from '../../../../http/common/headers.ts'
-import { Field, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { InspectorSection } from './inspectorSection.tsx'
 import { NodeInputValue } from './nodeInputValue.tsx'
 
@@ -14,6 +16,8 @@ const expanded = () => true
 
 /** Fixed response inputs compose the ordinary source editor and object field layout. */
 export function WebhookResponseEditor({
+  bodyFormat,
+  onBodyFormat,
   entries,
   disabled,
   readOnly,
@@ -22,6 +26,8 @@ export function WebhookResponseEditor({
   onValue,
   onVariable,
 }: {
+  readonly bodyFormat?: 'artifact'
+  readonly onBodyFormat?: (bodyFormat: 'artifact' | undefined) => void
   readonly entries: readonly NodeInputField[]
   readonly disabled: boolean
   readonly readOnly?: boolean
@@ -31,6 +37,7 @@ export function WebhookResponseEditor({
   readonly onVariable: (handle: string, name: string | undefined) => void
 }) {
   const t = useTranslate()
+  const id = useId()
   const labels: Readonly<Record<string, string>> = {
     body: t('webhookEditor.webhookResponseContent'),
     statusCode: t('webhookEditor.webhookStatus'),
@@ -39,6 +46,20 @@ export function WebhookResponseEditor({
   return (
     <InspectorSection title={t('webhookEditor.webhookResponse')} className="inspector-form" data-inspector-section="inputs">
       <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor={`${id}-format`}>{t('webhookEditor.responseBodyFormat')}</FieldLabel>
+          <NativeSelect
+            id={`${id}-format`}
+            className="w-full"
+            value={bodyFormat ?? 'data'}
+            disabled={disabled || readOnly || onBodyFormat == null}
+            onChange={(event) => onBodyFormat?.(event.target.value === 'artifact' ? 'artifact' : undefined)}
+          >
+            <NativeSelectOption value="data">{t('webhookEditor.responseBodyData')}</NativeSelectOption>
+            <NativeSelectOption value="artifact">{t('webhookEditor.responseBodyFile')}</NativeSelectOption>
+          </NativeSelect>
+          {bodyFormat === 'artifact' && <FieldDescription>{t('webhookEditor.responseBodyFileHint')}</FieldDescription>}
+        </Field>
         {entries.map((entry) => {
           const { definition, value } = entry
           const label = labels[definition.handle] ?? definition.handle

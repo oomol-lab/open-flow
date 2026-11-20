@@ -4,7 +4,7 @@ import type { WebhookAuthentication, WebhookBodyField, WebhookOptions } from './
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../base/common/json.ts'
-import { validWebhookStatus, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
+import { validWebhookStatus, webhookArtifactId, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
 import { httpHeaderNameIssue } from '../../http/common/headers.ts'
 
 export { webhookSupportsBody } from './contract.ts'
@@ -22,6 +22,14 @@ export function webhookResponseBody(
   const value = workflowOutputValue(result, source.output)
   if (value === undefined) return
   return encodeWebhookBody(value)
+}
+
+/** The Run Artifact an Artifact-mode workflow-output response sends, or undefined when the output is not one. */
+export function webhookResponseArtifactId(
+  result: unknown,
+  source: Extract<NonNullable<WebhookOptions['responseBody']>, { kind: 'workflow-outputs' }>,
+): string | undefined {
+  return source.output == null ? undefined : webhookArtifactId(workflowOutputValue(result, source.output))
 }
 
 export function webhookResponseStatusCode(result: unknown, output: string): number | undefined {

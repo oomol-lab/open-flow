@@ -114,7 +114,7 @@ function canonicalNode(value: GraphNode): JsonValue {
   }
   switch (value.kind) {
     case 'webhook-response':
-      return { ...common, kind: value.kind }
+      return { ...common, ...(value.bodyFormat == null ? {} : { bodyFormat: value.bodyFormat }), kind: value.kind }
     case 'outputs':
       return { ...common, kind: value.kind, outputDefs: canonicalPorts(value.outputDefs), outputMappings: canonicalInputs(value.outputMappings) }
     case 'condition':
@@ -301,9 +301,10 @@ function canonicalWebhookOptions(value: WebhookOptions): JsonValue {
           responseBody: {
             kind: value.responseBody.kind,
             ...(value.responseBody.kind === 'workflow-outputs'
-              ? value.responseBody.output == null
-                ? {}
-                : { output: value.responseBody.output }
+              ? {
+                  ...(value.responseBody.bodyFormat == null ? {} : { bodyFormat: value.responseBody.bodyFormat }),
+                  ...(value.responseBody.output == null ? {} : { output: value.responseBody.output }),
+                }
               : value.responseBody.nodeId == null
                 ? {}
                 : { nodeId: value.responseBody.nodeId }),

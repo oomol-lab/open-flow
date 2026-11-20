@@ -1,6 +1,7 @@
 import type { SourceOperation, SourceReferenceOperation } from '../../event-source/common/definition.ts'
 import type { InputMapping, InputPort, ManagedTaskDefinitionOf, TaskDefinitionBase } from '../../flow/common/model.ts'
 import type { RequestTaskNode } from '../../flow/common/requestParameters.ts'
+import type { ArtifactContent } from '../../http/common/artifact.ts'
 import type { JsonValue } from '../../types/index.ts'
 
 import { z } from 'zod'
@@ -14,6 +15,7 @@ import {
   withRequestParameterFields,
   withRequestParameterSource,
 } from '../../flow/common/requestParameters.ts'
+import { artifactMediaType, artifactName, artifactSchema } from '../../http/common/artifact.ts'
 export type TriggerOperationRequest =
   | { readonly operation: 'sourceReference'; readonly request: SourceReferenceOperation }
   | { readonly operation: 'source'; readonly request: SourceOperation }
@@ -66,6 +68,8 @@ export const connectorProxyConfigSchema = z.strictObject({
   query: requestParameterSchema.default({ mode: 'fields', names: [] }),
   headers: requestParameterSchema.default({ mode: 'fields', names: [] }),
   bodyFormat: z.enum(['none', 'json']).default('none'),
+  /** `artifact` stores the response body as a Run Artifact instead of returning JSON, text or base64. */
+  responseFormat: z.literal('artifact').optional(),
 })
 export type ConnectorProxyConfig = z.infer<typeof connectorProxyConfigSchema>
 export interface ConnectorProxyExecutor extends ConnectorProxyConfig {
@@ -98,7 +102,7 @@ export function connectorProxyTask(
     ...(config.bodyFormat === 'none' ? [] : [connectorProxyBodyInput]),
   ]
   const outputs: InputPort[] = [
-    { handle: 'body', jsonSchema: {}, nullable: true },
+    config.responseFormat === 'artifact' ? { handle: 'body', jsonSchema: artifactSchema, nullable: false } : { handle: 'body', jsonSchema: {}, nullable: true },
     { handle: 'statusCode', jsonSchema: { type: 'integer' }, nullable: false },
     { handle: 'headers', jsonSchema: connectorProxyHeaderSchema, nullable: false },
     { handle: 'bodyEncoding', jsonSchema: { const: 'base64' }, nullable: true },
@@ -124,6 +128,26 @@ export function connectorProxyInputs(
     if (connectorProxyHasBody(inputs.body, bodyPort?.value)) inputs.body = { kind: 'unset' }
   }
   return inputs
+}
+
+/**
+ * Response bytes for Artifact mode. Base64 data keeps its exact bytes; text the Connector already decoded is stored as
+ * UTF-8, parsed JSON is re-serialized and a missing body is empty.
+ */
+export function connectorProxyArtifactContent(result: ConnectorProxyResult, endpoint: string): ArtifactContent {
+  const header = (name: string) => Object.entries(result.headers ?? {}).find(([key]) => key.toLowerCase() === name)?.[1]
+  const media = artifactMediaType(header('content-type'))
+  const bytes =
+    result.bodyEncoding === 'base64' && typeof result.data === 'string'
+      ? Uint8Array.from(atob(result.data), (character) => character.charCodeAt(0))
+      : new TextEncoder().encode(result.data == null ? '' : typeof result.data === 'string' ? result.data : JSON.stringify(result.data))
+  const mediaType =
+    media ?? (result.bodyEncoding === 'base64' || result.data == null ? undefined : typeof result.data === 'string' ? 'text/plain' : 'application/json')
+  let url: string | undefined
+  try {
+    url = new URL(endpoint, 'https://provider.invalid/').href
+  } catch {}
+  return { bytes, name: artifactName(header('content-disposition'), url), ...(mediaType == null ? {} : { mediaType }) }
 }
 
 export function connectorProxyIssues(config: ConnectorProxyConfig, hasBody = config.bodyFormat !== 'none') {

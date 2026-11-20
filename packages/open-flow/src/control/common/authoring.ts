@@ -182,6 +182,8 @@ export function authoringNode(content: RevisionContent, ref: string) {
         texts.prompt = node.prompt
         break
       case 'webhook-response':
+        config = node.bodyFormat == null ? {} : { bodyFormat: node.bodyFormat }
+        break
       case 'manual':
         config = {}
         break
@@ -441,6 +443,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
     const node = nodeAt(content, ref),
       view = authoringNode(content, ref),
       type = view.type as AuthoringType
+    const configKeys = Object.keys(record(view.config))
     const original = {
       name: view.name,
       ...(view.description == null ? {} : { description: view.description }),
@@ -659,7 +662,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
         }
         default: {
           const fields = { ...next } as Record<string, unknown>
-          for (const key of Object.keys(record(view.config))) delete fields[key]
+          for (const key of configKeys) delete fields[key]
           next = { ...fields, ...config } as unknown as GraphNode
         }
       }
@@ -779,7 +782,18 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
               changes = createManagedTask(identity, await resolveWorkflow(String(authoringConfigurations.workflow.parse(config).flowId), name))
               break
             case 'webhook-response':
-              changes = [{ kind: 'graph.node.create', nodeId, node: { kind: 'webhook-response', name, inputs: {} } }]
+              changes = [
+                {
+                  kind: 'graph.node.create',
+                  nodeId,
+                  node: {
+                    kind: 'webhook-response',
+                    name,
+                    inputs: {},
+                    ...(authoringConfigurations['webhook-response'].parse(config ?? {}).bodyFormat == null ? {} : { bodyFormat: 'artifact' as const }),
+                  },
+                },
+              ]
               break
             case 'outputs':
               changes = [{ kind: 'graph.node.create', nodeId, node: { outputDefs: [], outputMappings: {}, kind: 'outputs', name } }]

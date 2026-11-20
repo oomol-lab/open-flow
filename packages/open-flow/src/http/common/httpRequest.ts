@@ -1,5 +1,6 @@
 import type { InputMapping, InputPort, JsonValue, ManagedTaskDefinitionOf, TaskDefinitionBase } from '../../flow/common/model.ts'
 import type { RequestTaskNode } from '../../flow/common/requestParameters.ts'
+import type { ArtifactContent } from './artifact.ts'
 
 import { z } from 'zod'
 import {
@@ -11,15 +12,20 @@ import {
   withRequestParameterFields,
   withRequestParameterSource,
 } from '../../flow/common/requestParameters.ts'
+import { artifactSchema, isArtifactRef } from './artifact.ts'
 import { httpHeaderNameIssue } from './headers.ts'
 
 export { httpHostAllowed, isHttpHost, maxHttpHosts } from './hosts.ts'
+export { artifactContentDisposition, artifactMediaType, artifactName, artifactSchema, isArtifactRef } from './artifact.ts'
+export type { ArtifactContent } from './artifact.ts'
 
 export const httpRequestConfigSchema = z.strictObject({
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']).default('GET'),
   query: requestParameterSchema.default({ mode: 'fields', names: [] }),
   headers: requestParameterSchema.default({ mode: 'fields', names: [] }),
-  bodyFormat: z.enum(['none', 'json', 'text', 'form']).default('none'),
+  bodyFormat: z.enum(['none', 'json', 'text', 'form', 'binary', 'multipart']).default('none'),
+  /** Multipart field names; each becomes a `body.<name>` input accepting text, a number, a boolean or a Run Artifact. */
+  bodyFields: z.array(z.string()).optional(),
   authentication: z
     .union([
       z.strictObject({ type: z.literal('none') }),
@@ -27,7 +33,7 @@ export const httpRequestConfigSchema = z.strictObject({
       z.strictObject({ type: z.literal('apiKey'), name: z.string(), in: z.enum(['header', 'query']) }),
     ])
     .default({ type: 'none' }),
-  responseFormat: z.enum(['auto', 'json', 'text']).default('auto'),
+  responseFormat: z.enum(['auto', 'json', 'text', 'artifact']).default('auto'),
   statusPolicy: z.enum(['success', 'all']).default('success'),
 })
 export type HttpRequestConfig = z.infer<typeof httpRequestConfigSchema>
@@ -52,15 +58,20 @@ export function httpRequestTask(
     { handle: 'url', jsonSchema: { type: 'string' }, nullable: false },
     ...requestParameterPorts(config, httpQuerySchema, queryValueSchema, httpHeaderSchema),
   ]
-  if (config.bodyFormat != 'none')
+  if (config.bodyFormat == 'multipart')
+    inputs.push(...multipartFieldNames(config).map((field) => ({ handle: httpMultipartHandle(field), jsonSchema: multipartValueSchema, nullable: true })))
+  else if (config.bodyFormat != 'none')
     inputs.push({
       handle: 'body',
-      jsonSchema: config.bodyFormat == 'json' ? {} : config.bodyFormat == 'text' ? { type: 'string' } : httpQuerySchema,
+      jsonSchema:
+        config.bodyFormat == 'json' ? {} : config.bodyFormat == 'text' ? { type: 'string' } : config.bodyFormat == 'binary' ? artifactSchema : httpQuerySchema,
       nullable: config.bodyFormat == 'json',
     })
   inputs.push(...httpAuthHandles(config).map((handle) => ({ handle, jsonSchema: { type: 'string' }, nullable: false })))
   const outputs: InputPort[] = [
-    { handle: 'body', jsonSchema: config.responseFormat == 'text' ? { type: 'string' } : {}, nullable: true },
+    config.responseFormat == 'artifact'
+      ? { handle: 'body', jsonSchema: artifactSchema, nullable: false }
+      : { handle: 'body', jsonSchema: config.responseFormat == 'text' ? { type: 'string' } : {}, nullable: true },
     { handle: 'statusCode', jsonSchema: { type: 'integer' }, nullable: false },
     { handle: 'headers', jsonSchema: httpHeaderSchema, nullable: false },
   ]
@@ -72,6 +83,17 @@ export function httpRequestTask(
     outputs: retainRequestPorts(outputs, previous?.outputs),
   }
 }
+/** A multipart field value: text, a number, a boolean, a Run Artifact, or a list of them for repeated fields. */
+const multipartValueSchema = {}
+
+export function httpMultipartHandle(name: string): string {
+  return `body.${name}`
+}
+
+function multipartFieldNames(config: HttpRequestConfig): readonly string[] {
+  return (config.bodyFields ?? []).filter((name) => name.trim())
+}
+
 export interface HttpRequestIssue {
   field: string
   index?: number
@@ -82,6 +104,14 @@ export function httpRequestIssues(config: HttpRequestConfig): HttpRequestIssue[]
   const issues: HttpRequestIssue[] = []
   if (['GET', 'HEAD'].includes(config.method) && config.bodyFormat != 'none')
     issues.push({ field: 'bodyFormat', code: 'bodyUnsupported', message: 'GET and HEAD do not support a request body.' })
+  if (config.bodyFormat == 'multipart') {
+    const seen = new Set<string>()
+    for (const [index, name] of (config.bodyFields ?? []).entries()) {
+      if (!name.trim() || seen.has(name))
+        issues.push({ field: 'bodyFields', index, code: 'parameterNamesInvalid', message: 'Multipart field names must be nonempty and unique.' })
+      seen.add(name)
+    }
+  }
   issues.push(...requestParameterIssues(config))
   const auth = config.authentication
   if (auth.type != 'none') {
@@ -113,7 +143,29 @@ export function httpRequestUrl(value: unknown): URL {
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('An HTTP(S) URL without credentials is required.')
   return url
 }
-export function buildHttpRequest(config: HttpRequestConfig, input: Readonly<Record<string, JsonValue>>): { url: string; init: RequestInit } {
+/** Run Artifact identities the request body sends; the host resolves each before calling `buildHttpRequest`. */
+export function httpRequestArtifactIds(config: HttpRequestConfig, input: Readonly<Record<string, JsonValue>>): readonly string[] {
+  const values =
+    config.bodyFormat == 'binary'
+      ? [input.body]
+      : config.bodyFormat == 'multipart'
+        ? multipartFieldNames(config).flatMap((name) => {
+            const value = input[httpMultipartHandle(name)]
+            return Array.isArray(value) ? value : [value]
+          })
+        : []
+  return [...new Set(values.flatMap((value) => (isArtifactRef(value) ? [value.id] : [])))]
+}
+
+/**
+ * Build the fetch request. Binary and multipart bodies read Artifact bytes and metadata only from `artifacts`, which
+ * the host fills from its own Run storage; a reference it did not resolve is invalid input.
+ */
+export function buildHttpRequest(
+  config: HttpRequestConfig,
+  input: Readonly<Record<string, JsonValue>>,
+  artifacts: ReadonlyMap<string, ArtifactContent> = new Map(),
+): { url: string; init: RequestInit } {
   if (httpRequestIssues(config).length) throw new Error('Invalid HTTP request configuration.')
   const url = httpRequestUrl(input.url)
   const parameters = (group: 'query' | 'headers') =>
@@ -154,8 +206,30 @@ export function buildHttpRequest(config: HttpRequestConfig, input: Readonly<Reco
       } else headers.set(name, auth.type == 'bearer' ? `Bearer ${credential('token')}` : credential('token'))
     }
   }
-  let body: string | undefined
-  if (config.bodyFormat != 'none') {
+  const artifact = (value: JsonValue | undefined): ArtifactContent => {
+    const content = isArtifactRef(value) ? artifacts.get(value.id) : undefined
+    if (content == null) throw new Error('The Artifact is not available in this Run.')
+    return content
+  }
+  let body: string | Uint8Array<ArrayBuffer> | FormData | undefined
+  if (config.bodyFormat == 'multipart') {
+    if (headers.has('content-type')) throw new Error('Multipart requests set their own Content-Type.')
+    const form = new FormData()
+    for (const name of multipartFieldNames(config)) {
+      const value = input[httpMultipartHandle(name)]
+      for (const item of value == null ? [] : Array.isArray(value) ? value : [value]) {
+        if (isArtifactRef(item)) {
+          const file = artifact(item)
+          form.append(name, new Blob([new Uint8Array(file.bytes)], { type: file.mediaType ?? 'application/octet-stream' }), file.name)
+        } else form.append(name, scalar(item))
+      }
+    }
+    body = form
+  } else if (config.bodyFormat == 'binary') {
+    const file = artifact(input.body)
+    body = new Uint8Array(file.bytes)
+    if (!headers.has('content-type')) headers.set('content-type', file.mediaType ?? 'application/octet-stream')
+  } else if (config.bodyFormat != 'none') {
     if (!Object.hasOwn(input, 'body')) throw new Error('Request body is unset.')
     let contentType: string
     if (config.bodyFormat == 'json') {

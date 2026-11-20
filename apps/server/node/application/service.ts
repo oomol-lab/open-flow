@@ -578,6 +578,11 @@ export class ServerService {
     return this.#webhookTargets.authenticationSecret(target)
   }
 
+  /** A whole Artifact owned by the Run, for HTTP responses that send it. */
+  runArtifact(runId: string, artifactId: string) {
+    return this.#store.runs.artifact(runId, artifactId)
+  }
+
   webhookEndpoint(flowId: string, triggerNodeId: string): string | undefined {
     return this.#store.triggers.webhookEndpoint(flowId, triggerNodeId)
   }

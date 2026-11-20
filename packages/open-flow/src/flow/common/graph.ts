@@ -15,6 +15,7 @@ import type {
 } from './change.ts'
 import type { Diagnostic } from './semantics.ts'
 
+import { artifactSchema } from '../../http/common/artifact.ts'
 import { httpHeaderNameIssue } from '../../http/common/headers.ts'
 import { missingTriggerConfig, resolveTriggerConfig, validateTemplateTriggerConfig } from '../../trigger/common/config.ts'
 import { triggerOutputDefinitions, triggerOutputPorts, webhookAuthenticationHeaderValid, webhookSupportsBody } from '../../trigger/common/contract.ts'
@@ -28,7 +29,7 @@ import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInp
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
 import { waitAutoContinueSchema } from './wait.ts'
 import {
-  webhookResponseInputs,
+  webhookResponseInputPorts,
   validWebhookStatus,
   webhookHeaderValues,
   webhookHeaderValuePort,
@@ -129,6 +130,10 @@ export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path
     }
   }
   const responsePath = `${path}/options/responseBody`
+  if (response.bodyFormat === 'artifact' && response.output == null)
+    diagnostics.push(
+      graphDiagnostic('trigger.webhook-response-artifact-output', 'Choose the workflow output that holds the response Artifact.', `${responsePath}/output`),
+    )
   const outputs = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'outputs')
   if (outputs.length == 0) {
     diagnostics.push(graphDiagnostic('trigger.webhook-response-outputs-missing', 'Add a workflow Outputs node for the HTTP response.', responsePath))
@@ -142,6 +147,13 @@ export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path
       diagnostics.push(
         graphDiagnostic('trigger.webhook-response-output-missing', `Workflow output "${field}" does not exist.`, `${responsePath}/output`, { output: field }),
       )
+    if (response.bodyFormat === 'artifact' && field != null && output[1].kind == 'outputs') {
+      const port = output[1].outputDefs.find((candidate) => candidate.handle == field)
+      if (port != null && !portsAssignable(port, { jsonSchema: artifactSchema, nullable: false }))
+        diagnostics.push(
+          graphDiagnostic('trigger.webhook-response-artifact-output', 'Choose the workflow output that holds the response Artifact.', `${responsePath}/output`),
+        )
+    }
     if (statusOutput != null && output[1].kind == 'outputs') {
       const port = output[1].outputDefs.find((candidate) => candidate.handle == statusOutput)
       if (port == null)
@@ -248,7 +260,7 @@ export function nodeInputPorts(node: GraphNode): Readonly<Record<string, InputPo
     case 'delay':
       return portsByHandle([delayDurationInput])
     case 'webhook-response':
-      return portsByHandle(webhookResponseInputs)
+      return portsByHandle(webhookResponseInputPorts(node))
     case 'outputs':
       return portsByHandle(node.outputDefs)
     case 'condition':

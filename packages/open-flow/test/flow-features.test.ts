@@ -72,7 +72,17 @@ describe('Engine capabilities', () => {
     ],
     [
       'open-flow-engine/v12',
-      ['code-http', 'connector-proxy', 'delay', 'http-request', 'skip-duplicates', 'wait-auto-continue', 'webhook-response', 'workflow-tools'],
+      [
+        'code-http',
+        'connector-proxy',
+        'delay',
+        'http-request',
+        'skip-duplicates',
+        'wait-auto-continue',
+        'webhook-artifact-response',
+        'webhook-response',
+        'workflow-tools',
+      ],
       { workflowTools: true, codeFetch: true, flowState: true },
     ],
   ] as const)(
@@ -147,6 +157,46 @@ describe('Engine capabilities', () => {
 })
 
 describe('Model v16 features', () => {
+  it('declares Artifact transfer features and keeps HTTP and Provider API formats host-only', () => {
+    const cases: readonly [string, GraphNode, readonly string[], readonly string[]][] = [
+      ['binary body', task({ kind: 'http-request', method: 'PUT', bodyFormat: 'binary' }), ['http-request-artifacts'], ['http-request']],
+      [
+        'multipart body',
+        task({ kind: 'http-request', method: 'POST', bodyFormat: 'multipart', bodyFields: ['file'] }),
+        ['http-request-artifacts'],
+        ['http-request'],
+      ],
+      ['HTTP Artifact response', task({ kind: 'http-request', responseFormat: 'artifact' }), ['http-request-artifacts'], ['http-request']],
+      ['Provider API Artifact response', task({ kind: 'connector-proxy', responseFormat: 'artifact' }), ['connector-proxy-artifacts'], ['connector-proxy']],
+      [
+        'Response node',
+        { inputs: {}, kind: 'webhook-response', bodyFormat: 'artifact' },
+        ['webhook-artifact-response'],
+        ['webhook-artifact-response', 'webhook-response'],
+      ],
+      [
+        'workflow output',
+        {
+          kind: 'webhook',
+          name: 'Hook',
+          method: 'POST',
+          bodyFields: [],
+          options: { responseBody: { kind: 'workflow-outputs', bodyFormat: 'artifact', output: 'file' } },
+        } as GraphNode,
+        ['webhook-artifact-response'],
+        ['webhook-artifact-response'],
+      ],
+    ]
+    for (const [name, node, features, capabilities] of cases) {
+      const flow = content({ node })
+      expect(serializeRevisionContent(flow).features, name).toEqual(features)
+      expect(requiredEngineCapabilities(flow), name).toEqual(capabilities)
+    }
+    expect(serializeRevisionContent(content({ node: task({ kind: 'http-request', bodyFormat: 'json' }) })).features).toEqual([])
+    const older = envelope({ node: task({ kind: 'http-request', responseFormat: 'artifact' }) }, { features: ['http-request-artifacts'] })
+    expect(decodeRevision(bytes(older)).document.graph.nodes.node).toMatchObject({ task: { executor: { responseFormat: 'artifact' } } })
+  })
+
   it('serializes the derived features list only from Model v16', () => {
     const current = content({ pause: delay })
     expect(serializeRevisionContent(current)).toEqual({ ...current, features: [] })

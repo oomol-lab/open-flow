@@ -7,6 +7,7 @@ import type { ResolveControlActor } from './control.ts'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { controlRequests, waitActionBodySchema } from '@oomol-lab/open-flow/control-requests'
+import { artifactContentDisposition, artifactMediaType } from '@oomol-lab/open-flow/http-request'
 import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
 import {
   maximumWebhookBodyBytes,
@@ -15,6 +16,7 @@ import {
   webhookOutputHeaders,
   webhookOccurrenceId,
   webhookSupportsBody,
+  webhookResponseArtifactId,
   webhookResponseBody,
   webhookResponseAllowsBody,
   webhookResponseTimeout,
@@ -548,21 +550,27 @@ async function webhook(
       )
       if (outcome.kind == 'timeout') return webhookFailure(504, 'webhook.response-timeout', 'The workflow response timed out.', origin)
       if (outcome.kind == 'aborted') return webhookFailure(503, 'webhook.response-unavailable', 'The workflow response is unavailable.', origin)
-      if (outcome.kind === 'responded') return webhookSuccess(target.trigger, origin, outcome.response)
+      if (outcome.kind === 'responded')
+        return outcome.response.artifactId == null
+          ? webhookSuccess(target.trigger, origin, outcome.response)
+          : webhookArtifact(service, accepted.runId, outcome.response.artifactId, origin, outcome.response.status, outcome.response.headers)
       if (outcome.kind === 'unavailable') return webhookFailure(500, 'webhook.response-unavailable', 'The selected response is unavailable.', origin)
       if (outcome.kind === 'failed' && (outcome.code === 'webhook.response-status-invalid' || outcome.code === 'webhook.response-headers-invalid'))
         return webhookFailure(500, outcome.code, 'The workflow response is invalid.', origin)
       if (outcome.kind == 'failed') return webhookFailure(500, 'webhook.run-failed', 'The workflow did not complete successfully.', origin)
       if (source.kind !== 'workflow-outputs') return webhookFailure(500, 'webhook.response-unavailable', 'The selected response is unavailable.', origin)
-      const response = webhookResponseBody(outcome.result, source)
-      if (response == null) return webhookFailure(500, 'webhook.response-missing', 'The workflow response output is unavailable.', origin)
+      const artifactId = source.bodyFormat === 'artifact' ? webhookResponseArtifactId(outcome.result, source) : undefined
+      const response = source.bodyFormat === 'artifact' ? undefined : webhookResponseBody(outcome.result, source)
+      if (response == null && artifactId == null) return webhookFailure(500, 'webhook.response-missing', 'The workflow response output is unavailable.', origin)
       const statusOutput = target.trigger.options?.responseStatusCodeOutput
       const status = statusOutput == null ? undefined : webhookResponseStatusCode(outcome.result, statusOutput)
       if (statusOutput != null && status == null)
         return webhookFailure(500, 'webhook.response-status-invalid', 'The workflow response status code is unavailable or invalid.', origin)
       const headers = projectWebhookResponseHeaders(outcome.result, target.trigger.options ?? {})
       if (headers == null) return webhookFailure(500, 'webhook.response-headers-invalid', 'The workflow response headers are unavailable or invalid.', origin)
-      return webhookSuccess(target.trigger, origin, { ...response, status, headers })
+      if (artifactId != null)
+        return webhookArtifact(service, accepted.runId, artifactId, origin, status ?? target.trigger.options?.responseStatusCode ?? 200, headers)
+      return webhookSuccess(target.trigger, origin, { ...response!, status, headers })
     }
     return webhookSuccess(target.trigger, origin)
   } catch (error) {
@@ -614,6 +622,26 @@ function webhookSuccess(
   const headers = webhookResponseHeaders(origin, response?.contentType, response?.headers ?? trigger.options?.responseHeaders)
   const body = webhookResponseAllowsBody(status) ? (response?.body ?? trigger.options?.responseData ?? null) : null
   return text(status, body, headers)
+}
+
+/**
+ * Send a Run Artifact as the response body. Stored metadata is authoritative: the media type and an attachment
+ * disposition replace any configured Content-Type or Content-Disposition, and an Artifact outside this Run fails.
+ */
+function webhookArtifact(
+  service: ServerService,
+  runId: string,
+  artifactId: string,
+  origin: string | undefined,
+  status: number,
+  configured: Readonly<Record<string, string>>,
+): Response {
+  const artifact = service.runArtifact(runId, artifactId)
+  if (artifact == null) return webhookFailure(500, 'webhook.response-unavailable', 'The response Artifact is unavailable.', origin)
+  const headers = webhookResponseHeaders(origin, artifactMediaType(artifact.mediaType) ?? 'application/octet-stream', configured)
+  headers.set('content-disposition', artifactContentDisposition(artifact.name))
+  headers.set('content-length', String(artifact.content.byteLength))
+  return new Response(webhookResponseAllowsBody(status) ? new Uint8Array(artifact.content) : null, { headers, status })
 }
 
 function webhookResponseHeaders(origin: string | undefined, contentType?: string, configured?: Readonly<Record<string, string>>): Headers {

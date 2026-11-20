@@ -60,6 +60,29 @@ export async function executeHttpTransport(
   failure: FailureFactory,
   request = fetch,
 ): Promise<{ response: Response; body: string }> {
+  return await transport(built, signal, acceptAllStatuses, failure, request, (response) => readHttpBody(response, failure))
+}
+
+/** The same policy, keeping the raw response bytes up to `limit` for file downloads. */
+export async function executeHttpBytesTransport(
+  built: { url: string; init: RequestInit },
+  signal: AbortSignal,
+  acceptAllStatuses: boolean,
+  failure: FailureFactory,
+  limit: number,
+  request = fetch,
+): Promise<{ response: Response; body: Uint8Array }> {
+  return await transport(built, signal, acceptAllStatuses, failure, request, (response) => readHttpBytes(response, failure, limit))
+}
+
+async function transport<Body>(
+  built: { url: string; init: RequestInit },
+  signal: AbortSignal,
+  acceptAllStatuses: boolean,
+  failure: FailureFactory,
+  request: typeof fetch,
+  read: (response: Response) => Promise<Body>,
+): Promise<{ response: Response; body: Body }> {
   const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(30000)])
   let response: Response
   try {
@@ -75,9 +98,9 @@ export async function executeHttpTransport(
     response.ok || acceptAllStatuses
       ? undefined
       : failure('http-failed', `API request failed with HTTP ${response.status}.`, response.status == 429 || response.status >= 500)
-  let body: string
+  let body: Body
   try {
-    body = await readHttpBody(response, failure)
+    body = await read(response)
   } catch (error) {
     if (requestSignal.aborted) throw requestSignal.reason
     if (error instanceof HttpTaskError) throw error

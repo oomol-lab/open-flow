@@ -937,7 +937,8 @@
         "webhook-response-header-output-missing": "Выход процесса «{{output}}» не существует.",
         "webhook-response-header-output-type": "Выберите текст, число, логическое значение или объект только с такими значениями.",
         "webhook-response-status-output-type": "Выберите числовое поле выходных данных процесса для кода статуса.",
-        "webhook-authentication-header-name": "Используйте допустимое имя HTTP-заголовка, не зарезервированное транспортом Webhook."
+        "webhook-authentication-header-name": "Используйте допустимое имя HTTP-заголовка, не зарезервированное транспортом Webhook.",
+        "webhook-response-artifact-output": "Выберите выход рабочего процесса, содержащий файл ответа."
       },
       "leina": {
         "robot-required": "Выберите робота Leina или привяжите его идентификатор к источнику данных."
@@ -1202,7 +1203,12 @@
     "webhookAuthenticationHint": "Запросы без секрета отклоняются с кодом 401 и не запускают выполнение. Заголовок с учётными данными удаляется из выхода headers.",
     "webhookAuthenticationHeaderName": "Имя заголовка с секретом",
     "webhookAuthenticationHeaderInvalid": "Введите допустимое имя HTTP-заголовка, кроме Host, Content-Type, Content-Length, Idempotency-Key и X-Request-ID.",
-    "webhookAuthenticationSecret": "Секретная переменная"
+    "webhookAuthenticationSecret": "Секретная переменная",
+    "responseBodyFormat": "Тип тела ответа",
+    "responseBodyData": "Данные",
+    "responseBodyFile": "Файл",
+    "responseBodyFileHint": "Отправляет файл, созданный в этом запуске. Content-Type и Content-Disposition задаются по сохранённому имени и типу содержимого.",
+    "responseBodyChooseOutput": "Выберите выход"
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",
@@ -1760,7 +1766,13 @@
     "keyValue": "Значение ключа",
     "responseOutputs": "Выходы ответа",
     "authenticationType": "Тип",
-    "responseSettings": "Настройки ответа"
+    "responseSettings": "Настройки ответа",
+    "binary": "Двоичный файл",
+    "file": "Файл",
+    "multipartFields": "Поля формы",
+    "multipartFieldName": "Имя поля",
+    "removeMultipartField": "Удалить поле",
+    "addMultipartField": "Добавить поле"
   },
   "tags": {
     "count": "Всего: {{count}}",

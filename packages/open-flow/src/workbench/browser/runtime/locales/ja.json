@@ -937,7 +937,8 @@
         "webhook-response-header-output-missing": "ワークフロー出力「{{output}}」は存在しません。",
         "webhook-response-header-output-type": "文字列、数値、真偽値、またはこれらの値のみを含むオブジェクトを選択してください。",
         "webhook-response-status-output-type": "ステータスコードには数値のワークフロー出力を選択してください。",
-        "webhook-authentication-header-name": "Webhook のトランスポートで予約されていない有効な HTTP ヘッダー名を使用してください。"
+        "webhook-authentication-header-name": "Webhook のトランスポートで予約されていない有効な HTTP ヘッダー名を使用してください。",
+        "webhook-response-artifact-output": "レスポンスファイルを保持するワークフロー出力を選択してください。"
       },
       "leina": {
         "robot-required": "Leina ロボットを選択するか、識別子の入力ソースを設定してください。"
@@ -1202,7 +1203,12 @@
     "webhookAuthenticationHint": "シークレットのないリクエストは 401 で拒否され、実行は開始されません。認証情報のヘッダーは headers 出力から除かれます。",
     "webhookAuthenticationHeaderName": "シークレットのヘッダー名",
     "webhookAuthenticationHeaderInvalid": "Host、Content-Type、Content-Length、Idempotency-Key、X-Request-ID 以外の有効な HTTP ヘッダー名を入力してください。",
-    "webhookAuthenticationSecret": "シークレット変数"
+    "webhookAuthenticationSecret": "シークレット変数",
+    "responseBodyFormat": "レスポンス本文の種類",
+    "responseBodyData": "データ",
+    "responseBodyFile": "ファイル",
+    "responseBodyFileHint": "この実行で作成したファイルを送信します。Content-Type と Content-Disposition は保存された名前とメディアタイプから設定されます。",
+    "responseBodyChooseOutput": "出力を選択"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",
@@ -1760,7 +1766,13 @@
     "keyValue": "キーの値",
     "responseOutputs": "レスポンス出力",
     "authenticationType": "認証方式",
-    "responseSettings": "レスポンス設定"
+    "responseSettings": "レスポンス設定",
+    "binary": "バイナリファイル",
+    "file": "ファイル",
+    "multipartFields": "フォームフィールド",
+    "multipartFieldName": "フィールド名",
+    "removeMultipartField": "フィールドを削除",
+    "addMultipartField": "フィールドを追加"
   },
   "tags": {
     "count": "計 {{count}} 件",

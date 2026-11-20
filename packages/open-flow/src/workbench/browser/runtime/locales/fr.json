@@ -937,7 +937,8 @@
         "webhook-response-header-output-missing": "La sortie du workflow « {{output}} » n’existe pas.",
         "webhook-response-header-output-type": "Choisissez du texte, un nombre, un booléen ou un objet contenant uniquement ces valeurs.",
         "webhook-response-status-output-type": "Choisissez une sortie numérique du workflow pour le code de statut.",
-        "webhook-authentication-header-name": "Utilisez un nom d’en-tête HTTP valide non réservé par le transport Webhook."
+        "webhook-authentication-header-name": "Utilisez un nom d’en-tête HTTP valide non réservé par le transport Webhook.",
+        "webhook-response-artifact-output": "Choisissez la sortie du workflow qui contient le fichier de réponse."
       },
       "leina": {
         "robot-required": "Sélectionnez un robot Leina ou liez son identifiant à une source d’entrée."
@@ -1202,7 +1203,12 @@
     "webhookAuthenticationHint": "Les requêtes sans secret sont refusées avec 401 et ne démarrent pas d’exécution. L’en-tête d’identifiant est retiré de la sortie headers.",
     "webhookAuthenticationHeaderName": "Nom de l’en-tête secret",
     "webhookAuthenticationHeaderInvalid": "Saisissez un nom d’en-tête HTTP valide autre que Host, Content-Type, Content-Length, Idempotency-Key ou X-Request-ID.",
-    "webhookAuthenticationSecret": "Variable secrète"
+    "webhookAuthenticationSecret": "Variable secrète",
+    "responseBodyFormat": "Type du corps de réponse",
+    "responseBodyData": "Données",
+    "responseBodyFile": "Fichier",
+    "responseBodyFileHint": "Envoie un fichier créé pendant cette exécution. Son nom et son type de média enregistrés définissent Content-Type et Content-Disposition.",
+    "responseBodyChooseOutput": "Choisir une sortie"
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",
@@ -1760,7 +1766,13 @@
     "keyValue": "Valeur de la clé",
     "responseOutputs": "Sorties de réponse",
     "authenticationType": "Type",
-    "responseSettings": "Paramètres de réponse"
+    "responseSettings": "Paramètres de réponse",
+    "binary": "Fichier binaire",
+    "file": "Fichier",
+    "multipartFields": "Champs du formulaire",
+    "multipartFieldName": "Nom du champ",
+    "removeMultipartField": "Supprimer le champ",
+    "addMultipartField": "Ajouter un champ"
   },
   "tags": {
     "count": "{{count}} au total",

@@ -341,6 +341,12 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
 function responseSnapshot(value: unknown): WebhookResponseSnapshot {
   const source = object(value, 'Runtime response')
   const headers = webhookHeaderValues(source.headers)
+  const artifactId = source.artifactId
+  if (artifactId !== undefined) {
+    if (!validWebhookStatus(source.status) || typeof artifactId !== 'string' || artifactId.length == 0 || source.body !== '' || headers == null)
+      throw new TypeError('Invalid runtime response.')
+    return { artifactId, status: source.status, body: '', contentType: 'application/octet-stream', headers }
+  }
   if (
     !validWebhookStatus(source.status) ||
     typeof source.body !== 'string' ||

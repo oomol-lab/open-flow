@@ -937,7 +937,8 @@
         "webhook-response-header-output-missing": "Workflow output \"{{output}}\" does not exist.",
         "webhook-response-header-output-type": "Choose text, number or boolean values, or an object containing only these values.",
         "webhook-response-status-output-type": "Choose a numeric workflow output for the response status code.",
-        "webhook-authentication-header-name": "Use a valid HTTP header name the Webhook transport does not reserve."
+        "webhook-authentication-header-name": "Use a valid HTTP header name the Webhook transport does not reserve.",
+        "webhook-response-artifact-output": "Choose the workflow output that holds the response file."
       },
       "leina": {
         "robot-required": "Select a Leina robot or bind its identifier to an input source."
@@ -1202,7 +1203,12 @@
     "webhookAuthenticationHint": "Requests without the secret are rejected with 401 and do not start a run. The credential header is removed from the headers output.",
     "webhookAuthenticationHeaderName": "Secret header name",
     "webhookAuthenticationHeaderInvalid": "Enter a valid HTTP header name other than Host, Content-Type, Content-Length, Idempotency-Key or X-Request-ID.",
-    "webhookAuthenticationSecret": "Secret variable"
+    "webhookAuthenticationSecret": "Secret variable",
+    "responseBodyFormat": "Response body type",
+    "responseBodyData": "Data",
+    "responseBodyFile": "File",
+    "responseBodyFileHint": "Send a file created in this run. Its stored name and media type set Content-Type and Content-Disposition.",
+    "responseBodyChooseOutput": "Choose an output"
   },
   "conditionEditor": {
     "addCondition": "Add condition",
@@ -1760,7 +1766,13 @@
     "keyValue": "Key value",
     "responseOutputs": "Response outputs",
     "authenticationType": "Type",
-    "responseSettings": "Response settings"
+    "responseSettings": "Response settings",
+    "binary": "Binary file",
+    "file": "File",
+    "multipartFields": "Form fields",
+    "multipartFieldName": "Field name",
+    "removeMultipartField": "Remove field",
+    "addMultipartField": "Add field"
   },
   "tags": {
     "count": "{{count}} total",

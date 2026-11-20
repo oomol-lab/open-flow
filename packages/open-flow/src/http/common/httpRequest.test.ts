@@ -205,3 +205,45 @@ it('preserves named input sources and metadata, without confusing mode switches 
   const objectMode = httpRequestTask(config({ query: { mode: 'object', names: ['page'] } }))
   expect(httpRequestInputs(mappings, previous, objectMode)).toEqual({ url: mappings.url })
 })
+
+it('authors multipart fields, keeps a renamed field source and replaces the field list', async () => {
+  const created = await compileAuthoring(
+    empty,
+    {
+      baseRevision: 'base',
+      requestId: 'multipart',
+      edits: [
+        {
+          op: 'node.add',
+          type: 'http-request',
+          as: 'upload',
+          name: 'Upload',
+          config: { method: 'POST', bodyFormat: 'multipart', bodyFields: ['file', 'note'], responseFormat: 'artifact' },
+          inputs: { 'url': { kind: 'value', value: 'https://example.test' }, 'body.note': { kind: 'value', value: 'hello' } },
+        },
+      ],
+    },
+    host,
+  )
+  const id = created.nodes.upload!
+  expect(authoringNode(created.content, id)).toMatchObject({
+    config: { bodyFormat: 'multipart', bodyFields: ['file', 'note'], responseFormat: 'artifact' },
+    inputs: { 'body.note': { kind: 'value', value: 'hello' } },
+  })
+  const renamed = await compileAuthoring(
+    created.content,
+    { baseRevision: 'created', requestId: 'rename', edits: [{ op: 'node.update', node: id, set: { config: { bodyFields: ['file', 'memo'] } } }] },
+    host,
+  )
+  expect(authoringNode(renamed.content, id).inputs).toMatchObject({ 'body.memo': { kind: 'value', value: 'hello' } })
+  const removed = await compileAuthoring(
+    renamed.content,
+    { baseRevision: 'renamed', requestId: 'remove', edits: [{ op: 'node.update', node: id, set: { config: { bodyFields: ['file'] } } }] },
+    host,
+  )
+  expect(authoringNode(removed.content, id).config).toMatchObject({ bodyFields: ['file'] })
+  expect(authoringNode(removed.content, id).inputs).not.toHaveProperty('body.memo')
+  expect(removed.content.document.graph.nodes[id]).toMatchObject({
+    task: { inputs: expect.not.arrayContaining([expect.objectContaining({ handle: 'body.memo' })]) },
+  })
+})

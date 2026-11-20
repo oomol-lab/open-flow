@@ -39,11 +39,33 @@ export const webhookResponseInputs: readonly InputPort[] = [
   { handle: 'headers', jsonSchema: webhookHeadersPort.jsonSchema, nullable: false, value: {} },
 ]
 
+const webhookArtifactInputs: readonly InputPort[] = [
+  { handle: 'body', jsonSchema: { contentMediaType: 'oomol/artifact' }, nullable: false },
+  ...webhookResponseInputs.slice(1),
+]
+
+/** Artifact mode requires a Run Artifact as `body`; the default accepts any JSON. */
+export function webhookResponseInputPorts(node: { readonly bodyFormat?: 'artifact' }): readonly InputPort[] {
+  return node.bodyFormat === 'artifact' ? webhookArtifactInputs : webhookResponseInputs
+}
+
+/**
+ * The response a Run selected. An `artifactId` response carries no inline body: the host sends the bytes of that Run
+ * Artifact with its stored media type, or fails when the Run does not own it.
+ */
 export interface WebhookResponseSnapshot {
+  readonly artifactId?: string
   readonly body: string
   readonly contentType: string
   readonly status: number
   readonly headers: Readonly<Record<string, string>>
+}
+
+/** The Artifact identity of a JSON value shaped as an ArtifactRef. */
+export function webhookArtifactId(value: unknown): string | undefined {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) return
+  const record = value as Readonly<Record<string, unknown>>
+  return record.kind === 'artifact' && typeof record.id === 'string' && record.id.length > 0 ? record.id : undefined
 }
 
 export function validWebhookStatus(value: unknown): value is number {
