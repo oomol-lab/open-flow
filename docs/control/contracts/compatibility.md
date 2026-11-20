@@ -1,5 +1,21 @@
 # Public contracts and version evolution
 
+## Webhook request admission (after beta.95)
+
+The npm `next` baseline is `0.1.0-beta.95`. Confirm the published artifact before release.
+
+`FlowFeature` now also covers host features, which the deployment applies before execution and which need no
+Engine capability: `webhook-any-body` (`options.bodyMode: "any"`) and `webhook-authentication`
+(`options.authentication`). Both are non-baseline, so Model v16 content using them declares them in `features`, and
+packages up to beta.95 reject it as unsupported instead of silently stripping the new options. That matters for
+authentication: an earlier client that dropped the policy on save would leave the endpoint open. `bodyMode: "fields"`
+is the default and is not a feature. Content that uses neither option encodes byte-for-byte as before; there is no
+Model, Engine or database migration.
+
+The authentication secret binding joins the Flow closure, so Publication requires the Variable and Variable reference
+listings include it. Server and Cloud must upgrade together before either writes such content, and both must pass the
+new `webhookConformanceCases` (fixtures may now carry `bindings` and `variables`).
+
 ## Flow features: Flow model v16 and capability-based Engine admission
 
 The npm `next` baseline is `0.1.0-beta.94`, gitHead `f933d812`, with Model v15 and Engine v12.

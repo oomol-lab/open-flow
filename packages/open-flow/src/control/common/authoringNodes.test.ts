@@ -323,6 +323,77 @@ describe('business configuration authoring contracts', () => {
     expect(authoringNode(updated.content, ref).config).not.toHaveProperty('body.memo.default')
   })
 
+  it('configures Webhook any-body mode and authentication by Variable name without exposing binding identities', async () => {
+    const created = await edit(empty, [
+      {
+        op: 'node.add',
+        type: 'webhook',
+        as: 'entry',
+        name: 'Relay',
+        config: {
+          method: 'POST',
+          body: {},
+          options: { bodyMode: 'any', authentication: { type: 'bearer', secret: { kind: 'variable', name: 'WEBHOOK_TOKEN' } } },
+        },
+      },
+    ])
+    const ref = created.nodes.entry!
+    const node = created.content.document.graph.nodes[ref]
+    if (node?.kind != 'webhook') throw new Error('Expected Webhook')
+    const bindingId = node.options?.authentication?.secret.bindingId
+    expect(created.content.document.bindings[bindingId!]).toEqual({ kind: 'variable', target: 'WEBHOOK_TOKEN' })
+    expect(nodeOutputPorts(node).body?.jsonSchema).toEqual({ type: ['object', 'array'] })
+    const view = await roundTrip(created.content, ref)
+    expect(view.config).toMatchObject({
+      options: { bodyMode: 'any', authentication: { type: 'bearer', secret: { kind: 'variable', name: 'WEBHOOK_TOKEN' } } },
+    })
+    expect((await validateFlow(created.content, findEngineContract(currentEngineContract)!)).diagnostics).toEqual([])
+
+    const header = await edit(created.content, [
+      {
+        op: 'node.update',
+        node: ref,
+        set: {
+          config: {
+            method: 'POST',
+            body: {},
+            options: { authentication: { type: 'header', name: 'Host', secret: { kind: 'variable', name: 'WEBHOOK_TOKEN' } } },
+          },
+        },
+      },
+    ])
+    expect((await validateFlow(header.content, findEngineContract(currentEngineContract)!)).diagnostics.map((item) => item.code)).toContain(
+      'trigger.webhook-authentication-header-name',
+    )
+    const requestId = await edit(created.content, [
+      {
+        op: 'node.update',
+        node: ref,
+        set: { config: { options: { authentication: { type: 'header', name: 'X-Request-ID', secret: { kind: 'variable', name: 'WEBHOOK_TOKEN' } } } } },
+      },
+    ])
+    expect((await validateFlow(requestId.content, findEngineContract(currentEngineContract)!)).diagnostics.map((item) => item.code)).toContain(
+      'trigger.webhook-authentication-header-name',
+    )
+
+    // A missing secret binding reads as a placeholder; an unrelated edit must keep the stored reference.
+    const { [bindingId!]: _removed, ...bindings } = created.content.document.bindings
+    const orphaned = { ...created.content, document: { ...created.content.document, bindings } }
+    const renamed = await edit(orphaned, [{ op: 'node.update', node: ref, set: { name: 'Renamed relay' } }])
+    expect(renamed.content.document.bindings).toEqual({})
+    expect(renamed.content.document.graph.nodes[ref]).toMatchObject({
+      name: 'Renamed relay',
+      options: { authentication: { type: 'bearer', secret: { kind: 'binding', bindingId } } },
+    })
+    const rebound = await edit(orphaned, [
+      { op: 'node.update', node: ref, set: { config: { options: { authentication: { secret: { kind: 'variable', name: 'NEW_TOKEN' } } } } } },
+    ])
+    expect(Object.values(rebound.content.document.bindings)).toEqual([{ kind: 'variable', target: 'NEW_TOKEN' }])
+
+    const cleared = await edit(created.content, [{ op: 'node.update', node: ref, clear: [['config', 'options', 'authentication']] }])
+    expect(cleared.content.document.bindings).toEqual({})
+  })
+
   it.each(['poll', 'integration'] as const)('uses the ordinary input API for %s fixed configuration and rejects dynamic sources', async (type) => {
     const created = await edit(empty, [
       { op: 'node.add', type, as: 'entry', name: 'Orders', config: { key: type }, inputs: { account: { kind: 'value', value: null } } },

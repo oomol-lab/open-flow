@@ -116,7 +116,22 @@ export const authoringConfigurations = {
   'start': z.strictObject({ inputDefs: flowInputFields.default({}) }),
   'outputs': z.strictObject({ outputDefs: flowOutputFields.default({}) }),
   'error': z.strictObject({ sourceFlowIds: z.array(id).optional() }),
-  'webhook': definitions.webhook.omit({ bodyFields: true }).extend({ body: inputFields }).strict(),
+  'webhook': definitions.webhook
+    .omit({ bodyFields: true, options: true })
+    .extend({
+      body: inputFields,
+      options: definitions.webhookOptions
+        .extend({
+          authentication: z
+            .discriminatedUnion('type', [
+              z.strictObject({ type: z.literal('bearer'), secret: variable }),
+              z.strictObject({ type: z.literal('header'), name: z.string(), secret: variable }),
+            ])
+            .optional(),
+        })
+        .optional(),
+    })
+    .strict(),
   'cron': z.strictObject({ schedule: definitions.schedule }),
   'poll': z.strictObject({ key: id, connectionId: id.optional(), schedule: definitions.schedule }),
   'integration': z.strictObject({ key: id, connectionId: id.optional() }),
@@ -308,7 +323,7 @@ export function authoringSchema(kind?: AuthoringType) {
               : kind == 'outputs'
                 ? 'Declare output fields through config.outputDefs. Set their values through node.add.inputs or input.set. Outputs is a singleton execution sink; it waits for its predecessors and produces workflow business outputs independently of node logs. No downstream edges or data references to Outputs are allowed.'
                 : kind == 'webhook'
-                  ? 'Use options.responseBody: {kind: "webhook-response", nodeId: "node ID or $alias", timeoutMs: 30000} to respond on the selected node’s first completion while the Run continues. Body, statusCode and headers come exclusively from that node; clear workflow-output-only status/header references when switching. Alternatively configure options.responseBody as {kind: "workflow-outputs", output?: "top-level output name", timeoutMs?: 30000} to respond after the Run succeeds. Omit output for the complete object. Connect Webhook to Outputs. Timeout is 1000–60000 ms; HTTP timeout does not cancel the Run. Strings return text; other values return JSON. Only in this mode, options.responseStatusCodeOutput can select a numeric top-level workflow output as the HTTP status, overriding the preserved fixed responseStatusCode (default 200). Its runtime value must be an integer from 200 to 599, excluding 204, 205, 304; missing or invalid values return 500. Use responseHeaders for fixed text headers. In workflow-output mode, responseHeaderOutputs maps header names to top-level output names; values can be string, number or boolean and are converted to text. Alternatively responseHeadersSource: {kind: "workflow-outputs", output?: "object field"} replaces the entire header object (omit output for all outputs), preserving but ignoring per-header settings. Missing, null, complex or invalid header values return 500 without fallback. Header restrictions and Content-Type policy still apply. Omit responseBody for immediate responseData. Clear options.responseBody, options.responseStatusCodeOutput, options.responseHeadersSource and options.responseHeaderOutputs explicitly to switch back.'
+                  ? 'Set options.bodyMode: "any" to accept any JSON object or top-level array as body without declaring fields; declared body fields are kept but inactive, and other JSON values return 400. Default "fields" accepts only declared fields. Set options.authentication to {type: "bearer", secret: {kind: "variable", name: "VARIABLE"}} (Authorization: Bearer <secret>) or {type: "header", name: "X-Header", secret: {kind: "variable", name: "VARIABLE"}} to reject requests with 401 before a Run is created; the credential header is removed from the headers output. Use options.responseBody: {kind: "webhook-response", nodeId: "node ID or $alias", timeoutMs: 30000} to respond on the selected node’s first completion while the Run continues. Body, statusCode and headers come exclusively from that node; clear workflow-output-only status/header references when switching. Alternatively configure options.responseBody as {kind: "workflow-outputs", output?: "top-level output name", timeoutMs?: 30000} to respond after the Run succeeds. Omit output for the complete object. Connect Webhook to Outputs. Timeout is 1000–60000 ms; HTTP timeout does not cancel the Run. Strings return text; other values return JSON. Only in this mode, options.responseStatusCodeOutput can select a numeric top-level workflow output as the HTTP status, overriding the preserved fixed responseStatusCode (default 200). Its runtime value must be an integer from 200 to 599, excluding 204, 205, 304; missing or invalid values return 500. Use responseHeaders for fixed text headers. In workflow-output mode, responseHeaderOutputs maps header names to top-level output names; values can be string, number or boolean and are converted to text. Alternatively responseHeadersSource: {kind: "workflow-outputs", output?: "object field"} replaces the entire header object (omit output for all outputs), preserving but ignoring per-header settings. Missing, null, complex or invalid header values return 500 without fallback. Header restrictions and Content-Type policy still apply. Omit responseBody for immediate responseData. Clear options.responseBody, options.responseStatusCodeOutput, options.responseHeadersSource and options.responseHeaderOutputs explicitly to switch back.'
                   : kind == 'start'
                     ? 'Declare workflow inputs through config.inputDefs; read them in Start node details. REST calls and manual runs supply them as trigger.outputs. Downstream nodes bind these parameters as Start outputs. Start has no input sources or defaults; non-nullable parameters are required, and omitted nullable parameters become null.'
                     : kind == 'condition'

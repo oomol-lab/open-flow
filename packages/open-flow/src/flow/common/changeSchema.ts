@@ -187,9 +187,17 @@ const wait = {
   inputDefinitions: z.array(input),
   prompt: text,
 }
+const bindingSource = z.strictObject({ kind: z.literal('binding'), bindingId: text })
 const webhookOptions = z.object({
   allowedMethods: z.never().optional(),
   allowedOrigins: strings.optional(),
+  authentication: z
+    .discriminatedUnion('type', [
+      z.strictObject({ type: z.literal('bearer'), secret: bindingSource }),
+      z.strictObject({ type: z.literal('header'), name: text, secret: bindingSource }),
+    ])
+    .optional(),
+  bodyMode: z.enum(['any', 'fields']).optional(),
   noResponseBody: z.never().optional(),
   responseBody: z
     .discriminatedUnion('kind', [
@@ -300,6 +308,7 @@ export const authoringDefinitionSchemas = {
   wait: z.strictObject(wait),
   waitAutoContinue: waitAutoContinueSchema,
   webhook: z.strictObject(webhook),
+  webhookOptions,
   schedule: triggerScheduleSchema,
   capabilities: z.array(capability),
   connector: managedFields.shape.executor.options[0].omit({ kind: true }).strict(),

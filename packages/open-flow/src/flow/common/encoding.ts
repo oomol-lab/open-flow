@@ -285,6 +285,16 @@ function canonicalTriggerDefinition(snapshot: TriggerKeySnapshot): JsonValue {
 function canonicalWebhookOptions(value: WebhookOptions): JsonValue {
   return {
     ...(value.allowedOrigins == null ? {} : { allowedOrigins: value.allowedOrigins }),
+    ...(value.authentication == null
+      ? {}
+      : {
+          authentication: {
+            ...(value.authentication.type == 'header' ? { name: value.authentication.name } : {}),
+            secret: { bindingId: value.authentication.secret.bindingId, kind: 'binding' },
+            type: value.authentication.type,
+          },
+        }),
+    ...(value.bodyMode == null ? {} : { bodyMode: value.bodyMode }),
     ...(value.responseBody == null
       ? {}
       : {

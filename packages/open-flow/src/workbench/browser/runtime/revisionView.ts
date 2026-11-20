@@ -3,6 +3,7 @@ import type {
   CodeModule,
   ApprovalNode,
   ConditionNode,
+  Diagnostic,
   Draft,
   Graph,
   GraphNode,
@@ -18,7 +19,7 @@ import { isTriggerNode } from '../../../flow/common/change.ts'
 import { nodeInputMappings } from '../../../flow/common/condition.ts'
 import { connectionUsage } from '../../../flow/common/connectionUsage.ts'
 import { nodeSystemOutputPorts } from '../../../flow/common/errorHandling.ts'
-import { checkInputSources, inputSourceCandidates, nodeOutputDescription, nodeOutputPorts } from '../../../flow/common/graph.ts'
+import { checkInputSources, inputSourceCandidates, nodeOutputDescription, nodeOutputPorts, webhookRequestDiagnostics } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
 import { sourcePort } from '../../../flow/common/sourceField.ts'
 
@@ -218,6 +219,10 @@ export class RevisionView<Source extends RevisionSource = Draft> {
 
   public binding(bindingId: string): FlowDocument['bindings'][string] | undefined {
     return this.#document.bindings[bindingId]
+  }
+
+  public webhookRequestDiagnostics(triggerId: string): readonly Diagnostic[] {
+    return webhookRequestDiagnostics(this.#document.graph, this.#document, triggerId)
   }
 
   public trigger(triggerId: string): TriggerNode | undefined {

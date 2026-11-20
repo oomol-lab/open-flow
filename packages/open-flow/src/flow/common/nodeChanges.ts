@@ -24,6 +24,7 @@ import type {
 import { dequal } from 'dequal/lite'
 import { connectorProxyHasBody, connectorProxyTask } from '../../connector/common/proxy.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
+import { triggerBindingIds } from '../../trigger/common/contract.ts'
 import { isTriggerNode, applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 import { codeSharedPermissionsEnabled } from './codePermissions.ts'
 import { nodeInputMappings } from './condition.ts'
@@ -503,7 +504,10 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
     references.set(bindingId, (references.get(bindingId) ?? 0) + 1)
   }
   for (const node of Object.values(document.graph.nodes)) {
-    if (isTriggerNode(node)) continue
+    if (isTriggerNode(node)) {
+      for (const bindingId of triggerBindingIds(node)) add(bindingId)
+      continue
+    }
     const inputs = Object.values(nodeInputMappings(node))
     for (const mapping of inputs) {
       if (mapping.kind != 'sources') continue

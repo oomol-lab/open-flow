@@ -9,7 +9,7 @@ import { isTriggerNode } from './change.ts'
 import { nodeWorkflowReferences } from './workflowReferences.ts'
 export { renderPrompt } from './promptTemplate.ts'
 export { connectionUsage, removeConnectionUsage } from './connectionUsage.ts'
-import { matchesTriggerOutputs, normalizeTriggerOutputs } from '../../trigger/common/contract.ts'
+import { matchesTriggerOutputs, normalizeTriggerOutputs, triggerBindingIds } from '../../trigger/common/contract.ts'
 import { nodeInputMappings } from './condition.ts'
 import { connectionUsage } from './connectionUsage.ts'
 export { matchesTriggerOutputs, normalizeTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
@@ -102,7 +102,9 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
         case 'error':
         case 'manual':
         case 'start':
+          break
         case 'webhook':
+          for (const bindingId of triggerBindingIds(node)) bindings.add(bindingId)
           break
       }
     }

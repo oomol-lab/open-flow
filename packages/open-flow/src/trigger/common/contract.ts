@@ -4,6 +4,7 @@ import type { TriggerNode } from './model.ts'
 import { isJsonObject } from '../../base/common/json.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 import { webhookMethods, webhookSupportsBody } from '../../flow/common/webhookMethod.ts'
+import { httpHeaderNameIssue } from '../../http/common/headers.ts'
 
 export { webhookMethods, webhookSupportsBody }
 
@@ -87,19 +88,32 @@ export function triggerOutputDefinitions(trigger: TriggerNode): readonly Port[] 
     case 'webhook':
       return webhookOutputs
         .filter((port) => port.handle !== 'body' || webhookSupportsBody(trigger.method))
-        .map((port) =>
-          port.handle === 'body'
-            ? Object.assign({}, port, {
-                jsonSchema: {
-                  type: 'object',
-                  additionalProperties: false,
-                  properties: Object.fromEntries(trigger.bodyFields.map((field) => [field.handle, field.jsonSchema])),
-                  required: trigger.bodyFields.filter((field) => !field.nullable && !Object.hasOwn(field, 'value')).map((field) => field.handle),
-                },
-              })
-            : port,
-        )
+        .map((port) => (port.handle === 'body' ? Object.assign({}, port, { jsonSchema: webhookBodySchema(trigger) }) : port))
   }
+}
+
+/** Any-body mode accepts JSON objects and arrays; field mode accepts only declared fields. */
+function webhookBodySchema(trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>): JsonValue {
+  if (trigger.options?.bodyMode == 'any') return { type: ['object', 'array'] }
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: Object.fromEntries(trigger.bodyFields.map((field) => [field.handle, field.jsonSchema])),
+    required: trigger.bodyFields.filter((field) => !field.nullable && !Object.hasOwn(field, 'value')).map((field) => field.handle),
+  }
+}
+
+// x-request-id is logged and echoed by the transport, so it must never carry a credential.
+const reservedWebhookAuthenticationHeaders = new Set(['content-length', 'content-type', 'host', 'idempotency-key', 'x-request-id'])
+
+/** A custom authentication header must be a valid name the transport does not already own. */
+export function webhookAuthenticationHeaderValid(name: string): boolean {
+  return httpHeaderNameIssue(name, []) == null && !reservedWebhookAuthenticationHeaders.has(name.toLowerCase())
+}
+
+/** Variable bindings a Trigger uses outside input mappings. */
+export function triggerBindingIds(trigger: TriggerNode): readonly string[] {
+  return trigger.kind == 'webhook' && trigger.options?.authentication != null ? [trigger.options.authentication.secret.bindingId] : []
 }
 
 export function triggerOutputPorts(trigger: TriggerNode): Readonly<Record<string, PortDefinition>> {

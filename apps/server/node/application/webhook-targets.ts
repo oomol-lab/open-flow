@@ -5,6 +5,7 @@ import type { RevisionValidator } from './flow-validation.ts'
 
 import { canonicalJsonBytes, decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
+import { webhookAuthenticationVariable } from '@oomol-lab/open-flow/webhook-trigger'
 import { isDeepStrictEqual } from 'node:util'
 import { AcceptanceError } from '../error.ts'
 
@@ -85,6 +86,15 @@ export class WebhookTargets {
     if (accepted?.kind == 'accepted' && accepted.created) this.#runCreated(target.flowId, accepted.runId)
     if (accepted != null) this.#signal()
     return accepted
+  }
+
+  /** The current authentication secret. Undefined means the request must be refused because the secret is unavailable. */
+  authenticationSecret(target: WebhookTarget): string | undefined {
+    const authentication = target.trigger.options?.authentication
+    if (authentication == null) return
+    const name = webhookAuthenticationVariable(target.revision.document.bindings, authentication)
+    if (name == null) return
+    return this.#store.variables.resolve(target.flowId, { secret: name })?.secret
   }
 
   target(endpointId: string): WebhookTarget | undefined {

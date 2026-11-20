@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import type { Diagnostic, InputPort, WebhookMethod, WebhookOptions } from '../api.ts'
-import type { WebhookSettings } from './flowChanges.ts'
+import type { WebhookAuthenticationChoice, WebhookSettings } from './flowChanges.ts'
 import type { PropertyDeletion } from './propertyDeletion.ts'
+import type { InputVariables } from './sourceValueEditor.tsx'
 import type { WorkflowResponseOutputs } from './webhookStatusSource.tsx'
 
 import { useEffect, useId, useRef, useState } from 'react'
@@ -10,11 +11,12 @@ import { webhookResponseAllowsBody, webhookResponseTimeout } from '../../../../f
 import { editorComponentIcons } from '../../../../form/browser/editorComponentIcon.tsx'
 import { ValueControl, ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
-import { webhookMethods, webhookSupportsBody } from '../../../../trigger/common/contract.ts'
+import { webhookAuthenticationHeaderValid, webhookMethods, webhookSupportsBody } from '../../../../trigger/common/contract.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { VariablePicker } from '../../../../ui/browser/variable-picker.tsx'
 import { Icon } from '../icons.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { InspectorSection } from './inspectorSection.tsx'
@@ -182,6 +184,119 @@ function validStatus(value: string, issue: string, signal: AbortSignal, dynamic 
   }, signal)
 }
 
+const defaultAuthenticationHeader = 'X-Webhook-Secret'
+const noVariables: InputVariables = { enabled: false, loaded: false, loading: false, names: [] }
+
+/** Request admission: the secret is always a Variable, so a policy is saved only once a Variable is chosen. */
+function WebhookAuthenticationFields({
+  options,
+  variable,
+  variables,
+  diagnostics,
+  disabled,
+  readOnly,
+  onChange,
+  onOptionsChange,
+}: {
+  readonly options: WebhookOptions
+  readonly variable?: string
+  readonly variables: InputVariables
+  readonly diagnostics: readonly Diagnostic[]
+  readonly disabled: boolean
+  readonly readOnly?: boolean
+  readonly onChange?: (choice: WebhookAuthenticationChoice | undefined) => void
+  readonly onOptionsChange: (options: WebhookOptions) => void
+}) {
+  const t = useTranslate()
+  const saved = options.authentication
+  const [draft, setDraft] = useState<{ readonly type: 'bearer' | 'header'; readonly name: string }>()
+  // A draft only stands in for a policy that is not saved yet. Once the saved policy changes (saved, removed or undone),
+  // the saved state wins; an incomplete draft survives edits that leave the saved policy unchanged.
+  const savedKey = JSON.stringify(saved ?? null)
+  useEffect(() => setDraft(undefined), [savedKey])
+  const type = saved?.type ?? draft?.type ?? 'none'
+  const name = saved?.type === 'header' ? saved.name : (draft?.name ?? defaultAuthenticationHeader)
+  const locked = disabled || readOnly || onChange == null
+  const issue =
+    diagnostics
+      .filter((item) => item.path.includes('/options/authentication/secret'))
+      .map((item) => diagnosticMessage(item, t))
+      .join(' ') || undefined
+  const choose = (next: string | undefined, nextName = name) => {
+    if (next == null || type === 'none') return
+    onChange?.(type === 'bearer' ? { type, variable: next } : { name: nextName, type, variable: next })
+  }
+  return (
+    <>
+      <Field>
+        <FieldLabel>{t('webhookEditor.webhookAuthentication')}</FieldLabel>
+        <FieldSelect
+          aria-label={t('webhookEditor.webhookAuthentication')}
+          disabled={locked}
+          value={type}
+          onChange={(value) => {
+            if (value === type) return
+            if (value === 'none') {
+              setDraft(undefined)
+              onChange?.(undefined)
+              return
+            }
+            const nextType = value as 'bearer' | 'header'
+            setDraft({ type: nextType, name })
+            if (variable != null) onChange?.(nextType === 'bearer' ? { type: nextType, variable } : { name, type: nextType, variable })
+          }}
+        >
+          <option value="none">{t('webhookEditor.webhookAuthenticationNone')}</option>
+          <option value="bearer">{t('webhookEditor.webhookAuthenticationBearer')}</option>
+          <option value="header">{t('webhookEditor.webhookAuthenticationHeader')}</option>
+        </FieldSelect>
+        {type !== 'none' && <FieldDescription className="px-2 text-[11px] leading-4">{t('webhookEditor.webhookAuthenticationHint')}</FieldDescription>}
+      </Field>
+      {type === 'header' && (
+        <DraftTextField
+          label={t('webhookEditor.webhookAuthenticationHeaderName')}
+          value={name}
+          disabled={locked}
+          placeholder={defaultAuthenticationHeader}
+          inspect={(value, signal) =>
+            deferInspection(
+              () => ({
+                value: value.trim(),
+                ...(webhookAuthenticationHeaderValid(value.trim()) ? {} : { issue: t('webhookEditor.webhookAuthenticationHeaderInvalid') }),
+              }),
+              signal,
+            )
+          }
+          onSave={(value) => {
+            setDraft({ type: 'header', name: value })
+            if (saved?.type === 'header') onOptionsChange({ ...options, authentication: { ...saved, name: value } })
+          }}
+        />
+      )}
+      {type !== 'none' && (
+        <Field data-invalid={issue != null || undefined}>
+          <FieldLabel>{t('webhookEditor.webhookAuthenticationSecret')}</FieldLabel>
+          <ValueEditorFeedback error={issue}>
+            {() => (
+              <VariablePicker
+                clearable={false}
+                disabled={locked}
+                enabled={variables.enabled}
+                loaded={variables.loaded}
+                loading={variables.loading}
+                names={variables.names}
+                name={saved == null ? undefined : variable}
+                onOpen={() => variables.onOpen?.()}
+                onChange={(next) => choose(next)}
+              />
+            )}
+          </ValueEditorFeedback>
+        </Field>
+      )}
+    </>
+  )
+}
+
 export function WebhookEditor({
   bodyFields,
   method,
@@ -195,6 +310,10 @@ export function WebhookEditor({
   responseNodes = [],
   onAddResponseNode,
   onChange,
+  authenticationVariable,
+  variables = noVariables,
+  requestDiagnostics = [],
+  onAuthenticationChange,
 }: {
   readonly responseNodes?: readonly { readonly id: string; readonly name: string; readonly reachable: boolean }[]
   readonly onAddResponseNode?: () => void
@@ -208,6 +327,10 @@ export function WebhookEditor({
   readonly onAddWorkflowOutputs?: () => void
   readonly outputSection?: ReactNode
   readonly onChange: (settings: WebhookSettings, deletion?: PropertyDeletion) => void
+  readonly authenticationVariable?: string
+  readonly variables?: InputVariables
+  readonly requestDiagnostics?: readonly Diagnostic[]
+  readonly onAuthenticationChange?: (choice: WebhookAuthenticationChoice | undefined) => void
 }) {
   const t = useTranslate()
   const policy = options.responseBody
@@ -271,6 +394,23 @@ export function WebhookEditor({
             </FieldSelect>
           </Field>
           {webhookSupportsBody(method) && (
+            <Field>
+              <FieldLabel>{t('webhookEditor.webhookBodyMode')}</FieldLabel>
+              <FieldSelect
+                aria-label={t('webhookEditor.webhookBodyMode')}
+                disabled={disabled || readOnly}
+                value={options.bodyMode ?? 'fields'}
+                onChange={(value) => changeOption('bodyMode', value === 'any' ? 'any' : undefined)}
+              >
+                <option value="fields">{t('webhookEditor.webhookBodyModeFields')}</option>
+                <option value="any">{t('webhookEditor.webhookBodyModeAny')}</option>
+              </FieldSelect>
+              {options.bodyMode === 'any' && (
+                <FieldDescription className="px-2 text-[11px] leading-4">{t('webhookEditor.webhookBodyModeAnyHint')}</FieldDescription>
+              )}
+            </Field>
+          )}
+          {webhookSupportsBody(method) && options.bodyMode !== 'any' && (
             <PortDefinitionEditor
               readOnly={readOnly}
               layout="ports"
@@ -283,6 +423,16 @@ export function WebhookEditor({
               onChange={(next, deletion) => onChange({ bodyFields: next, method, options }, deletion)}
             />
           )}
+          <WebhookAuthenticationFields
+            options={options}
+            variable={authenticationVariable}
+            variables={variables}
+            diagnostics={requestDiagnostics}
+            disabled={disabled}
+            readOnly={readOnly}
+            onChange={onAuthenticationChange}
+            onOptionsChange={(next) => onChange({ bodyFields, method, options: next })}
+          />
         </FieldGroup>
       </InspectorSection>
       {outputSection}

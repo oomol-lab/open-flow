@@ -10,7 +10,9 @@ import { controlRequests, waitActionBodySchema } from '@oomol-lab/open-flow/cont
 import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
 import {
   maximumWebhookBodyBytes,
+  verifyWebhookAuthentication,
   webhookEndpointId,
+  webhookOutputHeaders,
   webhookOccurrenceId,
   webhookSupportsBody,
   webhookResponseBody,
@@ -501,6 +503,16 @@ async function webhook(
     if (requestOrigin != null && origin == null) return plain(403)
     const method = request.method
     if (method !== configuredMethod) return plain(405, { allow: configuredMethod }, origin)
+    const authentication = target.trigger.options?.authentication
+    if (authentication != null) {
+      const secret = service.webhookAuthenticationSecret(target)
+      if (secret == null || secret.length == 0) {
+        logger.error({ category: 'webhook.authentication.unavailable', requestId }, 'Webhook authentication secret is unavailable.')
+        return plain(503, undefined, origin)
+      }
+      if (!(await verifyWebhookAuthentication(request.headers, authentication, secret)))
+        return plain(401, authentication.type == 'bearer' ? { 'www-authenticate': 'Bearer' } : undefined, origin)
+    }
 
     const body = webhookSupportsBody(configuredMethod) ? await readWebhookBody(request) : undefined
     const url = new URL(request.url)
@@ -513,7 +525,7 @@ async function webhook(
     url.search = ''
     url.hash = ''
     const outputs = {
-      headers: Object.fromEntries(request.headers),
+      headers: webhookOutputHeaders(request.headers, target.trigger.options),
       query,
       ...(body === undefined ? {} : { body }),
       webhookUrl: url.href,

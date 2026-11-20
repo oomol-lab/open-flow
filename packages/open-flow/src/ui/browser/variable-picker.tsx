@@ -14,9 +14,11 @@ export interface VariablePickerProps {
   readonly names: readonly string[]
   readonly onChange: (name: string | undefined) => void
   readonly onOpen: () => void
+  /** Offer the Clear action for a selected Variable. Disable it where a Variable is required. Defaults to true. */
+  readonly clearable?: boolean
 }
 
-export function VariablePicker({ disabled, enabled, loaded, loading, name, names, onChange, onOpen }: VariablePickerProps) {
+export function VariablePicker({ clearable = true, disabled, enabled, loaded, loading, name, names, onChange, onOpen }: VariablePickerProps) {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -114,7 +116,7 @@ export function VariablePicker({ disabled, enabled, loaded, loading, name, names
               </p>
             )}
           </div>
-          {name != null && (
+          {clearable && name != null && (
             <Button type="button" size="sm" variant="ghost" onClick={() => choose(undefined)}>
               {t('variablePicker.clear')}
             </Button>

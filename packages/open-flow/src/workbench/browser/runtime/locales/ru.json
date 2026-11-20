@@ -936,7 +936,8 @@
         "webhook-response-header-name": "Укажите допустимые и уникальные имена HTTP-заголовков.",
         "webhook-response-header-output-missing": "Выход процесса «{{output}}» не существует.",
         "webhook-response-header-output-type": "Выберите текст, число, логическое значение или объект только с такими значениями.",
-        "webhook-response-status-output-type": "Выберите числовое поле выходных данных процесса для кода статуса."
+        "webhook-response-status-output-type": "Выберите числовое поле выходных данных процесса для кода статуса.",
+        "webhook-authentication-header-name": "Используйте допустимое имя HTTP-заголовка, не зарезервированное транспортом Webhook."
       },
       "leina": {
         "robot-required": "Выберите робота Leina или привяжите его идентификатор к источнику данных."
@@ -1189,7 +1190,19 @@
     "webhookSelectResponse": "Выберите узел ответа Webhook",
     "webhookResponseDisconnected": "Узел ответа Webhook не подключён",
     "webhookConnectResponse": "Выберите узел ответа Webhook на холсте, чтобы подключить его.",
-    "webhookMissingResponse": "Выбранный узел ответа Webhook отсутствует"
+    "webhookMissingResponse": "Выбранный узел ответа Webhook отсутствует",
+    "webhookBodyMode": "Тело запроса",
+    "webhookBodyModeFields": "Объявленные поля",
+    "webhookBodyModeAny": "Любой JSON",
+    "webhookBodyModeAnyHint": "Принимает любой JSON-объект или массив. Объявленные поля сохраняются, но не используются.",
+    "webhookAuthentication": "Аутентификация",
+    "webhookAuthenticationNone": "Нет",
+    "webhookAuthenticationBearer": "Токен Bearer",
+    "webhookAuthenticationHeader": "Свой заголовок",
+    "webhookAuthenticationHint": "Запросы без секрета отклоняются с кодом 401 и не запускают выполнение. Заголовок с учётными данными удаляется из выхода headers.",
+    "webhookAuthenticationHeaderName": "Имя заголовка с секретом",
+    "webhookAuthenticationHeaderInvalid": "Введите допустимое имя HTTP-заголовка, кроме Host, Content-Type, Content-Length, Idempotency-Key и X-Request-ID.",
+    "webhookAuthenticationSecret": "Секретная переменная"
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",

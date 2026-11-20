@@ -19,6 +19,7 @@ import {
   updateNodeName,
   updateValue,
   updateWebhook,
+  setWebhookAuthentication,
   agentTool,
   applyFlowChanges,
   setInputValue,
@@ -805,6 +806,33 @@ describe('Webhook product editing', () => {
     expect(cleared.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', method: 'POST', name: 'Inbound', bodyFields: settings.bodyFields })
   })
 
+  it('binds Webhook authentication to a Variable, reuses its binding and removes it when cleared', () => {
+    const base = draft('export default () => ({})')
+    const current: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          bindings: { existing: { kind: 'variable', target: 'SHARED' } },
+          graph: { edges: [], nodes: { hook: { kind: 'webhook' as const, method: 'POST' as const, name: 'Inbound', bodyFields: [] } } },
+        },
+      },
+    }
+    const created = applyFlowChanges(current, setWebhookAuthentication(revisionView(current), 'hook', { type: 'bearer', variable: 'TOKEN' }, 'fresh')!)
+    expect(created.content.document.bindings).toEqual({ existing: { kind: 'variable', target: 'SHARED' }, fresh: { kind: 'variable', target: 'TOKEN' } })
+    const reused = applyFlowChanges(
+      created,
+      setWebhookAuthentication(revisionView(created), 'hook', { name: 'X-Secret', type: 'header', variable: 'SHARED' }, 'unused')!,
+    )
+    expect(reused.content.document.graph.nodes.hook).toMatchObject({
+      options: { authentication: { name: 'X-Secret', secret: { bindingId: 'existing', kind: 'binding' }, type: 'header' } },
+    })
+    expect(Object.keys(reused.content.document.bindings)).toEqual(['existing'])
+    const cleared = applyFlowChanges(reused, setWebhookAuthentication(revisionView(reused), 'hook', undefined, 'unused')!)
+    expect(cleared.content.document.bindings).toEqual({})
+    expect(cleared.content.document.graph.nodes.hook).not.toHaveProperty('options')
+  })
+
   it('keeps a downstream body reference missing until one undo restores the previous Webhook', () => {
     const base = draft('export default () => ({})')
     const current: Draft = {
@@ -1217,6 +1245,39 @@ it('copies multiple response nodes and remaps the selected response with ordinar
   expect(copied.content.document.graph.nodes['copy-2']).toMatchObject({ kind: 'webhook-response', inputs: { body: { kind: 'value', value: 'first' } } })
   expect(copied.content.document.graph.nodes['copy-3']).toMatchObject({ kind: 'webhook-response' })
   expect(applyFlowChanges(copied, inverseFlowChanges(current.content, pasted.changes)).content).toEqual(current.content)
+})
+
+it('copies the Webhook authentication Variable binding into another Flow', () => {
+  const authentication = { type: 'bearer' as const, secret: { kind: 'binding' as const, bindingId: 'secret' } }
+  const source = applyFlowChanges(draft('export default () => ({})'), [
+    { kind: 'binding.create', bindingId: 'secret', binding: { kind: 'variable', target: 'WEBHOOK_TOKEN' } },
+    { kind: 'graph.node.create', nodeId: 'hook', node: { kind: 'webhook', name: 'Hook', method: 'POST', bodyFields: [], options: { authentication } } },
+  ])
+  const destination = draft('export default () => ({})')
+  let sequence = 0
+  const pasted = pasteNodes(revisionView(destination), copyNodes(revisionView(source), ['hook']), () => `copy-${++sequence}`)
+  const copied = applyFlowChanges(destination, pasted.changes)
+  expect(copied.content.document.bindings).toEqual({ 'copy-2': { kind: 'variable', target: 'WEBHOOK_TOKEN' } })
+  expect(copied.content.document.graph.nodes['copy-1']).toMatchObject({ options: { authentication: { secret: { bindingId: 'copy-2' } } } })
+})
+
+it('keeps a pasted Webhook protected without matching a destination binding when its secret was not copied', () => {
+  const authentication = { type: 'bearer' as const, secret: { kind: 'binding' as const, bindingId: 'secret' } }
+  const source = applyFlowChanges(draft('export default () => ({})'), [
+    { kind: 'graph.node.create', nodeId: 'hook', node: { kind: 'webhook', name: 'Hook', method: 'POST', bodyFields: [], options: { authentication } } },
+  ])
+  const destination = applyFlowChanges(draft('export default () => ({})'), [
+    { kind: 'binding.create', bindingId: 'secret', binding: { kind: 'variable', target: 'OTHER_TOKEN' } },
+  ])
+  let sequence = 0
+  const pasted = pasteNodes(revisionView(destination), copyNodes(revisionView(source), ['hook']), () => `copy-${++sequence}`)
+  const copied = applyFlowChanges(destination, pasted.changes)
+  const node = copied.content.document.graph.nodes['copy-1']
+  if (node?.kind !== 'webhook') throw new Error('Expected Webhook')
+  const bindingId = node.options?.authentication?.secret.bindingId
+  expect(node.options?.authentication).toMatchObject({ type: 'bearer' })
+  expect(bindingId).not.toBe('secret')
+  expect(copied.content.document.bindings[bindingId!]).toBeUndefined()
 })
 
 it.each<WaitAutoContinue>([

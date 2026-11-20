@@ -64,6 +64,7 @@ export type {
   TriggerKeySnapshot,
   TriggerNode,
   TriggerSchedule,
+  WebhookAuthentication,
   WebhookBodyField,
   WebhookOptions,
 } from '../../trigger/common/model.ts'

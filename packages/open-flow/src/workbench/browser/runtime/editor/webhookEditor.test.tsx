@@ -117,6 +117,87 @@ describe('Webhook configuration', () => {
     expect(markup).toContain('Advanced settings')
   })
 
+  it('switches to any-JSON bodies and hides the inactive declared fields', async () => {
+    const onChange = vi.fn()
+    const fields = [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }] as const
+    const { container } = render(<WebhookEditor bodyFields={fields} method="POST" options={{}} disabled={false} onChange={onChange} />)
+    await click(container.querySelector<HTMLButtonElement>('[aria-label="Request body"]')!)
+    await click([...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'Any JSON')!)
+    expect(onChange).toHaveBeenLastCalledWith({ bodyFields: fields, method: 'POST', options: { bodyMode: 'any' } }, undefined)
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <WebhookEditor bodyFields={fields} method="POST" options={{ bodyMode: 'any' }} disabled={false} onChange={vi.fn()} />
+      </I18nProvider>,
+    )
+    expect(markup).not.toContain('Request body fields')
+    expect(markup).toContain('Declared fields are kept but not used.')
+  })
+
+  it('saves authentication only after a secret Variable is chosen and clears it with None', async () => {
+    const onAuthenticationChange = vi.fn()
+    const variables = { enabled: true, loaded: true, loading: false, names: ['WEBHOOK_TOKEN'] }
+    const { container } = render(
+      <WebhookEditor
+        bodyFields={[]}
+        method="POST"
+        options={{}}
+        disabled={false}
+        variables={variables}
+        onAuthenticationChange={onAuthenticationChange}
+        onChange={vi.fn()}
+      />,
+    )
+    await click(container.querySelector<HTMLButtonElement>('[aria-label="Authentication"]')!)
+    await click([...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'Custom header')!)
+    expect(onAuthenticationChange).not.toHaveBeenCalled()
+    expect(container.querySelector<HTMLInputElement>('input[value="X-Webhook-Secret"]')).not.toBeNull()
+    await click([...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Choose variable')!)
+    await click(document.querySelector<HTMLButtonElement>('button[data-variable-option]')!)
+    expect(onAuthenticationChange).toHaveBeenLastCalledWith({ name: 'X-Webhook-Secret', type: 'header', variable: 'WEBHOOK_TOKEN' })
+
+    const saved = render(
+      <WebhookEditor
+        bodyFields={[]}
+        method="POST"
+        options={{ authentication: { secret: { bindingId: 'secret', kind: 'binding' }, type: 'bearer' } }}
+        authenticationVariable="WEBHOOK_TOKEN"
+        disabled={false}
+        variables={variables}
+        onAuthenticationChange={onAuthenticationChange}
+        onChange={vi.fn()}
+      />,
+    )
+    await click(saved.container.querySelector<HTMLButtonElement>('[aria-label="Authentication"]')!)
+    await click([...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'None')!)
+    expect(onAuthenticationChange).toHaveBeenLastCalledWith(undefined)
+  })
+
+  it('drops a completed draft when the saved policy is undone and offers no Clear for the required secret', async () => {
+    const variables = { enabled: true, loaded: true, loading: false, names: ['WEBHOOK_TOKEN'] }
+    const editor = (options: WebhookOptions) => (
+      <WebhookEditor
+        bodyFields={[]}
+        method="POST"
+        options={options}
+        authenticationVariable={options.authentication == null ? undefined : 'WEBHOOK_TOKEN'}
+        disabled={false}
+        variables={variables}
+        onAuthenticationChange={vi.fn()}
+        onChange={vi.fn()}
+      />
+    )
+    const view = render(editor({}))
+    await click(view.container.querySelector<HTMLButtonElement>('[aria-label="Authentication"]')!)
+    await click([...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'Custom header')!)
+    const saved: WebhookOptions = { authentication: { name: 'X-Webhook-Secret', secret: { bindingId: 'secret', kind: 'binding' }, type: 'header' } }
+    view.rerender(editor(saved))
+    await click([...view.container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('WEBHOOK_TOKEN'))!)
+    expect(document.querySelector('button[data-variable-option]')).not.toBeNull()
+    expect([...document.querySelectorAll('button')].some((button) => button.textContent === '<unset>')).toBe(false)
+    view.rerender(editor({}))
+    expect(view.container.querySelector('[aria-label="Authentication"]')?.textContent).toContain('None')
+  })
+
   it('hides request body fields for GET and shows the owned empty state for POST', () => {
     expect(renderWebhook('GET')).not.toContain('Request body fields')
     const post = renderWebhook('POST')

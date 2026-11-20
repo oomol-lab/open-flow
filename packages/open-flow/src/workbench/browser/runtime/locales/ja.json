@@ -936,7 +936,8 @@
         "webhook-response-header-name": "有効で重複のない HTTP ヘッダー名を入力してください。",
         "webhook-response-header-output-missing": "ワークフロー出力「{{output}}」は存在しません。",
         "webhook-response-header-output-type": "文字列、数値、真偽値、またはこれらの値のみを含むオブジェクトを選択してください。",
-        "webhook-response-status-output-type": "ステータスコードには数値のワークフロー出力を選択してください。"
+        "webhook-response-status-output-type": "ステータスコードには数値のワークフロー出力を選択してください。",
+        "webhook-authentication-header-name": "Webhook のトランスポートで予約されていない有効な HTTP ヘッダー名を使用してください。"
       },
       "leina": {
         "robot-required": "Leina ロボットを選択するか、識別子の入力ソースを設定してください。"
@@ -1189,7 +1190,19 @@
     "webhookSelectResponse": "Webhook レスポンスノードを選択",
     "webhookResponseDisconnected": "Webhook レスポンスノードが未接続です",
     "webhookConnectResponse": "キャンバス上で Webhook レスポンスノードを選択して接続してください。",
-    "webhookMissingResponse": "選択した Webhook レスポンスノードがありません"
+    "webhookMissingResponse": "選択した Webhook レスポンスノードがありません",
+    "webhookBodyMode": "リクエストボディ",
+    "webhookBodyModeFields": "宣言したフィールド",
+    "webhookBodyModeAny": "任意の JSON",
+    "webhookBodyModeAnyHint": "任意の JSON オブジェクトまたは配列を受け付けます。宣言したフィールドは保持されますが使用されません。",
+    "webhookAuthentication": "認証",
+    "webhookAuthenticationNone": "なし",
+    "webhookAuthenticationBearer": "Bearer トークン",
+    "webhookAuthenticationHeader": "カスタムヘッダー",
+    "webhookAuthenticationHint": "シークレットのないリクエストは 401 で拒否され、実行は開始されません。認証情報のヘッダーは headers 出力から除かれます。",
+    "webhookAuthenticationHeaderName": "シークレットのヘッダー名",
+    "webhookAuthenticationHeaderInvalid": "Host、Content-Type、Content-Length、Idempotency-Key、X-Request-ID 以外の有効な HTTP ヘッダー名を入力してください。",
+    "webhookAuthenticationSecret": "シークレット変数"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",

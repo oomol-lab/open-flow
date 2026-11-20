@@ -77,7 +77,7 @@ export function defaultTriggerTestOutputs(trigger: TriggerNode): Readonly<Record
     triggerOutputDefinitions(trigger).flatMap((port) => {
       if (trigger.kind === 'start' && port.nullable) return []
       let value = trigger.kind === 'webhook' && port.handle === 'webhookUrl' ? 'https://example.com/webhook' : sampleValue(port.jsonSchema)
-      if (trigger.kind === 'webhook' && port.handle === 'body') {
+      if (trigger.kind === 'webhook' && port.handle === 'body' && trigger.options?.bodyMode !== 'any') {
         const body = {
           ...schemaObject(value ?? {}),
           ...Object.fromEntries(trigger.bodyFields.flatMap((field) => (field.value === undefined ? [] : [[field.handle, structuredClone(field.value)]]))),

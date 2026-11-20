@@ -21,7 +21,7 @@ function next(label: string): string {
 function revision(fixture: WebhookConformanceFixture, enabled = true): RevisionContent {
   return {
     document: {
-      bindings: {},
+      bindings: fixture.bindings ?? {},
       graph: {
         edges: [],
         nodes: enabled
@@ -46,17 +46,20 @@ async function createHarness(fixture: WebhookConformanceFixture): Promise<Webhoo
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-webhook-conformance-'))
   const file = path.join(directory, 'open-flow.sqlite')
   const service = await openService(file)
+  const { flow } = await service.control.flows.createFlow('operator', 'Webhook conformance', next('create'))
+  const flowId = flow.flowId
+  for (const [name, value] of Object.entries(fixture.variables ?? {})) service.control.variables.putVariable('operator', name, value)
   let revisionId = next('revision')
   const published = await service.publisher.publish({
     expectedLivePublicationId: null,
-    flowId: 'main',
+    flowId,
     idempotencyKey: next('publish'),
     revision: revision(fixture),
     revisionId,
   })
   if (published.kind != 'published') throw new Error('Initial conformance Publication unexpectedly conflicted.')
   let publicationId = published.publicationId
-  const endpointId = service.webhookEndpoint('main', 'webhook')
+  const endpointId = service.webhookEndpoint(flowId, 'webhook')
   if (endpointId == null) throw new Error('Server conformance endpoint was not created.')
   const app = createServerApp(service)
 
@@ -87,7 +90,7 @@ async function createHarness(fixture: WebhookConformanceFixture): Promise<Webhoo
     async republish() {
       const republished = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
-        flowId: 'main',
+        flowId,
         idempotencyKey: next('publish'),
         revision: revision(fixture),
         revisionId,
@@ -102,7 +105,7 @@ async function createHarness(fixture: WebhookConformanceFixture): Promise<Webhoo
       revisionId = next('revision')
       const retired = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
-        flowId: 'main',
+        flowId,
         idempotencyKey: next('publish'),
         revision: revision(fixture, false),
         revisionId,

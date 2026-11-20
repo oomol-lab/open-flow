@@ -17,7 +17,7 @@ import type { Diagnostic } from './semantics.ts'
 
 import { httpHeaderNameIssue } from '../../http/common/headers.ts'
 import { missingTriggerConfig, resolveTriggerConfig } from '../../trigger/common/config.ts'
-import { triggerOutputDefinitions, triggerOutputPorts, webhookSupportsBody } from '../../trigger/common/contract.ts'
+import { triggerOutputDefinitions, triggerOutputPorts, webhookAuthenticationHeaderValid, webhookSupportsBody } from '../../trigger/common/contract.ts'
 import { isTriggerNode, portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
 import { delayDurationInput, delayDurationSchema } from './delay.ts'
@@ -63,6 +63,26 @@ export function executionReachableNodes(graph: Graph, source: string): ReadonlyS
   const reachable = new Set([source])
   for (const id of reachable) for (const edge of graph.edges) if (edge.source === id) reachable.add(edge.target)
   return reachable
+}
+
+/** Request admission settings: the authentication secret must be a Variable and a custom header name must be usable. */
+export function webhookRequestDiagnostics(
+  graph: Graph,
+  document: FlowDocument,
+  triggerId: string,
+  path = `/document/graph/nodes/${triggerId}`,
+): readonly Diagnostic[] {
+  const trigger = graph.nodes[triggerId]
+  const authentication = trigger?.kind == 'webhook' ? trigger.options?.authentication : undefined
+  if (authentication == null) return []
+  const diagnostics: Diagnostic[] = []
+  const location = `${path}/options/authentication`
+  if (authentication.type == 'header' && !webhookAuthenticationHeaderValid(authentication.name))
+    diagnostics.push(
+      graphDiagnostic('trigger.webhook-authentication-header-name', 'Use a valid HTTP header name the Webhook transport does not reserve.', `${location}/name`),
+    )
+  checkSource(authentication.secret, graph, document, undefined, `${location}/secret`, diagnostics)
+  return diagnostics
 }
 
 export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path = `/document/graph/nodes/${triggerId}`): readonly Diagnostic[] {
@@ -725,7 +745,11 @@ function validateGraph(graph: Graph, document: FlowDocument, path: string, diagn
       diagnostics.push(graphDiagnostic('graph.error-trigger-duplicate', 'A graph can contain only one Flow Error node.', `${path}/nodes/${nodeId}`))
   const outputNodes = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'outputs')
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
-    if (node.kind == 'webhook') diagnostics.push(...webhookResponseDiagnostics(graph, nodeId, `${path}/nodes/${nodeId}`))
+    if (node.kind == 'webhook')
+      diagnostics.push(
+        ...webhookRequestDiagnostics(graph, document, nodeId, `${path}/nodes/${nodeId}`),
+        ...webhookResponseDiagnostics(graph, nodeId, `${path}/nodes/${nodeId}`),
+      )
     if (node.kind === 'webhook-response') {
       const status = node.inputs.statusCode
       if (status?.kind === 'value' && !validWebhookStatus(status.value))

@@ -12,7 +12,10 @@ import { nodeWorkflowReferences } from './workflowReferences.ts'
  * package rejects (a new node, executor or Capability kind, or a new field), so existing documents never start
  * requiring a feature they did not declare.
  */
-export type FlowFeature = EngineCapability
+export type FlowFeature = EngineCapability | HostFeature
+
+/** Features the deployment host applies before execution, such as Webhook request admission. They need no Engine support. */
+export type HostFeature = 'webhook-any-body' | 'webhook-authentication'
 
 /** The first Flow model whose serialized documents declare non-baseline features in `features`. */
 export const flowFeaturesModelVersion = 16
@@ -51,6 +54,8 @@ const flowFeatures: Readonly<Record<FlowFeature, FlowFeatureDefinition>> = {
   'skip-duplicates': { baseline: true, detect: someNode((node) => executorKind(node) == 'skip-duplicates') },
   'connector-proxy': { baseline: true, detect: someNode((node) => executorKind(node) == 'connector-proxy') },
   'delay': { baseline: true, detect: someNode((node) => node.kind == 'delay') },
+  'webhook-any-body': { baseline: false, detect: someNode((node) => node.kind == 'webhook' && node.options?.bodyMode == 'any') },
+  'webhook-authentication': { baseline: false, detect: someNode((node) => node.kind == 'webhook' && node.options?.authentication != null) },
 }
 
 const featureNames = (Object.keys(flowFeatures) as FlowFeature[]).toSorted()
@@ -71,7 +76,7 @@ export function declaredFlowFeatures(content: RevisionContent): readonly FlowFea
 
 /** Engine capabilities a Revision needs, sorted. */
 export function requiredEngineCapabilities(content: RevisionContent): readonly EngineCapability[] {
-  return usedFlowFeatures(content).filter((name) => Object.hasOwn(engineCapabilityRevisions, name))
+  return usedFlowFeatures(content).filter((name): name is EngineCapability => Object.hasOwn(engineCapabilityRevisions, name))
 }
 
 /** Engine capabilities a Revision needs that the contract does not provide, sorted. */

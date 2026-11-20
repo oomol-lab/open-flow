@@ -27,6 +27,10 @@ function content(nodes: Record<string, GraphNode>, edges: RevisionContent['docum
   return { modelVersion: currentFlowModelVersion, document: { bindings: {}, graph: { nodes, edges } }, modules: {} }
 }
 
+function webhook(options: Record<string, unknown>): GraphNode {
+  return { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Hook', options } as unknown as GraphNode
+}
+
 function bytes(candidate: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(candidate))
 }
@@ -159,6 +163,17 @@ describe('Model v16 features', () => {
     expect(decodeRevision(encoded)).toEqual(upgraded)
     expect(decodeRevisionContent(serializeRevisionContent(upgraded))).toEqual(upgraded)
     expect(decodeRevisionContent(upgraded)).toEqual(upgraded)
+  })
+
+  it('declares Webhook request features so earlier readers cannot drop admission settings', () => {
+    const graph = content({ hook: webhook({ authentication: { secret: { bindingId: 'secret', kind: 'binding' }, type: 'bearer' }, bodyMode: 'any' }) })
+    const authenticated: RevisionContent = { ...graph, document: { ...graph.document, bindings: { secret: { kind: 'variable', target: 'TOKEN' } } } }
+    expect(serializeRevisionContent(authenticated).features).toEqual(['webhook-any-body', 'webhook-authentication'])
+    expect(requiredEngineCapabilities(authenticated)).toEqual([])
+    expect(decodeRevision(encodeRevision(authenticated))).toEqual(authenticated)
+    expect(() => decodeRevisionContent({ ...serializeRevisionContent(authenticated), features: [] })).toThrow()
+    const plain = content({ hook: webhook({ bodyMode: 'fields' }) })
+    expect(serializeRevisionContent(plain).features).toEqual([])
   })
 
   it('rejects features this package does not know without offering repair', () => {
