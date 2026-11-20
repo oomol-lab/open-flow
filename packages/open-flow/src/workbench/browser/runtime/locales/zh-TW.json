@@ -938,7 +938,9 @@
         "webhook-response-header-output-type": "請選擇文字、數值、布林值，或僅包含這些值的物件。",
         "webhook-response-status-output-type": "請選擇數字類型的工作流程輸出欄位作為狀態碼。",
         "webhook-authentication-header-name": "請使用有效且未被 Webhook 傳輸層保留的 HTTP 標頭名稱。",
-        "webhook-response-artifact-output": "請選擇存放回應檔案的工作流程輸出。"
+        "webhook-response-artifact-output": "請選擇存放回應檔案的工作流程輸出。",
+        "webhook-form-conflict": "託管表單需要使用 POST 方法、宣告請求主體欄位並立即回應，且不能啟用驗證。",
+        "webhook-form-field-unsupported": "請求主體欄位「{{field}}」無法顯示在表單中。請使用文字、數字、整數、布林值或文字選項。"
       },
       "leina": {
         "robot-required": "請選擇 Leina 機器人，或綁定機器人識別碼的資料來源。"
@@ -1208,7 +1210,19 @@
     "responseBodyData": "資料",
     "responseBodyFile": "檔案",
     "responseBodyFileHint": "傳送本次執行中產生的檔案。Content-Type 與 Content-Disposition 取自檔案儲存的名稱與媒體類型。",
-    "responseBodyChooseOutput": "選擇輸出"
+    "responseBodyChooseOutput": "選擇輸出",
+    "webhookForm": "託管表單",
+    "webhookFormOff": "關閉",
+    "webhookFormOn": "開啟",
+    "webhookFormHint": "在瀏覽器中開啟 Webhook URL 會顯示根據請求主體欄位產生的表單。每次提交都會像 POST 請求一樣啟動一次執行。",
+    "webhookFormTitle": "表單標題",
+    "webhookFormTitlePlaceholder": "預設使用節點名稱",
+    "webhookFormDescription": "表單說明",
+    "webhookFormSubmitLabel": "提交按鈕文字",
+    "webhookFormSubmitPlaceholder": "提交",
+    "webhookFormSuccessMessage": "提交成功提示",
+    "webhookFormSuccessPlaceholder": "感謝填寫，已成功提交。",
+    "webhookFormTooLong": "最多輸入 {{limit}} 個字元。"
   },
   "conditionEditor": {
     "addCondition": "新增條件",

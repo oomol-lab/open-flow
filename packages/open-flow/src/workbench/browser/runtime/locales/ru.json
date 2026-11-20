@@ -938,7 +938,9 @@
         "webhook-response-header-output-type": "Выберите текст, число, логическое значение или объект только с такими значениями.",
         "webhook-response-status-output-type": "Выберите числовое поле выходных данных процесса для кода статуса.",
         "webhook-authentication-header-name": "Используйте допустимое имя HTTP-заголовка, не зарезервированное транспортом Webhook.",
-        "webhook-response-artifact-output": "Выберите выход рабочего процесса, содержащий файл ответа."
+        "webhook-response-artifact-output": "Выберите выход рабочего процесса, содержащий файл ответа.",
+        "webhook-form-conflict": "Для размещённой формы нужны метод POST, объявленные поля тела и немедленный ответ, без аутентификации.",
+        "webhook-form-field-unsupported": "Поле тела «{{field}}» нельзя показать в форме. Используйте текст, число, целое число, логическое значение или выбор из текстовых вариантов."
       },
       "leina": {
         "robot-required": "Выберите робота Leina или привяжите его идентификатор к источнику данных."
@@ -1208,7 +1210,19 @@
     "responseBodyData": "Данные",
     "responseBodyFile": "Файл",
     "responseBodyFileHint": "Отправляет файл, созданный в этом запуске. Content-Type и Content-Disposition задаются по сохранённому имени и типу содержимого.",
-    "responseBodyChooseOutput": "Выберите выход"
+    "responseBodyChooseOutput": "Выберите выход",
+    "webhookForm": "Размещённая форма",
+    "webhookFormOff": "Выкл.",
+    "webhookFormOn": "Вкл.",
+    "webhookFormHint": "Если открыть URL Webhook в браузере, появится форма, созданная из полей тела. Каждая отправка запускает выполнение, как POST-запрос.",
+    "webhookFormTitle": "Заголовок формы",
+    "webhookFormTitlePlaceholder": "По умолчанию — имя узла",
+    "webhookFormDescription": "Описание формы",
+    "webhookFormSubmitLabel": "Текст кнопки отправки",
+    "webhookFormSubmitPlaceholder": "Отправить",
+    "webhookFormSuccessMessage": "Сообщение об успешной отправке",
+    "webhookFormSuccessPlaceholder": "Спасибо. Ваш ответ отправлен.",
+    "webhookFormTooLong": "Введите не более {{limit}} символов."
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",

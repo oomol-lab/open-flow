@@ -343,6 +343,23 @@ describe('business configuration authoring contracts', () => {
     const keptNode = kept.content.document.graph.nodes[boundRef]
     if (keptNode?.kind != 'webhook-response') throw new Error('Expected Webhook Response')
     expect(keptNode.inputs.body).toMatchObject({ kind: 'sources' })
+  it('configures a hosted Webhook form and reports settings it cannot serve', async () => {
+    const created = await edit(empty, [
+      {
+        op: 'node.add',
+        type: 'webhook',
+        as: 'entry',
+        name: 'Signup',
+        config: { method: 'POST', body: { email: { schema: { type: 'string' }, nullable: false } }, options: { form: { title: 'Join', submitLabel: 'Send' } } },
+      },
+    ])
+    const ref = created.nodes.entry!
+    expect((await roundTrip(created.content, ref)).config).toMatchObject({ options: { form: { title: 'Join', submitLabel: 'Send' } } })
+    expect((await validateFlow(created.content, findEngineContract(currentEngineContract)!)).diagnostics).toEqual([])
+    const conflicting = await edit(created.content, [{ op: 'node.update', node: ref, set: { config: { options: { bodyMode: 'any' } } } }])
+    expect((await validateFlow(conflicting.content, findEngineContract(currentEngineContract)!)).diagnostics.map((item) => item.code)).toContain(
+      'trigger.webhook-form-conflict',
+    )
   })
 
   it('configures Webhook any-body mode and authentication by Variable name without exposing binding identities', async () => {

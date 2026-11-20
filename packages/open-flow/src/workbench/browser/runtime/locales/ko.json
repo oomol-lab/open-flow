@@ -938,7 +938,9 @@
         "webhook-response-header-output-type": "텍스트, 숫자, 불리언 또는 이러한 값만 포함하는 객체를 선택하세요.",
         "webhook-response-status-output-type": "상태 코드에는 숫자 형식의 워크플로 출력을 선택하세요.",
         "webhook-authentication-header-name": "Webhook 전송 계층에서 예약하지 않은 유효한 HTTP 헤더 이름을 사용하세요.",
-        "webhook-response-artifact-output": "응답 파일을 담은 워크플로 출력을 선택하세요."
+        "webhook-response-artifact-output": "응답 파일을 담은 워크플로 출력을 선택하세요.",
+        "webhook-form-conflict": "호스팅 양식에는 POST 메서드, 선언된 본문 필드, 즉시 응답이 필요하며 인증은 사용할 수 없습니다.",
+        "webhook-form-field-unsupported": "본문 필드 \"{{field}}\"은(는) 양식에 표시할 수 없습니다. 텍스트, 숫자, 정수, 불리언 또는 텍스트 선택지를 사용하세요."
       },
       "leina": {
         "robot-required": "Leina 로봇을 선택하거나 식별자의 입력 소스를 연결하세요."
@@ -1208,7 +1210,19 @@
     "responseBodyData": "데이터",
     "responseBodyFile": "파일",
     "responseBodyFileHint": "이번 실행에서 만든 파일을 보냅니다. Content-Type과 Content-Disposition은 저장된 이름과 미디어 유형으로 설정됩니다.",
-    "responseBodyChooseOutput": "출력 선택"
+    "responseBodyChooseOutput": "출력 선택",
+    "webhookForm": "호스팅 양식",
+    "webhookFormOff": "끄기",
+    "webhookFormOn": "켜기",
+    "webhookFormHint": "브라우저에서 Webhook URL을 열면 본문 필드로 만든 양식이 표시됩니다. 제출할 때마다 POST 요청처럼 실행이 시작됩니다.",
+    "webhookFormTitle": "양식 제목",
+    "webhookFormTitlePlaceholder": "기본값은 노드 이름",
+    "webhookFormDescription": "양식 설명",
+    "webhookFormSubmitLabel": "제출 버튼 텍스트",
+    "webhookFormSubmitPlaceholder": "제출",
+    "webhookFormSuccessMessage": "제출 완료 메시지",
+    "webhookFormSuccessPlaceholder": "감사합니다. 응답이 제출되었습니다.",
+    "webhookFormTooLong": "최대 {{limit}}자까지 입력하세요."
   },
   "conditionEditor": {
     "addCondition": "조건 추가",

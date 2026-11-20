@@ -43,11 +43,23 @@ export type WebhookAuthentication =
   | { readonly secret: BindingSource; readonly type: 'bearer' }
   | { readonly name: string; readonly secret: BindingSource; readonly type: 'header' }
 
+/**
+ * A hosted HTML form for the Webhook. GET renders the declared body fields; browser form submissions are converted to
+ * the typed body. All texts are plain text and optional.
+ */
+export interface WebhookForm {
+  readonly description?: string
+  readonly submitLabel?: string
+  readonly successMessage?: string
+  readonly title?: string
+}
+
 export interface WebhookOptions {
   readonly allowedOrigins?: readonly string[]
   readonly authentication?: WebhookAuthentication
   /** `fields` (default) accepts only declared body fields; `any` accepts any JSON object or array. */
   readonly bodyMode?: 'any' | 'fields'
+  readonly form?: WebhookForm
   readonly responseBody?:
     | { readonly bodyFormat?: 'artifact'; readonly kind: 'workflow-outputs'; readonly output?: string; readonly timeoutMs?: number }
     | { readonly kind: 'webhook-response'; readonly nodeId?: string; readonly timeoutMs?: number }

@@ -180,6 +180,18 @@ Rejected requests count toward the endpoint's rate limit, so repeated guessing i
 header is dropped from the `headers` output. Both settings are Flow features (`webhook-any-body`, `webhook-authentication`), so
 earlier readers reject such content instead of dropping the policy.
 
+`config.options.form` turns a POST Webhook into a hosted form, for example
+`{ "form": { "title": "Contact us", "description": "…", "submitLabel": "Send", "successMessage": "Thanks!" } }`; every
+text is optional and `{}` uses the node name and localized defaults. A browser GET to the Webhook URL returns an HTML
+page with one control per `body` field: strings as text areas, `number`/`integer` as number inputs, `boolean` as a
+checkbox (unchecked is `false`) and a string `enum` as a choice. Form submissions are converted to these types, empty
+values are omitted, undeclared names are ignored, and files, repeated names or invalid numbers return 400. A form
+posted from the endpoint's own origin is accepted without listing it in `allowedOrigins`. The browser then sees a
+result page that only reports whether the Run was admitted, instead of `responseData` or `responseStatusCode`; JSON requests to the same URL keep the ordinary contract. The form cannot be
+combined with other methods, `authentication`, `bodyMode: "any"` or `responseBody`, and other field types are not
+supported; `flow_check` reports `trigger.webhook-form-conflict` and `trigger.webhook-form-field-unsupported`. File
+uploads are not supported yet. The setting is the Flow feature `webhook-form`.
+
 ## Webhook HTTP responses
 
 Webhook response configuration is static business configuration applied after Run admission, not

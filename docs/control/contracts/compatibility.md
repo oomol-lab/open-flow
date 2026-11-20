@@ -16,6 +16,15 @@ The authentication secret binding joins the Flow closure, so Publication require
 listings include it. Server and Cloud must upgrade together before either writes such content, and both must pass the
 new `webhookConformanceCases` (fixtures may now carry `bindings` and `variables`).
 
+`webhook-form` (`options.form`) is a third host feature of the same kind. A deployment serving it answers GET with the
+shared `renderWebhookFormPage` and `webhookFormPageHeaders`, converts `application/x-www-form-urlencoded` and
+`multipart/form-data` submissions with `webhookFormBody` under the same 64 KiB body limit, accepts a same-origin
+`Origin` for them, and answers them with result pages that report admission regardless of the configured API response.
+Other requests to the endpoint keep the existing contract. The page must keep `Referrer-Policy: same-origin`: under
+`no-referrer` browsers send `Origin: null` with the form's own POST, which is rejected like any opaque origin. The
+same-origin check compares the `Origin` host with the request `Host`, so a gateway that rewrites `Host` must forward the
+public one. The form case in `webhookConformanceCases` covers this; Cloud implements it after the package is published.
+
 ## Portable Trigger configuration (after beta.95)
 
 Portable files preserve Trigger business configuration while clearing Open Flow Connection and

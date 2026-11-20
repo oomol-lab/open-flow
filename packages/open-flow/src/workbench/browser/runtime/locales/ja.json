@@ -938,7 +938,9 @@
         "webhook-response-header-output-type": "文字列、数値、真偽値、またはこれらの値のみを含むオブジェクトを選択してください。",
         "webhook-response-status-output-type": "ステータスコードには数値のワークフロー出力を選択してください。",
         "webhook-authentication-header-name": "Webhook のトランスポートで予約されていない有効な HTTP ヘッダー名を使用してください。",
-        "webhook-response-artifact-output": "レスポンスファイルを保持するワークフロー出力を選択してください。"
+        "webhook-response-artifact-output": "レスポンスファイルを保持するワークフロー出力を選択してください。",
+        "webhook-form-conflict": "ホスト型フォームには POST メソッド、宣言済みのボディフィールド、即時レスポンスが必要で、認証は使用できません。",
+        "webhook-form-field-unsupported": "ボディフィールド「{{field}}」はフォームに表示できません。テキスト、数値、整数、ブール値、またはテキストの選択肢を使用してください。"
       },
       "leina": {
         "robot-required": "Leina ロボットを選択するか、識別子の入力ソースを設定してください。"
@@ -1208,7 +1210,19 @@
     "responseBodyData": "データ",
     "responseBodyFile": "ファイル",
     "responseBodyFileHint": "この実行で作成したファイルを送信します。Content-Type と Content-Disposition は保存された名前とメディアタイプから設定されます。",
-    "responseBodyChooseOutput": "出力を選択"
+    "responseBodyChooseOutput": "出力を選択",
+    "webhookForm": "ホスト型フォーム",
+    "webhookFormOff": "オフ",
+    "webhookFormOn": "オン",
+    "webhookFormHint": "ブラウザーで Webhook URL を開くと、ボディフィールドから作られたフォームが表示されます。送信するたびに POST リクエストと同じように実行が開始されます。",
+    "webhookFormTitle": "フォームのタイトル",
+    "webhookFormTitlePlaceholder": "既定ではノード名を使用",
+    "webhookFormDescription": "フォームの説明",
+    "webhookFormSubmitLabel": "送信ボタンの文言",
+    "webhookFormSubmitPlaceholder": "送信",
+    "webhookFormSuccessMessage": "送信完了メッセージ",
+    "webhookFormSuccessPlaceholder": "ご回答ありがとうございます。送信が完了しました。",
+    "webhookFormTooLong": "{{limit}} 文字以内で入力してください。"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",

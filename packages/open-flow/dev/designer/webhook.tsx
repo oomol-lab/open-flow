@@ -87,6 +87,27 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
             setSecretVariable('REMOVED_SECRET')
           },
         },
+        {
+          label: 'Hosted form',
+          onClick: () =>
+            setSample({
+              bodyFields: [
+                { handle: 'name', jsonSchema: { title: 'Name', type: 'string' }, nullable: false },
+                { handle: 'plan', jsonSchema: { enum: ['free', 'pro'], type: 'string' }, nullable: true },
+              ],
+              method: 'POST',
+              options: { form: { description: 'Tell us how to reach you.', title: 'Contact us' } },
+            }),
+        },
+        {
+          label: 'Hosted form conflicts',
+          onClick: () =>
+            setSample({
+              bodyFields: [{ handle: 'tags', jsonSchema: { items: { type: 'string' }, type: 'array' }, nullable: true }],
+              method: 'POST',
+              options: { bodyMode: 'any', form: {} },
+            }),
+        },
         { label: 'GET', onClick: () => setSample({ bodyFields: [], method: 'GET', options: {} }) },
         {
           label: 'Request fields',
@@ -289,7 +310,7 @@ export const webhookStory: FrontendStory = {
   propertyPanel: true,
   title: 'Webhook Editor',
   description:
-    'Choose declared or any-JSON request bodies and Bearer or custom-header authentication backed by a Variable, including a missing Variable. Choose fixed content, workflow outputs or an early Webhook Response node. Compare body, status and whole/per-field header sources, standard object disclosure and child indentation, node submenus with incompatible fields, long names, missing or disconnected outputs, quick creation, and read-only settings.',
+    'Choose declared or any-JSON request bodies, Bearer or custom-header authentication backed by a Variable (including a missing Variable), and a hosted form with its conflicts. Choose fixed content, workflow outputs or an early Webhook Response node. Compare body, status and whole/per-field header sources, standard object disclosure and child indentation, node submenus with incompatible fields, long names, missing or disconnected outputs, quick creation, and read-only settings.',
   standalone: true,
   render: (log, dark, language) => <WebhookStory dark={dark} language={language} log={log} />,
 }
