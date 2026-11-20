@@ -19,7 +19,7 @@
 
 **Créez vos automatisations avec votre agent IA. Voyez exactement ce qui sera exécuté.**
 
-Open Flow est la plateforme d’automatisation de workflows d’OOMOL destinée aux équipes qui utilisent des agents de programmation. Son code source est accessible sous licence Open Flow. Votre agent peut créer et modifier un workflow via la CLI ou MCP, puis votre équipe peut le vérifier et le tester dans Workbench.
+Open Flow est une plateforme d’automatisation de workflows destinée aux équipes qui utilisent des agents de programmation. Son code source est accessible sous licence Open Flow. Votre agent peut créer et modifier un workflow via la CLI ou MCP, puis votre équipe peut le vérifier et le tester dans Workbench.
 
 Combinez JavaScript, applications connectées, IA, embranchements et validation humaine sur un même canevas. Inspectez les entrées, suivez l'exécution et choisissez la version à mettre en production. Utilisez OOMOL Hosted ou votre propre infrastructure.
 

@@ -17,7 +17,7 @@
 
 **Build automation with your AI agent. See exactly what will run.**
 
-Open Flow is OOMOL’s source-available workflow automation platform for teams using coding agents. Build and edit workflows with Codex, Claude Code, or another coding agent through the CLI or MCP. Review and test the same workflows in Workbench before publishing.
+Open Flow is a source-available workflow automation platform for teams using coding agents. Build and edit workflows with Codex, Claude Code, or another coding agent through the CLI or MCP. Review and test the same workflows in Workbench before publishing.
 
 Combine JavaScript, connected apps, AI, branching, and human approval in one canvas. Inspect the
 inputs, follow the execution, and decide which version goes live. Run on OOMOL Hosted or on your

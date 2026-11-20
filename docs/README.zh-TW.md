@@ -19,7 +19,7 @@
 
 **和 AI Agent 一起建立自動化，讓每一步執行清楚可見。**
 
-Open Flow 是 OOMOL 為使用程式設計助手的團隊開發的工作流程自動化平台，原始碼依 Open Flow License 提供。請 Codex、Claude Code 等程式設計助手透過 CLI 或 MCP 建立及修改工作流程，再到 Workbench 檢查、測試及發布同一個流程。
+Open Flow 是為使用程式設計助手的團隊打造的工作流程自動化平台，原始碼依 Open Flow License 提供。請 Codex、Claude Code 等程式設計助手透過 CLI 或 MCP 建立及修改工作流程，再到 Workbench 檢查、測試及發布同一個流程。
 
 在一張畫布上組合 JavaScript、應用程式整合、AI、條件分支和人工核准。檢視輸入、追蹤執行，並決定哪個版本正式上線。可以使用 OOMOL Hosted，也可以部署到自己的基礎設施。
 

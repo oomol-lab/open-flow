@@ -19,7 +19,7 @@
 
 **和 AI Agent 一起搭建自动化，让每一步执行清晰可见。**
 
-Open Flow 是 OOMOL 为使用编程助手的团队开发的工作流自动化平台，源代码按 Open Flow License 提供。让 Codex、Claude Code 等编程助手通过 CLI 或 MCP 创建和修改工作流，你可以在 Workbench 中检查、测试并发布同一个流程。
+Open Flow 是为使用编程助手的团队打造的工作流自动化平台，源代码按 Open Flow License 提供。让 Codex、Claude Code 等编程助手通过 CLI 或 MCP 创建和修改工作流，你可以在 Workbench 中检查、测试并发布同一个流程。
 
 在一张画布上组合 JavaScript、应用集成、AI、条件分支和人工审批。查看输入、跟踪执行，并决定哪个版本正式上线。可以使用 OOMOL Hosted，也可以部署到自己的基础设施。
 
