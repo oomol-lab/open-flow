@@ -1201,7 +1201,7 @@
     "webhookAuthenticationHeader": "自定义请求头",
     "webhookAuthenticationHint": "未携带密钥的请求会返回 401，且不会启动运行。凭据所在的请求头不会出现在 headers 输出中。",
     "webhookAuthenticationHeaderName": "密钥请求头名称",
-    "webhookAuthenticationHeaderInvalid": "请输入有效的 HTTP 请求头名称，不能使用 Host、Content-Type、Content-Length 或 Idempotency-Key。",
+    "webhookAuthenticationHeaderInvalid": "请输入有效的 HTTP 请求头名称，不能使用 Host、Content-Type、Content-Length、Idempotency-Key 或 X-Request-ID。",
     "webhookAuthenticationSecret": "密钥变量"
   },
   "conditionEditor": {

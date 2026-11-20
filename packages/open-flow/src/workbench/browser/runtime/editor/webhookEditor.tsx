@@ -210,6 +210,10 @@ function WebhookAuthenticationFields({
   const t = useTranslate()
   const saved = options.authentication
   const [draft, setDraft] = useState<{ readonly type: 'bearer' | 'header'; readonly name: string }>()
+  // A draft only stands in for a policy that is not saved yet. Once the saved policy changes (saved, removed or undone),
+  // the saved state wins; an incomplete draft survives edits that leave the saved policy unchanged.
+  const savedKey = JSON.stringify(saved ?? null)
+  useEffect(() => setDraft(undefined), [savedKey])
   const type = saved?.type ?? draft?.type ?? 'none'
   const name = saved?.type === 'header' ? saved.name : (draft?.name ?? defaultAuthenticationHeader)
   const locked = disabled || readOnly || onChange == null
@@ -275,6 +279,7 @@ function WebhookAuthenticationFields({
           <ValueEditorFeedback error={issue}>
             {() => (
               <VariablePicker
+                clearable={false}
                 disabled={locked}
                 enabled={variables.enabled}
                 loaded={variables.loaded}

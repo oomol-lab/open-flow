@@ -1201,7 +1201,7 @@
     "webhookAuthenticationHeader": "自訂標頭",
     "webhookAuthenticationHint": "未攜帶密鑰的請求會回傳 401，且不會啟動執行。憑證所在的標頭不會出現在 headers 輸出中。",
     "webhookAuthenticationHeaderName": "密鑰標頭名稱",
-    "webhookAuthenticationHeaderInvalid": "請輸入有效的 HTTP 標頭名稱，不能使用 Host、Content-Type、Content-Length 或 Idempotency-Key。",
+    "webhookAuthenticationHeaderInvalid": "請輸入有效的 HTTP 標頭名稱，不能使用 Host、Content-Type、Content-Length、Idempotency-Key 或 X-Request-ID。",
     "webhookAuthenticationSecret": "密鑰變數"
   },
   "conditionEditor": {

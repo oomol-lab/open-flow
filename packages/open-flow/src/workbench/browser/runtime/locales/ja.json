@@ -1201,7 +1201,7 @@
     "webhookAuthenticationHeader": "カスタムヘッダー",
     "webhookAuthenticationHint": "シークレットのないリクエストは 401 で拒否され、実行は開始されません。認証情報のヘッダーは headers 出力から除かれます。",
     "webhookAuthenticationHeaderName": "シークレットのヘッダー名",
-    "webhookAuthenticationHeaderInvalid": "Host、Content-Type、Content-Length、Idempotency-Key 以外の有効な HTTP ヘッダー名を入力してください。",
+    "webhookAuthenticationHeaderInvalid": "Host、Content-Type、Content-Length、Idempotency-Key、X-Request-ID 以外の有効な HTTP ヘッダー名を入力してください。",
     "webhookAuthenticationSecret": "シークレット変数"
   },
   "conditionEditor": {

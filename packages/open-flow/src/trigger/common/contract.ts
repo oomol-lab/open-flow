@@ -103,7 +103,8 @@ function webhookBodySchema(trigger: Extract<TriggerNode, { readonly kind: 'webho
   }
 }
 
-const reservedWebhookAuthenticationHeaders = new Set(['content-length', 'content-type', 'host', 'idempotency-key'])
+// x-request-id is logged and echoed by the transport, so it must never carry a credential.
+const reservedWebhookAuthenticationHeaders = new Set(['content-length', 'content-type', 'host', 'idempotency-key', 'x-request-id'])
 
 /** A custom authentication header must be a valid name the transport does not already own. */
 export function webhookAuthenticationHeaderValid(name: string): boolean {

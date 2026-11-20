@@ -1201,7 +1201,7 @@
     "webhookAuthenticationHeader": "En-tête personnalisé",
     "webhookAuthenticationHint": "Les requêtes sans secret sont refusées avec 401 et ne démarrent pas d’exécution. L’en-tête d’identifiant est retiré de la sortie headers.",
     "webhookAuthenticationHeaderName": "Nom de l’en-tête secret",
-    "webhookAuthenticationHeaderInvalid": "Saisissez un nom d’en-tête HTTP valide autre que Host, Content-Type, Content-Length ou Idempotency-Key.",
+    "webhookAuthenticationHeaderInvalid": "Saisissez un nom d’en-tête HTTP valide autre que Host, Content-Type, Content-Length, Idempotency-Key ou X-Request-ID.",
     "webhookAuthenticationSecret": "Variable secrète"
   },
   "conditionEditor": {

@@ -1201,7 +1201,7 @@
     "webhookAuthenticationHeader": "Custom header",
     "webhookAuthenticationHint": "Requests without the secret are rejected with 401 and do not start a run. The credential header is removed from the headers output.",
     "webhookAuthenticationHeaderName": "Secret header name",
-    "webhookAuthenticationHeaderInvalid": "Enter a valid HTTP header name other than Host, Content-Type, Content-Length or Idempotency-Key.",
+    "webhookAuthenticationHeaderInvalid": "Enter a valid HTTP header name other than Host, Content-Type, Content-Length, Idempotency-Key or X-Request-ID.",
     "webhookAuthenticationSecret": "Secret variable"
   },
   "conditionEditor": {

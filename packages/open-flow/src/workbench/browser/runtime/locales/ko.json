@@ -1201,7 +1201,7 @@
     "webhookAuthenticationHeader": "사용자 지정 헤더",
     "webhookAuthenticationHint": "비밀 값이 없는 요청은 401로 거부되며 실행이 시작되지 않습니다. 자격 증명 헤더는 headers 출력에서 제거됩니다.",
     "webhookAuthenticationHeaderName": "비밀 헤더 이름",
-    "webhookAuthenticationHeaderInvalid": "Host, Content-Type, Content-Length, Idempotency-Key를 제외한 유효한 HTTP 헤더 이름을 입력하세요.",
+    "webhookAuthenticationHeaderInvalid": "Host, Content-Type, Content-Length, Idempotency-Key, X-Request-ID를 제외한 유효한 HTTP 헤더 이름을 입력하세요.",
     "webhookAuthenticationSecret": "비밀 변수"
   },
   "conditionEditor": {

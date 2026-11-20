@@ -108,9 +108,11 @@ export function pasteNodes(revision: RevisionView, clipboard: NodeClipboard, ide
                 ...(authentication == null
                   ? {}
                   : {
+                      // An uncopied secret gets a fresh ID that resolves to no binding, so the paste stays protected and
+                      // reports the missing Variable instead of matching a destination binding or dropping authentication.
                       authentication: {
                         ...authentication,
-                        secret: { ...authentication.secret, bindingId: bindingIds.get(authentication.secret.bindingId) ?? authentication.secret.bindingId },
+                        secret: { ...authentication.secret, bindingId: bindingIds.get(authentication.secret.bindingId) ?? identity() },
                       },
                     }),
               },

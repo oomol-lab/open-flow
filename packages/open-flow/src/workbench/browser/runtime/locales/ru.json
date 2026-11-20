@@ -1201,7 +1201,7 @@
     "webhookAuthenticationHeader": "Свой заголовок",
     "webhookAuthenticationHint": "Запросы без секрета отклоняются с кодом 401 и не запускают выполнение. Заголовок с учётными данными удаляется из выхода headers.",
     "webhookAuthenticationHeaderName": "Имя заголовка с секретом",
-    "webhookAuthenticationHeaderInvalid": "Введите допустимое имя HTTP-заголовка, кроме Host, Content-Type, Content-Length и Idempotency-Key.",
+    "webhookAuthenticationHeaderInvalid": "Введите допустимое имя HTTP-заголовка, кроме Host, Content-Type, Content-Length, Idempotency-Key и X-Request-ID.",
     "webhookAuthenticationSecret": "Секретная переменная"
   },
   "conditionEditor": {

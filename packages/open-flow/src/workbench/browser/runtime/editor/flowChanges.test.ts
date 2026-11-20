@@ -1261,6 +1261,25 @@ it('copies the Webhook authentication Variable binding into another Flow', () =>
   expect(copied.content.document.graph.nodes['copy-1']).toMatchObject({ options: { authentication: { secret: { bindingId: 'copy-2' } } } })
 })
 
+it('keeps a pasted Webhook protected without matching a destination binding when its secret was not copied', () => {
+  const authentication = { type: 'bearer' as const, secret: { kind: 'binding' as const, bindingId: 'secret' } }
+  const source = applyFlowChanges(draft('export default () => ({})'), [
+    { kind: 'graph.node.create', nodeId: 'hook', node: { kind: 'webhook', name: 'Hook', method: 'POST', bodyFields: [], options: { authentication } } },
+  ])
+  const destination = applyFlowChanges(draft('export default () => ({})'), [
+    { kind: 'binding.create', bindingId: 'secret', binding: { kind: 'variable', target: 'OTHER_TOKEN' } },
+  ])
+  let sequence = 0
+  const pasted = pasteNodes(revisionView(destination), copyNodes(revisionView(source), ['hook']), () => `copy-${++sequence}`)
+  const copied = applyFlowChanges(destination, pasted.changes)
+  const node = copied.content.document.graph.nodes['copy-1']
+  if (node?.kind !== 'webhook') throw new Error('Expected Webhook')
+  const bindingId = node.options?.authentication?.secret.bindingId
+  expect(node.options?.authentication).toMatchObject({ type: 'bearer' })
+  expect(bindingId).not.toBe('secret')
+  expect(copied.content.document.bindings[bindingId!]).toBeUndefined()
+})
+
 it.each<WaitAutoContinue>([
   { kind: 'after', durationMs: 1000 },
   { kind: 'after', durationMs: null },
