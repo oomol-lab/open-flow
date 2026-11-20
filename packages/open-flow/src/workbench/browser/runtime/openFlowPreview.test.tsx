@@ -4,7 +4,7 @@ import type { CanvasStore } from '../../../canvas/browser/stores/canvas/canvas.s
 import type { OpenFlowPreviewProps } from './openFlowPreview.tsx'
 
 import { act } from 'react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, expect, it, vi } from 'vitest'
 import { previewProviderCatalog, previewProviderFixture } from '../../../../dev/designer/previewProviderFixture.ts'
 import { publicationFixture } from '../../../../dev/designer/publicationFixture.ts'
 import { click, render } from '../../../../test/support/render.tsx'
@@ -22,6 +22,12 @@ vi.mock('../../../canvas/browser/graph/FlowCanvas/FlowCanvas.tsx', () => ({
     return <>{props.toolbar}</>
   },
 }))
+
+// OpenFlowPreview loads RevisionCanvas lazily. Load that module graph once here, outside every test's timeout, so the
+// first test does not absorb its cold transform and import time.
+beforeAll(async () => {
+  await import('./editor/revisionCanvas.tsx')
+}, 60_000)
 
 afterEach(() => {
   boundary.props = undefined
