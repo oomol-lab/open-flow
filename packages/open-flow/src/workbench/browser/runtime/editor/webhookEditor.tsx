@@ -17,7 +17,10 @@ import { webhookFormLimits } from '../../../../trigger/common/webhookForm.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
+import { Label } from '../../../../ui/browser/label.tsx'
+import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { cn } from '../../../../ui/browser/utils.ts'
 import { VariablePicker } from '../../../../ui/browser/variable-picker.tsx'
 import { Icon } from '../icons.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
@@ -51,6 +54,8 @@ function DraftTextField({
   description,
   inputMode,
   multiline,
+  monospace,
+  textareaClassName,
   placeholder,
   inspect,
   onSave,
@@ -64,6 +69,8 @@ function DraftTextField({
   readonly description?: string
   readonly inputMode?: React.HTMLAttributes<HTMLElement>['inputMode']
   readonly multiline?: boolean
+  readonly monospace?: boolean
+  readonly textareaClassName?: string
   readonly placeholder?: string
   readonly inspect?: (value: string, signal: AbortSignal) => Promise<DraftInspection>
   readonly onSave: (value: string) => void
@@ -118,7 +125,7 @@ function DraftTextField({
     id,
     'aria-describedby': [description == null ? undefined : descriptionId, errorId].filter(Boolean).join(' ') || undefined,
     'aria-invalid': issue != null || undefined,
-    'className': 'placeholder:text-muted-foreground/60',
+    'className': cn('placeholder:text-muted-foreground/60', multiline && monospace && 'font-mono', multiline && textareaClassName),
     disabled,
     inputMode,
     placeholder,
@@ -148,7 +155,7 @@ function DraftTextField({
         </ValueEditorFeedback>
       </ValueControl>
       {description != null && (
-        <FieldDescription id={descriptionId} className="px-2 text-[11px] leading-4">
+        <FieldDescription id={descriptionId} className="text-[11px] leading-4">
           {description}
         </FieldDescription>
       )}
@@ -190,7 +197,7 @@ const defaultAuthenticationHeader = 'X-Webhook-Secret'
 const noVariables: InputVariables = { enabled: false, loaded: false, loading: false, names: [] }
 
 /** Request admission: the secret is always a Variable, so a policy is saved only once a Variable is chosen. */
-function WebhookAuthenticationFields({
+function WebhookAuthenticationSection({
   options,
   variable,
   variables,
@@ -229,77 +236,78 @@ function WebhookAuthenticationFields({
     onChange?.(type === 'bearer' ? { type, variable: next } : { name: nextName, type, variable: next })
   }
   return (
-    <>
-      <Field>
-        <FieldLabel>{t('webhookEditor.webhookAuthentication')}</FieldLabel>
-        <FieldSelect
-          aria-label={t('webhookEditor.webhookAuthentication')}
-          disabled={locked}
-          value={type}
-          onChange={(value) => {
-            if (value === type) return
-            if (value === 'none') {
-              setDraft(undefined)
-              onChange?.(undefined)
-              return
-            }
-            const nextType = value as 'bearer' | 'header'
-            setDraft({ type: nextType, name })
-            if (variable != null) onChange?.(nextType === 'bearer' ? { type: nextType, variable } : { name, type: nextType, variable })
-          }}
-        >
-          <option value="none">{t('webhookEditor.webhookAuthenticationNone')}</option>
-          <option value="bearer">{t('webhookEditor.webhookAuthenticationBearer')}</option>
-          <option value="header">{t('webhookEditor.webhookAuthenticationHeader')}</option>
-        </FieldSelect>
-        {type !== 'none' && <FieldDescription className="px-2 text-[11px] leading-4">{t('webhookEditor.webhookAuthenticationHint')}</FieldDescription>}
-      </Field>
-      {type === 'header' && (
-        <DraftTextField
-          label={t('webhookEditor.webhookAuthenticationHeaderName')}
-          value={name}
-          disabled={locked}
-          placeholder={defaultAuthenticationHeader}
-          inspect={(value, signal) =>
-            deferInspection(
-              () => ({
-                value: value.trim(),
-                ...(webhookAuthenticationHeaderValid(value.trim()) ? {} : { issue: t('webhookEditor.webhookAuthenticationHeaderInvalid') }),
-              }),
-              signal,
-            )
-          }
-          onSave={(value) => {
-            setDraft({ type: 'header', name: value })
-            if (saved?.type === 'header') onOptionsChange({ ...options, authentication: { ...saved, name: value } })
-          }}
-        />
-      )}
-      {type !== 'none' && (
-        <Field data-invalid={issue != null || undefined}>
-          <FieldLabel>{t('webhookEditor.webhookAuthenticationSecret')}</FieldLabel>
-          <ValueEditorFeedback error={issue}>
-            {() => (
-              <VariablePicker
-                clearable={false}
-                disabled={locked}
-                enabled={variables.enabled}
-                loaded={variables.loaded}
-                loading={variables.loading}
-                names={variables.names}
-                name={saved == null ? undefined : variable}
-                onOpen={() => variables.onOpen?.()}
-                onChange={(next) => choose(next)}
-              />
-            )}
-          </ValueEditorFeedback>
+    <InspectorSection title={t('webhookEditor.webhookAuthentication')} className="node-settings" data-inspector-section="trigger">
+      <FieldGroup>
+        <Field>
+          <FieldSelect
+            aria-label={t('webhookEditor.webhookAuthentication')}
+            disabled={locked}
+            value={type}
+            onChange={(value) => {
+              if (value === type) return
+              if (value === 'none') {
+                setDraft(undefined)
+                onChange?.(undefined)
+                return
+              }
+              const nextType = value as 'bearer' | 'header'
+              setDraft({ type: nextType, name })
+              if (variable != null) onChange?.(nextType === 'bearer' ? { type: nextType, variable } : { name, type: nextType, variable })
+            }}
+          >
+            <option value="none">{t('webhookEditor.webhookAuthenticationNone')}</option>
+            <option value="bearer">{t('webhookEditor.webhookAuthenticationBearer')}</option>
+            <option value="header">{t('webhookEditor.webhookAuthenticationHeader')}</option>
+          </FieldSelect>
+          {type !== 'none' && <FieldDescription className="text-[11px] leading-4">{t('webhookEditor.webhookAuthenticationHint')}</FieldDescription>}
         </Field>
-      )}
-    </>
+        {type === 'header' && (
+          <DraftTextField
+            label={t('webhookEditor.webhookAuthenticationHeaderName')}
+            value={name}
+            disabled={locked}
+            placeholder={defaultAuthenticationHeader}
+            inspect={(value, signal) =>
+              deferInspection(
+                () => ({
+                  value: value.trim(),
+                  ...(webhookAuthenticationHeaderValid(value.trim()) ? {} : { issue: t('webhookEditor.webhookAuthenticationHeaderInvalid') }),
+                }),
+                signal,
+              )
+            }
+            onSave={(value) => {
+              setDraft({ type: 'header', name: value })
+              if (saved?.type === 'header') onOptionsChange({ ...options, authentication: { ...saved, name: value } })
+            }}
+          />
+        )}
+        {type !== 'none' && (
+          <Field data-invalid={issue != null || undefined}>
+            <FieldLabel>{t('webhookEditor.webhookAuthenticationSecret')}</FieldLabel>
+            <ValueEditorFeedback error={issue}>
+              {() => (
+                <VariablePicker
+                  clearable={false}
+                  disabled={locked}
+                  enabled={variables.enabled}
+                  loaded={variables.loaded}
+                  loading={variables.loading}
+                  names={variables.names}
+                  name={saved == null ? undefined : variable}
+                  onOpen={() => variables.onOpen?.()}
+                  onChange={(next) => choose(next)}
+                />
+              )}
+            </ValueEditorFeedback>
+          </Field>
+        )}
+      </FieldGroup>
+    </InspectorSection>
   )
 }
 
-function WebhookFormFields({
+function WebhookFormSection({
   options,
   diagnostics,
   disabled,
@@ -313,9 +321,12 @@ function WebhookFormFields({
   readonly onOptionsChange: (options: WebhookOptions) => void
 }) {
   const t = useTranslate()
+  const switchId = useId()
   const form = options.form
+  const enabled = form != null
   const locked = disabled || readOnly === true
   const issues = [...new Set(diagnostics.filter((item) => item.code.startsWith('trigger.webhook-form-')).map((item) => diagnosticMessage(item, t)))]
+  const showContent = enabled || issues.length > 0
   const change = (key: keyof WebhookForm, value: string) => {
     if (form == null) return
     const next: Record<string, string> = { ...form }
@@ -329,6 +340,7 @@ function WebhookFormFields({
       value={form?.[key] ?? ''}
       disabled={locked}
       multiline={multiline}
+      textareaClassName={multiline ? 'min-h-12' : undefined}
       placeholder={placeholder}
       inspect={(value, signal) =>
         deferInspection(() => ({ value, ...(value.length > limit ? { issue: t('webhookEditor.webhookFormTooLong', { limit }) } : {}) }), signal)
@@ -337,46 +349,71 @@ function WebhookFormFields({
     />
   )
   return (
-    <>
-      <Field data-invalid={issues.length > 0 || undefined}>
-        <FieldLabel>{t('webhookEditor.webhookForm')}</FieldLabel>
-        <FieldSelect
-          aria-label={t('webhookEditor.webhookForm')}
-          disabled={locked}
-          value={form == null ? 'off' : 'on'}
-          onChange={(value) => {
-            if ((value === 'on') === (form != null)) return
-            const next = { ...options }
-            if (value === 'on') next.form = {}
-            else delete next.form
-            onOptionsChange(next)
-          }}
-        >
-          <option value="off">{t('webhookEditor.webhookFormOff')}</option>
-          <option value="on">{t('webhookEditor.webhookFormOn')}</option>
-        </FieldSelect>
-        {form != null && <FieldDescription className="px-2 text-[11px] leading-4">{t('webhookEditor.webhookFormHint')}</FieldDescription>}
-        {issues.map((issue) => (
-          <p key={issue} role="alert" className="px-2 text-[11px] leading-4 text-destructive">
-            {issue}
-          </p>
-        ))}
-      </Field>
-      {form != null && (
+    <InspectorSection
+      className="node-settings"
+      contentInset={showContent}
+      data-inspector-section="trigger"
+      title={
         <>
-          {text('title', t('webhookEditor.webhookFormTitle'), webhookFormLimits.label, false, t('webhookEditor.webhookFormTitlePlaceholder'))}
-          {text('description', t('webhookEditor.webhookFormDescription'), webhookFormLimits.description, true)}
-          {text('submitLabel', t('webhookEditor.webhookFormSubmitLabel'), webhookFormLimits.label, false, t('webhookEditor.webhookFormSubmitPlaceholder'))}
-          {text(
-            'successMessage',
-            t('webhookEditor.webhookFormSuccessMessage'),
-            webhookFormLimits.description,
-            true,
-            t('webhookEditor.webhookFormSuccessPlaceholder'),
-          )}
+          <Label htmlFor={switchId} className={cn('min-w-0 flex-1 text-[length:inherit] font-[inherit] leading-[inherit]', !locked && 'cursor-pointer')}>
+            {t('webhookEditor.webhookForm')}
+          </Label>
+          <Switch
+            id={switchId}
+            aria-label={t('webhookEditor.webhookForm')}
+            aria-invalid={issues.length > 0 || undefined}
+            className="mr-2"
+            size="sm"
+            checked={enabled}
+            disabled={locked}
+            onCheckedChange={(checked) => {
+              if (checked === enabled) return
+              const next = { ...options }
+              if (checked) next.form = {}
+              else delete next.form
+              onOptionsChange(next)
+            }}
+          />
         </>
+      }
+    >
+      {showContent && (
+        <FieldGroup>
+          {(enabled || issues.length > 0) && (
+            <div className="flex flex-col gap-1.5">
+              {enabled && <FieldDescription className="text-[11px] leading-4">{t('webhookEditor.webhookFormHint')}</FieldDescription>}
+              {issues.map((issue) => (
+                <p key={issue} role="alert" className="m-0 text-[11px] leading-4 text-destructive">
+                  {issue}
+                </p>
+              ))}
+            </div>
+          )}
+          {enabled && (
+            <>
+              <div className="grid grid-cols-1 gap-2.5 @[300px]/field-group:grid-cols-2">
+                {text('title', t('webhookEditor.webhookFormTitle'), webhookFormLimits.label, false, t('webhookEditor.webhookFormTitlePlaceholder'))}
+                {text(
+                  'submitLabel',
+                  t('webhookEditor.webhookFormSubmitLabel'),
+                  webhookFormLimits.label,
+                  false,
+                  t('webhookEditor.webhookFormSubmitPlaceholder'),
+                )}
+              </div>
+              {text('description', t('webhookEditor.webhookFormDescription'), webhookFormLimits.description, true)}
+              {text(
+                'successMessage',
+                t('webhookEditor.webhookFormSuccessMessage'),
+                webhookFormLimits.description,
+                true,
+                t('webhookEditor.webhookFormSuccessPlaceholder'),
+              )}
+            </>
+          )}
+        </FieldGroup>
       )}
-    </>
+    </InspectorSection>
   )
 }
 
@@ -449,49 +486,56 @@ export function WebhookEditor({
         onChange={(output) => changeOption('responseStatusCodeOutput', output)}
       />
     )
+  const methodField = (
+    <Field>
+      <FieldLabel>{t('webhookEditor.webhookMethod')}</FieldLabel>
+      <FieldSelect
+        aria-label={t('webhookEditor.webhookMethod')}
+        disabled={disabled}
+        value={method}
+        onChange={(value) => {
+          const next = value as WebhookMethod
+          if (next === method) return
+          const supportsBody = webhookSupportsBody(next)
+          onChange(
+            { bodyFields: supportsBody ? bodyFields : [], method: next, options },
+            !supportsBody && bodyFields.length > 0 ? { target: 'webhookBody' } : undefined,
+          )
+        }}
+      >
+        {webhookMethods.map((value) => (
+          <option key={value} value={value}>
+            {value}
+          </option>
+        ))}
+      </FieldSelect>
+    </Field>
+  )
   return (
     <>
-      <InspectorSection title={t('webhookEditor.webhookRequest')} className="inspector-form" data-inspector-section="trigger">
+      <InspectorSection title={t('webhookEditor.webhookRequest')} className="node-settings" data-inspector-section="trigger">
         <FieldGroup>
-          <Field>
-            <FieldLabel>{t('webhookEditor.webhookMethod')}</FieldLabel>
-            <FieldSelect
-              aria-label={t('webhookEditor.webhookMethod')}
-              disabled={disabled}
-              value={method}
-              onChange={(value) => {
-                const next = value as WebhookMethod
-                if (next === method) return
-                const supportsBody = webhookSupportsBody(next)
-                onChange(
-                  { bodyFields: supportsBody ? bodyFields : [], method: next, options },
-                  !supportsBody && bodyFields.length > 0 ? { target: 'webhookBody' } : undefined,
-                )
-              }}
-            >
-              {webhookMethods.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </FieldSelect>
-          </Field>
-          {webhookSupportsBody(method) && (
-            <Field>
-              <FieldLabel>{t('webhookEditor.webhookBodyMode')}</FieldLabel>
-              <FieldSelect
-                aria-label={t('webhookEditor.webhookBodyMode')}
-                disabled={disabled || readOnly}
-                value={options.bodyMode ?? 'fields'}
-                onChange={(value) => changeOption('bodyMode', value === 'any' ? 'any' : undefined)}
-              >
-                <option value="fields">{t('webhookEditor.webhookBodyModeFields')}</option>
-                <option value="any">{t('webhookEditor.webhookBodyModeAny')}</option>
-              </FieldSelect>
-              {options.bodyMode === 'any' && (
-                <FieldDescription className="px-2 text-[11px] leading-4">{t('webhookEditor.webhookBodyModeAnyHint')}</FieldDescription>
-              )}
-            </Field>
+          {webhookSupportsBody(method) ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-1 gap-2.5 @[280px]/field-group:grid-cols-[minmax(96px,1fr)_minmax(0,2fr)]">
+                {methodField}
+                <Field>
+                  <FieldLabel>{t('webhookEditor.webhookBodyMode')}</FieldLabel>
+                  <FieldSelect
+                    aria-label={t('webhookEditor.webhookBodyMode')}
+                    disabled={disabled || readOnly}
+                    value={options.bodyMode ?? 'fields'}
+                    onChange={(value) => changeOption('bodyMode', value === 'any' ? 'any' : undefined)}
+                  >
+                    <option value="fields">{t('webhookEditor.webhookBodyModeFields')}</option>
+                    <option value="any">{t('webhookEditor.webhookBodyModeAny')}</option>
+                  </FieldSelect>
+                </Field>
+              </div>
+              {options.bodyMode === 'any' && <FieldDescription className="text-[11px] leading-4">{t('webhookEditor.webhookBodyModeAnyHint')}</FieldDescription>}
+            </div>
+          ) : (
+            methodField
           )}
           {webhookSupportsBody(method) && options.bodyMode !== 'any' && (
             <PortDefinitionEditor
@@ -506,29 +550,29 @@ export function WebhookEditor({
               onChange={(next, deletion) => onChange({ bodyFields: next, method, options }, deletion)}
             />
           )}
-          <WebhookAuthenticationFields
-            options={options}
-            variable={authenticationVariable}
-            variables={variables}
-            diagnostics={requestDiagnostics}
-            disabled={disabled}
-            readOnly={readOnly}
-            onChange={onAuthenticationChange}
-            onOptionsChange={(next) => onChange({ bodyFields, method, options: next })}
-          />
-          {(webhookSupportsBody(method) || options.form != null) && (
-            <WebhookFormFields
-              options={options}
-              diagnostics={requestDiagnostics}
-              disabled={disabled}
-              readOnly={readOnly}
-              onOptionsChange={(next) => onChange({ bodyFields, method, options: next })}
-            />
-          )}
         </FieldGroup>
       </InspectorSection>
+      <WebhookAuthenticationSection
+        options={options}
+        variable={authenticationVariable}
+        variables={variables}
+        diagnostics={requestDiagnostics}
+        disabled={disabled}
+        readOnly={readOnly}
+        onChange={onAuthenticationChange}
+        onOptionsChange={(next) => onChange({ bodyFields, method, options: next })}
+      />
+      {(webhookSupportsBody(method) || options.form != null) && (
+        <WebhookFormSection
+          options={options}
+          diagnostics={requestDiagnostics}
+          disabled={disabled}
+          readOnly={readOnly}
+          onOptionsChange={(next) => onChange({ bodyFields, method, options: next })}
+        />
+      )}
       {outputSection}
-      <InspectorSection title={t('webhookEditor.webhookResponse')} className="inspector-form" data-inspector-section="trigger">
+      <InspectorSection title={t('webhookEditor.webhookResponse')} className="node-settings" data-inspector-section="trigger">
         <FieldGroup>
           <Field>
             <FieldLabel>{t('webhookEditor.webhookResponseMode')}</FieldLabel>
@@ -613,6 +657,7 @@ export function WebhookEditor({
             <DraftTextField
               label={t('webhookEditor.webhookResponseData')}
               multiline
+              monospace
               value={options.responseData ?? ''}
               disabled={disabled}
               placeholder={t('webhookEditor.webhookResponseDataPlaceholder')}
@@ -785,7 +830,7 @@ export function WebhookEditor({
             <strong className="inspector-section-title-text">{t('webhookEditor.webhookAdvanced')}</strong>
           </span>
         </summary>
-        <div className="inspector-disclosure-content inspector-form">
+        <div className="inspector-disclosure-content node-settings">
           <FieldGroup>
             <DraftTextField
               label={t('webhookEditor.webhookOrigins')}
