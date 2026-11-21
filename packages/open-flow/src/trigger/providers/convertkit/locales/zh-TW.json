@@ -1,14 +1,14 @@
 {
   "convertkit.on_subscriber_event": {
-    "displayName": "订阅者事件",
-    "description": "当 Kit (ConvertKit) 发生选定的订阅者事件时触发。",
+    "displayName": "訂閱者事件",
+    "description": "當 Kit (ConvertKit) 發生選定的訂閱者事件時觸發。",
     "configInputs": {
-      "eventName": "Kit (ConvertKit) subscriber event name."
+      "eventName": "Kit (ConvertKit) 訂閱者事件名稱。"
     },
     "outputs": {
-      "event": "Event type that triggered this Run.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "body": "Original webhook or polled event payload."
+      "event": "觸發本次執行的事件類型。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
     }
   }
 }

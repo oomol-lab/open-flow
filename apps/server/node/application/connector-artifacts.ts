@@ -2,6 +2,8 @@ import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorHost } from '../deployment/connector-contract.ts'
 import type { ArtifactEvent, RunArtifacts } from './run-artifacts.ts'
 
+import { matchesSchema } from '@oomol-lab/open-flow/flow-semantics'
+
 export interface ConnectorArtifactPort {
   readonly handle: string
   readonly jsonSchema: unknown
@@ -89,37 +91,24 @@ function childArrayItemSchema(schema: unknown): unknown {
   return schema.items
 }
 
-const artifactRefRequiredKeys = ['kind', 'id', 'name', 'mediaType', 'sizeBytes', 'sha256'] as const
 const defaultAggregateTransitBudgetBytes = 50 * 1024 * 1024
 const defaultPerFileTransitMaxBytes = 10 * 1024 * 1024
 
-function schemaAcceptsArtifactRef(schema: unknown): boolean {
-  if (schema === undefined || schema === true) return true
-  if (schema === false) return false
-  if (!isPlainObject(schema)) return false
-  if (schema.type !== undefined) {
-    if (typeof schema.type === 'string' && schema.type !== 'object') return false
-    if (Array.isArray(schema.type) && !schema.type.includes('object')) return false
-  }
-  if (schema.additionalProperties === false) {
-    const props = isPlainObject(schema.properties) ? schema.properties : undefined
-    if (!props) return false
-    return artifactRefRequiredKeys.every((key) => Object.hasOwn(props, key))
-  }
-  return true
+/**
+ * Resolves the schema that governs an `artifact` property on an object described by `schema`.
+ * Returns `false` when the object schema forbids the property, and `undefined` when nothing constrains it.
+ */
+function artifactSlotSchema(schema: unknown): unknown {
+  if (!isPlainObject(schema)) return undefined
+  const properties = isPlainObject(schema.properties) ? schema.properties : undefined
+  if (properties && Object.hasOwn(properties, 'artifact')) return properties.artifact
+  return schema.additionalProperties
 }
 
-function allowsArtifactAttachment(schema: unknown): boolean {
-  if (!isPlainObject(schema)) return true
-  const properties = isPlainObject(schema.properties) ? schema.properties : undefined
-  if (properties && Object.hasOwn(properties, 'artifact')) {
-    return schemaAcceptsArtifactRef(properties.artifact)
-  }
-  if (schema.additionalProperties === false) return false
-  if (isPlainObject(schema.additionalProperties)) {
-    return schemaAcceptsArtifactRef(schema.additionalProperties)
-  }
-  return true
+/** Attaches the stored reference only when the actual `ArtifactRef` satisfies the declared `artifact` schema. */
+function acceptsArtifactRef(slotSchema: unknown, ref: JsonValue): boolean {
+  if (slotSchema === undefined) return true
+  return matchesSchema(ref, slotSchema as JsonValue)
 }
 
 /**
@@ -180,7 +169,7 @@ export async function prepareConnectorInputsWithArtifacts(
 interface PendingDownload {
   readonly target: Record<string, JsonValue>
   readonly transit: TransitFileDescriptor
-  readonly canAttachProperty: boolean
+  readonly artifactSchema: unknown
   downloaded?: { readonly content: Uint8Array; readonly mediaType?: string }
 }
 
@@ -225,7 +214,7 @@ export async function bridgeConnectorOutputArtifacts(
     if (!isPlainObject(value)) return
     const transit = extractTransitFile(value)
     if (transit && value.artifact === undefined) {
-      pending.push({ target: value, transit, canAttachProperty: allowsArtifactAttachment(schema) })
+      pending.push({ target: value, transit, artifactSchema: artifactSlotSchema(schema) })
       return
     }
     for (const [k, v] of Object.entries(value)) {
@@ -267,7 +256,8 @@ export async function bridgeConnectorOutputArtifacts(
       },
       context.emit,
     )
-    refsByTarget.set(item.target, { ref: ref as unknown as JsonValue, attach: item.canAttachProperty })
+    const refValue = ref as unknown as JsonValue
+    refsByTarget.set(item.target, { ref: refValue, attach: acceptsArtifactRef(item.artifactSchema, refValue) })
   }
 
   const rewrite = (value: JsonValue): JsonValue => {

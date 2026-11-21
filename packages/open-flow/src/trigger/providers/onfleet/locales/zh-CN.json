@@ -3,13 +3,13 @@
     "displayName": "任务或配送员事件",
     "description": "当 Onfleet 发生选定的配送任务或人员事件时触发。",
     "configInputs": {
-      "trigger": "Onfleet webhook trigger event to subscribe to."
+      "trigger": "要订阅的 Onfleet Webhook 触发事件。"
     },
     "outputs": {
-      "triggerName": "Onfleet trigger event name.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "taskId": "Associated Onfleet task ID.",
-      "body": "Original webhook or polled event payload."
+      "triggerName": "Onfleet 触发事件名称。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "taskId": "关联的 Onfleet 任务 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }

@@ -3,12 +3,12 @@
     "displayName": "表单条目",
     "description": "当 Wufoo 表单收到新提交条目时触发。",
     "configInputs": {
-      "formHash": "Wufoo form hash identifier."
+      "formHash": "Wufoo 表单哈希标识。"
     },
     "outputs": {
-      "entryId": "Unique Wufoo form entry ID.",
-      "formHash": "Wufoo form hash identifier.",
-      "body": "Original webhook or polled event payload."
+      "entryId": "唯一的 Wufoo 表单条目 ID。",
+      "formHash": "Wufoo 表单哈希标识。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }

@@ -1,17 +1,17 @@
 {
   "taiga.on_project_event": {
-    "displayName": "项目事件",
-    "description": "当 Taiga 项目发生选定的 Webhook 事件时触发。",
+    "displayName": "專案事件",
+    "description": "當 Taiga 專案發生選定的 Webhook 事件時觸發。",
     "configInputs": {
-      "projectId": "Numeric Taiga project ID to monitor.",
-      "types": "Optional Taiga entity types to filter.",
-      "actions": "Webhook action types to subscribe to."
+      "projectId": "要監控的 Taiga 專案數字 ID。",
+      "types": "選填，要篩選的 Taiga 實體類型。",
+      "actions": "要訂閱的 Webhook 動作類型。"
     },
     "outputs": {
-      "entityType": "Taiga entity type.",
-      "action": "Event action name.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "body": "Original webhook or polled event payload."
+      "entityType": "Taiga 實體類型。",
+      "action": "事件動作名稱。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
     }
   }
 }

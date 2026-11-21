@@ -3,14 +3,14 @@
     "displayName": "看板或卡片事件",
     "description": "当 Trello 看板、列表或卡片发生变更时触发。",
     "configInputs": {
-      "modelId": "ID of the Trello board, list, or card to watch.",
-      "actionTypes": "Optional Trello action types to filter events."
+      "modelId": "要监听的 Trello 看板、列表或卡片 ID。",
+      "actionTypes": "可选，用于筛选事件的 Trello 动作类型。"
     },
     "outputs": {
-      "actionType": "Trello action type.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "modelId": "ID of the Trello board, list, or card to watch.",
-      "body": "Original webhook or polled event payload."
+      "actionType": "Trello 动作类型。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "modelId": "发生变更的 Trello 看板、列表或卡片 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }

@@ -3,14 +3,14 @@
     "displayName": "邮件事件",
     "description": "当 Postmark 发生选定的邮件投递或互动事件时触发。",
     "configInputs": {
-      "messageStream": "Postmark message stream ID (defaults to outbound).",
-      "events": "Webhook events that trigger a Run."
+      "messageStream": "Postmark 消息流 ID（默认为 outbound）。",
+      "events": "触发运行的 Webhook 事件。"
     },
     "outputs": {
-      "recordType": "Postmark email event record type.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "messageId": "Postmark message ID.",
-      "body": "Original webhook or polled event payload."
+      "recordType": "Postmark 邮件事件记录类型。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "messageId": "Postmark 消息 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }

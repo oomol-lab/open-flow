@@ -28,6 +28,54 @@ function createMemoryArtifactStore() {
   return { artifacts: new RunArtifacts(runs), store }
 }
 
+function transitOutputSchema(artifactSchema: JsonValue): JsonValue {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['fileId', 'downloadUrl', 'sizeBytes', 'name', 'mimeType'],
+    properties: {
+      fileId: { type: 'string' },
+      downloadUrl: { type: 'string' },
+      sizeBytes: { type: 'number' },
+      name: { type: 'string' },
+      mimeType: { type: 'string' },
+      artifact: artifactSchema,
+    },
+  }
+}
+
+async function bridgeWithArtifactSchema(artifactSchema: JsonValue) {
+  const { artifacts } = createMemoryArtifactStore()
+  const events: ArtifactEvent[] = []
+  const connector = {
+    async downloadTransitFile() {
+      return { content: new TextEncoder().encode('abc'), mediaType: 'text/plain' }
+    },
+  } as unknown as ConnectorHost
+  const output = await bridgeConnectorOutputArtifacts(
+    {
+      fileId: 'tf-closed',
+      downloadUrl: 'https://connector.example/api/files/tf-closed',
+      sizeBytes: 3,
+      name: 'closed.txt',
+      mimeType: 'text/plain',
+    },
+    {
+      runId: 'run-closed',
+      nodeId: 'node-closed',
+      jobId: 'job-closed',
+      artifacts,
+      connector,
+      signal: new AbortController().signal,
+      outputPorts: [{ handle: 'output', jsonSchema: transitOutputSchema(artifactSchema) }],
+      emit: async (event) => {
+        events.push(event)
+      },
+    },
+  )
+  return { events, output: output as Record<string, unknown> }
+}
+
 describe('Connector Transit File <-> ArtifactRef bridge', () => {
   it('converts OpenConnector transit file outputs into ArtifactRef and emits node.artifact', async () => {
     const { artifacts } = createMemoryArtifactStore()
@@ -312,6 +360,35 @@ describe('Connector Transit File <-> ArtifactRef bridge', () => {
 
     expect(events).toHaveLength(1)
     expect('artifact' in (output as Record<string, unknown>)).toBe(false)
+  })
+
+  it('attaches ArtifactRef when a closed artifact schema declares the actual reference fields', async () => {
+    const { events, output } = await bridgeWithArtifactSchema({
+      type: 'object',
+      additionalProperties: false,
+      required: ['kind', 'id', 'name', 'size', 'digest'],
+      properties: {
+        kind: { const: 'artifact' },
+        id: { type: 'string' },
+        name: { type: 'string' },
+        size: { type: 'number' },
+        digest: { type: 'string', pattern: '^sha256:' },
+        mediaType: { type: 'string' },
+      },
+    })
+
+    expect(events).toHaveLength(1)
+    expect(output.artifact).toEqual(events[0]!.artifact)
+  })
+
+  it('does not attach ArtifactRef when nested artifact field constraints reject the reference', async () => {
+    const { events, output } = await bridgeWithArtifactSchema({
+      type: 'object',
+      properties: { id: { type: 'number' } },
+    })
+
+    expect(events).toHaveLength(1)
+    expect('artifact' in output).toBe(false)
   })
 
   it('enforces aggregate download budget across multiple transit files without persisting partial artifacts', async () => {

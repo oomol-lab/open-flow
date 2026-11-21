@@ -3,13 +3,13 @@
     "displayName": "转账或余额事件",
     "description": "当 Wise 账户发生选定的转账或余额事件时触发。",
     "configInputs": {
-      "profileId": "Wise profile ID for the webhook subscription.",
-      "triggerOn": "Wise webhook event type to subscribe to."
+      "profileId": "用于 Webhook 订阅的 Wise 资料 ID。",
+      "triggerOn": "要订阅的 Wise Webhook 事件类型。"
     },
     "outputs": {
-      "event": "Event type that triggered this Run.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "body": "Original webhook or polled event payload."
+      "event": "触发本次运行的事件类型。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }

@@ -1,17 +1,17 @@
 {
   "bitbucket.on_repo_event": {
-    "displayName": "仓库事件",
-    "description": "当 Bitbucket 仓库发生选定的 Webhook 事件时触发。",
+    "displayName": "儲存庫事件",
+    "description": "當 Bitbucket 儲存庫發生選定的 Webhook 事件時觸發。",
     "configInputs": {
-      "workspace": "Bitbucket workspace slug.",
-      "repoSlug": "Bitbucket repository slug.",
-      "events": "Webhook events that trigger a Run."
+      "workspace": "Bitbucket 工作區識別碼（slug）。",
+      "repoSlug": "Bitbucket 儲存庫識別碼（slug）。",
+      "events": "觸發執行的 Webhook 事件。"
     },
     "outputs": {
-      "event": "Event type that triggered this Run.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "hookUuid": "Bitbucket webhook UUID.",
-      "body": "Original webhook or polled event payload."
+      "event": "觸發本次執行的事件類型。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "hookUuid": "Bitbucket Webhook UUID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
     }
   }
 }

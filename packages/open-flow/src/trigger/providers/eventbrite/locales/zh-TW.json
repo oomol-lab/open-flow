@@ -1,17 +1,17 @@
 {
   "eventbrite.on_event": {
     "displayName": "Eventbrite 事件",
-    "description": "当 Eventbrite 发生选定的订单、参会者或活动事件时触发。",
+    "description": "當 Eventbrite 發生選定的訂單、參加者或活動事件時觸發。",
     "configInputs": {
-      "organizationId": "Eventbrite organization ID.",
-      "eventId": "Optional Eventbrite event ID filter.",
-      "actions": "Webhook action types to subscribe to."
+      "organizationId": "Eventbrite 組織 ID。",
+      "eventId": "選填，用於篩選的 Eventbrite 活動 ID。",
+      "actions": "要訂閱的 Webhook 動作類型。"
     },
     "outputs": {
-      "action": "Event action name.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "apiUrl": "Eventbrite API URL for the event resource.",
-      "body": "Original webhook or polled event payload."
+      "action": "事件動作名稱。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "apiUrl": "事件資源對應的 Eventbrite API URL。",
+      "body": "原始 Webhook 或輪詢事件資料。"
     }
   }
 }

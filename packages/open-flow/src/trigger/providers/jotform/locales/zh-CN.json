@@ -3,12 +3,12 @@
     "displayName": "表单提交",
     "description": "当 Jotform 表单收到新提交时触发。",
     "configInputs": {
-      "formId": "Jotform form ID to watch for submissions."
+      "formId": "要监听提交的 Jotform 表单 ID。"
     },
     "outputs": {
-      "submissionId": "Unique Jotform submission ID.",
-      "formId": "Jotform form ID to watch for submissions.",
-      "body": "Original webhook or polled event payload."
+      "submissionId": "唯一的 Jotform 提交 ID。",
+      "formId": "收到提交的 Jotform 表单 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }

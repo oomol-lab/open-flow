@@ -1,16 +1,16 @@
 {
   "postmark.on_email_event": {
-    "displayName": "邮件事件",
-    "description": "当 Postmark 发生选定的邮件投递或互动事件时触发。",
+    "displayName": "郵件事件",
+    "description": "當 Postmark 發生選定的郵件投遞或互動事件時觸發。",
     "configInputs": {
-      "messageStream": "Postmark message stream ID (defaults to outbound).",
-      "events": "Webhook events that trigger a Run."
+      "messageStream": "Postmark 訊息串流 ID（預設為 outbound）。",
+      "events": "觸發執行的 Webhook 事件。"
     },
     "outputs": {
-      "recordType": "Postmark email event record type.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "messageId": "Postmark message ID.",
-      "body": "Original webhook or polled event payload."
+      "recordType": "Postmark 郵件事件記錄類型。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "messageId": "Postmark 訊息 ID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
     }
   }
 }

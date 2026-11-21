@@ -3,15 +3,15 @@
     "displayName": "项目事件",
     "description": "当 Taiga 项目发生选定的 Webhook 事件时触发。",
     "configInputs": {
-      "projectId": "Numeric Taiga project ID to monitor.",
-      "types": "Optional Taiga entity types to filter.",
-      "actions": "Webhook action types to subscribe to."
+      "projectId": "要监控的 Taiga 项目数字 ID。",
+      "types": "可选，要筛选的 Taiga 实体类型。",
+      "actions": "要订阅的 Webhook 动作类型。"
     },
     "outputs": {
-      "entityType": "Taiga entity type.",
-      "action": "Event action name.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "body": "Original webhook or polled event payload."
+      "entityType": "Taiga 实体类型。",
+      "action": "事件动作名称。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }

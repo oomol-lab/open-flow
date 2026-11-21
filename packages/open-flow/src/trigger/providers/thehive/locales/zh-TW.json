@@ -1,12 +1,12 @@
 {
   "thehive.on_event": {
-    "displayName": "告警或工单事件",
-    "description": "轮询 TheHive 中新增或更新的告警与工单。",
+    "displayName": "警示或案件事件",
+    "description": "輪詢 TheHive 中新增或更新的警示與案件。",
     "configInputs": {
-      "resourceType": "Resource type to monitor."
+      "resourceType": "要監控的資源類型。"
     },
     "outputs": {
-      "events": "TheHive alerts or cases detected in this poll batch."
+      "events": "本批次輪詢偵測到的 TheHive 警示或案件。"
     }
   }
 }

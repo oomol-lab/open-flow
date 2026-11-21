@@ -1,14 +1,14 @@
 {
   "helpscout.on_conversation_event": {
-    "displayName": "会话事件",
-    "description": "当 Help Scout 发生选定的会话或客户事件时触发。",
+    "displayName": "對話事件",
+    "description": "當 Help Scout 發生選定的對話或客戶事件時觸發。",
     "configInputs": {
-      "events": "Webhook events that trigger a Run."
+      "events": "觸發執行的 Webhook 事件。"
     },
     "outputs": {
-      "event": "Event type that triggered this Run.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "body": "Original webhook or polled event payload."
+      "event": "觸發本次執行的事件類型。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
     }
   }
 }

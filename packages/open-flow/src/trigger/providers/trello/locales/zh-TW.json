@@ -1,16 +1,16 @@
 {
   "trello.on_model_event": {
     "displayName": "看板或卡片事件",
-    "description": "当 Trello 看板、列表或卡片发生变更时触发。",
+    "description": "當 Trello 看板、清單或卡片發生變更時觸發。",
     "configInputs": {
-      "modelId": "ID of the Trello board, list, or card to watch.",
-      "actionTypes": "Optional Trello action types to filter events."
+      "modelId": "要監聽的 Trello 看板、清單或卡片 ID。",
+      "actionTypes": "選填，用於篩選事件的 Trello 動作類型。"
     },
     "outputs": {
-      "actionType": "Trello action type.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "modelId": "ID of the Trello board, list, or card to watch.",
-      "body": "Original webhook or polled event payload."
+      "actionType": "Trello 動作類型。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "modelId": "發生變更的 Trello 看板、清單或卡片 ID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
     }
   }
 }

@@ -1,12 +1,12 @@
 {
   "chargebee.on_event": {
-    "displayName": "账单事件",
-    "description": "轮询 Chargebee 的客户、订阅、发票和支付事件。",
+    "displayName": "帳單事件",
+    "description": "輪詢 Chargebee 的客戶、訂閱、發票和付款事件。",
     "configInputs": {
-      "eventTypes": "Optional event types to filter polled events."
+      "eventTypes": "選填，用於篩選輪詢事件的事件類型。"
     },
     "outputs": {
-      "events": "Chargebee events detected in this poll batch."
+      "events": "本批次輪詢偵測到的 Chargebee 事件。"
     }
   }
 }

@@ -3,13 +3,13 @@
     "displayName": "PayPal 事件",
     "description": "当 PayPal 发生选定的支付或账单 Webhook 事件时触发。",
     "configInputs": {
-      "events": "Webhook events that trigger a Run."
+      "events": "触发运行的 Webhook 事件。"
     },
     "outputs": {
-      "event": "Event type that triggered this Run.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "resourceType": "Provider resource type associated with the event.",
-      "body": "Original webhook or polled event payload."
+      "event": "触发本次运行的事件类型。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "resourceType": "与此事件关联的资源类型。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }

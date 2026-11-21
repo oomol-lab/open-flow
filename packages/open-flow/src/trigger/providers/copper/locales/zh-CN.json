@@ -3,14 +3,14 @@
     "displayName": "CRM 记录事件",
     "description": "当 Copper CRM 记录被创建、更新或删除时触发。",
     "configInputs": {
-      "resourceType": "Resource type to monitor.",
-      "event": "Event type that triggered this Run."
+      "resourceType": "要监控的资源类型。",
+      "event": "要监听的事件类型。"
     },
     "outputs": {
-      "resourceType": "Provider resource type associated with the event.",
-      "event": "Event type that triggered this Run.",
-      "deliveryId": "Unique delivery ID for this event.",
-      "body": "Original webhook or polled event payload."
+      "resourceType": "与此事件关联的资源类型。",
+      "event": "触发本次运行的事件类型。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
     }
   }
 }
