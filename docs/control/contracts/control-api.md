@@ -1819,10 +1819,11 @@ Fixed outputs are nullable `body`, integer `statusCode`, string-object `headers`
 `bodyEncoding` (`"base64"` when returned, otherwise null). Preserve complete response data and
 headers without inferring business output fields. `responseFormat: "artifact"` stores the response
 as a Run Artifact and makes `body` a non-nullable `ArtifactRef`: base64 data is decoded to its exact
-bytes, text is UTF-8 and JSON is serialized with `application/json`. The media type comes from the
+bytes, text is UTF-8 and JSON is serialized with `application/json`. A top-level JSON string is
+indistinguishable from text in the Connector response and is stored unquoted. The media type comes from the
 response Content-Type and the name from Content-Disposition or the endpoint path. Connector response
 limits still apply first (20 MiB in the open-source Connector, 4 MiB in the Hosted Connector by
-default). Request bodies remain JSON. A successful Connector proxy envelope completes
+default); the Server accepts proxy envelopes of up to 32 MiB to fit base64 bodies. Request bodies remain JSON. A successful Connector proxy envelope completes
 the node even when the upstream status is 4xx or 5xx. Connector failures fail the node with an
 explicit permission, connection, input/support or availability error. Ordinary `onError` is
 supported, defaulting to stop; retries are unavailable. An unconfirmed write is indeterminate,

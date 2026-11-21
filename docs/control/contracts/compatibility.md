@@ -49,7 +49,9 @@ and clients together; Flows without these features are unaffected.
 calls. The new `http/common/artifact` module is exported through `@oomol-lab/open-flow/http-request`.
 Artifact downloads use the deployment's Artifact limits (10 MiB per Artifact and 100 MiB per Run on
 the Server) instead of the 4 MiB parsed-response limit. Provider API Artifact responses are also
-bounded by the Connector's own response limit. Binary and multipart Provider API request bodies need
+bounded by the Connector's own response limit, and the Server reads proxy envelopes of up to 32 MiB so base64
+bodies near the open-source Connector's 20 MiB limit still arrive. Without a distinct marker in the Connector protocol, a
+top-level JSON string body is stored as its raw text rather than as a quoted JSON value. Binary and multipart Provider API request bodies need
 Connector protocol changes and are not part of this release.
 
 ## Flow features: Flow model v16 and capability-based Engine admission

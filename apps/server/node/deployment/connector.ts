@@ -41,6 +41,9 @@ import {
 
 const base64Body = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 const maxActionResponseBytes = 32 * 1024 * 1024
+// The open-source Connector returns proxy bodies of up to 20 MiB, and base64 adds a third plus the JSON envelope, so the
+// 1 MiB transport default would reject files well below the Connector and Artifact limits.
+const maxProxyResponseBytes = 32 * 1024 * 1024
 const maxActionCatalogBytes = 8 * 1024 * 1024
 const catalogConcurrency = 16
 const readinessTimeoutMs = 1_000
@@ -681,7 +684,7 @@ export class ConnectorClient implements ConnectorHost {
           method: 'POST',
         },
         signal,
-        { fields: { ...(connectionId == null ? {} : { connectionId }), provider, rateLimitId }, teamId },
+        { fields: { ...(connectionId == null ? {} : { connectionId }), provider, rateLimitId }, maximumResponseBytes: maxProxyResponseBytes, teamId },
       )
       .catch((error: unknown) => {
         if (signal.aborted) throw signal.reason
