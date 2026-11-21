@@ -60,6 +60,11 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
             setOutputState('disconnected')
           },
         },
+        {
+          label: 'File response',
+          onClick: () =>
+            setSample({ bodyFields: [], method: 'POST', options: { responseBody: { kind: 'workflow-outputs', bodyFormat: 'artifact', output: 'report' } } }),
+        },
         { label: 'Default POST', onClick: () => setSample({ bodyFields: [], method: 'POST', options: {} }) },
         {
           label: 'Any JSON body',
@@ -193,6 +198,7 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
     { handle: 'enabled', jsonSchema: { type: 'boolean' }, nullable: false },
     { handle: 'headers', jsonSchema: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean'] } }, nullable: false },
     { handle: 'items', jsonSchema: { type: 'array' }, nullable: false },
+    { handle: 'report', jsonSchema: { contentMediaType: 'oomol/artifact' }, nullable: false },
     { handle: 'business_result_message_for_the_http_response', jsonSchema: { type: 'string' }, nullable: false },
   ] as const
   const graph: Graph = {

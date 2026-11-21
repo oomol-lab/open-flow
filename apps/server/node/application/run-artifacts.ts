@@ -1,4 +1,5 @@
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { ArtifactContent } from '@oomol-lab/open-flow/http-request'
 import type { RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-lab/open-flow/runtime-contract'
 import type { RunStore, StoredArtifact } from '../storage/run-store.ts'
 
@@ -15,7 +16,10 @@ export const artifactLimits: ArtifactLimits = {
 }
 
 const chunkBytes = 512 * 1024
-const base64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+// A single character class: a repeated group overflows V8's stack on large strings.
+function isBase64(value: string): boolean {
+  return value.length % 4 == 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value)
+}
 
 export class ArtifactHostError extends Error {
   readonly catchable = false
@@ -56,6 +60,10 @@ export class RunArtifacts {
     this.#limits = limits
   }
 
+  get maxArtifactBytes(): number {
+    return this.#limits.maxArtifactBytes
+  }
+
   invoke(
     runId: string,
     call: RuntimeCapabilityCall,
@@ -80,6 +88,33 @@ export class RunArtifacts {
     }
   }
 
+  /**
+   * Stores bytes a managed Task produced, such as a downloaded HTTP response, under the same limits, identity and
+   * `node.artifact` event as Code Artifacts.
+   */
+  async store(
+    runId: string,
+    owner: { readonly jobId: string; readonly nodeId: string },
+    content: ArtifactContent,
+    emit: (event: ArtifactEvent) => Promise<void>,
+  ): Promise<StoredArtifact & { readonly kind: 'artifact' }> {
+    if (content.bytes.length > this.#limits.maxArtifactBytes)
+      throw new ArtifactHostError('runtime.limit-exceeded', 'Artifact exceeds the configured size limit.')
+    this.#checkRunBytes(runId, content.bytes.length)
+    return await this.#persist(runId, owner, Buffer.from(content.bytes), content.name, content.mediaType, emit)
+  }
+
+  /** Resolves Artifact identities of this Run from storage; metadata comes from storage, never from the reference. */
+  resolve(runId: string, ids: readonly string[]): ReadonlyMap<string, ArtifactContent> {
+    const resolved = new Map<string, ArtifactContent>()
+    for (const id of ids) {
+      const artifact = this.#runs.artifact(runId, id)
+      if (artifact != null)
+        resolved.set(id, { bytes: artifact.content, name: artifact.name, ...(artifact.mediaType == null ? {} : { mediaType: artifact.mediaType }) })
+    }
+    return resolved
+  }
+
   /** Discards unfinished uploads of a finished node execution, or of the whole Run when `jobId` is omitted. */
   discard(runId: string, jobId?: string): void {
     for (const [id, upload] of this.#uploads) if (upload.runId == runId && (jobId == null || upload.jobId == jobId)) this.#uploads.delete(id)
@@ -99,17 +134,43 @@ export class RunArtifacts {
   }
 
   #append(upload: Upload, data: JsonValue | undefined): void {
-    if (typeof data != 'string' || !base64.test(data)) throw new ArtifactHostError('capability.invalid', 'Artifact content must be base64.')
+    if (typeof data != 'string' || !isBase64(data)) throw new ArtifactHostError('capability.invalid', 'Artifact content must be base64.')
     const part = Buffer.from(data, 'base64')
     if (part.length > chunkBytes) throw new ArtifactHostError('capability.invalid', 'Artifact chunks must not exceed 512 KiB.')
     upload.bytes += part.length
     if (upload.bytes > this.#limits.maxArtifactBytes) throw new ArtifactHostError('runtime.limit-exceeded', 'Artifact exceeds the configured size limit.')
-    // Unfinished uploads are retained in memory, so they count toward the Run limit before they are stored.
-    let pending = 0
-    for (const other of this.#uploads.values()) if (other.runId == upload.runId && other !== upload) pending += other.bytes
-    if (this.#runs.artifactBytes(upload.runId) + pending + upload.bytes > this.#limits.maxRunBytes)
-      throw new ArtifactHostError('runtime.limit-exceeded', 'Run Artifacts exceed the configured size limit.')
+    this.#checkRunBytes(upload.runId, upload.bytes, upload)
     upload.parts.push(part)
+  }
+
+  /** Unfinished uploads are retained in memory, so they count toward the Run limit before they are stored. */
+  #checkRunBytes(runId: string, bytes: number, except?: Upload): void {
+    let pending = 0
+    for (const upload of this.#uploads.values()) if (upload.runId == runId && upload !== except) pending += upload.bytes
+    if (this.#runs.artifactBytes(runId) + pending + bytes > this.#limits.maxRunBytes)
+      throw new ArtifactHostError('runtime.limit-exceeded', 'Run Artifacts exceed the configured size limit.')
+  }
+
+  /** The single place that assigns Artifact identity, stores the bytes and announces the Artifact. */
+  async #persist(
+    runId: string,
+    owner: { readonly jobId: string; readonly nodeId: string },
+    bytes: Buffer,
+    name: string,
+    mediaType: string | undefined,
+    emit: (event: ArtifactEvent) => Promise<void>,
+  ) {
+    const artifact: StoredArtifact = {
+      digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+      id: randomUUID(),
+      ...(mediaType === undefined ? {} : { mediaType }),
+      name,
+      size: bytes.length,
+    }
+    this.#runs.putArtifact(runId, artifact, bytes)
+    const ref = { kind: 'artifact' as const, ...artifact }
+    await emit({ artifact: ref, jobId: owner.jobId, nodeId: owner.nodeId, runId, type: 'node.artifact' })
+    return ref
   }
 
   async #put(
@@ -129,17 +190,7 @@ export class RunArtifacts {
     const upload = this.#upload(runId, call, payload.upload)
     this.#uploads.delete(upload.id)
     this.#append(upload, payload.data)
-    const content = Buffer.concat(upload.parts)
-    const artifact: StoredArtifact = {
-      digest: `sha256:${createHash('sha256').update(content).digest('hex')}`,
-      id: randomUUID(),
-      ...(mediaType === undefined ? {} : { mediaType }),
-      name,
-      size: content.length,
-    }
-    this.#runs.putArtifact(runId, artifact, content)
-    const ref = { kind: 'artifact' as const, ...artifact }
-    await emit({ artifact: ref, jobId: call.jobId!, nodeId: call.nodeId!, runId, type: 'node.artifact' })
+    const ref = await this.#persist(runId, { jobId: call.jobId!, nodeId: call.nodeId! }, Buffer.concat(upload.parts), name, mediaType, emit)
     return { body: ref, status: 200 }
   }
 

@@ -937,7 +937,8 @@
         "webhook-response-header-output-missing": "工作流程輸出「{{output}}」不存在。",
         "webhook-response-header-output-type": "請選擇文字、數值、布林值，或僅包含這些值的物件。",
         "webhook-response-status-output-type": "請選擇數字類型的工作流程輸出欄位作為狀態碼。",
-        "webhook-authentication-header-name": "請使用有效且未被 Webhook 傳輸層保留的 HTTP 標頭名稱。"
+        "webhook-authentication-header-name": "請使用有效且未被 Webhook 傳輸層保留的 HTTP 標頭名稱。",
+        "webhook-response-artifact-output": "請選擇存放回應檔案的工作流程輸出。"
       },
       "leina": {
         "robot-required": "請選擇 Leina 機器人，或綁定機器人識別碼的資料來源。"
@@ -1202,7 +1203,12 @@
     "webhookAuthenticationHint": "未攜帶密鑰的請求會回傳 401，且不會啟動執行。憑證所在的標頭不會出現在 headers 輸出中。",
     "webhookAuthenticationHeaderName": "密鑰標頭名稱",
     "webhookAuthenticationHeaderInvalid": "請輸入有效的 HTTP 標頭名稱，不能使用 Host、Content-Type、Content-Length、Idempotency-Key 或 X-Request-ID。",
-    "webhookAuthenticationSecret": "密鑰變數"
+    "webhookAuthenticationSecret": "密鑰變數",
+    "responseBodyFormat": "回應內容類型",
+    "responseBodyData": "資料",
+    "responseBodyFile": "檔案",
+    "responseBodyFileHint": "傳送本次執行中產生的檔案。Content-Type 與 Content-Disposition 取自檔案儲存的名稱與媒體類型。",
+    "responseBodyChooseOutput": "選擇輸出"
   },
   "conditionEditor": {
     "addCondition": "新增條件",
@@ -1760,7 +1766,14 @@
     "keyValue": "金鑰值",
     "responseOutputs": "回應輸出",
     "authenticationType": "驗證方式",
-    "responseSettings": "回應設定"
+    "responseSettings": "回應設定",
+    "binary": "二進位檔案",
+    "multipart": "多部分表單",
+    "file": "檔案",
+    "multipartFields": "表單欄位",
+    "multipartFieldName": "欄位名稱",
+    "removeMultipartField": "移除欄位",
+    "addMultipartField": "新增欄位"
   },
   "tags": {
     "count": "共 {{count}} 個",

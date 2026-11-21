@@ -528,6 +528,21 @@ export function WebhookEditor({
             />
           ) : (
             <>
+              <Field>
+                <FieldLabel>{t('webhookEditor.responseBodyFormat')}</FieldLabel>
+                <FieldSelect
+                  aria-label={t('webhookEditor.responseBodyFormat')}
+                  disabled={disabled}
+                  value={response.bodyFormat ?? 'data'}
+                  onChange={(value) => {
+                    const { bodyFormat: _bodyFormat, ...rest } = response
+                    changeOption('responseBody', value === 'artifact' ? { ...rest, bodyFormat: 'artifact' } : rest)
+                  }}
+                >
+                  <option value="data">{t('webhookEditor.responseBodyData')}</option>
+                  <option value="artifact">{t('webhookEditor.responseBodyFile')}</option>
+                </FieldSelect>
+              </Field>
               <Field data-invalid={responseIssue != null || undefined}>
                 <FieldLabel>{t('webhookEditor.webhookResponseContent')}</FieldLabel>
                 <ValueEditorFeedback error={responseIssue}>
@@ -553,8 +568,14 @@ export function WebhookEditor({
                         aria-describedby={errorId}
                         danger={responseIssue != null}
                         disabled={disabled || outputsDisconnected}
-                        value={response.output == null ? 'all' : `field:${response.output}`}
-                        displayValue={outputsDisconnected ? t('webhookEditor.webhookOutputsDisconnected') : undefined}
+                        value={response.output == null ? (response.bodyFormat === 'artifact' ? '' : 'all') : `field:${response.output}`}
+                        displayValue={
+                          outputsDisconnected
+                            ? t('webhookEditor.webhookOutputsDisconnected')
+                            : response.bodyFormat === 'artifact' && response.output == null
+                              ? t('webhookEditor.responseBodyChooseOutput')
+                              : undefined
+                        }
                         renderOption={(value, label) => (
                           <>
                             <i
@@ -568,13 +589,17 @@ export function WebhookEditor({
                           changeOption(
                             'responseBody',
                             value === 'all'
-                              ? { kind: response.kind, ...(response.timeoutMs == null ? {} : { timeoutMs: response.timeoutMs }) }
+                              ? {
+                                  kind: response.kind,
+                                  ...(response.bodyFormat == null ? {} : { bodyFormat: response.bodyFormat }),
+                                  ...(response.timeoutMs == null ? {} : { timeoutMs: response.timeoutMs }),
+                                }
                               : { ...response, output: value.slice(6) },
                           )
                         }
                       >
-                        <option value="all">{t('webhookEditor.webhookAllOutputs')}</option>
-                        {(outputDefs.length > 0 || selectedMissing) && <hr />}
+                        {response.bodyFormat !== 'artifact' && <option value="all">{t('webhookEditor.webhookAllOutputs')}</option>}
+                        {response.bodyFormat !== 'artifact' && (outputDefs.length > 0 || selectedMissing) && <hr />}
                         {outputDefs.map((port) => (
                           <option key={port.handle} value={`field:${port.handle}`}>
                             {port.handle}

@@ -937,7 +937,8 @@
         "webhook-response-header-output-missing": "워크플로 출력 \"{{output}}\"이 없습니다.",
         "webhook-response-header-output-type": "텍스트, 숫자, 불리언 또는 이러한 값만 포함하는 객체를 선택하세요.",
         "webhook-response-status-output-type": "상태 코드에는 숫자 형식의 워크플로 출력을 선택하세요.",
-        "webhook-authentication-header-name": "Webhook 전송 계층에서 예약하지 않은 유효한 HTTP 헤더 이름을 사용하세요."
+        "webhook-authentication-header-name": "Webhook 전송 계층에서 예약하지 않은 유효한 HTTP 헤더 이름을 사용하세요.",
+        "webhook-response-artifact-output": "응답 파일을 담은 워크플로 출력을 선택하세요."
       },
       "leina": {
         "robot-required": "Leina 로봇을 선택하거나 식별자의 입력 소스를 연결하세요."
@@ -1202,7 +1203,12 @@
     "webhookAuthenticationHint": "비밀 값이 없는 요청은 401로 거부되며 실행이 시작되지 않습니다. 자격 증명 헤더는 headers 출력에서 제거됩니다.",
     "webhookAuthenticationHeaderName": "비밀 헤더 이름",
     "webhookAuthenticationHeaderInvalid": "Host, Content-Type, Content-Length, Idempotency-Key, X-Request-ID를 제외한 유효한 HTTP 헤더 이름을 입력하세요.",
-    "webhookAuthenticationSecret": "비밀 변수"
+    "webhookAuthenticationSecret": "비밀 변수",
+    "responseBodyFormat": "응답 본문 유형",
+    "responseBodyData": "데이터",
+    "responseBodyFile": "파일",
+    "responseBodyFileHint": "이번 실행에서 만든 파일을 보냅니다. Content-Type과 Content-Disposition은 저장된 이름과 미디어 유형으로 설정됩니다.",
+    "responseBodyChooseOutput": "출력 선택"
   },
   "conditionEditor": {
     "addCondition": "조건 추가",
@@ -1760,7 +1766,14 @@
     "keyValue": "키 값",
     "responseOutputs": "응답 출력",
     "authenticationType": "인증 방식",
-    "responseSettings": "응답 설정"
+    "responseSettings": "응답 설정",
+    "binary": "바이너리 파일",
+    "multipart": "멀티파트 양식",
+    "file": "파일",
+    "multipartFields": "양식 필드",
+    "multipartFieldName": "필드 이름",
+    "removeMultipartField": "필드 제거",
+    "addMultipartField": "필드 추가"
   },
   "tags": {
     "count": "총 {{count}}개",

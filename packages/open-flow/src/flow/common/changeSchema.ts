@@ -203,6 +203,7 @@ const webhookOptions = z.object({
     .discriminatedUnion('kind', [
       z.strictObject({
         kind: z.literal('workflow-outputs'),
+        bodyFormat: z.literal('artifact').optional(),
         output: text.optional(),
         timeoutMs: z.number().int().min(webhookResponseTimeout.minMs).max(webhookResponseTimeout.maxMs).optional(),
       }),
@@ -263,7 +264,13 @@ const node = z.union([
       onError: z.never().optional(),
     })
     .omit({ timeoutMs: true }),
-  z.strictObject({ ...base, kind: z.literal('webhook-response'), retry: z.never().optional(), onError: z.never().optional() }),
+  z.strictObject({
+    ...base,
+    kind: z.literal('webhook-response'),
+    bodyFormat: z.literal('artifact').optional(),
+    retry: z.never().optional(),
+    onError: z.never().optional(),
+  }),
   z.strictObject({ ...base, kind: z.literal('outputs'), outputDefs: z.array(port.strict()), outputMappings: inputs }).omit({ inputs: true }),
   z.object({ ...base, inputs: z.record(text, z.never()), kind: z.literal('condition'), ...condition }),
   z.object({

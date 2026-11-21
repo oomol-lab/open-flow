@@ -23,6 +23,15 @@ describe('Trigger test defaults', () => {
     expect(outputs).toEqual({ headers: {}, query: {}, body: { event: 'order.created', count: 0, enabled: false }, webhookUrl: 'https://example.com/webhook' })
     expect(matchesTriggerOutputs(trigger, outputs)).toBe(true)
     expect(trigger).toEqual(original)
+    // A nullable field accepts null both as its default and in a request body; a required one does not.
+    const nullDefault: TriggerNode = {
+      ...trigger,
+      bodyFields: [...trigger.bodyFields, { handle: 'memo', jsonSchema: { type: 'string' }, nullable: true, value: null }],
+    }
+    expect(defaultTriggerTestOutputs(nullDefault)).toMatchObject({ body: { event: 'order.created', memo: null } })
+    expect(matchesTriggerOutputs(nullDefault, defaultTriggerTestOutputs(nullDefault))).toBe(true)
+    expect(matchesTriggerOutputs(trigger, { ...outputs, body: { event: 'order.created', note: null } })).toBe(true)
+    expect(matchesTriggerOutputs(trigger, { ...outputs, body: { event: null } })).toBe(false)
     const get: TriggerNode = { ...trigger, method: 'GET' }
     expect(defaultTriggerTestOutputs(get)).not.toHaveProperty('body')
     expect(matchesTriggerOutputs(get, defaultTriggerTestOutputs(get))).toBe(true)

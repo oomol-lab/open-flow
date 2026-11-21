@@ -11,6 +11,7 @@ export const engineCapabilityRevisions = {
   'skip-duplicates': 10,
   'connector-proxy': 11,
   'delay': 12,
+  'webhook-artifact-response': 12,
 } as const
 
 export type EngineCapability = keyof typeof engineCapabilityRevisions

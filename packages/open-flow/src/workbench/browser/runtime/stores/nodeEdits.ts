@@ -22,6 +22,7 @@ import {
   resetInputValues,
   setInputSources,
   updateTriggerSchedule,
+  setWebhookResponseBodyFormat,
   updateStartInputDefs,
   setConnectorConnection as changeConnectorConnection,
   setTriggerConnection as changeTriggerConnection,
@@ -279,6 +280,13 @@ export class NodeEdits {
     if (revision == null) return false
     const changes = changeWebhookAuthentication(revision, triggerId, choice, this.identity())
     return changes != null && (await this.save(changes))
+  }
+
+  public async setWebhookResponseBodyFormat(nodeId: string, bodyFormat: 'artifact' | undefined): Promise<boolean> {
+    const revision = this.revision.value
+    if (revision == null) return false
+    const changes = setWebhookResponseBodyFormat(revision.revision.content, nodeId, bodyFormat)
+    return changes.length > 0 && (await this.save(changes))
   }
 
   public async setTriggerConnection(triggerId: string, connectionId: string | undefined): Promise<boolean> {

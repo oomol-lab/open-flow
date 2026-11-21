@@ -937,7 +937,8 @@
         "webhook-response-header-output-missing": "工作流输出“{{output}}”不存在。",
         "webhook-response-header-output-type": "请选择文本、数值、布尔值，或仅包含这些值的对象。",
         "webhook-response-status-output-type": "请选择数字类型的工作流输出字段作为状态码。",
-        "webhook-authentication-header-name": "请使用有效且未被 Webhook 传输层保留的 HTTP 请求头名称。"
+        "webhook-authentication-header-name": "请使用有效且未被 Webhook 传输层保留的 HTTP 请求头名称。",
+        "webhook-response-artifact-output": "请选择存放响应文件的工作流输出。"
       },
       "leina": {
         "robot-required": "请选择 Leina 机器人，或绑定机器人标识的数据来源。"
@@ -1202,7 +1203,12 @@
     "webhookAuthenticationHint": "未携带密钥的请求会返回 401，且不会启动运行。凭据所在的请求头不会出现在 headers 输出中。",
     "webhookAuthenticationHeaderName": "密钥请求头名称",
     "webhookAuthenticationHeaderInvalid": "请输入有效的 HTTP 请求头名称，不能使用 Host、Content-Type、Content-Length、Idempotency-Key 或 X-Request-ID。",
-    "webhookAuthenticationSecret": "密钥变量"
+    "webhookAuthenticationSecret": "密钥变量",
+    "responseBodyFormat": "响应体类型",
+    "responseBodyData": "数据",
+    "responseBodyFile": "文件",
+    "responseBodyFileHint": "发送本次运行中生成的文件。Content-Type 和 Content-Disposition 取自文件存储的名称与媒体类型。",
+    "responseBodyChooseOutput": "选择输出"
   },
   "conditionEditor": {
     "addCondition": "添加条件",
@@ -1760,7 +1766,14 @@
     "keyValue": "密钥值",
     "responseOutputs": "响应输出",
     "authenticationType": "认证方式",
-    "responseSettings": "响应配置"
+    "responseSettings": "响应配置",
+    "binary": "二进制文件",
+    "multipart": "多部分表单",
+    "file": "文件",
+    "multipartFields": "表单字段",
+    "multipartFieldName": "字段名",
+    "removeMultipartField": "移除字段",
+    "addMultipartField": "添加字段"
   },
   "tags": {
     "count": "{{count}} 个",

@@ -5,6 +5,7 @@ import type { RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-la
 import type { FlowRunOutcome, FlowRunResult, RunLaunch, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { Logger } from 'pino'
 import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector-contract.ts'
+import type { HttpArtifactHost } from '../deployment/http-request.ts'
 import type { LlmHost } from '../deployment/llm.ts'
 import type { StoredRun } from '../storage/run-store.ts'
 import type { Store } from '../storage/store.ts'
@@ -12,7 +13,7 @@ import type { ArtifactEvent } from './run-artifacts.ts'
 import type { RunControl } from './run-control.ts'
 
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
-import { buildConnectorProxyRequest } from '@oomol-lab/open-flow/connector-proxy'
+import { buildConnectorProxyRequest, connectorProxyArtifactContent } from '@oomol-lab/open-flow/connector-proxy'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
@@ -375,7 +376,7 @@ export class RunExecutor {
           },
           invokeTask: (invocation) => {
             if (!('kind' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
-            return this.#invokeTask(flow, invocation, run, connectors, async (data) => {
+            return this.#invokeTask(flow, invocation, run, connectors, emit, async (data) => {
               const event = await projectEvent({
                 type: 'node.log',
                 runId: invocation.runId,
@@ -486,9 +487,16 @@ export class RunExecutor {
     invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal },
     run: StoredRun,
     connectors: ConnectorExecution,
+    emit: (event: ArtifactEvent) => Promise<void>,
     report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
   ): Promise<unknown> {
     const access = this.#connectorContext(run, 'execute', 'selected')
+    const owner = { jobId: invocation.jobId, nodeId: invocation.nodeId }
+    const artifacts: HttpArtifactHost = {
+      maxBytes: this.#artifacts.maxArtifactBytes,
+      resolve: (ids) => this.#artifacts.resolve(run.runId, ids),
+      store: async (content) => ({ ...(await this.#artifacts.store(run.runId, owner, content, emit)) }),
+    }
     const node = prepared.graph.nodes[invocation.nodeId]
     if (node?.kind != 'task' || !('executor' in node.task)) throw new Error('Managed Task node is unavailable.')
     const task = node.task
@@ -519,7 +527,7 @@ export class RunExecutor {
         return { items: values.filter((_, index) => inserted[index]), duplicates: values.filter((_, index) => !inserted[index]) }
       }
       case 'http-request':
-        return executeHttpRequest(executor, invocation.input, invocation.signal)
+        return executeHttpRequest(executor, invocation.input, invocation.signal, fetch, artifacts)
       case 'connector-proxy': {
         const connector = this.#resolveConnector()
         if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
@@ -538,6 +546,14 @@ export class RunExecutor {
           providerId: executor.providerId,
           connectionId: executor.connectionId,
         })
+        if (executor.responseFormat === 'artifact') {
+          return {
+            body: await artifacts.store(connectorProxyArtifactContent(response, request.endpoint)),
+            statusCode: response.status,
+            headers: response.headers ?? {},
+            bodyEncoding: null,
+          }
+        }
         return { body: response.data, statusCode: response.status, headers: response.headers ?? {}, bodyEncoding: response.bodyEncoding ?? null }
       }
       case 'openapi':

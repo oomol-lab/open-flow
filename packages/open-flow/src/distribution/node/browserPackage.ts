@@ -123,6 +123,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['flow/common/workflowBundle', 'common/flow-workflowBundle'],
   ['flow/common/workflowFile', 'common/flow-workflowFile'],
   ['flow/common/workflowReferences', 'common/flow-workflowReferences'],
+  ['http/common/artifact', 'common/http-artifact'],
   ['http/common/hosts', 'common/http-hosts'],
   ['state/common/conformance', 'common/state-conformance'],
   ['state/common/state', 'common/flow-state'],

@@ -39,7 +39,15 @@ import {
   resolveProviderAccessBinding,
 } from './provider-access.ts'
 
+// A repeated group recurses per four characters in V8 and overflows the stack on multi-MiB bodies; a single character
+// class plus a length check accepts exactly the same strings.
+function isBase64(value: string): boolean {
+  return value.length % 4 == 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value)
+}
 const maxActionResponseBytes = 32 * 1024 * 1024
+// The open-source Connector returns proxy bodies of up to 20 MiB, and base64 adds a third plus the JSON envelope, so the
+// 1 MiB transport default would reject files well below the Connector and Artifact limits.
+const maxProxyResponseBytes = 32 * 1024 * 1024
 const maxActionCatalogBytes = 8 * 1024 * 1024
 const catalogConcurrency = 16
 const readinessTimeoutMs = 1_000
@@ -680,7 +688,7 @@ export class ConnectorClient implements ConnectorHost {
           method: 'POST',
         },
         signal,
-        { fields: { ...(connectionId == null ? {} : { connectionId }), provider, rateLimitId }, teamId },
+        { fields: { ...(connectionId == null ? {} : { connectionId }), provider, rateLimitId }, maximumResponseBytes: maxProxyResponseBytes, teamId },
       )
       .catch((error: unknown) => {
         if (signal.aborted) throw signal.reason
@@ -699,7 +707,8 @@ export class ConnectorClient implements ConnectorHost {
         Number(status) <= 599 &&
         Object.hasOwn(response.data, 'data') &&
         (headers === undefined || (record(headers) && Object.values(headers).every((value) => typeof value === 'string'))) &&
-        (bodyEncoding === undefined || bodyEncoding === 'base64')
+        // Declared base64 must be well-formed text, so Artifact mode can never store substituted bytes.
+        (bodyEncoding === undefined || (bodyEncoding === 'base64' && typeof response.data.data === 'string' && isBase64(response.data.data)))
       ) {
         return {
           data: response.data.data,

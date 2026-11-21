@@ -212,6 +212,13 @@ null, arrays, nested objects, invalid names/values and case-insensitive duplicat
 CORS and Content-Type encoding policy remain authoritative. References are limited to the singleton
 Outputs node; names and literal values are edited as single-line text.
 
+Set `bodyFormat: "artifact"` in a workflow-outputs `responseBody` to send a file. `output` is then
+required and must hold an `ArtifactRef` of the same Run. The response body is the stored bytes.
+Content-Type comes from the stored media type (default `application/octet-stream`) and
+Content-Disposition is `attachment` with the stored name; both override configured or dynamic
+headers with the same name. A missing output, a non-Artifact value or an Artifact the Run does not
+own returns 500.
+
 Omitted `responseBody` retains immediate `responseData` behavior. Updating dynamic configuration
 preserves saved fixed text. Switch back by clearing `responseBody` and any
 `responseStatusCodeOutput`, `responseHeadersSource` and `responseHeaderOutputs`; the fixed status, text and headers remain saved.
@@ -229,6 +236,12 @@ changing the singleton Outputs contract. Set Webhook `options.responseBody` to
 path. Same-batch authoring supports `$alias` in `nodeId`. Clear the old responseBody and its
 workflow-output-specific status/header policies before switching modes through recursive updates.
 Static Webhook content, status and headers remain saved but inactive in this mode.
+
+Set node field `bodyFormat: "artifact"` (authoring `config.bodyFormat`) to send a Run Artifact. The
+`body` input then requires an `ArtifactRef` and has no default; status and headers keep their
+behavior, and Content-Type and Content-Disposition follow the workflow-output rules above. A body
+that is not an Artifact fails the node. Switching to Artifact mode in the Workbench drops a literal
+body value and keeps upstream sources. Clear `['config', 'bodyFormat']` to return to JSON bodies.
 
 Each node accepts ordinary upstream and variable sources; it exposes no business outputs and
 allows downstream execution edges. Headers accept fixed text entries or one whole-object source;
@@ -311,6 +324,12 @@ The node supports ordinary `retry` and `onError`; it has no separate error execu
 Use `statusPolicy: "all"` to inspect non-2xx responses with a Condition node. Network and parsing
 failures still fail. See the Control API HTTP Request contract for wire formats and limits.
 
+Files use Run Artifacts. `bodyFormat: "binary"` sends the `ArtifactRef` bound to `body` as the raw
+request body. `bodyFormat: "multipart"` with `bodyFields: ["file", "meta"]` generates inputs
+`body.file` and `body.meta`; an Artifact becomes a file part and scalars become text parts.
+`responseFormat: "artifact"` stores the whole response as an Artifact and returns it as `body`, even
+when the response is empty.
+
 ## Provider API requests
 
 Public type `connector-proxy` calls Provider endpoints not packaged as Actions through the existing
@@ -332,6 +351,9 @@ complete dynamic values; upstream 4xx/5xx statuses remain successful outputs whe
 a proxy result. Connector errors fail the node. `onError` is supported; retry configuration is not.
 Unconfirmed writes are indeterminate and cannot be replayed. Connector owns credential injection,
 endpoint restrictions and unsupported-Provider errors. No-auth Providers may omit the account.
+
+Set `responseFormat: "artifact"` to store the response as a Run Artifact; `body` is then an
+`ArtifactRef` and `bodyEncoding` is null. Binary and form request bodies are not supported.
 
 Use independent Proxy permission in connection usage, snapshots, publication and runtime checks.
 Do not infer it from an Action grant or add Proxy to Code/Agent capabilities. The node requires

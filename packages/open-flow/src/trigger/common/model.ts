@@ -49,7 +49,7 @@ export interface WebhookOptions {
   /** `fields` (default) accepts only declared body fields; `any` accepts any JSON object or array. */
   readonly bodyMode?: 'any' | 'fields'
   readonly responseBody?:
-    | { readonly kind: 'workflow-outputs'; readonly output?: string; readonly timeoutMs?: number }
+    | { readonly bodyFormat?: 'artifact'; readonly kind: 'workflow-outputs'; readonly output?: string; readonly timeoutMs?: number }
     | { readonly kind: 'webhook-response'; readonly nodeId?: string; readonly timeoutMs?: number }
   readonly responseData?: string
   readonly responseHeaders?: Readonly<Record<string, string>>

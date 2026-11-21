@@ -300,3 +300,37 @@ it('does not show a stale body error while a method change is being saved', asyn
     mounted.unmount()
   }
 })
+
+it('switches the Provider response to a file and removes the setting when switching back', async () => {
+  const session = requestSession({ method: 'GET' })
+  let mounted: ReturnType<typeof render> | undefined
+  try {
+    await session.start()
+    mounted = render(<Inspector session={session} />)
+    const { container } = mounted
+    const executor = () => {
+      const node = session.store.$.draft.value!.content.document.graph.nodes.request!
+      return node.kind === 'task' && 'executor' in node.task ? (node.task.executor as Record<string, unknown>) : {}
+    }
+    const output = () => {
+      const node = session.store.$.draft.value!.content.document.graph.nodes.request!
+      return node.kind === 'task' ? node.task.outputs.find((port) => 'handle' in port && port.handle === 'body') : undefined
+    }
+    const label = [...container.querySelectorAll<HTMLLabelElement>('label')].find((element) => element.textContent === 'Response format')!
+    const select = document.getElementById(label.htmlFor) as HTMLSelectElement
+    const choose = async (value: string) =>
+      act(async () => {
+        select.value = value
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+      })
+    await choose('artifact')
+    await vi.waitFor(() => expect(executor().responseFormat).toBe('artifact'))
+    expect(output()).toMatchObject({ jsonSchema: { contentMediaType: 'oomol/artifact' }, nullable: false })
+    await choose('auto')
+    await vi.waitFor(() => expect(Object.hasOwn(executor(), 'responseFormat')).toBe(false))
+    expect(output()).toMatchObject({ nullable: true })
+  } finally {
+    mounted?.unmount()
+    session.dispose()
+  }
+})

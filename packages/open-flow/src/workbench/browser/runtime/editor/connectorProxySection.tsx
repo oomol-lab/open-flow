@@ -46,6 +46,10 @@ export function ConnectorProxySection({
         if (before.kind !== 'connector-proxy' || next.kind !== 'connector-proxy' || current.executor.kind !== 'connector-proxy') return Promise.resolve(false)
         const merged = { ...current.executor }
         if (before.method !== next.method) merged.method = next.method
+        if (before.responseFormat !== next.responseFormat) {
+          if (next.responseFormat == null) Reflect.deleteProperty(merged, 'responseFormat')
+          else merged.responseFormat = next.responseFormat
+        }
         return saveRef.current(current, connectorProxyTask(merged, current.name, current))
       }),
   )
@@ -74,6 +78,13 @@ export function ConnectorProxySection({
     setConfig(changes.value)
     void save()
   }
+  function setResponseFormat(responseFormat: 'artifact' | undefined) {
+    if (disabled || changes.value.kind !== 'connector-proxy') return
+    const { responseFormat: _previous, ...rest } = changes.value
+    changes.value = responseFormat == null ? rest : { ...rest, responseFormat }
+    setConfig(changes.value)
+    void save()
+  }
   return (
     <InspectorSection title={t('connectorProxy.title')} data-inspector-section="task">
       <div className="node-settings flex flex-col gap-3" data-value-editor-scope>
@@ -96,6 +107,19 @@ export function ConnectorProxySection({
         </Field>
         {parameters}
         {supportsBody && input('body', t('httpRequest.body'))}
+        <Field>
+          <FieldLabel htmlFor={`${id}-responseFormat`}>{t('httpRequest.responseFormat')}</FieldLabel>
+          <NativeSelect
+            id={`${id}-responseFormat`}
+            value={config.responseFormat ?? 'auto'}
+            disabled={disabled}
+            className="w-full"
+            onChange={(event) => setResponseFormat(event.target.value === 'artifact' ? 'artifact' : undefined)}
+          >
+            <NativeSelectOption value="auto">{t('httpRequest.auto')}</NativeSelectOption>
+            <NativeSelectOption value="artifact">{t('httpRequest.file')}</NativeSelectOption>
+          </NativeSelect>
+        </Field>
         {bodyError && (
           <div className="flex flex-col gap-2">
             <p id={`${id}-body-error`} role="alert" className="text-xs text-destructive">

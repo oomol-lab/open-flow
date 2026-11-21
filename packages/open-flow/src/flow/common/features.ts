@@ -14,8 +14,8 @@ import { nodeWorkflowReferences } from './workflowReferences.ts'
  */
 export type FlowFeature = EngineCapability | HostFeature
 
-/** Features the deployment host applies before execution, such as Webhook request admission. They need no Engine support. */
-export type HostFeature = 'webhook-any-body' | 'webhook-authentication'
+/** Features the deployment host applies around execution, such as Webhook request admission or managed HTTP Tasks. They need no Engine support. */
+export type HostFeature = 'connector-proxy-artifacts' | 'http-request-artifacts' | 'webhook-any-body' | 'webhook-authentication'
 
 /** The first Flow model whose serialized documents declare non-baseline features in `features`. */
 export const flowFeaturesModelVersion = 16
@@ -56,6 +56,30 @@ const flowFeatures: Readonly<Record<FlowFeature, FlowFeatureDefinition>> = {
   'delay': { baseline: true, detect: someNode((node) => node.kind == 'delay') },
   'webhook-any-body': { baseline: false, detect: someNode((node) => node.kind == 'webhook' && node.options?.bodyMode == 'any') },
   'webhook-authentication': { baseline: false, detect: someNode((node) => node.kind == 'webhook' && node.options?.authentication != null) },
+  'webhook-artifact-response': {
+    baseline: false,
+    detect: someNode(
+      (node) =>
+        (node.kind == 'webhook-response' && node.bodyFormat == 'artifact') ||
+        (node.kind == 'webhook' && node.options?.responseBody?.kind == 'workflow-outputs' && node.options.responseBody.bodyFormat == 'artifact'),
+    ),
+  },
+  'http-request-artifacts': {
+    baseline: false,
+    detect: someNode((node) => {
+      const executor = node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'http-request' ? node.task.executor : undefined
+      return (
+        executor != null &&
+        (executor.bodyFormat == 'binary' || executor.bodyFormat == 'multipart' || executor.responseFormat == 'artifact' || executor.bodyFields != null)
+      )
+    }),
+  },
+  'connector-proxy-artifacts': {
+    baseline: false,
+    detect: someNode(
+      (node) => node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'connector-proxy' && node.task.executor.responseFormat != null,
+    ),
+  },
 }
 
 const featureNames = (Object.keys(flowFeatures) as FlowFeature[]).toSorted()

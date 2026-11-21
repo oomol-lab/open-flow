@@ -24,6 +24,36 @@ or importing a file, so upgrade the exporting client and importing deployment to
 Local file authoring permits unset Trigger configuration in template checks; runtime and publication
 validation keep their existing requirements. The file format, Flow model, and Engine contract are unchanged.
 
+## Artifact transfer in HTTP, Provider API and Webhook responses (after beta.95)
+
+The npm `next` baseline for this change is `0.1.0-beta.95`, with Model v16 and Engine v12. Confirm
+the published artifact before release.
+
+Three Flow features are added outside the v16 baseline, so earlier packages reject content that uses
+them instead of dropping the new fields:
+
+- `http-request-artifacts`: HTTP Request `bodyFormat` `binary` or `multipart`, `bodyFields`, or
+  `responseFormat: "artifact"`. Host feature only.
+- `connector-proxy-artifacts`: Provider API `responseFormat`. Host feature only.
+- `webhook-artifact-response`: Webhook Response node `bodyFormat` or workflow-output
+  `responseBody.bodyFormat`. It joins the Engine v12 capabilities because the Engine records an
+  `artifactId` response snapshot.
+
+The `node.completed` response snapshot gains optional `artifactId`; such snapshots carry an empty
+`body`. Projectors from earlier packages reject it. A Cloud or other execution deployment that
+advertises Engine v12 must upgrade to this package before it accepts Flows using
+`webhook-artifact-response`, because the Engine contract name is unchanged. Upgrade Server, Cloud
+and clients together; Flows without these features are unaffected.
+
+`buildHttpRequest` gains an optional third argument with resolved Artifacts and keeps its existing
+calls. The new `http/common/artifact` module is exported through `@oomol-lab/open-flow/http-request`.
+Artifact downloads use the deployment's Artifact limits (10 MiB per Artifact and 100 MiB per Run on
+the Server) instead of the 4 MiB parsed-response limit. Provider API Artifact responses are also
+bounded by the Connector's own response limit, and the Server reads proxy envelopes of up to 32 MiB so base64
+bodies near the open-source Connector's 20 MiB limit still arrive. Without a distinct marker in the Connector protocol, a
+top-level JSON string body is stored as its raw text rather than as a quoted JSON value. Binary and multipart Provider API request bodies need
+Connector protocol changes and are not part of this release.
+
 ## Flow features: Flow model v16 and capability-based Engine admission
 
 The npm `next` baseline is `0.1.0-beta.94`, gitHead `f933d812`, with Model v15 and Engine v12.

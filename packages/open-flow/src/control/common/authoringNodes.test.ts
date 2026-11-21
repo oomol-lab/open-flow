@@ -323,6 +323,28 @@ describe('business configuration authoring contracts', () => {
     expect(authoringNode(updated.content, ref).config).not.toHaveProperty('body.memo.default')
   })
 
+  it('drops a literal Webhook Response body when authoring switches it to an Artifact body', async () => {
+    const created = await edit(empty, [
+      { op: 'node.add', type: 'webhook-response', as: 'reply', name: 'Reply', inputs: { body: { kind: 'value', value: 'hello' } } },
+    ])
+    const ref = created.nodes.reply!
+    const switched = await edit(created.content, [{ op: 'node.update', node: ref, set: { config: { bodyFormat: 'artifact' } } }])
+    const node = switched.content.document.graph.nodes[ref]
+    expect(node).toMatchObject({ kind: 'webhook-response', bodyFormat: 'artifact' })
+    if (node?.kind != 'webhook-response') throw new Error('Expected Webhook Response')
+    expect(node.inputs).not.toHaveProperty('body')
+
+    const bound = await edit(empty, [
+      { op: 'node.add', type: 'code', as: 'file', name: 'File' },
+      { op: 'node.add', type: 'webhook-response', as: 'reply', name: 'Reply', inputs: { body: { kind: 'output', node: '$file' } } },
+    ])
+    const boundRef = bound.nodes.reply!
+    const kept = await edit(bound.content, [{ op: 'node.update', node: boundRef, set: { config: { bodyFormat: 'artifact' } } }])
+    const keptNode = kept.content.document.graph.nodes[boundRef]
+    if (keptNode?.kind != 'webhook-response') throw new Error('Expected Webhook Response')
+    expect(keptNode.inputs.body).toMatchObject({ kind: 'sources' })
+  })
+
   it('configures Webhook any-body mode and authentication by Variable name without exposing binding identities', async () => {
     const created = await edit(empty, [
       {
@@ -389,6 +411,31 @@ describe('business configuration authoring contracts', () => {
       { op: 'node.update', node: ref, set: { config: { options: { authentication: { secret: { kind: 'variable', name: 'NEW_TOKEN' } } } } } },
     ])
     expect(Object.values(rebound.content.document.bindings)).toEqual([{ kind: 'variable', target: 'NEW_TOKEN' }])
+
+    // Switching a header policy to bearer clears only the header name, so the stored secret reference stays.
+    const headerPolicy = await edit(created.content, [
+      {
+        op: 'node.update',
+        node: ref,
+        set: { config: { options: { authentication: { type: 'header', name: 'X-Relay-Secret', secret: { kind: 'variable', name: 'WEBHOOK_TOKEN' } } } } },
+      },
+    ])
+    const headerNode = headerPolicy.content.document.graph.nodes[ref]
+    if (headerNode?.kind != 'webhook') throw new Error('Expected Webhook')
+    const headerBinding = headerNode.options?.authentication?.secret.bindingId
+    const orphanedHeader = { ...headerPolicy.content, document: { ...headerPolicy.content.document, bindings: {} } }
+    const switched = await edit(orphanedHeader, [
+      {
+        op: 'node.update',
+        node: ref,
+        set: { config: { options: { authentication: { type: 'bearer' } } } },
+        clear: [['config', 'options', 'authentication', 'name']],
+      },
+    ])
+    expect(switched.content.document.bindings).toEqual({})
+    expect(switched.content.document.graph.nodes[ref]).toMatchObject({
+      options: { authentication: { type: 'bearer', secret: { kind: 'binding', bindingId: headerBinding } } },
+    })
 
     const cleared = await edit(created.content, [{ op: 'node.update', node: ref, clear: [['config', 'options', 'authentication']] }])
     expect(cleared.content.document.bindings).toEqual({})

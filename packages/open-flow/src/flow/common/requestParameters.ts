@@ -84,7 +84,8 @@ export function requestInputMappings(
   next: TaskDefinitionBase,
 ): Record<string, InputMapping> {
   const candidate = renamedPort(previous.inputs, next.inputs)
-  const rename = candidate != null && ['query.', 'header.'].some((prefix) => candidate.every((name) => name.startsWith(prefix))) ? candidate : undefined
+  const rename =
+    candidate != null && ['query.', 'header.', 'body.'].some((prefix) => candidate.every((name) => name.startsWith(prefix))) ? candidate : undefined
   return remapInputMappings(mappings, next.inputs, rename)
 }
 

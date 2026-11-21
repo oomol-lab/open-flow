@@ -131,6 +131,13 @@ denied. Deployments own storage, retention and the per-Artifact and per-Run size
 them is a non-catchable `limit-exceeded` failure. Invalid arguments fail with `capability.invalid`
 before Host dispatch.
 
+Managed nodes use the same Run storage. HTTP Request and Provider API nodes in Artifact response mode
+store the response bytes and return an `ArtifactRef`; each stored response produces a `node.artifact`
+event for that node and counts toward the same limits. HTTP Request binary and multipart bodies, and
+Webhook Artifact responses, read Artifacts of the current Run only. Hosts resolve the identity from
+storage and use the stored name, media type and bytes; the `name`, `mediaType` and `size` in a
+reference are never trusted.
+
 ## Flow State (Engine v10)
 
 Code receives `context.state.get(keyOrKeys)`, `set(key, value)`, `insert(key, value)`, `delete(key)` and

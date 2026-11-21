@@ -92,13 +92,18 @@ export function triggerOutputDefinitions(trigger: TriggerNode): readonly Port[] 
   }
 }
 
-/** Any-body mode accepts JSON objects and arrays; field mode accepts only declared fields. */
-function webhookBodySchema(trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>): JsonValue {
+/**
+ * Any-body mode accepts JSON objects and arrays; field mode accepts only declared fields. The port schema keeps each
+ * field's own type for typing and connections; validation also admits null for nullable fields.
+ */
+function webhookBodySchema(trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>, validation = false): JsonValue {
   if (trigger.options?.bodyMode == 'any') return { type: ['object', 'array'] }
   return {
     type: 'object',
     additionalProperties: false,
-    properties: Object.fromEntries(trigger.bodyFields.map((field) => [field.handle, field.jsonSchema])),
+    properties: Object.fromEntries(
+      trigger.bodyFields.map((field) => [field.handle, validation && field.nullable ? { anyOf: [field.jsonSchema, { type: 'null' }] } : field.jsonSchema]),
+    ),
     required: trigger.bodyFields.filter((field) => !field.nullable && !Object.hasOwn(field, 'value')).map((field) => field.handle),
   }
 }
@@ -120,6 +125,11 @@ export function triggerOutputPorts(trigger: TriggerNode): Readonly<Record<string
   return Object.fromEntries(triggerOutputDefinitions(trigger).map(({ handle, ...port }) => [handle, port]))
 }
 
+/** Whether a Webhook request body satisfies the declared fields, including null for nullable fields. */
+export function matchesWebhookBody(trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>, body: JsonValue): boolean {
+  return matchesSchema(body, webhookBodySchema(trigger, true))
+}
+
 export function matchesTriggerOutputs(trigger: TriggerNode, outputs: unknown): outputs is Readonly<Record<string, JsonValue>> {
   if (!isJsonObject(outputs)) return false
   const ports = triggerOutputDefinitions(trigger)
@@ -128,7 +138,9 @@ export function matchesTriggerOutputs(trigger: TriggerNode, outputs: unknown): o
     Object.keys(outputs).length === ports.length &&
     ports.every(
       (port) =>
-        Object.hasOwn(outputs, port.handle) && ((outputs[port.handle] === null && port.nullable) || matchesSchema(outputs[port.handle]!, port.jsonSchema)),
+        Object.hasOwn(outputs, port.handle) &&
+        ((outputs[port.handle] === null && port.nullable) ||
+          matchesSchema(outputs[port.handle]!, trigger.kind == 'webhook' && port.handle == 'body' ? webhookBodySchema(trigger, true) : port.jsonSchema)),
     )
   )
 }

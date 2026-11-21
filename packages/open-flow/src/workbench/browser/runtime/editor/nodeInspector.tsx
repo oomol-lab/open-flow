@@ -31,7 +31,7 @@ import { decisionModel } from '../../../../decision/common/decision.ts'
 import { delayDurationInput } from '../../../../flow/common/delay.ts'
 import { executionReachableNodes, webhookResponseDiagnostics, inputSourceCandidates } from '../../../../flow/common/graph.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
-import { webhookResponseInputs } from '../../../../flow/common/webhookResponse.ts'
+import { webhookResponseInputPorts } from '../../../../flow/common/webhookResponse.ts'
 import { FieldTable } from '../../../../form/browser/fieldTable.tsx'
 import { httpQuerySchema, httpHeaderSchema } from '../../../../http/common/httpRequest.ts'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -701,7 +701,11 @@ export function NodeInspector({
         )}
         {selection?.kind === 'webhook-response' && (
           <WebhookResponseEditor
-            entries={webhookResponseInputs.map((definition) => {
+            bodyFormat={selection.node.bodyFormat}
+            onBodyFormat={(bodyFormat) => {
+              void store?.nodes.setWebhookResponseBodyFormat(selection.id, bodyFormat)
+            }}
+            entries={webhookResponseInputPorts(selection.node).map((definition) => {
               const mapping = selection.node.inputs[definition.handle]
               const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
               const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined

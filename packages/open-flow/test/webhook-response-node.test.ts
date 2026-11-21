@@ -1,4 +1,4 @@
-import type { GraphNode, RevisionContent } from '../src/flow/common/change.ts'
+import type { GraphNode, InputPort, RevisionContent } from '../src/flow/common/change.ts'
 
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
@@ -10,6 +10,7 @@ import { applyFlowChanges, currentFlowModelVersion } from '../src/flow/common/ch
 import { decodeRevision, decodeRevisionContent, encodeRevision } from '../src/flow/common/encoding.ts'
 import { validateFlowGraph } from '../src/flow/common/graph.ts'
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
+import { setWebhookResponseBodyFormat } from '../src/flow/common/nodeChanges.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 import { currentEngineContract } from '../src/runtime/common/engineContract.ts'
 
@@ -235,4 +236,121 @@ it('commits each execution snapshot while keeping response data out of downstrea
     ),
   ).rejects.toThrow('maximum execution count')
   expect(bodies).toEqual(['1', '2'])
+})
+
+function artifactOutputFlow(outputDefs: readonly InputPort[], output?: string): RevisionContent {
+  return {
+    modelVersion: currentFlowModelVersion,
+    modules: {},
+    document: {
+      bindings: {},
+      graph: {
+        edges: [{ source: 'hook', target: 'outputs' }],
+        nodes: {
+          hook: {
+            kind: 'webhook',
+            name: 'Hook',
+            method: 'POST',
+            bodyFields: [],
+            options: { responseBody: { kind: 'workflow-outputs', bodyFormat: 'artifact', ...(output == null ? {} : { output }) } },
+          },
+          outputs: { kind: 'outputs', name: 'Outputs', outputDefs, outputMappings: {} },
+        },
+      },
+    },
+  }
+}
+
+function artifactOutputCodes(revision: RevisionContent) {
+  return validateFlowGraph(revision).map((diagnostic) => diagnostic.code)
+}
+
+describe('Artifact webhook responses', () => {
+  it('projects Artifact snapshots without inline bodies and rejects malformed ones', async () => {
+    const project = createEventProjector('run', new Set())
+    await project({ type: 'run.started', runId: 'run', flowId: 'root' })
+    const response = { artifactId: 'a1', body: '', contentType: 'application/octet-stream', status: 202, headers: { 'x-kept': 'yes' } }
+    expect(await project({ type: 'node.completed', runId: 'run', jobId: 'job', nodeId: 'reply', outputs: {}, response })).toHaveProperty('response', response)
+    await expect(
+      project({ type: 'node.completed', runId: 'run', jobId: 'bad', nodeId: 'reply', outputs: {}, response: { ...response, body: 'inline' } }),
+    ).rejects.toThrow()
+    await expect(
+      project({ type: 'node.completed', runId: 'run', jobId: 'bad', nodeId: 'reply', outputs: {}, response: { ...response, artifactId: '' } }),
+    ).rejects.toThrow()
+  })
+
+  it('fails an Artifact-mode response node whose body is not an Artifact and declares the Engine capability', async () => {
+    const source = content({ reply: { kind: 'webhook-response', name: 'Reply', bodyFormat: 'artifact', inputs: { body: { kind: 'value', value: 'text' } } } })
+    const prepared = await prepareFlow(source, currentEngineContract)
+    if (prepared.kind !== 'prepared') throw new Error(JSON.stringify(prepared))
+    const events: unknown[] = []
+    await Effect.runPromise(
+      Effect.exit(
+        runFlow(prepared.flow, {
+          flowId: 'flow',
+          runId: 'run',
+          createId: () => crypto.randomUUID(),
+          trigger: { nodeId: 'hook', outputs: { headers: {}, query: {}, body: {}, webhookUrl: 'http://localhost/' } },
+          invokeTask: () => Effect.die('Unexpected invocation'),
+          emit: (event) =>
+            Effect.sync(() => {
+              events.push(event)
+            }),
+        }),
+      ),
+    )
+    expect(events).toContainEqual(expect.objectContaining({ type: 'node.failed', nodeId: 'reply' }))
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'node.completed', nodeId: 'reply' }))
+    expect((await prepareFlow(source, 'open-flow-engine/v11')).kind).toBe('engine-unsupported')
+  })
+
+  it('requires an Artifact workflow output in Artifact response mode', () => {
+    const file = { handle: 'file', jsonSchema: { contentMediaType: 'oomol/artifact' }, nullable: false }
+    const text = { handle: 'text', jsonSchema: { type: 'string' }, nullable: false }
+    expect(artifactOutputCodes(artifactOutputFlow([file]))).toContain('trigger.webhook-response-artifact-output')
+    expect(artifactOutputCodes(artifactOutputFlow([file, text], 'text'))).toContain('trigger.webhook-response-artifact-output')
+    expect(artifactOutputCodes(artifactOutputFlow([file], 'file'))).not.toContain('trigger.webhook-response-artifact-output')
+  })
+
+  it('drops a literal body when switching to Artifact mode and keeps upstream sources', () => {
+    const literal = content({
+      reply: { kind: 'webhook-response', name: 'Reply', inputs: { body: { kind: 'value', value: 'x' }, statusCode: { kind: 'value', value: 201 } } },
+    })
+    const [change] = setWebhookResponseBodyFormat(literal, 'reply', 'artifact')
+    expect(change).toMatchObject({ kind: 'graph.node.replace', node: { bodyFormat: 'artifact', inputs: { statusCode: { kind: 'value', value: 201 } } } })
+    expect(change).not.toHaveProperty(['node', 'inputs', 'body'])
+    const sources = { kind: 'sources' as const, sources: [{ kind: 'node' as const, nodeId: 'hook', output: 'body' }] }
+    const linked = content({ reply: { kind: 'webhook-response', name: 'Reply', bodyFormat: 'artifact', inputs: { body: sources } } })
+    expect(setWebhookResponseBodyFormat(linked, 'reply', undefined)).toEqual([
+      {
+        kind: 'graph.node.replace',
+        nodeId: 'reply',
+        before: linked.document.graph.nodes.reply,
+        node: { kind: 'webhook-response', name: 'Reply', inputs: { body: sources } },
+      },
+    ])
+    expect(setWebhookResponseBodyFormat(linked, 'reply', 'artifact')).toEqual([])
+  })
+
+  it('reads and edits the Artifact body format through authoring', async () => {
+    const created = await compileAuthoring(
+      content(),
+      {
+        baseRevision: 'base',
+        requestId: 'artifact',
+        edits: [{ op: 'node.add', type: 'webhook-response', as: 'file', name: 'File', config: { bodyFormat: 'artifact' } }],
+      },
+      host,
+    )
+    const ref = created.nodes.file!
+    expect(created.content.document.graph.nodes[ref]).toMatchObject({ kind: 'webhook-response', bodyFormat: 'artifact' })
+    expect(authoringNode(created.content, ref).config).toEqual({ bodyFormat: 'artifact' })
+    const cleared = await compileAuthoring(
+      created.content,
+      { baseRevision: 'base', requestId: 'clear', edits: [{ op: 'node.update', node: ref, clear: [['config', 'bodyFormat']] }] },
+      host,
+    )
+    expect(cleared.content.document.graph.nodes[ref]).not.toHaveProperty('bodyFormat')
+    expect(decodeRevision(encodeRevision(created.content))).toEqual(created.content)
+  })
 })

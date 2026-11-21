@@ -3,14 +3,15 @@ import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { HttpRequestConfig } from '../../../../http/common/httpRequest.ts'
 
 import { dequal } from 'dequal/lite'
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
-import { httpRequestIssues, httpRequestTask } from '../../../../http/common/httpRequest.ts'
+import { httpMultipartHandle, httpRequestIssues, httpRequestTask } from '../../../../http/common/httpRequest.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { InspectorSection } from './inspectorSection.tsx'
 import { TaskExecutorChanges } from './taskExecutorChanges.ts'
 
@@ -40,7 +41,7 @@ export function HttpRequestSection({
         const current = taskRef.current
         if (current.executor.kind !== 'http-request') return Promise.resolve(false)
         const merged = { ...current.executor }
-        for (const key of ['method', 'authentication', 'bodyFormat', 'responseFormat', 'statusPolicy'] as const) {
+        for (const key of ['method', 'authentication', 'bodyFormat', 'bodyFields', 'responseFormat', 'statusPolicy'] as const) {
           if (!dequal(before[key], next[key])) Object.assign(merged, { [key]: next[key] })
         }
         return saveRef.current(current, httpRequestTask(merged, current.name, current))
@@ -122,13 +123,25 @@ export function HttpRequestSection({
               ['json', 'JSON'],
               ['text', t('httpRequest.text')],
               ['form', 'URL-encoded'],
+              ['multipart', t('httpRequest.multipart')],
+              ['binary', t('httpRequest.binary')],
             ],
             (bodyFormat) =>
               update({
                 bodyFormat: bodyFormat as HttpRequestConfig['bodyFormat'],
               }),
           )}
-          {config.bodyFormat !== 'none' && input('body', t('httpRequest.body'))}
+          {config.bodyFormat === 'multipart' ? (
+            <MultipartFields
+              fields={config.bodyFields ?? []}
+              disabled={disabled}
+              error={(index) => error('bodyFields', index)}
+              input={input}
+              onChange={(bodyFields) => update({ bodyFields })}
+            />
+          ) : (
+            config.bodyFormat !== 'none' && input('body', config.bodyFormat === 'binary' ? t('httpRequest.file') : t('httpRequest.body'))
+          )}
         </div>
       </InspectorSection>
       <InspectorSection title={t('httpRequest.authentication')}>
@@ -205,6 +218,7 @@ export function HttpRequestSection({
               ['auto', t('httpRequest.auto')],
               ['json', 'JSON'],
               ['text', t('httpRequest.text')],
+              ['artifact', t('httpRequest.file')],
             ],
             (responseFormat) =>
               update({
@@ -236,4 +250,90 @@ export function HttpRequestSection({
       </InspectorSection>
     </>
   )
+}
+
+/** Names of multipart fields; each name becomes one `body.<name>` input. Renames commit on blur to keep bindings stable. */
+function MultipartFields({
+  fields,
+  disabled,
+  error,
+  input,
+  onChange,
+}: {
+  fields: readonly string[]
+  disabled: boolean
+  error: (index: number) => string | undefined
+  input: (handle: string, label: string) => ReactNode
+  onChange: (fields: string[]) => void
+}) {
+  const t = useTranslate()
+  const id = useId()
+  const [drafts, setDrafts] = useState(fields)
+  useEffect(() => setDrafts(fields), [fields])
+  const commit = (next: readonly string[]) => {
+    if (!dequal(next, fields)) onChange([...next])
+  }
+  return (
+    <Field>
+      <FieldLabel id={`${id}-label`}>{t('httpRequest.multipartFields')}</FieldLabel>
+      <div className="flex flex-col gap-2" role="group" aria-labelledby={`${id}-label`}>
+        {drafts.map((name, index) => (
+          <div key={index} className="flex flex-col gap-2">
+            <ValueEditorFeedback error={error(index)}>
+              {(errorId) => (
+                <div className="flex items-center gap-1">
+                  <Input
+                    className="min-w-0 flex-1"
+                    value={name}
+                    aria-label={t('httpRequest.multipartFieldName')}
+                    aria-invalid={!!errorId}
+                    aria-describedby={errorId}
+                    readOnly={disabled}
+                    onChange={(event) => setDrafts(drafts.map((draft, position) => (position === index ? event.target.value : draft)))}
+                    onBlur={() => commit(drafts)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') commit(drafts)
+                    }}
+                  />
+                  {!disabled && (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={t('httpRequest.removeMultipartField')}
+                            onClick={() => commit(drafts.filter((_, position) => position !== index))}
+                          />
+                        }
+                      >
+                        <i aria-hidden="true" className="i-lucide-light:x text-sm" />
+                      </TooltipTrigger>
+                      <TooltipContent>{t('httpRequest.removeMultipartField')}</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+              )}
+            </ValueEditorFeedback>
+            {/* Keyed by handle: removing an earlier field must not hand its editor state to the next one. */}
+            {name.trim() !== '' && name === fields[index] && fields.indexOf(name) === index && (
+              <Fragment key={httpMultipartHandle(name)}>{input(httpMultipartHandle(name), name)}</Fragment>
+            )}
+          </div>
+        ))}
+        {!disabled && (
+          <Button variant="outline" size="field" onClick={() => commit([...drafts, nextFieldName(drafts)])}>
+            {t('httpRequest.addMultipartField')}
+          </Button>
+        )}
+      </div>
+    </Field>
+  )
+}
+
+function nextFieldName(fields: readonly string[]) {
+  if (!fields.includes('file')) return 'file'
+  let index = 2
+  while (fields.includes(`file${index}`)) index++
+  return `file${index}`
 }

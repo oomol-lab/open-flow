@@ -1747,14 +1747,32 @@ are rejected. Headers accept text and reject case-insensitive duplicate names. A
 use source-only `auth.token` or Basic `auth.username`/`auth.password`; literals are rejected and
 start events omit these inputs. Credential injection conflicts with ordinary parameters fail.
 
-Body formats are `none`, `json`, `text`, and `form` (URL-encoded field object). Selected body formats
-require an explicitly supplied `body`; JSON null encodes as `null`, empty text remains empty, and no
-body remains absent. GET/HEAD bodies are rejected. JSON/Form supply Content-Type and reject
-conflicting media types; text defaults to text/plain and accepts an explicit Content-Type.
+Body formats are `none`, `json`, `text`, `form` (URL-encoded field object), `binary` and
+`multipart`. `json`, `text`, `form` and `binary` require an explicitly supplied `body`; `none` has no body and
+`multipart` uses separate `body.<name>` inputs instead; JSON null encodes as
+`null`, empty text remains empty, and no body remains absent. GET/HEAD bodies are rejected. JSON/Form
+supply Content-Type and reject conflicting media types; text defaults to text/plain and accepts an
+explicit Content-Type.
+
+`binary` declares a non-nullable `body` input with `contentMediaType: "oomol/artifact"`. The request
+body is the stored bytes of that Run Artifact. Content-Type defaults to its stored media type, then
+`application/octet-stream`; an explicit Content-Type header wins. `multipart` uses
+`bodyFields: string[]`, nonempty unique names that generate optional `body.<name>` inputs. Each value
+is an `ArtifactRef` (a file part with the stored name and media type), a string, number or boolean
+(a text part), or an array of these (repeated parts). Unset and null fields are omitted; objects are
+rejected. The runtime sets the multipart boundary, so an explicit Content-Type header is invalid.
+References that do not resolve in the current Run fail with `http-request.input-invalid`; reference
+metadata is never trusted.
 
 Fixed outputs are `body`, integer `statusCode`, and `headers` with lowercase names excluding
-set-cookie. Body parsing is Auto (Content-Type), JSON or Text. JSON parse errors fail rather than
-fall back to text. Empty bodies and HEAD/204/205/304 yield null. JSON arrays are not expanded into
+set-cookie. Body parsing is Auto (Content-Type), JSON, Text or Artifact. Artifact mode declares a
+non-nullable `body` with `contentMediaType: "oomol/artifact"` and always stores the response,
+including an empty one, under the Run's per-Artifact and per-Run limits instead of the 4 MiB text
+limit. The name comes from Content-Disposition (`filename*` first), then the last URL path segment,
+then `response`; path separators and control characters are replaced. The media type is the
+Content-Type essence when it is well formed. JSON parse errors fail rather than
+fall back to text. In the parsed formats, empty bodies and HEAD/204/205/304 yield null; Artifact mode still stores a
+0-byte file and returns its reference. JSON arrays are not expanded into
 multiple node executions. The node does not infer a permanent schema from response samples.
 
 Only 2xx succeeds by default. `statusPolicy: "all"` accepts any HTTP status, without changing network
@@ -1763,8 +1781,8 @@ retry. HTTP 429/5xx and GET/HEAD/OPTIONS transport failures are retryable when e
 side effects are indeterminate and cannot be caught or replayed. Cancellation and response size limits
 remain terminal. Requests use deployment networking, never forward Operator credentials, do not
 follow redirects, and retain TLS verification. The total request/read timeout is 30 seconds bounded
-by shorter node/Run deadlines; responses are capped at 4 MiB. There is no file, streaming, pagination,
-batching, proxy or connection-credential feature in this version.
+by shorter node/Run deadlines; parsed responses are capped at 4 MiB. There is no streaming,
+pagination, batching, proxy or connection-credential feature in this version.
 
 ## Provider API request Tasks
 
@@ -1799,7 +1817,13 @@ body editor; read-only previews show the diagnostic without a mutation action.
 
 Fixed outputs are nullable `body`, integer `statusCode`, string-object `headers` and nullable
 `bodyEncoding` (`"base64"` when returned, otherwise null). Preserve complete response data and
-headers without inferring business output fields. A successful Connector proxy envelope completes
+headers without inferring business output fields. `responseFormat: "artifact"` stores the response
+as a Run Artifact and makes `body` a non-nullable `ArtifactRef`: base64 data is decoded to its exact
+bytes, text is UTF-8 and JSON is serialized with `application/json`. A top-level JSON string is
+indistinguishable from text in the Connector response and is stored unquoted. The media type comes from the
+response Content-Type and the name from Content-Disposition or the endpoint path. Connector response
+limits still apply first (20 MiB in the open-source Connector, 4 MiB in the Hosted Connector by
+default); the Server accepts proxy envelopes of up to 32 MiB to fit base64 bodies. Request bodies remain JSON. A successful Connector proxy envelope completes
 the node even when the upstream status is 4xx or 5xx. Connector failures fail the node with an
 explicit permission, connection, input/support or availability error. Ordinary `onError` is
 supported, defaulting to stop; retries are unavailable. An unconfirmed write is indeterminate,

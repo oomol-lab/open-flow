@@ -541,6 +541,25 @@ export class RunStore {
     return (this.#database.prepare('SELECT COALESCE(SUM(size), 0) AS bytes FROM run_artifacts WHERE run_id = ?').get(runId) as { readonly bytes: number }).bytes
   }
 
+  /** Reads a whole Artifact with its stored metadata; undefined when it does not belong to the Run. */
+  artifact(runId: string, artifactId: string): (StoredArtifact & { readonly content: Uint8Array }) | undefined {
+    const row = this.#database
+      .prepare('SELECT artifact_id AS id, name, media_type AS mediaType, size, digest, content FROM run_artifacts WHERE run_id = ? AND artifact_id = ?')
+      .get(runId, artifactId) as
+      | {
+          readonly content: Uint8Array | null
+          readonly digest: string
+          readonly id: string
+          readonly mediaType: string | null
+          readonly name: string
+          readonly size: number
+        }
+      | undefined
+    if (row == null) return
+    const { content, mediaType, ...artifact } = row
+    return { ...artifact, ...(mediaType == null ? {} : { mediaType }), content: content ?? new Uint8Array(0) }
+  }
+
   /** Reads `length` bytes from `offset`; undefined when the Artifact does not belong to the Run. */
   readArtifact(runId: string, artifactId: string, offset: number, length: number): { readonly content: Uint8Array; readonly size: number } | undefined {
     const row = this.#database
