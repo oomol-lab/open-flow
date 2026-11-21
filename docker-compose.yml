@@ -6,9 +6,9 @@
 # Environment variables: docs/server/container-delivery.md
 services:
   open-flow:
-    # OPEN_FLOW_IMAGE_TAG selects the tag. `latest` appears with the first stable
-    # release; while Open Flow is in beta, set a release tag explicitly, for
-    # example OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1.
+    # OPEN_FLOW_IMAGE_TAG selects the tag (default `latest`, the newest stable
+    # release). Pin a release tag for production, for example
+    # OPEN_FLOW_IMAGE_TAG=v0.1.0.
     image: ghcr.io/oomol-lab/open-flow:${OPEN_FLOW_IMAGE_TAG:-latest}
     ports:
       - '3000:3000'

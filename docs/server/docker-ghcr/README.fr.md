@@ -15,22 +15,22 @@ et la sauvegarde y sont documentés et ne sont pas répétés ici.
 
 ## Choisir un tag
 
-| Tag             | Pointe vers                                                 | À utiliser quand                                                     |
-| --------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
-| `latest`        | la Release stable la plus récente                           | vous voulez le Server stable actuel                                  |
-| `<release-tag>` | une Release précise, par exemple `v0.1.0-beta.1` (immuable) | vous déployez en production et voulez un build figé et reproductible |
+| Tag             | Pointe vers                                          | À utiliser quand                                                     |
+| --------------- | ---------------------------------------------------- | -------------------------------------------------------------------- |
+| `latest`        | la Release stable la plus récente                    | vous voulez le Server stable actuel                                  |
+| `<release-tag>` | une Release précise, par exemple `v0.1.0` (immuable) | vous déployez en production et voulez un build figé et reproductible |
 
 Chaque GitHub Release publie son tag. Une Release stable déplace aussi `latest` ; une pre-release ne le fait pas, donc `latest` ne pointe
-jamais vers une beta.
+jamais vers une pre-release.
 
-Open Flow est en beta : `latest` apparaît avec la première Release stable, donc en attendant utilisez un tag de Release beta tel que `v0.1.0-beta.1`. En production, figez un tag de Release plutôt que `latest`.
+En production, figez un tag de Release plutôt que `latest`.
 
 ## Pull
 
 L'image est publique, aucune connexion n'est requise :
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1   # ou un autre tag de Release
+docker pull ghcr.io/oomol-lab/open-flow:v0.1.0   # ou un autre tag de Release
 ```
 
 Si vous obtenez une erreur `unauthorized` ou `denied`, connectez-vous avec un token GitHub ayant le scope `read:packages` :
@@ -59,7 +59,7 @@ docker run -d \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1
+  ghcr.io/oomol-lab/open-flow:v0.1.0
 ```
 
 Ouvrez [http://127.0.0.1:3000](http://127.0.0.1:3000) et connectez-vous avec le token. Si vous omettez `OPEN_FLOW_TOKEN`, le premier
@@ -80,7 +80,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-Pour exécuter un tag précis, exportez `OPEN_FLOW_IMAGE_TAG` dans le shell avant chaque commande compose, y compris les commandes de mise à niveau ci-dessous : `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`. Le fichier compose fourni utilise `latest` par défaut, qui n'apparaîtra qu'avec la première Release stable ; en beta, définissez donc cette variable.
+Pour exécuter un tag précis, exportez `OPEN_FLOW_IMAGE_TAG` dans le shell avant chaque commande compose, y compris les commandes de mise à niveau ci-dessous : `export OPEN_FLOW_IMAGE_TAG=v0.1.0`. Le fichier compose fourni utilise `latest` par défaut.
 
 ### Construire depuis les sources
 

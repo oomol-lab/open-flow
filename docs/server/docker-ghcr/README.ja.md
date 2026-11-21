@@ -14,22 +14,22 @@ SQLite migration を含む 1 つの Server プロセスです。設定、ヘル�
 
 ## Tag の選び方
 
-| Tag             | 指す先                                        | 使いどころ                                           |
-| --------------- | --------------------------------------------- | ---------------------------------------------------- |
-| `latest`        | 最新の安定 Release                            | 現在の安定版 Server を使いたい                       |
-| `<release-tag>` | `v0.1.0-beta.1` のような特定の Release (不変) | 本番にデプロイし、固定された再現可能なビルドが欲しい |
+| Tag             | 指す先                                 | 使いどころ                                           |
+| --------------- | -------------------------------------- | ---------------------------------------------------- |
+| `latest`        | 最新の安定 Release                     | 現在の安定版 Server を使いたい                       |
+| `<release-tag>` | `v0.1.0` のような特定の Release (不変) | 本番にデプロイし、固定された再現可能なビルドが欲しい |
 
-GitHub Release を公開するたびにその tag が発行されます。安定 Release は `latest` も更新しますが、pre-release は更新しないため、`latest` が beta を
+GitHub Release を公開するたびにその tag が発行されます。安定 Release は `latest` も更新しますが、pre-release は更新しないため、`latest` が pre-release を
 指すことはありません。
 
-Open Flow は beta 段階です。`latest` は最初の安定 Release と同時に現れるため、それまでは `v0.1.0-beta.1` のような beta Release tag を使ってください。本番環境では `latest` ではなく Release tag に固定してください。
+本番環境では `latest` ではなく Release tag に固定してください。
 
 ## Pull
 
 イメージは公開されているため、サインインは不要です:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1   # 他の Release tag でも可
+docker pull ghcr.io/oomol-lab/open-flow:v0.1.0   # 他の Release tag でも可
 ```
 
 `unauthorized` や `denied` エラーが出る場合は、`read:packages` scope を持つ GitHub token でサインインしてください:
@@ -58,7 +58,7 @@ docker run -d \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1
+  ghcr.io/oomol-lab/open-flow:v0.1.0
 ```
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000) を開き、その token でサインインします。`OPEN_FLOW_TOKEN` を省略した場合、初回起動時にログへ
@@ -79,7 +79,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-特定の tag を実行するには、下記のアップグレードコマンドを含むすべての compose コマンドの前にシェルで `OPEN_FLOW_IMAGE_TAG` を export してください: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`。同梱の compose ファイルは既定で `latest` を使いますが、`latest` は最初の安定 Release と同時にしか現れないため、beta の間はこの変数を必ず設定してください。
+特定の tag を実行するには、下記のアップグレードコマンドを含むすべての compose コマンドの前にシェルで `OPEN_FLOW_IMAGE_TAG` を export してください: `export OPEN_FLOW_IMAGE_TAG=v0.1.0`。同梱の compose ファイルは既定で `latest` を使います。
 
 ### ソースからビルド
 
