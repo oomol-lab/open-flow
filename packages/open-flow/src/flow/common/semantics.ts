@@ -371,7 +371,7 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
           })
         }
       }
-      if (task.executor.bodyFormat != 'none' && (node.inputs.body == null || node.inputs.body.kind == 'unset'))
+      if (task.executor.bodyFormat != 'none' && task.executor.bodyFormat != 'multipart' && (node.inputs.body == null || node.inputs.body.kind == 'unset'))
         checked.diagnostics.push({
           code: 'http-request.body-required',
           column: 0,
