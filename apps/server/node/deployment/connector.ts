@@ -1095,24 +1095,42 @@ function requestPublicTransitFile(target: URL, signal: AbortSignal): Promise<Res
       target,
       { method: 'GET', agent: false, headers: { 'accept-encoding': 'identity' }, lookup: restrictedTransitLookup, signal },
       (incoming) => {
-        const encoding = incoming.headers['content-encoding']?.trim().toLowerCase()
-        if (encoding && encoding !== 'identity') {
+        try {
+          const encoding = incoming.headers['content-encoding']?.trim().toLowerCase()
+          if (encoding && encoding !== 'identity') {
+            throw nonRetryableTransitError('Connector transit file uses an unsupported content encoding.')
+          }
+          const headers = new Headers()
+          for (const [name, value] of Object.entries(incoming.headers)) {
+            if (value === undefined) continue
+            for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item)
+          }
+          const status = incoming.statusCode ?? 502
+          const nullBody = status === 204 || status === 205 || status === 304
+          const body = nullBody ? null : (Readable.toWeb(incoming) as unknown as ReadableStream<Uint8Array>)
+          const response = new Response(body, { status, headers })
+          if (nullBody) incoming.resume()
+          resolve(response)
+        } catch (error) {
           incoming.destroy()
-          reject(nonRetryableTransitError('Connector transit file uses an unsupported content encoding.'))
-          return
+          reject(
+            error instanceof ConnectorTaskError
+              ? error
+              : nonRetryableTransitError(
+                  error instanceof Error ? `Connector transit file response is invalid: ${error.message}` : 'Connector transit file response is invalid.',
+                ),
+          )
         }
-        const headers = new Headers()
-        for (const [name, value] of Object.entries(incoming.headers)) {
-          if (value === undefined) continue
-          for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item)
-        }
-        const status = incoming.statusCode ?? 502
-        const body = status === 204 || status === 304 ? null : (Readable.toWeb(incoming) as unknown as ReadableStream<Uint8Array>)
-        if (body == null) incoming.resume()
-        resolve(new Response(body, { status, headers }))
       },
     )
+    // Node does not call the response callback for upgrades and closes the socket without a listener.
+    outgoing.on('upgrade', (_response, socket) => {
+      socket.destroy()
+      reject(nonRetryableTransitError('Connector transit file download does not support protocol upgrades.'))
+    })
     outgoing.on('error', reject)
+    // Settles any path where the request closes before a response arrives; later calls are no-ops.
+    outgoing.on('close', () => reject(nonRetryableTransitError('Connector transit file download closed before a response was received.')))
     outgoing.end()
   })
 }

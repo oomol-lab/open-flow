@@ -1,11 +1,25 @@
 import type { LookupAddress } from 'node:dns'
-import type { AddressInfo } from 'node:net'
+import type { AddressInfo, IPVersion, SocketAddress } from 'node:net'
 
 import { createServer } from 'node:http'
+import { createServer as createTcpServer } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConnectorClient } from './connector.ts'
 
 const resolved = vi.hoisted(() => new Map<string, readonly LookupAddress[] | Error>())
+// Addresses a test explicitly treats as public, so local servers can exercise the external download path.
+const publicForTest = vi.hoisted(() => new Set<string>())
+
+vi.mock('node:net', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:net')>()
+  class TestBlockList extends actual.BlockList {
+    override check(address: string | SocketAddress, family?: IPVersion): boolean {
+      if (typeof address !== 'string') return super.check(address)
+      return !publicForTest.has(address) && super.check(address, family)
+    }
+  }
+  return { ...actual, BlockList: TestBlockList }
+})
 
 vi.mock('node:dns', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:dns')>()
@@ -30,6 +44,7 @@ describe('Connector transit file download address checks', () => {
   beforeEach(async () => {
     hits = 0
     resolved.clear()
+    publicForTest.clear()
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     port = (server.address() as AddressInfo).port
   })
@@ -76,6 +91,46 @@ describe('Connector transit file download address checks', () => {
       await expect(client.downloadTransitFile(url, new AbortController().signal)).rejects.toMatchObject({
         message: 'Connector transit download URL targets a restricted host.',
       })
+    }
+  })
+
+  it('accepts HTTP 205 responses with an empty body', async () => {
+    const edge = createServer((_request, response) => {
+      response.writeHead(205)
+      response.end()
+    })
+    await new Promise<void>((resolve) => edge.listen(0, '127.0.0.1', resolve))
+    try {
+      publicForTest.add('127.0.0.1')
+      resolved.set('reset.edge.example', [{ address: '127.0.0.1', family: 4 }])
+      const { port: edgePort } = edge.address() as AddressInfo
+
+      const result = await client.downloadTransitFile(`http://reset.edge.example:${edgePort}/file`, new AbortController().signal)
+      expect(result.content.byteLength).toBe(0)
+    } finally {
+      await new Promise<void>((resolve) => edge.close(() => resolve()))
+    }
+  })
+
+  it('rejects protocol upgrade responses instead of hanging', async () => {
+    const edge = createTcpServer((socket) => {
+      socket.once('data', () => {
+        socket.end('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n')
+      })
+    })
+    await new Promise<void>((resolve) => edge.listen(0, '127.0.0.1', resolve))
+    try {
+      publicForTest.add('127.0.0.1')
+      resolved.set('upgrade.edge.example', [{ address: '127.0.0.1', family: 4 }])
+      const { port: edgePort } = edge.address() as AddressInfo
+
+      await expect(client.downloadTransitFile(`http://upgrade.edge.example:${edgePort}/file`, new AbortController().signal)).rejects.toMatchObject({
+        code: 'connector.unavailable',
+        retryable: false,
+        message: 'Connector transit file download does not support protocol upgrades.',
+      })
+    } finally {
+      await new Promise<void>((resolve) => edge.close(() => resolve()))
     }
   })
 })
