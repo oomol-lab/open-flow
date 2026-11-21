@@ -247,3 +247,52 @@ it('authors multipart fields, keeps a renamed field source and replaces the fiel
     task: { inputs: expect.not.arrayContaining([expect.objectContaining({ handle: 'body.memo' })]) },
   })
 })
+
+it('validates multipart requests without a body port while still requiring body for binary requests', async () => {
+  const multipart = await compileAuthoring(
+    empty,
+    {
+      baseRevision: 'base',
+      requestId: 'multipart-prepare',
+      edits: [
+        { op: 'node.add', type: 'start', as: 'start', name: 'Start' },
+        {
+          op: 'node.add',
+          type: 'http-request',
+          as: 'upload',
+          name: 'Upload',
+          config: { method: 'POST', bodyFormat: 'multipart', bodyFields: ['content', 'files[0]'] },
+          inputs: { 'url': { kind: 'value', value: 'https://example.test/upload' }, 'body.content': { kind: 'value', value: 'hello' } },
+        },
+        { op: 'edge.connect', source: '$start', target: '$upload' },
+      ],
+    },
+    host,
+  )
+  expect(await prepareFlow(multipart.content, currentEngineContract)).toMatchObject({ kind: 'prepared' })
+
+  const binary = await compileAuthoring(
+    empty,
+    {
+      baseRevision: 'base',
+      requestId: 'binary-missing-body',
+      edits: [
+        { op: 'node.add', type: 'start', as: 'start', name: 'Start' },
+        {
+          op: 'node.add',
+          type: 'http-request',
+          as: 'upload',
+          name: 'Upload',
+          config: { method: 'PUT', bodyFormat: 'binary' },
+          inputs: { url: { kind: 'value', value: 'https://example.test/upload' } },
+        },
+        { op: 'edge.connect', source: '$start', target: '$upload' },
+      ],
+    },
+    host,
+  )
+  expect(await prepareFlow(binary.content, currentEngineContract)).toMatchObject({
+    kind: 'flow-invalid',
+    validation: { diagnostics: expect.arrayContaining([expect.objectContaining({ code: 'http-request.body-required' })]) },
+  })
+})
