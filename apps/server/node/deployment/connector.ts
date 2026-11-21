@@ -8,6 +8,7 @@ import type {
   ConnectorProvider,
 } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { LookupAddress } from 'node:dns'
 import type { Logger } from 'pino'
 import type { ConnectorAccessContext, ConnectorHost } from './connector-contract.ts'
 import type { ResponseBudget, RuntimeAction } from './connector-response.ts'
@@ -15,8 +16,11 @@ import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-ac
 
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
-import { lookup } from 'node:dns/promises'
-import { isIP } from 'node:net'
+import { lookup as dnsLookup } from 'node:dns'
+import { request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
+import { BlockList, isIP } from 'node:net'
+import { Readable } from 'node:stream'
 import { silentLogger } from '../logger.ts'
 import { accessInvalid, assertConnectionNotDeferred, connectionRequired, ConnectorTaskError, unavailable } from './connector-contract.ts'
 import {
@@ -918,8 +922,8 @@ export class ConnectorClient implements ConnectorHost {
       throw nonRetryableTransitError('Connector transit download URL must use HTTP or HTTPS.')
     }
     const sameOrigin = target.origin === this.#origin.origin
-    if (!sameOrigin) {
-      await assertPublicTransitHost(target.hostname)
+    if (!sameOrigin && isRestrictedTransitHost(target.hostname)) {
+      throw nonRetryableTransitError('Connector transit download URL targets a restricted host.')
     }
     const headers: Record<string, string> = {}
     // Only send the Connector bearer token to the trusted Connector origin itself.
@@ -929,14 +933,20 @@ export class ConnectorClient implements ConnectorHost {
     const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(this.#timeoutMs)])
     let response: Response
     try {
-      response = await fetch(target, { method: 'GET', headers, redirect: 'error', signal: requestSignal })
+      response = sameOrigin
+        ? await fetch(target, { method: 'GET', headers, redirect: 'error', signal: requestSignal })
+        : await requestPublicTransitFile(target, requestSignal)
     } catch (error) {
+      if (error instanceof ConnectorTaskError) throw error
       if (signal.aborted) throw signal.reason
       throw nonRetryableTransitError(
         error instanceof Error ? `Connector transit file download failed: ${error.message}` : 'Connector transit file download failed.',
       )
     }
-    if (!response.ok) throw nonRetryableTransitError(`Connector transit file download failed with HTTP ${response.status}.`, response.status)
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined)
+      throw nonRetryableTransitError(`Connector transit file download failed with HTTP ${response.status}.`, response.status)
+    }
     const contentLength = Number(response.headers.get('content-length'))
     if (Number.isFinite(contentLength) && contentLength > maxBytes) {
       void response.body?.cancel().catch(() => undefined)
@@ -1011,56 +1021,100 @@ function nonRetryableTransitError(message: string, status?: number): ConnectorTa
   return new ConnectorTaskError('connector.unavailable', message, status, { retryable: false })
 }
 
-async function assertPublicTransitHost(rawHostname: string): Promise<void> {
-  if (isRestrictedTransitHost(rawHostname)) {
-    throw nonRetryableTransitError('Connector transit download URL targets a restricted host.')
+const restrictedTransitAddresses = /*#__PURE__*/ (() => {
+  const list = new BlockList()
+  for (const [network, prefix] of [
+    ['0.0.0.0', 8],
+    ['10.0.0.0', 8],
+    ['100.64.0.0', 10],
+    ['127.0.0.0', 8],
+    ['169.254.0.0', 16],
+    ['172.16.0.0', 12],
+    ['192.168.0.0', 16],
+    ['198.18.0.0', 15],
+    ['224.0.0.0', 3],
+  ] as const) {
+    list.addSubnet(network, prefix, 'ipv4')
   }
-  const host = rawHostname.toLowerCase().replace(/^\[|\]$/g, '')
-  if (isIP(host) !== 0) return
-  let resolved: ReadonlyArray<{ readonly address: string }>
-  try {
-    resolved = await lookup(host, { all: true, verbatim: true })
-  } catch {
-    throw nonRetryableTransitError('Connector transit download host could not be resolved.')
+  for (const [network, prefix] of [
+    ['::', 128],
+    ['::1', 128],
+    ['fc00::', 7],
+    ['fe80::', 10],
+    ['ff00::', 8],
+  ] as const) {
+    list.addSubnet(network, prefix, 'ipv6')
   }
-  if (resolved.length === 0 || resolved.some((entry) => isRestrictedTransitHost(entry.address))) {
-    throw nonRetryableTransitError('Connector transit download URL resolved to a restricted address.')
-  }
+  return list
+})()
+
+/** Rejects loopback, private, link-local, shared, benchmark, multicast, and IPv4-mapped IPv6 addresses. */
+function isRestrictedTransitAddress(address: string): boolean {
+  const family = isIP(address)
+  if (family === 0) return true
+  if (family === 6 && address.toLowerCase().startsWith('::ffff:')) return true
+  return restrictedTransitAddresses.check(address, family === 4 ? 'ipv4' : 'ipv6')
 }
 
+/** Early rejection for local host names and restricted IP literals; resolved names are checked at connect time. */
 function isRestrictedTransitHost(rawHostname: string): boolean {
   const host = rawHostname.toLowerCase().replace(/^\[|\]$/g, '')
-  if (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.local') ||
-    host.endsWith('.internal') ||
-    host === 'metadata.google.internal' ||
-    host === '::1' ||
-    host === '::' ||
-    host.startsWith('fc') ||
-    host.startsWith('fd') ||
-    host.startsWith('fe80:') ||
-    host.startsWith('::ffff:')
-  ) {
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host === 'metadata.google.internal') {
     return true
   }
-  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])]
-    if (
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168)
-    ) {
-      return true
+  return isIP(host) !== 0 && isRestrictedTransitAddress(host)
+}
+
+/**
+ * Resolves the host once and hands only validated addresses to the socket, so the checked address is the one
+ * connected to (no second resolution that DNS rebinding could change).
+ */
+const restrictedTransitLookup: NonNullable<Parameters<typeof httpRequest>[1]['lookup']> = (hostname, options, callback) => {
+  dnsLookup(hostname, { ...options, all: true, verbatim: true }, (error, addresses) => {
+    if (error) {
+      callback(nonRetryableTransitError('Connector transit download host could not be resolved.'), '', 0)
+      return
     }
-  }
-  return false
+    if (addresses.length === 0 || addresses.some((entry) => isRestrictedTransitAddress(entry.address))) {
+      callback(nonRetryableTransitError('Connector transit download URL resolved to a restricted address.'), '', 0)
+      return
+    }
+    if (options.all) {
+      ;(callback as unknown as (error: null, addresses: readonly LookupAddress[]) => void)(null, addresses)
+      return
+    }
+    callback(null, addresses[0]!.address, addresses[0]!.family)
+  })
+}
+
+/** Downloads an external transit file without following redirects, connecting only to validated public addresses. */
+function requestPublicTransitFile(target: URL, signal: AbortSignal): Promise<Response> {
+  const request = target.protocol === 'https:' ? httpsRequest : httpRequest
+  return new Promise((resolve, reject) => {
+    const outgoing = request(
+      target,
+      { method: 'GET', agent: false, headers: { 'accept-encoding': 'identity' }, lookup: restrictedTransitLookup, signal },
+      (incoming) => {
+        const encoding = incoming.headers['content-encoding']?.trim().toLowerCase()
+        if (encoding && encoding !== 'identity') {
+          incoming.destroy()
+          reject(nonRetryableTransitError('Connector transit file uses an unsupported content encoding.'))
+          return
+        }
+        const headers = new Headers()
+        for (const [name, value] of Object.entries(incoming.headers)) {
+          if (value === undefined) continue
+          for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item)
+        }
+        const status = incoming.statusCode ?? 502
+        const body = status === 204 || status === 304 ? null : (Readable.toWeb(incoming) as unknown as ReadableStream<Uint8Array>)
+        if (body == null) incoming.resume()
+        resolve(new Response(body, { status, headers }))
+      },
+    )
+    outgoing.on('error', reject)
+    outgoing.end()
+  })
 }
 
 async function readBoundedBytes(
