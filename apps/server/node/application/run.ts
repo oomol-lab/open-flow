@@ -625,6 +625,7 @@ export class RunExecutor {
           artifacts: this.#artifacts,
           connector,
           signal: invocation.signal,
+          outputPorts: task.outputs.filter((port) => 'handle' in port),
           emit: async (event) => report(event as unknown as Readonly<Record<string, JsonValue>>),
         })
       }

@@ -4,6 +4,7 @@ import type { RunStore, StoredArtifact } from '../storage/run-store.ts'
 import type { ArtifactEvent } from './run-artifacts.ts'
 
 import { describe, expect, it } from 'vitest'
+import { ConnectorClient } from '../deployment/connector.ts'
 import { bridgeConnectorOutputArtifacts, prepareConnectorInputsWithArtifacts } from './connector-artifacts.ts'
 import { RunArtifacts } from './run-artifacts.ts'
 
@@ -159,6 +160,113 @@ describe('Connector Transit File <-> ArtifactRef bridge', () => {
     expect(prepared).toEqual({
       file: { fileId: 'tf-up-1', name: 'notes.txt', mimeType: 'text/plain' },
       fileUrl: 'https://connector.example/api/files/tf-up-1',
+    })
+  })
+
+  it('converts nested ArtifactRef fields using child schemas', async () => {
+    const { artifacts } = createMemoryArtifactStore()
+    const ref = await artifacts.storeBytes(
+      'run-4',
+      'node-0',
+      'job-0',
+      { name: 'img.png', mediaType: 'image/png', content: new Uint8Array([9, 8]) },
+      async () => {},
+    )
+    const connector = {
+      async uploadTransitFile(file: { name: string; mediaType?: string; content: Uint8Array }) {
+        return {
+          fileId: 'tf-nested-1',
+          downloadUrl: 'https://connector.example/api/files/tf-nested-1',
+          sizeBytes: file.content.byteLength,
+          name: file.name,
+          mimeType: file.mediaType ?? 'application/octet-stream',
+        }
+      },
+    } as unknown as ConnectorHost
+
+    const prepared = await prepareConnectorInputsWithArtifacts(
+      [
+        {
+          handle: 'attachments',
+          jsonSchema: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { url: { type: 'string' }, file: { type: 'object' } },
+            },
+          },
+        },
+      ],
+      {
+        attachments: [{ url: ref as unknown as JsonValue, file: ref as unknown as JsonValue }],
+      },
+      {
+        runId: 'run-4',
+        artifacts,
+        connector,
+        signal: new AbortController().signal,
+      },
+    )
+
+    expect(prepared).toEqual({
+      attachments: [
+        {
+          url: 'https://connector.example/api/files/tf-nested-1',
+          file: { fileId: 'tf-nested-1', name: 'img.png', mimeType: 'image/png' },
+        },
+      ],
+    })
+  })
+
+  it('preserves strict output schemas without injecting undeclared artifact properties while emitting node.artifact', async () => {
+    const { artifacts } = createMemoryArtifactStore()
+    const events: ArtifactEvent[] = []
+    const connector = {
+      async downloadTransitFile() {
+        return { content: new TextEncoder().encode('abc'), mediaType: 'text/plain' }
+      },
+    } as unknown as ConnectorHost
+
+    const output = await bridgeConnectorOutputArtifacts(
+      {
+        fileId: 'tf-strict',
+        downloadUrl: 'https://connector.example/api/files/tf-strict',
+        sizeBytes: 3,
+        name: 'strict.txt',
+        mimeType: 'text/plain',
+      },
+      {
+        runId: 'run-5',
+        nodeId: 'node-5',
+        jobId: 'job-5',
+        artifacts,
+        connector,
+        signal: new AbortController().signal,
+        outputPorts: [
+          {
+            handle: 'output',
+            jsonSchema: { type: 'object', additionalProperties: false, properties: { fileId: { type: 'string' } } },
+          },
+        ],
+        emit: async (event) => {
+          events.push(event)
+        },
+      },
+    )
+
+    expect(events).toHaveLength(1)
+    expect('artifact' in (output as Record<string, unknown>)).toBe(false)
+  })
+
+  it('rejects private/loopback external transit URLs with non-retryable ConnectorTaskError', async () => {
+    const client = new ConnectorClient('https://connector.example', 'tok')
+    await expect(client.downloadTransitFile('http://127.0.0.1:8080/secret', new AbortController().signal)).rejects.toMatchObject({
+      code: 'connector.unavailable',
+      retryable: false,
+    })
+    await expect(client.downloadTransitFile('http://169.254.169.254/latest/meta-data/', new AbortController().signal)).rejects.toMatchObject({
+      code: 'connector.unavailable',
+      retryable: false,
     })
   })
 })

@@ -184,6 +184,7 @@ export class ConnectorClient implements ConnectorHost {
   readonly #logger: Logger
   readonly #origin: URL
   readonly #teamOrigin?: URL
+  readonly #timeoutMs: number
   readonly #transport: ConnectorTransport
   readonly #token: string
   readonly #teamAccess = new Map<string, { readonly expiresAt: number; readonly value: TeamAppAccess }>()
@@ -204,6 +205,7 @@ export class ConnectorClient implements ConnectorHost {
       this.#apiOrigin = new URL(`https://api.${domain}/`)
       this.#teamOrigin = new URL(`https://relation-control.${domain}/`)
     }
+    this.#timeoutMs = timeoutMs
     this.#transport = new ConnectorTransport(url, token, timeoutMs, this.#logger)
     this.#token = token
   }
@@ -864,9 +866,21 @@ export class ConnectorClient implements ConnectorHost {
     form.append('file', new File([Uint8Array.from(file.content)], file.name, { type: mimeType }), file.name)
     const headers: Record<string, string> = {}
     if (this.#token.length > 0) headers.authorization = `Bearer ${this.#token}`
-    const response = await fetch(url, { method: 'POST', headers, body: form, signal })
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(this.#timeoutMs)])
+    let response: Response
+    try {
+      response = await fetch(url, { method: 'POST', headers, body: form, redirect: 'error', signal: requestSignal })
+    } catch (error) {
+      if (signal.aborted) throw signal.reason
+      throw unavailable(error instanceof Error ? `Connector transit file upload failed: ${error.message}` : 'Connector transit file upload failed.')
+    }
     if (!response.ok) throw unavailable(`Connector transit file upload failed with HTTP ${response.status}.`)
-    const body = (await response.json()) as unknown
+    let body: unknown
+    try {
+      body = (await response.json()) as unknown
+    } catch {
+      throw unavailable('Connector transit file upload returned invalid JSON.')
+    }
     const data = record(body) && record(body.data) ? body.data : record(body) ? body : undefined
     if (
       data == null ||
@@ -892,25 +906,41 @@ export class ConnectorClient implements ConnectorHost {
     signal: AbortSignal,
     maxBytes = 10 * 1024 * 1024,
   ): Promise<{ readonly content: Uint8Array; readonly mediaType?: string }> {
-    const target = new URL(downloadUrl, this.#origin)
+    let target: URL
+    try {
+      target = new URL(downloadUrl, this.#origin)
+    } catch {
+      throw nonRetryableTransitError('Connector transit download URL is invalid.')
+    }
     if (target.protocol != 'http:' && target.protocol != 'https:') {
-      throw unavailable('Connector transit download URL must use HTTP or HTTPS.')
+      throw nonRetryableTransitError('Connector transit download URL must use HTTP or HTTPS.')
+    }
+    const sameOrigin = target.origin === this.#origin.origin
+    if (!sameOrigin && isRestrictedTransitHost(target.hostname)) {
+      throw nonRetryableTransitError('Connector transit download URL targets a restricted host.')
     }
     const headers: Record<string, string> = {}
     // Only send the Connector bearer token to the trusted Connector origin itself.
-    if (target.origin === this.#origin.origin && this.#token.length > 0) {
+    if (sameOrigin && this.#token.length > 0) {
       headers.authorization = `Bearer ${this.#token}`
     }
-    const response = await fetch(target, { method: 'GET', headers, signal })
-    if (!response.ok) throw unavailable(`Connector transit file download failed with HTTP ${response.status}.`)
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(this.#timeoutMs)])
+    let response: Response
+    try {
+      response = await fetch(target, { method: 'GET', headers, redirect: 'error', signal: requestSignal })
+    } catch (error) {
+      if (signal.aborted) throw signal.reason
+      throw nonRetryableTransitError(
+        error instanceof Error ? `Connector transit file download failed: ${error.message}` : 'Connector transit file download failed.',
+      )
+    }
+    if (!response.ok) throw nonRetryableTransitError(`Connector transit file download failed with HTTP ${response.status}.`, response.status)
     const contentLength = Number(response.headers.get('content-length'))
     if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-      throw unavailable('Connector transit file exceeds the Run Artifact size limit.')
+      void response.body?.cancel().catch(() => undefined)
+      throw nonRetryableTransitError('Connector transit file exceeds the Run Artifact size limit.')
     }
-    const buffer = new Uint8Array(await response.arrayBuffer())
-    if (buffer.byteLength > maxBytes) {
-      throw unavailable('Connector transit file exceeds the Run Artifact size limit.')
-    }
+    const buffer = await readBoundedBytes(response, maxBytes, signal, nonRetryableTransitError)
     const mediaType = response.headers.get('content-type') ?? undefined
     return { content: buffer, mediaType }
   }
@@ -973,4 +1003,78 @@ function accessRequired(): ConnectorTaskError {
 
 function actionNotFound(): ConnectorTaskError {
   return new ConnectorTaskError('connector.action-not-found', 'The Connector Action was not found.')
+}
+
+function nonRetryableTransitError(message: string, status?: number): ConnectorTaskError {
+  return new ConnectorTaskError('connector.unavailable', message, status, { retryable: false })
+}
+
+function isRestrictedTransitHost(rawHostname: string): boolean {
+  const host = rawHostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host === 'metadata.google.internal' ||
+    host === '::1' ||
+    host === '::' ||
+    host.startsWith('fc') ||
+    host.startsWith('fd') ||
+    host.startsWith('fe80:') ||
+    host.startsWith('::ffff:')
+  ) {
+    return true
+  }
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])]
+    if (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+async function readBoundedBytes(
+  response: Response,
+  maxBytes: number,
+  signal: AbortSignal,
+  createError: (message: string) => ConnectorTaskError,
+): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array()
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined)
+        throw createError('Connector transit file exceeds the Run Artifact size limit.')
+      }
+      chunks.push(value)
+    }
+  } catch (error) {
+    if (error instanceof ConnectorTaskError) throw error
+    if (signal.aborted) throw signal.reason
+    throw createError(error instanceof Error ? `Connector transit file read failed: ${error.message}` : 'Connector transit file read failed.')
+  }
+  const result = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return result
 }
