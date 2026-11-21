@@ -1,3 +1,5 @@
+import type { WorkbenchPreferences } from '../contract.ts'
+
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
@@ -32,7 +34,230 @@ const operation = {
 
 afterEach(() => vi.useRealTimers())
 
+const previousOperation = { ...operation, operationId: 'previous-operation', revisionId: 'previous-revision', publicationId: 'previous-publication' }
+
+function setupPublish(
+  preferences: WorkbenchPreferences,
+  completeOnRead: () => boolean,
+  readPreviousOperation: () => Response | Promise<Response> = () => Response.json(previousOperation),
+) {
+  const flowId = publication.flowId
+  const pending = { ...operation, publicationId: undefined, status: 'pending' }
+  let published = false
+  const live = (targetFlowId: string) =>
+    published && targetFlowId == flowId
+      ? { flowId, hasUnpublishedChanges: false, publication, revision: 1, status: 'runnable', version: 1 }
+      : { flowId: targetFlowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 }
+  const flow = {
+    createdAt: timestamp,
+    draftRevisionId: publication.revisionId,
+    flowId,
+    name: 'Main',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
+    status: 'active',
+    updatedAt: timestamp,
+    version: 1,
+  }
+  const request = vi.fn(async (path: string) => {
+    if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [{ ...flow, referenceCount: 0 }], total: 1, version: 1 })
+    if (path == `/v1/flows/${flowId}/editor`) {
+      return Response.json({
+        draft: {
+          actorId: 'actor',
+          content: { document: { bindings: {}, graph: { edges: [], nodes: {} } }, modelVersion: currentFlowModelVersion, modules: {} },
+          createdAt: timestamp,
+          digest: publication.revisionDigest,
+          flowId,
+          modelVersion: currentFlowModelVersion,
+          parentRevisionId: null,
+          revisionId: publication.revisionId,
+          version: 1,
+        },
+        flow,
+        live: live(flowId),
+        presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
+        version: 1,
+      })
+    }
+    if (path == `/v1/flows/${flowId}/revisions/${publication.revisionId}/publications`) return Response.json(pending, { status: 202 })
+    if (path == `/v1/flows/${flowId}/publish-operations/${operation.operationId}`) {
+      published = completeOnRead()
+      return Response.json(published ? operation : pending)
+    }
+    if (path == `/v1/flows/${flowId}/publish-operations/${previousOperation.operationId}`) return await readPreviousOperation()
+    const [, targetFlowId, resource] = path.match(/^\/v1\/flows\/([^/]+)\/(live|publications|triggers)/) ?? []
+    if (targetFlowId == null) throw new Error(`Unexpected request: ${path}`)
+    if (resource == 'live') return Response.json(live(targetFlowId))
+    if (resource == 'triggers') return Response.json({ bindings: [], flowId: targetFlowId, version: 1 })
+    const entries = published && targetFlowId == flowId ? [publication] : []
+    return Response.json({ publications: entries, total: entries.length, version: 1 })
+  })
+  const client = new WorkbenchClient(request)
+  const workspace = new WorkspaceStore(client, vi.fn())
+  const notice = vi.fn()
+  const store = new PublicationStore(client, workspace, notice, preferences)
+  return {
+    store,
+    notice,
+    start: () => workspace.start(flowId),
+    dispose: () => {
+      store.dispose()
+      workspace.dispose()
+    },
+  }
+}
+
 describe('PublicationStore', () => {
+  it('tracks an accepted publish and refreshes Live when browser storage is full', async () => {
+    const preferences = {
+      getItem: () => {
+        throw new DOMException('Storage is unavailable', 'SecurityError')
+      },
+      setItem: vi.fn(() => {
+        throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+      }),
+    }
+    const { store, start, notice, dispose } = setupPublish(preferences, () => true)
+
+    try {
+      await start()
+      const succeeded = await store.publish()
+      expect(preferences.setItem).toHaveBeenCalledWith(`publish-operation:${publication.flowId}`, operation.operationId)
+      expect(succeeded).toBe(true)
+      expect(store.$.operation.value).toEqual(operation)
+      expect(store.$.live.value?.publication).toEqual(publication)
+      expect(store.$.publications.value).toEqual([publication])
+      expect(notice.mock.calls).toEqual([[expect.objectContaining({ kind: 'success' })]])
+
+      store.reset()
+      await store.load('flow-2')
+      expect(store.$.loadFailed.value).toBe(false)
+      expect(store.$.live.value?.flowId).toBe('flow-2')
+    } finally {
+      dispose()
+    }
+  })
+
+  it.each([
+    { case: 'storage cannot clear the old ID', canClear: false },
+    { case: 'storage can clear the old ID', canClear: true },
+  ])('resumes the new pending publish after switching Flows when $case', async ({ canClear }) => {
+    vi.useFakeTimers()
+    const operationKey = `publish-operation:${publication.flowId}`
+    let savedId = previousOperation.operationId
+    const preferences = {
+      getItem: (key: string) => (key == operationKey ? savedId : null),
+      setItem: (key: string, value: string) => {
+        if (canClear && key == operationKey && value == '') {
+          savedId = ''
+          return
+        }
+        throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+      },
+    }
+    let complete = false
+    const { store, start, notice, dispose } = setupPublish(preferences, () => complete)
+
+    try {
+      await start()
+      await store.load(publication.flowId)
+      expect(store.$.operation.value).toEqual(previousOperation)
+
+      const publishing = store.publish()
+      await vi.waitFor(() => expect(store.$.operation.value).toMatchObject({ operationId: operation.operationId, status: 'pending' }))
+      expect(savedId).toBe(canClear ? '' : previousOperation.operationId)
+      store.reset()
+      await store.load('flow-2')
+      expect(store.$.operation.value).toBeUndefined()
+      await publishing
+
+      await store.load(publication.flowId)
+      expect(store.$.operation.value).toMatchObject({ operationId: operation.operationId, status: 'pending' })
+      expect(store.$.publishing.value).toBe(true)
+      complete = true
+      await vi.advanceTimersByTimeAsync(750)
+      await vi.waitFor(() => expect(store.$.live.value?.publication).toEqual(publication))
+      expect(store.$.publishing.value).toBe(false)
+      expect(notice).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success' }))
+    } finally {
+      dispose()
+    }
+  })
+
+  it.each(['browser storage', 'memory'])('keeps a newer operation in %s when an outdated load returns not found', async (location) => {
+    vi.useFakeTimers()
+    let savedId = previousOperation.operationId
+    const missing = Promise.withResolvers<Response>()
+    const readPreviousOperation = vi.fn(() => missing.promise)
+    const { store, start, dispose } = setupPublish(
+      {
+        getItem: () => savedId,
+        setItem: (_key, value) => {
+          if (location == 'memory') throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+          savedId = value
+        },
+      },
+      () => false,
+      readPreviousOperation,
+    )
+
+    try {
+      await start()
+      const loading = store.load(publication.flowId)
+      expect(readPreviousOperation).toHaveBeenCalledOnce()
+      store.reset()
+      const publishing = store.publish()
+      await vi.waitFor(() => expect(store.$.operation.value?.operationId).toBe(operation.operationId))
+
+      missing.resolve(Response.json({ error: { code: 'publication.operation-not-found', message: 'Operation expired' }, version: 1 }, { status: 404 }))
+      await loading
+      store.reset()
+      await publishing
+
+      await store.load(publication.flowId)
+      expect(store.$.operation.value).toMatchObject({ operationId: operation.operationId, status: 'pending' })
+    } finally {
+      dispose()
+    }
+  })
+
+  it.each([
+    { scenario: 'both remain current', reset: false, replaceId: false, expectedId: '' },
+    { scenario: 'the load was reset', reset: true, replaceId: false, expectedId: previousOperation.operationId },
+    { scenario: 'the saved ID changed', reset: false, replaceId: true, expectedId: operation.operationId },
+  ])('clears a missing operation ID only when the lookup and ID are current ($scenario)', async ({ reset, replaceId, expectedId }) => {
+    let savedId = previousOperation.operationId
+    const missing = Promise.withResolvers<Response>()
+    const readPreviousOperation = vi.fn(() => missing.promise)
+    const { store, dispose } = setupPublish(
+      {
+        getItem: () => savedId,
+        setItem: (_key, value) => {
+          savedId = value
+        },
+      },
+      () => false,
+      readPreviousOperation,
+    )
+
+    try {
+      const loading = store.load(publication.flowId)
+      expect(readPreviousOperation).toHaveBeenCalledOnce()
+      if (reset) store.reset()
+      if (replaceId) savedId = operation.operationId
+      missing.resolve(Response.json({ error: { code: 'publication.operation-not-found', message: 'Operation expired' }, version: 1 }, { status: 404 }))
+      await loading
+      expect(savedId).toBe(expectedId)
+      expect(store.$.operation.value).toBeUndefined()
+      expect(store.$.loadFailed.value).toBe(false)
+    } finally {
+      dispose()
+    }
+  })
+
   it('reads a stored Publish operation before its Live and Publication snapshot', async () => {
     const requests: string[] = []
     const accepted = Promise.withResolvers<Response>()
