@@ -36,7 +36,11 @@ afterEach(() => vi.useRealTimers())
 
 const previousOperation = { ...operation, operationId: 'previous-operation', revisionId: 'previous-revision', publicationId: 'previous-publication' }
 
-function setupPublish(preferences: WorkbenchPreferences, completeOnRead: () => boolean) {
+function setupPublish(
+  preferences: WorkbenchPreferences,
+  completeOnRead: () => boolean,
+  readPreviousOperation: () => Response | Promise<Response> = () => Response.json(previousOperation),
+) {
   const flowId = publication.flowId
   const pending = { ...operation, publicationId: undefined, status: 'pending' }
   let published = false
@@ -83,7 +87,7 @@ function setupPublish(preferences: WorkbenchPreferences, completeOnRead: () => b
       published = completeOnRead()
       return Response.json(published ? operation : pending)
     }
-    if (path == `/v1/flows/${flowId}/publish-operations/${previousOperation.operationId}`) return Response.json(previousOperation)
+    if (path == `/v1/flows/${flowId}/publish-operations/${previousOperation.operationId}`) return await readPreviousOperation()
     const [, targetFlowId, resource] = path.match(/^\/v1\/flows\/([^/]+)\/(live|publications|triggers)/) ?? []
     if (targetFlowId == null) throw new Error(`Unexpected request: ${path}`)
     if (resource == 'live') return Response.json(live(targetFlowId))
@@ -178,6 +182,77 @@ describe('PublicationStore', () => {
       await vi.waitFor(() => expect(store.$.live.value?.publication).toEqual(publication))
       expect(store.$.publishing.value).toBe(false)
       expect(notice).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success' }))
+    } finally {
+      dispose()
+    }
+  })
+
+  it.each(['browser storage', 'memory'])('keeps a newer operation in %s when an outdated load returns not found', async (location) => {
+    vi.useFakeTimers()
+    let savedId = previousOperation.operationId
+    const missing = Promise.withResolvers<Response>()
+    const readPreviousOperation = vi.fn(() => missing.promise)
+    const { store, start, dispose } = setupPublish(
+      {
+        getItem: () => savedId,
+        setItem: (_key, value) => {
+          if (location == 'memory') throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+          savedId = value
+        },
+      },
+      () => false,
+      readPreviousOperation,
+    )
+
+    try {
+      await start()
+      const loading = store.load(publication.flowId)
+      expect(readPreviousOperation).toHaveBeenCalledOnce()
+      store.reset()
+      const publishing = store.publish()
+      await vi.waitFor(() => expect(store.$.operation.value?.operationId).toBe(operation.operationId))
+
+      missing.resolve(Response.json({ error: { code: 'publication.operation-not-found', message: 'Operation expired' }, version: 1 }, { status: 404 }))
+      await loading
+      store.reset()
+      await publishing
+
+      await store.load(publication.flowId)
+      expect(store.$.operation.value).toMatchObject({ operationId: operation.operationId, status: 'pending' })
+    } finally {
+      dispose()
+    }
+  })
+
+  it.each([
+    { scenario: 'both remain current', reset: false, replaceId: false, expectedId: '' },
+    { scenario: 'the load was reset', reset: true, replaceId: false, expectedId: previousOperation.operationId },
+    { scenario: 'the saved ID changed', reset: false, replaceId: true, expectedId: operation.operationId },
+  ])('clears a missing operation ID only when the lookup and ID are current ($scenario)', async ({ reset, replaceId, expectedId }) => {
+    let savedId = previousOperation.operationId
+    const missing = Promise.withResolvers<Response>()
+    const readPreviousOperation = vi.fn(() => missing.promise)
+    const { store, dispose } = setupPublish(
+      {
+        getItem: () => savedId,
+        setItem: (_key, value) => {
+          savedId = value
+        },
+      },
+      () => false,
+      readPreviousOperation,
+    )
+
+    try {
+      const loading = store.load(publication.flowId)
+      expect(readPreviousOperation).toHaveBeenCalledOnce()
+      if (reset) store.reset()
+      if (replaceId) savedId = operation.operationId
+      missing.resolve(Response.json({ error: { code: 'publication.operation-not-found', message: 'Operation expired' }, version: 1 }, { status: 404 }))
+      await loading
+      expect(savedId).toBe(expectedId)
+      expect(store.$.operation.value).toBeUndefined()
+      expect(store.$.loadFailed.value).toBe(false)
     } finally {
       dispose()
     }

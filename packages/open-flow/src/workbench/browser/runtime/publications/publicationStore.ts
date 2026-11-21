@@ -232,7 +232,7 @@ export class PublicationStore {
       this.#state.set({ ...initialState, loading: true, target })
     }
     try {
-      const operation = warm ? state.operation : await this.#storedOperation(target)
+      const operation = warm ? state.operation : await this.#storedOperation(target, current)
       if (!current()) return
       const [live, page] = await this.#read(target)
       if (!current()) return
@@ -525,14 +525,14 @@ export class PublicationStore {
     ])
   }
 
-  async #storedOperation(target: Target): Promise<PublishOperation | undefined> {
-    const operationId = this.#unsavedOperationIds.get(target.flowId) ?? this.#readSavedOperationId(this.#operationKey(target.flowId))
+  async #storedOperation(target: Target, current: () => boolean): Promise<PublishOperation | undefined> {
+    const operationId = this.#readOperationId(target.flowId)
     if (operationId == null || operationId == '') return
     try {
       return await this.#client.getPublishOperation(target.flowId, operationId)
     } catch (error) {
       if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
-        this.#writeOperationId(target.flowId, '')
+        if (current() && this.#readOperationId(target.flowId) == operationId) this.#writeOperationId(target.flowId, '')
         return
       }
       throw error
@@ -617,6 +617,10 @@ export class PublicationStore {
 
   #operationKey(flowId: string): string {
     return `publish-operation:${flowId}`
+  }
+
+  #readOperationId(flowId: string): string | null {
+    return this.#unsavedOperationIds.get(flowId) ?? this.#readSavedOperationId(this.#operationKey(flowId))
   }
 
   #readSavedOperationId(key: string): string | null {
