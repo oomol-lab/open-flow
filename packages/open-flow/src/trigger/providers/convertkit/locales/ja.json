@@ -1,0 +1,14 @@
+{
+  "convertkit.on_subscriber_event": {
+    "displayName": "Subscriber Event",
+    "description": "Triggers when selected Kit (ConvertKit) subscriber webhook events occur.",
+    "configInputs": {
+      "eventName": "Kit (ConvertKit) subscriber event name."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

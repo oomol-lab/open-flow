@@ -1,0 +1,14 @@
+{
+  "jotform.on_submission": {
+    "displayName": "表单提交",
+    "description": "当 Jotform 表单收到新提交时触发。",
+    "configInputs": {
+      "formId": "Jotform form ID to watch for submissions."
+    },
+    "outputs": {
+      "submissionId": "Unique Jotform submission ID.",
+      "formId": "Jotform form ID to watch for submissions.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

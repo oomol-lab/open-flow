@@ -1,0 +1,16 @@
+{
+  "copper.on_crm_event": {
+    "displayName": "CRM Record Event",
+    "description": "Triggers when selected Copper CRM records are created, updated, or deleted.",
+    "configInputs": {
+      "resourceType": "Resource type to monitor.",
+      "event": "Event type that triggered this Run."
+    },
+    "outputs": {
+      "resourceType": "Provider resource type associated with the event.",
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

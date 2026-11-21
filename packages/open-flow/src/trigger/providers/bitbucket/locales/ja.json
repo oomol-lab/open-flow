@@ -1,0 +1,17 @@
+{
+  "bitbucket.on_repo_event": {
+    "displayName": "Repository Event",
+    "description": "Triggers when selected Bitbucket Cloud webhook events occur in a repository.",
+    "configInputs": {
+      "workspace": "Bitbucket workspace slug.",
+      "repoSlug": "Bitbucket repository slug.",
+      "events": "Webhook events that trigger a Run."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "hookUuid": "Bitbucket webhook UUID.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

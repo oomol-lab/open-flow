@@ -1,0 +1,14 @@
+{
+  "thehive.on_event": {
+    "displayName": "Alert or Case Event",
+    "description": "Polls TheHive for new or updated alerts or cases.",
+    "configInputs": {
+      "resourceType": "Resource type to monitor."
+    },
+    "outputs": {
+      "resourceType": "Provider resource type associated with the event.",
+      "objectId": "Unique object ID associated with the event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

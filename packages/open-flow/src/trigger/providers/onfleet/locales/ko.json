@@ -1,0 +1,15 @@
+{
+  "onfleet.on_task_event": {
+    "displayName": "Task or Worker Event",
+    "description": "Triggers when selected Onfleet delivery task or worker webhook events occur.",
+    "configInputs": {
+      "trigger": "Onfleet webhook trigger event to subscribe to."
+    },
+    "outputs": {
+      "triggerName": "Onfleet trigger event name.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "taskId": "Associated Onfleet task ID.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

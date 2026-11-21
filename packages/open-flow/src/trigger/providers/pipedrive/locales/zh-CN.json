@@ -1,7 +1,7 @@
 {
   "pipedrive.on_crm_event": {
-    "displayName": "商机或联系人事件",
-    "description": "商机或联系人事件。",
+    "displayName": "CRM 事件",
+    "description": "使用 Pipedrive Webhooks v2 接收商机、联系人或组织的创建、更新、删除及商机阶段/状态变更事件。",
     "configInputs": {
       "eventType": "事件"
     },

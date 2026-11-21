@@ -854,6 +854,67 @@ export class ConnectorClient implements ConnectorHost {
     )
   }
 
+  async uploadTransitFile(
+    file: { readonly name: string; readonly mediaType?: string; readonly content: Uint8Array },
+    signal: AbortSignal,
+  ): Promise<{ readonly fileId: string; readonly downloadUrl: string; readonly sizeBytes: number; readonly name: string; readonly mimeType: string }> {
+    const url = new URL('api/files', this.#origin)
+    const form = new FormData()
+    const mimeType = file.mediaType ?? 'application/octet-stream'
+    form.append('file', new File([Uint8Array.from(file.content)], file.name, { type: mimeType }), file.name)
+    const headers: Record<string, string> = {}
+    if (this.#token.length > 0) headers.authorization = `Bearer ${this.#token}`
+    const response = await fetch(url, { method: 'POST', headers, body: form, signal })
+    if (!response.ok) throw unavailable(`Connector transit file upload failed with HTTP ${response.status}.`)
+    const body = (await response.json()) as unknown
+    const data = record(body) && record(body.data) ? body.data : record(body) ? body : undefined
+    if (
+      data == null ||
+      typeof data.fileId != 'string' ||
+      typeof data.downloadUrl != 'string' ||
+      typeof data.sizeBytes != 'number' ||
+      typeof data.name != 'string' ||
+      typeof data.mimeType != 'string'
+    ) {
+      throw unavailable('Connector transit file upload returned an invalid response.')
+    }
+    return {
+      fileId: data.fileId,
+      downloadUrl: data.downloadUrl,
+      sizeBytes: data.sizeBytes,
+      name: data.name,
+      mimeType: data.mimeType,
+    }
+  }
+
+  async downloadTransitFile(
+    downloadUrl: string,
+    signal: AbortSignal,
+    maxBytes = 10 * 1024 * 1024,
+  ): Promise<{ readonly content: Uint8Array; readonly mediaType?: string }> {
+    const target = new URL(downloadUrl, this.#origin)
+    if (target.protocol != 'http:' && target.protocol != 'https:') {
+      throw unavailable('Connector transit download URL must use HTTP or HTTPS.')
+    }
+    const headers: Record<string, string> = {}
+    // Only send the Connector bearer token to the trusted Connector origin itself.
+    if (target.origin === this.#origin.origin && this.#token.length > 0) {
+      headers.authorization = `Bearer ${this.#token}`
+    }
+    const response = await fetch(target, { method: 'GET', headers, signal })
+    if (!response.ok) throw unavailable(`Connector transit file download failed with HTTP ${response.status}.`)
+    const contentLength = Number(response.headers.get('content-length'))
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      throw unavailable('Connector transit file exceeds the Run Artifact size limit.')
+    }
+    const buffer = new Uint8Array(await response.arrayBuffer())
+    if (buffer.byteLength > maxBytes) {
+      throw unavailable('Connector transit file exceeds the Run Artifact size limit.')
+    }
+    const mediaType = response.headers.get('content-type') ?? undefined
+    return { content: buffer, mediaType }
+  }
+
   async #connections(serviceId?: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {
     const path = serviceId == null ? 'v1/apps' : `v1/apps/services/${encodeURIComponent(serviceId)}`
     return this.#transport.get(

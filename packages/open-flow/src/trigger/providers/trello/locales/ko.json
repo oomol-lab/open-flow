@@ -1,0 +1,16 @@
+{
+  "trello.on_model_event": {
+    "displayName": "Board or Card Event",
+    "description": "Triggers when actions occur on a Trello board, list, or card.",
+    "configInputs": {
+      "modelId": "ID of the Trello board, list, or card to watch.",
+      "actionTypes": "Optional Trello action types to filter events."
+    },
+    "outputs": {
+      "actionType": "Trello action type.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "modelId": "ID of the Trello board, list, or card to watch.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

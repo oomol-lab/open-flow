@@ -1,0 +1,17 @@
+{
+  "taiga.on_project_event": {
+    "displayName": "Project Event",
+    "description": "Triggers when selected Taiga project webhook events occur.",
+    "configInputs": {
+      "projectId": "Numeric Taiga project ID to monitor.",
+      "types": "Optional Taiga entity types to filter.",
+      "actions": "Webhook action types to subscribe to."
+    },
+    "outputs": {
+      "entityType": "Taiga entity type.",
+      "action": "Event action name.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

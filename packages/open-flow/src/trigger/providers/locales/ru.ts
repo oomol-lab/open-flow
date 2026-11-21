@@ -2,37 +2,55 @@
 
 import resource0 from '../airtable/locales/ru.json' with { type: 'json' }
 import resource1 from '../asana/locales/ru.json' with { type: 'json' }
-import resource2 from '../calendly/locales/ru.json' with { type: 'json' }
-import resource3 from '../clickup/locales/ru.json' with { type: 'json' }
-import resource4 from '../feishu/locales/ru.json' with { type: 'json' }
-import resource5 from '../fireflies/locales/ru.json' with { type: 'json' }
-import resource6 from '../github/locales/ru.json' with { type: 'json' }
-import resource7 from '../gitlab/locales/ru.json' with { type: 'json' }
-import resource8 from '../gmail/locales/ru.json' with { type: 'json' }
-import resource9 from '../google-calendar/locales/ru.json' with { type: 'json' }
-import resource10 from '../google-drive/locales/ru.json' with { type: 'json' }
-import resource11 from '../google-sheets/locales/ru.json' with { type: 'json' }
-import resource12 from '../intercom/locales/ru.json' with { type: 'json' }
-import resource13 from '../jira/locales/ru.json' with { type: 'json' }
-import resource14 from '../linear/locales/ru.json' with { type: 'json' }
-import resource15 from '../notion/locales/ru.json' with { type: 'json' }
-import resource16 from '../one-drive/locales/ru.json' with { type: 'json' }
-import resource17 from '../outlook/locales/ru.json' with { type: 'json' }
-import resource18 from '../pandadoc/locales/ru.json' with { type: 'json' }
-import resource19 from '../pipedrive/locales/ru.json' with { type: 'json' }
-import resource20 from '../resend/locales/ru.json' with { type: 'json' }
-import resource21 from '../sentry/locales/ru.json' with { type: 'json' }
-import resource22 from '../shopify/locales/ru.json' with { type: 'json' }
-import resource23 from '../slack/locales/ru.json' with { type: 'json' }
-import resource24 from '../slackbot/locales/ru.json' with { type: 'json' }
-import resource25 from '../stripe/locales/ru.json' with { type: 'json' }
-import resource26 from '../tally/locales/ru.json' with { type: 'json' }
-import resource27 from '../telegram/locales/ru.json' with { type: 'json' }
-import resource28 from '../typeform/locales/ru.json' with { type: 'json' }
-import resource29 from '../vercel/locales/ru.json' with { type: 'json' }
-import resource30 from '../woocommerce/locales/ru.json' with { type: 'json' }
-import resource31 from '../zendesk/locales/ru.json' with { type: 'json' }
-import resource32 from '../zoom/locales/ru.json' with { type: 'json' }
+import resource2 from '../bitbucket/locales/ru.json' with { type: 'json' }
+import resource3 from '../box/locales/ru.json' with { type: 'json' }
+import resource4 from '../calendly/locales/ru.json' with { type: 'json' }
+import resource5 from '../chargebee/locales/ru.json' with { type: 'json' }
+import resource6 from '../clickup/locales/ru.json' with { type: 'json' }
+import resource7 from '../convertkit/locales/ru.json' with { type: 'json' }
+import resource8 from '../copper/locales/ru.json' with { type: 'json' }
+import resource9 from '../eventbrite/locales/ru.json' with { type: 'json' }
+import resource10 from '../feishu/locales/ru.json' with { type: 'json' }
+import resource11 from '../fireflies/locales/ru.json' with { type: 'json' }
+import resource12 from '../github/locales/ru.json' with { type: 'json' }
+import resource13 from '../gitlab/locales/ru.json' with { type: 'json' }
+import resource14 from '../gmail/locales/ru.json' with { type: 'json' }
+import resource15 from '../google-calendar/locales/ru.json' with { type: 'json' }
+import resource16 from '../google-drive/locales/ru.json' with { type: 'json' }
+import resource17 from '../google-sheets/locales/ru.json' with { type: 'json' }
+import resource18 from '../helpscout/locales/ru.json' with { type: 'json' }
+import resource19 from '../intercom/locales/ru.json' with { type: 'json' }
+import resource20 from '../jira/locales/ru.json' with { type: 'json' }
+import resource21 from '../jotform/locales/ru.json' with { type: 'json' }
+import resource22 from '../keap/locales/ru.json' with { type: 'json' }
+import resource23 from '../linear/locales/ru.json' with { type: 'json' }
+import resource24 from '../mailchimp/locales/ru.json' with { type: 'json' }
+import resource25 from '../notion/locales/ru.json' with { type: 'json' }
+import resource26 from '../one-drive/locales/ru.json' with { type: 'json' }
+import resource27 from '../onfleet/locales/ru.json' with { type: 'json' }
+import resource28 from '../outlook/locales/ru.json' with { type: 'json' }
+import resource29 from '../pandadoc/locales/ru.json' with { type: 'json' }
+import resource30 from '../paypal/locales/ru.json' with { type: 'json' }
+import resource31 from '../pipedrive/locales/ru.json' with { type: 'json' }
+import resource32 from '../postmark/locales/ru.json' with { type: 'json' }
+import resource33 from '../resend/locales/ru.json' with { type: 'json' }
+import resource34 from '../sentry/locales/ru.json' with { type: 'json' }
+import resource35 from '../shopify/locales/ru.json' with { type: 'json' }
+import resource36 from '../slack/locales/ru.json' with { type: 'json' }
+import resource37 from '../slackbot/locales/ru.json' with { type: 'json' }
+import resource38 from '../stripe/locales/ru.json' with { type: 'json' }
+import resource39 from '../taiga/locales/ru.json' with { type: 'json' }
+import resource40 from '../tally/locales/ru.json' with { type: 'json' }
+import resource41 from '../telegram/locales/ru.json' with { type: 'json' }
+import resource42 from '../thehive/locales/ru.json' with { type: 'json' }
+import resource43 from '../trello/locales/ru.json' with { type: 'json' }
+import resource44 from '../typeform/locales/ru.json' with { type: 'json' }
+import resource45 from '../vercel/locales/ru.json' with { type: 'json' }
+import resource46 from '../wise/locales/ru.json' with { type: 'json' }
+import resource47 from '../woocommerce/locales/ru.json' with { type: 'json' }
+import resource48 from '../wufoo/locales/ru.json' with { type: 'json' }
+import resource49 from '../zendesk/locales/ru.json' with { type: 'json' }
+import resource50 from '../zoom/locales/ru.json' with { type: 'json' }
 
 export default {
   ...resource0,
@@ -68,4 +86,22 @@ export default {
   ...resource30,
   ...resource31,
   ...resource32,
+  ...resource33,
+  ...resource34,
+  ...resource35,
+  ...resource36,
+  ...resource37,
+  ...resource38,
+  ...resource39,
+  ...resource40,
+  ...resource41,
+  ...resource42,
+  ...resource43,
+  ...resource44,
+  ...resource45,
+  ...resource46,
+  ...resource47,
+  ...resource48,
+  ...resource49,
+  ...resource50,
 }

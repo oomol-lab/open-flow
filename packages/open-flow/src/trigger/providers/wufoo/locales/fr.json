@@ -1,0 +1,14 @@
+{
+  "wufoo.on_form_entry": {
+    "displayName": "Form Entry",
+    "description": "Triggers when a new entry is submitted to a Wufoo form.",
+    "configInputs": {
+      "formHash": "Wufoo form hash identifier."
+    },
+    "outputs": {
+      "entryId": "Unique Wufoo form entry ID.",
+      "formHash": "Wufoo form hash identifier.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

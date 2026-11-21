@@ -1,0 +1,14 @@
+{
+  "wufoo.on_form_entry": {
+    "displayName": "表单条目",
+    "description": "当 Wufoo 表单收到新提交条目时触发。",
+    "configInputs": {
+      "formHash": "Wufoo form hash identifier."
+    },
+    "outputs": {
+      "entryId": "Unique Wufoo form entry ID.",
+      "formHash": "Wufoo form hash identifier.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "copper.on_crm_event": {
+    "displayName": "CRM 记录事件",
+    "description": "当 Copper CRM 记录被创建、更新或删除时触发。",
+    "configInputs": {
+      "resourceType": "Resource type to monitor.",
+      "event": "Event type that triggered this Run."
+    },
+    "outputs": {
+      "resourceType": "Provider resource type associated with the event.",
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

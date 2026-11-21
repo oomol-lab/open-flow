@@ -212,6 +212,236 @@
   },
   {
     "snapshot": {
+      "key": "bitbucket.on_repo_event",
+      "provider": "bitbucket",
+      "name": "on_repo_event",
+      "displayName": "Repository Event",
+      "description": "Triggers when selected Bitbucket Cloud webhook events occur in a repository.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "workspace",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        },
+        {
+          "handle": "repoSlug",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        },
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "repo:push",
+                "repo:fork",
+                "repo:updated",
+                "repo:commit_comment_created",
+                "repo:commit_status_created",
+                "repo:commit_status_updated",
+                "issue:created",
+                "issue:updated",
+                "issue:comment_created",
+                "pullrequest:created",
+                "pullrequest:updated",
+                "pullrequest:approved",
+                "pullrequest:unapproved",
+                "pullrequest:changes_request_created",
+                "pullrequest:changes_request_removed",
+                "pullrequest:fulfilled",
+                "pullrequest:rejected",
+                "pullrequest:comment_created",
+                "pullrequest:comment_updated",
+                "pullrequest:comment_deleted"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "hookUuid",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["x-event-key", "x-hook-uuid", "x-request-uuid", "x-hub-signature"],
+      "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "box.on_item_event",
+      "provider": "box",
+      "name": "on_item_event",
+      "displayName": "File or Folder Event",
+      "description": "Triggers when selected Box webhook events occur on a file or folder.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "targetType",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["file", "folder"],
+            "title": "Target Type"
+          },
+          "nullable": false,
+          "value": "folder"
+        },
+        {
+          "handle": "targetId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        },
+        {
+          "handle": "triggers",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FILE.UPLOADED",
+                "FILE.PREVIEWED",
+                "FILE.DOWNLOADED",
+                "FILE.TRASHED",
+                "FILE.DELETED",
+                "FILE.RESTORED",
+                "FILE.COPIED",
+                "FILE.MOVED",
+                "FILE.LOCKED",
+                "FILE.UNLOCKED",
+                "FILE.RENAMED",
+                "COMMENT.CREATED",
+                "COMMENT.UPDATED",
+                "COMMENT.DELETED",
+                "TASK_ASSIGNMENT.CREATED",
+                "TASK_ASSIGNMENT.UPDATED",
+                "FOLDER.CREATED",
+                "FOLDER.RENAMED",
+                "FOLDER.DOWNLOADED",
+                "FOLDER.RESTORED",
+                "FOLDER.DELETED",
+                "FOLDER.COPIED",
+                "FOLDER.MOVED",
+                "FOLDER.TRASHED",
+                "SHARED_LINK.CREATED",
+                "SHARED_LINK.UPDATED",
+                "SHARED_LINK.DELETED"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "targetId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "targetType",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["box-delivery-id", "box-delivery-timestamp", "box-signature-primary"],
+      "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "key": "calendly.on_booking_event",
       "provider": "calendly",
       "name": "on_booking_event",
@@ -290,6 +520,78 @@
     "callback": {
       "headers": ["calendly-webhook-signature"],
       "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "chargebee.on_event",
+      "provider": "chargebee",
+      "name": "on_event",
+      "displayName": "Billing Event",
+      "description": "Polls Chargebee events for customer, subscription, invoice, and payment changes.",
+      "definitionVersion": 1,
+      "type": "poll",
+      "configInputs": [
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "customer_created",
+                "customer_changed",
+                "customer_deleted",
+                "subscription_created",
+                "subscription_started",
+                "subscription_activated",
+                "subscription_changed",
+                "subscription_cancelled",
+                "subscription_reactivated",
+                "subscription_renewed",
+                "invoice_generated",
+                "invoice_updated",
+                "payment_succeeded",
+                "payment_failed",
+                "payment_refunded"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "nullable": true
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "eventType",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "occurredAt",
+          "jsonSchema": {
+            "type": "integer"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
     },
     "options": false
   },
@@ -374,6 +676,249 @@
     "callback": {
       "headers": ["x-signature"],
       "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "convertkit.on_subscriber_event",
+      "provider": "convertkit",
+      "name": "on_subscriber_event",
+      "displayName": "Subscriber Event",
+      "description": "Triggers when selected Kit (ConvertKit) subscriber webhook events occur.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "eventName",
+          "jsonSchema": {
+            "type": "string",
+            "enum": [
+              "subscriber.subscriber_activate",
+              "subscriber.subscriber_unsubscribe",
+              "subscriber.subscriber_bounce",
+              "subscriber.subscriber_complain",
+              "subscriber.form_subscribe",
+              "subscriber.tag_add",
+              "subscriber.tag_remove",
+              "subscriber.purchase_create"
+            ],
+            "title": "Event"
+          },
+          "nullable": false,
+          "value": "subscriber.subscriber_activate"
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": [],
+      "query": ["ck_token"]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "copper.on_crm_event",
+      "provider": "copper",
+      "name": "on_crm_event",
+      "displayName": "CRM Record Event",
+      "description": "Triggers when selected Copper CRM records are created, updated, or deleted.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "resourceType",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["lead", "person", "company", "opportunity", "task", "project"],
+            "title": "Resource Type"
+          },
+          "nullable": false,
+          "value": "opportunity"
+        },
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["new", "update", "delete"],
+            "title": "Event"
+          },
+          "nullable": false,
+          "value": "new"
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "resourceType",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": [],
+      "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "eventbrite.on_event",
+      "provider": "eventbrite",
+      "name": "on_event",
+      "displayName": "Eventbrite Webhook Event",
+      "description": "Triggers when selected Eventbrite order, attendee, or event webhook actions occur.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "organizationId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": true
+        },
+        {
+          "handle": "actions",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "order.placed",
+                "order.refunded",
+                "order.updated",
+                "attendee.checked_in",
+                "attendee.checked_out",
+                "attendee.updated",
+                "event.created",
+                "event.published",
+                "event.unpublished",
+                "event.updated"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "action",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "apiUrl",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["x-eventbrite-delivery"],
+      "query": ["eb_token"]
     },
     "options": false
   },
@@ -2006,6 +2551,83 @@
   },
   {
     "snapshot": {
+      "key": "helpscout.on_conversation_event",
+      "provider": "helpscout",
+      "name": "on_conversation_event",
+      "displayName": "Conversation Event",
+      "description": "Triggers when selected Help Scout conversation or customer webhook events occur.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "convo.assigned",
+                "convo.created",
+                "convo.deleted",
+                "convo.merged",
+                "convo.moved",
+                "convo.status",
+                "convo.tags",
+                "convo.customer.reply.created",
+                "convo.agent.reply.created",
+                "convo.note.created",
+                "customer.created",
+                "customer.updated",
+                "satisfaction.ratings"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["x-helpscout-event", "x-helpscout-signature"],
+      "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "key": "intercom.on_conversation_event",
       "provider": "intercom",
       "name": "on_conversation_event",
@@ -2411,6 +3033,140 @@
   },
   {
     "snapshot": {
+      "key": "jotform.on_submission",
+      "provider": "jotform",
+      "name": "on_submission",
+      "displayName": "Form Submission",
+      "description": "Triggers when a new submission is received for a Jotform form.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["form", "json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "formId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "submissionId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "formId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": [],
+      "query": ["jf_token"]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "keap.on_event",
+      "provider": "keap",
+      "name": "on_event",
+      "displayName": "CRM Event",
+      "description": "Triggers when selected Keap REST hook events occur.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": true
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "eventKey",
+          "jsonSchema": {
+            "type": "string",
+            "enum": [
+              "contact.add",
+              "contact.edit",
+              "contact.delete",
+              "company.add",
+              "company.edit",
+              "company.delete",
+              "opportunity.add",
+              "opportunity.edit",
+              "opportunity.delete",
+              "order.add",
+              "order.edit",
+              "invoice.add",
+              "invoice.payment.add",
+              "task.add",
+              "task.edit"
+            ],
+            "title": "Event"
+          },
+          "nullable": false,
+          "value": "contact.add"
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "eventKey",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["x-hook-secret"],
+      "query": ["keap_token"]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "configInputs": [
         {
           "handle": "teamId",
@@ -2501,6 +3257,84 @@
       "type": "poll"
     },
     "options": true
+  },
+  {
+    "snapshot": {
+      "key": "mailchimp.on_audience_event",
+      "provider": "mailchimp",
+      "name": "on_audience_event",
+      "displayName": "Audience Event",
+      "description": "Triggers when subscriber or campaign events occur in a Mailchimp audience.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["GET", "POST"],
+        "body": {
+          "formats": ["form", "json"],
+          "allowArray": false,
+          "allowEmpty": true
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "listId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        },
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign"]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "listId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": [],
+      "query": ["mc_token"]
+    },
+    "options": false
   },
   {
     "snapshot": {
@@ -2760,6 +3594,87 @@
   },
   {
     "snapshot": {
+      "key": "onfleet.on_task_event",
+      "provider": "onfleet",
+      "name": "on_task_event",
+      "displayName": "Task or Worker Event",
+      "description": "Triggers when selected Onfleet delivery task or worker webhook events occur.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["GET", "POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": true
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "trigger",
+          "jsonSchema": {
+            "type": "string",
+            "enum": [
+              "taskStarted",
+              "taskEta",
+              "taskArrival",
+              "taskCompleted",
+              "taskFailed",
+              "workerDuty",
+              "taskCreated",
+              "taskUpdated",
+              "taskDeleted",
+              "taskAssigned",
+              "taskUnassigned",
+              "taskDelayed",
+              "taskCloned"
+            ],
+            "title": "Event"
+          },
+          "nullable": false,
+          "value": "taskCompleted"
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "triggerName",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "taskId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": [],
+      "query": ["check", "of_token"]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "configInputs": [
         {
           "handle": "folder",
@@ -2985,11 +3900,96 @@
   },
   {
     "snapshot": {
+      "key": "paypal.on_event",
+      "provider": "paypal",
+      "name": "on_event",
+      "displayName": "PayPal Event",
+      "description": "Triggers when selected PayPal webhook events occur.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "*",
+                "PAYMENT.CAPTURE.COMPLETED",
+                "PAYMENT.CAPTURE.DENIED",
+                "PAYMENT.CAPTURE.REFUNDED",
+                "PAYMENT.SALE.COMPLETED",
+                "PAYMENT.SALE.REFUNDED",
+                "CHECKOUT.ORDER.APPROVED",
+                "CHECKOUT.ORDER.COMPLETED",
+                "BILLING.SUBSCRIPTION.CREATED",
+                "BILLING.SUBSCRIPTION.ACTIVATED",
+                "BILLING.SUBSCRIPTION.CANCELLED",
+                "BILLING.SUBSCRIPTION.SUSPENDED",
+                "INVOICING.INVOICE.PAID",
+                "CUSTOMER.DISPUTE.CREATED"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "resourceType",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["paypal-transmission-id"],
+      "query": ["pp_token"]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "key": "pipedrive.on_crm_event",
       "provider": "pipedrive",
       "name": "on_crm_event",
-      "displayName": "Deal or Contact Event",
-      "description": "Receives new deals or contacts, or actual changes to a deal stage or status using Pipedrive Webhooks v2.",
+      "displayName": "CRM Event",
+      "description": "Receives deal, person, or organization create, update, delete, or deal stage/status change events using Pipedrive Webhooks v2.",
       "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
@@ -3006,7 +4006,19 @@
           "handle": "eventType",
           "jsonSchema": {
             "type": "string",
-            "enum": ["deal.created", "deal.stage_changed", "deal.status_changed", "person.created"],
+            "enum": [
+              "deal.created",
+              "deal.updated",
+              "deal.deleted",
+              "deal.stage_changed",
+              "deal.status_changed",
+              "person.created",
+              "person.updated",
+              "person.deleted",
+              "organization.created",
+              "organization.updated",
+              "organization.deleted"
+            ],
             "title": "Event"
           },
           "nullable": false,
@@ -3018,7 +4030,19 @@
           "handle": "event",
           "jsonSchema": {
             "type": "string",
-            "enum": ["deal.created", "deal.stage_changed", "deal.status_changed", "person.created"]
+            "enum": [
+              "deal.created",
+              "deal.updated",
+              "deal.deleted",
+              "deal.stage_changed",
+              "deal.status_changed",
+              "person.created",
+              "person.updated",
+              "person.deleted",
+              "organization.created",
+              "organization.updated",
+              "organization.deleted"
+            ]
           },
           "nullable": false
         },
@@ -3031,6 +4055,85 @@
         },
         {
           "handle": "objectId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["authorization"],
+      "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "postmark.on_email_event",
+      "provider": "postmark",
+      "name": "on_email_event",
+      "displayName": "Email Event",
+      "description": "Triggers when selected Postmark email delivery or engagement events occur.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "messageStream",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false,
+          "value": "outbound"
+        },
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["Bounce", "Delivery", "Open", "Click", "SpamComplaint", "SubscriptionChange"]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "recordType",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "messageId",
           "jsonSchema": {
             "type": "string"
           },
@@ -4146,6 +5249,95 @@
   },
   {
     "snapshot": {
+      "key": "taiga.on_project_event",
+      "provider": "taiga",
+      "name": "on_project_event",
+      "displayName": "Project Event",
+      "description": "Triggers when selected Taiga project webhook events occur.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "projectId",
+          "jsonSchema": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nullable": false
+        },
+        {
+          "handle": "types",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["epic", "userstory", "task", "issue", "wikipage", "milestone"]
+            },
+            "uniqueItems": true
+          },
+          "nullable": true
+        },
+        {
+          "handle": "actions",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["create", "change", "delete"]
+            },
+            "uniqueItems": true
+          },
+          "nullable": true
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "entityType",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "action",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["x-taiga-webhook-signature"],
+      "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "configInputs": [
         {
           "handle": "formId",
@@ -4366,6 +5558,144 @@
   },
   {
     "snapshot": {
+      "key": "thehive.on_event",
+      "provider": "thehive",
+      "name": "on_event",
+      "displayName": "Alert or Case Event",
+      "description": "Polls TheHive for new or updated alerts or cases.",
+      "definitionVersion": 1,
+      "type": "poll",
+      "configInputs": [
+        {
+          "handle": "resourceType",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["alert", "case"],
+            "title": "Resource Type"
+          },
+          "nullable": false,
+          "value": "alert"
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "resourceType",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "objectId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "trello.on_model_event",
+      "provider": "trello",
+      "name": "on_model_event",
+      "displayName": "Board or Card Event",
+      "description": "Triggers when actions occur on a Trello board, list, or card.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["HEAD", "POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": true
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "modelId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        },
+        {
+          "handle": "actionTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "createCard",
+                "updateCard",
+                "deleteCard",
+                "commentCard",
+                "addAttachmentToCard",
+                "addMemberToCard",
+                "removeMemberFromCard",
+                "addLabelToCard",
+                "removeLabelFromCard",
+                "createList",
+                "updateList",
+                "createCheckItem",
+                "updateCheckItemStateOnCard"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "nullable": true
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "actionType",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "modelId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["x-trello-webhook"],
+      "query": ["trello_token"]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "key": "typeform.on_form_response",
       "provider": "typeform",
       "name": "on_form_response",
@@ -4531,6 +5861,74 @@
   },
   {
     "snapshot": {
+      "key": "wise.on_event",
+      "provider": "wise",
+      "name": "on_event",
+      "displayName": "Transfer or Balance Event",
+      "description": "Triggers when selected Wise webhook subscription events occur for a profile.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "profileId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        },
+        {
+          "handle": "triggerOn",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["transfers#state-change", "transfers#active-cases", "balances#credit", "balances#update", "swift-in#credit"],
+            "title": "Event"
+          },
+          "nullable": false,
+          "value": "transfers#state-change"
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": ["x-delivery-id", "x-signature-sha256"],
+      "query": ["wise_token"]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "configInputs": [
         {
           "handle": "events",
@@ -4652,6 +6050,64 @@
         "x-wc-webhook-source",
         "x-wc-webhook-topic"
       ],
+      "query": []
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "wufoo.on_form_entry",
+      "provider": "wufoo",
+      "name": "on_form_entry",
+      "displayName": "Form Entry",
+      "description": "Triggers when a new entry is submitted to a Wufoo form.",
+      "definitionVersion": 1,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["form", "json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "formHash",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "entryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "formHash",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "callback": {
+      "headers": [],
       "query": []
     },
     "options": false

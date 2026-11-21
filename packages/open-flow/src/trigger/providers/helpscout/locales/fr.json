@@ -1,0 +1,14 @@
+{
+  "helpscout.on_conversation_event": {
+    "displayName": "Conversation Event",
+    "description": "Triggers when selected Help Scout conversation or customer webhook events occur.",
+    "configInputs": {
+      "events": "Webhook events that trigger a Run."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

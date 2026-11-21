@@ -389,4 +389,164 @@ export const englishTriggerFieldDescriptions = {
       subject: 'Zendesk subject associated with the event.',
     },
   },
+  'bitbucket.on_repo_event': {
+    configInputs: { workspace: 'Bitbucket workspace slug.', repoSlug: 'Bitbucket repository slug.', events: 'Webhook events that trigger a Run.' },
+    outputs: {
+      event: 'Event type that triggered this Run.',
+      deliveryId: 'Unique delivery ID for this event.',
+      hookUuid: 'Bitbucket webhook UUID.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'box.on_item_event': {
+    configInputs: {
+      targetType: 'Type of Box item to monitor (file or folder).',
+      targetId: 'ID of the Box file or folder to monitor.',
+      triggers: 'Box webhook trigger events to subscribe to.',
+    },
+    outputs: {
+      event: 'Event type that triggered this Run.',
+      deliveryId: 'Unique delivery ID for this event.',
+      targetId: 'ID of the Box file or folder to monitor.',
+      targetType: 'Type of Box item to monitor (file or folder).',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'chargebee.on_event': {
+    configInputs: { eventTypes: 'Optional event types to filter polled events.' },
+    outputs: {
+      eventType: 'eventType output.',
+      eventId: 'Optional Eventbrite event ID filter.',
+      occurredAt: 'Unix timestamp when the event occurred.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'convertkit.on_subscriber_event': {
+    configInputs: { eventName: 'Kit (ConvertKit) subscriber event name.' },
+    outputs: {
+      event: 'Event type that triggered this Run.',
+      deliveryId: 'Unique delivery ID for this event.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'copper.on_crm_event': {
+    configInputs: { resourceType: 'Resource type to monitor.', event: 'Event type that triggered this Run.' },
+    outputs: {
+      resourceType: 'Provider resource type associated with the event.',
+      event: 'Event type that triggered this Run.',
+      deliveryId: 'Unique delivery ID for this event.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'eventbrite.on_event': {
+    configInputs: {
+      organizationId: 'Eventbrite organization ID.',
+      eventId: 'Optional Eventbrite event ID filter.',
+      actions: 'Webhook action types to subscribe to.',
+    },
+    outputs: {
+      action: 'Event action name.',
+      deliveryId: 'Unique delivery ID for this event.',
+      apiUrl: 'Eventbrite API URL for the event resource.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'helpscout.on_conversation_event': {
+    configInputs: { events: 'Webhook events that trigger a Run.' },
+    outputs: {
+      event: 'Event type that triggered this Run.',
+      deliveryId: 'Unique delivery ID for this event.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'jotform.on_submission': {
+    configInputs: { formId: 'Jotform form ID to watch for submissions.' },
+    outputs: {
+      submissionId: 'Unique Jotform submission ID.',
+      formId: 'Jotform form ID to watch for submissions.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'keap.on_event': {
+    configInputs: { eventKey: 'Keap REST hook event key.' },
+    outputs: { eventKey: 'Keap REST hook event key.', deliveryId: 'Unique delivery ID for this event.', body: 'Original webhook or polled event payload.' },
+  },
+  'mailchimp.on_audience_event': {
+    configInputs: { listId: 'Mailchimp audience list ID.', events: 'Webhook events that trigger a Run.' },
+    outputs: {
+      event: 'Event type that triggered this Run.',
+      deliveryId: 'Unique delivery ID for this event.',
+      listId: 'Mailchimp audience list ID.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'onfleet.on_task_event': {
+    configInputs: { trigger: 'Onfleet webhook trigger event to subscribe to.' },
+    outputs: {
+      triggerName: 'Onfleet trigger event name.',
+      deliveryId: 'Unique delivery ID for this event.',
+      taskId: 'Associated Onfleet task ID.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'paypal.on_event': {
+    configInputs: { events: 'Webhook events that trigger a Run.' },
+    outputs: {
+      event: 'Event type that triggered this Run.',
+      deliveryId: 'Unique delivery ID for this event.',
+      resourceType: 'Provider resource type associated with the event.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'postmark.on_email_event': {
+    configInputs: { messageStream: 'Postmark message stream ID (defaults to outbound).', events: 'Webhook events that trigger a Run.' },
+    outputs: {
+      recordType: 'Postmark email event record type.',
+      deliveryId: 'Unique delivery ID for this event.',
+      messageId: 'Postmark message ID.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'taiga.on_project_event': {
+    configInputs: {
+      projectId: 'Numeric Taiga project ID to monitor.',
+      types: 'Optional Taiga entity types to filter.',
+      actions: 'Webhook action types to subscribe to.',
+    },
+    outputs: {
+      entityType: 'Taiga entity type.',
+      action: 'Event action name.',
+      deliveryId: 'Unique delivery ID for this event.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'thehive.on_event': {
+    configInputs: { resourceType: 'Resource type to monitor.' },
+    outputs: {
+      resourceType: 'Provider resource type associated with the event.',
+      objectId: 'Unique object ID associated with the event.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'trello.on_model_event': {
+    configInputs: { modelId: 'ID of the Trello board, list, or card to watch.', actionTypes: 'Optional Trello action types to filter events.' },
+    outputs: {
+      actionType: 'Trello action type.',
+      deliveryId: 'Unique delivery ID for this event.',
+      modelId: 'ID of the Trello board, list, or card to watch.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'wise.on_event': {
+    configInputs: { profileId: 'Wise profile ID for the webhook subscription.', triggerOn: 'Wise webhook event type to subscribe to.' },
+    outputs: {
+      event: 'Event type that triggered this Run.',
+      deliveryId: 'Unique delivery ID for this event.',
+      body: 'Original webhook or polled event payload.',
+    },
+  },
+  'wufoo.on_form_entry': {
+    configInputs: { formHash: 'Wufoo form hash identifier.' },
+    outputs: { entryId: 'Unique Wufoo form entry ID.', formHash: 'Wufoo form hash identifier.', body: 'Original webhook or polled event payload.' },
+  },
 } as const satisfies Readonly<Record<string, FieldDescriptions>>

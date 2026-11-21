@@ -1,0 +1,14 @@
+{
+  "thehive.on_event": {
+    "displayName": "告警或工单事件",
+    "description": "轮询 TheHive 中新增或更新的告警与工单。",
+    "configInputs": {
+      "resourceType": "Resource type to monitor."
+    },
+    "outputs": {
+      "resourceType": "Provider resource type associated with the event.",
+      "objectId": "Unique object ID associated with the event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

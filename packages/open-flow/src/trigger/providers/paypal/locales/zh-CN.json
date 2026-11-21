@@ -1,0 +1,15 @@
+{
+  "paypal.on_event": {
+    "displayName": "PayPal 事件",
+    "description": "当 PayPal 发生选定的支付或账单 Webhook 事件时触发。",
+    "configInputs": {
+      "events": "Webhook events that trigger a Run."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "resourceType": "Provider resource type associated with the event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

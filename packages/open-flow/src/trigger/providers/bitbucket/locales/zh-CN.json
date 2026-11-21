@@ -1,0 +1,17 @@
+{
+  "bitbucket.on_repo_event": {
+    "displayName": "仓库事件",
+    "description": "当 Bitbucket 仓库发生选定的 Webhook 事件时触发。",
+    "configInputs": {
+      "workspace": "Bitbucket workspace slug.",
+      "repoSlug": "Bitbucket repository slug.",
+      "events": "Webhook events that trigger a Run."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "hookUuid": "Bitbucket webhook UUID.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

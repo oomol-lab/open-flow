@@ -1,0 +1,15 @@
+{
+  "wise.on_event": {
+    "displayName": "Transfer or Balance Event",
+    "description": "Triggers when selected Wise webhook subscription events occur for a profile.",
+    "configInputs": {
+      "profileId": "Wise profile ID for the webhook subscription.",
+      "triggerOn": "Wise webhook event type to subscribe to."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

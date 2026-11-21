@@ -2,37 +2,55 @@
 
 import resource0 from '../airtable/locales/zh-CN.json' with { type: 'json' }
 import resource1 from '../asana/locales/zh-CN.json' with { type: 'json' }
-import resource2 from '../calendly/locales/zh-CN.json' with { type: 'json' }
-import resource3 from '../clickup/locales/zh-CN.json' with { type: 'json' }
-import resource4 from '../feishu/locales/zh-CN.json' with { type: 'json' }
-import resource5 from '../fireflies/locales/zh-CN.json' with { type: 'json' }
-import resource6 from '../github/locales/zh-CN.json' with { type: 'json' }
-import resource7 from '../gitlab/locales/zh-CN.json' with { type: 'json' }
-import resource8 from '../gmail/locales/zh-CN.json' with { type: 'json' }
-import resource9 from '../google-calendar/locales/zh-CN.json' with { type: 'json' }
-import resource10 from '../google-drive/locales/zh-CN.json' with { type: 'json' }
-import resource11 from '../google-sheets/locales/zh-CN.json' with { type: 'json' }
-import resource12 from '../intercom/locales/zh-CN.json' with { type: 'json' }
-import resource13 from '../jira/locales/zh-CN.json' with { type: 'json' }
-import resource14 from '../linear/locales/zh-CN.json' with { type: 'json' }
-import resource15 from '../notion/locales/zh-CN.json' with { type: 'json' }
-import resource16 from '../one-drive/locales/zh-CN.json' with { type: 'json' }
-import resource17 from '../outlook/locales/zh-CN.json' with { type: 'json' }
-import resource18 from '../pandadoc/locales/zh-CN.json' with { type: 'json' }
-import resource19 from '../pipedrive/locales/zh-CN.json' with { type: 'json' }
-import resource20 from '../resend/locales/zh-CN.json' with { type: 'json' }
-import resource21 from '../sentry/locales/zh-CN.json' with { type: 'json' }
-import resource22 from '../shopify/locales/zh-CN.json' with { type: 'json' }
-import resource23 from '../slack/locales/zh-CN.json' with { type: 'json' }
-import resource24 from '../slackbot/locales/zh-CN.json' with { type: 'json' }
-import resource25 from '../stripe/locales/zh-CN.json' with { type: 'json' }
-import resource26 from '../tally/locales/zh-CN.json' with { type: 'json' }
-import resource27 from '../telegram/locales/zh-CN.json' with { type: 'json' }
-import resource28 from '../typeform/locales/zh-CN.json' with { type: 'json' }
-import resource29 from '../vercel/locales/zh-CN.json' with { type: 'json' }
-import resource30 from '../woocommerce/locales/zh-CN.json' with { type: 'json' }
-import resource31 from '../zendesk/locales/zh-CN.json' with { type: 'json' }
-import resource32 from '../zoom/locales/zh-CN.json' with { type: 'json' }
+import resource2 from '../bitbucket/locales/zh-CN.json' with { type: 'json' }
+import resource3 from '../box/locales/zh-CN.json' with { type: 'json' }
+import resource4 from '../calendly/locales/zh-CN.json' with { type: 'json' }
+import resource5 from '../chargebee/locales/zh-CN.json' with { type: 'json' }
+import resource6 from '../clickup/locales/zh-CN.json' with { type: 'json' }
+import resource7 from '../convertkit/locales/zh-CN.json' with { type: 'json' }
+import resource8 from '../copper/locales/zh-CN.json' with { type: 'json' }
+import resource9 from '../eventbrite/locales/zh-CN.json' with { type: 'json' }
+import resource10 from '../feishu/locales/zh-CN.json' with { type: 'json' }
+import resource11 from '../fireflies/locales/zh-CN.json' with { type: 'json' }
+import resource12 from '../github/locales/zh-CN.json' with { type: 'json' }
+import resource13 from '../gitlab/locales/zh-CN.json' with { type: 'json' }
+import resource14 from '../gmail/locales/zh-CN.json' with { type: 'json' }
+import resource15 from '../google-calendar/locales/zh-CN.json' with { type: 'json' }
+import resource16 from '../google-drive/locales/zh-CN.json' with { type: 'json' }
+import resource17 from '../google-sheets/locales/zh-CN.json' with { type: 'json' }
+import resource18 from '../helpscout/locales/zh-CN.json' with { type: 'json' }
+import resource19 from '../intercom/locales/zh-CN.json' with { type: 'json' }
+import resource20 from '../jira/locales/zh-CN.json' with { type: 'json' }
+import resource21 from '../jotform/locales/zh-CN.json' with { type: 'json' }
+import resource22 from '../keap/locales/zh-CN.json' with { type: 'json' }
+import resource23 from '../linear/locales/zh-CN.json' with { type: 'json' }
+import resource24 from '../mailchimp/locales/zh-CN.json' with { type: 'json' }
+import resource25 from '../notion/locales/zh-CN.json' with { type: 'json' }
+import resource26 from '../one-drive/locales/zh-CN.json' with { type: 'json' }
+import resource27 from '../onfleet/locales/zh-CN.json' with { type: 'json' }
+import resource28 from '../outlook/locales/zh-CN.json' with { type: 'json' }
+import resource29 from '../pandadoc/locales/zh-CN.json' with { type: 'json' }
+import resource30 from '../paypal/locales/zh-CN.json' with { type: 'json' }
+import resource31 from '../pipedrive/locales/zh-CN.json' with { type: 'json' }
+import resource32 from '../postmark/locales/zh-CN.json' with { type: 'json' }
+import resource33 from '../resend/locales/zh-CN.json' with { type: 'json' }
+import resource34 from '../sentry/locales/zh-CN.json' with { type: 'json' }
+import resource35 from '../shopify/locales/zh-CN.json' with { type: 'json' }
+import resource36 from '../slack/locales/zh-CN.json' with { type: 'json' }
+import resource37 from '../slackbot/locales/zh-CN.json' with { type: 'json' }
+import resource38 from '../stripe/locales/zh-CN.json' with { type: 'json' }
+import resource39 from '../taiga/locales/zh-CN.json' with { type: 'json' }
+import resource40 from '../tally/locales/zh-CN.json' with { type: 'json' }
+import resource41 from '../telegram/locales/zh-CN.json' with { type: 'json' }
+import resource42 from '../thehive/locales/zh-CN.json' with { type: 'json' }
+import resource43 from '../trello/locales/zh-CN.json' with { type: 'json' }
+import resource44 from '../typeform/locales/zh-CN.json' with { type: 'json' }
+import resource45 from '../vercel/locales/zh-CN.json' with { type: 'json' }
+import resource46 from '../wise/locales/zh-CN.json' with { type: 'json' }
+import resource47 from '../woocommerce/locales/zh-CN.json' with { type: 'json' }
+import resource48 from '../wufoo/locales/zh-CN.json' with { type: 'json' }
+import resource49 from '../zendesk/locales/zh-CN.json' with { type: 'json' }
+import resource50 from '../zoom/locales/zh-CN.json' with { type: 'json' }
 
 export default {
   ...resource0,
@@ -68,4 +86,22 @@ export default {
   ...resource30,
   ...resource31,
   ...resource32,
+  ...resource33,
+  ...resource34,
+  ...resource35,
+  ...resource36,
+  ...resource37,
+  ...resource38,
+  ...resource39,
+  ...resource40,
+  ...resource41,
+  ...resource42,
+  ...resource43,
+  ...resource44,
+  ...resource45,
+  ...resource46,
+  ...resource47,
+  ...resource48,
+  ...resource49,
+  ...resource50,
 }

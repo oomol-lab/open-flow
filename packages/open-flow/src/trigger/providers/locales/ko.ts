@@ -2,37 +2,55 @@
 
 import resource0 from '../airtable/locales/ko.json' with { type: 'json' }
 import resource1 from '../asana/locales/ko.json' with { type: 'json' }
-import resource2 from '../calendly/locales/ko.json' with { type: 'json' }
-import resource3 from '../clickup/locales/ko.json' with { type: 'json' }
-import resource4 from '../feishu/locales/ko.json' with { type: 'json' }
-import resource5 from '../fireflies/locales/ko.json' with { type: 'json' }
-import resource6 from '../github/locales/ko.json' with { type: 'json' }
-import resource7 from '../gitlab/locales/ko.json' with { type: 'json' }
-import resource8 from '../gmail/locales/ko.json' with { type: 'json' }
-import resource9 from '../google-calendar/locales/ko.json' with { type: 'json' }
-import resource10 from '../google-drive/locales/ko.json' with { type: 'json' }
-import resource11 from '../google-sheets/locales/ko.json' with { type: 'json' }
-import resource12 from '../intercom/locales/ko.json' with { type: 'json' }
-import resource13 from '../jira/locales/ko.json' with { type: 'json' }
-import resource14 from '../linear/locales/ko.json' with { type: 'json' }
-import resource15 from '../notion/locales/ko.json' with { type: 'json' }
-import resource16 from '../one-drive/locales/ko.json' with { type: 'json' }
-import resource17 from '../outlook/locales/ko.json' with { type: 'json' }
-import resource18 from '../pandadoc/locales/ko.json' with { type: 'json' }
-import resource19 from '../pipedrive/locales/ko.json' with { type: 'json' }
-import resource20 from '../resend/locales/ko.json' with { type: 'json' }
-import resource21 from '../sentry/locales/ko.json' with { type: 'json' }
-import resource22 from '../shopify/locales/ko.json' with { type: 'json' }
-import resource23 from '../slack/locales/ko.json' with { type: 'json' }
-import resource24 from '../slackbot/locales/ko.json' with { type: 'json' }
-import resource25 from '../stripe/locales/ko.json' with { type: 'json' }
-import resource26 from '../tally/locales/ko.json' with { type: 'json' }
-import resource27 from '../telegram/locales/ko.json' with { type: 'json' }
-import resource28 from '../typeform/locales/ko.json' with { type: 'json' }
-import resource29 from '../vercel/locales/ko.json' with { type: 'json' }
-import resource30 from '../woocommerce/locales/ko.json' with { type: 'json' }
-import resource31 from '../zendesk/locales/ko.json' with { type: 'json' }
-import resource32 from '../zoom/locales/ko.json' with { type: 'json' }
+import resource2 from '../bitbucket/locales/ko.json' with { type: 'json' }
+import resource3 from '../box/locales/ko.json' with { type: 'json' }
+import resource4 from '../calendly/locales/ko.json' with { type: 'json' }
+import resource5 from '../chargebee/locales/ko.json' with { type: 'json' }
+import resource6 from '../clickup/locales/ko.json' with { type: 'json' }
+import resource7 from '../convertkit/locales/ko.json' with { type: 'json' }
+import resource8 from '../copper/locales/ko.json' with { type: 'json' }
+import resource9 from '../eventbrite/locales/ko.json' with { type: 'json' }
+import resource10 from '../feishu/locales/ko.json' with { type: 'json' }
+import resource11 from '../fireflies/locales/ko.json' with { type: 'json' }
+import resource12 from '../github/locales/ko.json' with { type: 'json' }
+import resource13 from '../gitlab/locales/ko.json' with { type: 'json' }
+import resource14 from '../gmail/locales/ko.json' with { type: 'json' }
+import resource15 from '../google-calendar/locales/ko.json' with { type: 'json' }
+import resource16 from '../google-drive/locales/ko.json' with { type: 'json' }
+import resource17 from '../google-sheets/locales/ko.json' with { type: 'json' }
+import resource18 from '../helpscout/locales/ko.json' with { type: 'json' }
+import resource19 from '../intercom/locales/ko.json' with { type: 'json' }
+import resource20 from '../jira/locales/ko.json' with { type: 'json' }
+import resource21 from '../jotform/locales/ko.json' with { type: 'json' }
+import resource22 from '../keap/locales/ko.json' with { type: 'json' }
+import resource23 from '../linear/locales/ko.json' with { type: 'json' }
+import resource24 from '../mailchimp/locales/ko.json' with { type: 'json' }
+import resource25 from '../notion/locales/ko.json' with { type: 'json' }
+import resource26 from '../one-drive/locales/ko.json' with { type: 'json' }
+import resource27 from '../onfleet/locales/ko.json' with { type: 'json' }
+import resource28 from '../outlook/locales/ko.json' with { type: 'json' }
+import resource29 from '../pandadoc/locales/ko.json' with { type: 'json' }
+import resource30 from '../paypal/locales/ko.json' with { type: 'json' }
+import resource31 from '../pipedrive/locales/ko.json' with { type: 'json' }
+import resource32 from '../postmark/locales/ko.json' with { type: 'json' }
+import resource33 from '../resend/locales/ko.json' with { type: 'json' }
+import resource34 from '../sentry/locales/ko.json' with { type: 'json' }
+import resource35 from '../shopify/locales/ko.json' with { type: 'json' }
+import resource36 from '../slack/locales/ko.json' with { type: 'json' }
+import resource37 from '../slackbot/locales/ko.json' with { type: 'json' }
+import resource38 from '../stripe/locales/ko.json' with { type: 'json' }
+import resource39 from '../taiga/locales/ko.json' with { type: 'json' }
+import resource40 from '../tally/locales/ko.json' with { type: 'json' }
+import resource41 from '../telegram/locales/ko.json' with { type: 'json' }
+import resource42 from '../thehive/locales/ko.json' with { type: 'json' }
+import resource43 from '../trello/locales/ko.json' with { type: 'json' }
+import resource44 from '../typeform/locales/ko.json' with { type: 'json' }
+import resource45 from '../vercel/locales/ko.json' with { type: 'json' }
+import resource46 from '../wise/locales/ko.json' with { type: 'json' }
+import resource47 from '../woocommerce/locales/ko.json' with { type: 'json' }
+import resource48 from '../wufoo/locales/ko.json' with { type: 'json' }
+import resource49 from '../zendesk/locales/ko.json' with { type: 'json' }
+import resource50 from '../zoom/locales/ko.json' with { type: 'json' }
 
 export default {
   ...resource0,
@@ -68,4 +86,22 @@ export default {
   ...resource30,
   ...resource31,
   ...resource32,
+  ...resource33,
+  ...resource34,
+  ...resource35,
+  ...resource36,
+  ...resource37,
+  ...resource38,
+  ...resource39,
+  ...resource40,
+  ...resource41,
+  ...resource42,
+  ...resource43,
+  ...resource44,
+  ...resource45,
+  ...resource46,
+  ...resource47,
+  ...resource48,
+  ...resource49,
+  ...resource50,
 }

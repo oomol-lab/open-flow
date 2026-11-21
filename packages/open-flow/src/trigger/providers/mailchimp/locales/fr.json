@@ -1,0 +1,16 @@
+{
+  "mailchimp.on_audience_event": {
+    "displayName": "Audience Event",
+    "description": "Triggers when subscriber or campaign events occur in a Mailchimp audience.",
+    "configInputs": {
+      "listId": "Mailchimp audience list ID.",
+      "events": "Webhook events that trigger a Run."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "listId": "Mailchimp audience list ID.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

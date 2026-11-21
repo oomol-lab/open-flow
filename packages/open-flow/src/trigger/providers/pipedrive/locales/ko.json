@@ -1,7 +1,7 @@
 {
   "pipedrive.on_crm_event": {
-    "displayName": "거래 또는 연락처 이벤트",
-    "description": "거래 또는 연락처 이벤트를 수신합니다.",
+    "displayName": "CRM 이벤트",
+    "description": "Pipedrive Webhooks v2를 사용하여 거래, 연락처 또는 조직의 생성, 업데이트, 삭제 및 거래 단계/상태 변경 이벤트를 수신합니다.",
     "configInputs": {
       "eventType": "이벤트"
     },

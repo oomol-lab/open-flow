@@ -1,0 +1,18 @@
+{
+  "box.on_item_event": {
+    "displayName": "File or Folder Event",
+    "description": "Triggers when selected Box webhook events occur on a file or folder.",
+    "configInputs": {
+      "targetType": "Type of Box item to monitor (file or folder).",
+      "targetId": "ID of the Box file or folder to monitor.",
+      "triggers": "Box webhook trigger events to subscribe to."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "targetId": "ID of the Box file or folder to monitor.",
+      "targetType": "Type of Box item to monitor (file or folder).",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

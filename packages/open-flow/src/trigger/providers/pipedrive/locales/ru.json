@@ -1,7 +1,7 @@
 {
   "pipedrive.on_crm_event": {
-    "displayName": "Событие сделки или контакта",
-    "description": "Событие сделки или контакта.",
+    "displayName": "Событие CRM",
+    "description": "Получает события создания, изменения и удаления сделок, контактов и организаций через Pipedrive Webhooks v2.",
     "configInputs": {
       "eventType": "Событие"
     },

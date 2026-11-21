@@ -1,0 +1,14 @@
+{
+  "convertkit.on_subscriber_event": {
+    "displayName": "订阅者事件",
+    "description": "当 Kit (ConvertKit) 发生选定的订阅者事件时触发。",
+    "configInputs": {
+      "eventName": "Kit (ConvertKit) subscriber event name."
+    },
+    "outputs": {
+      "event": "Event type that triggered this Run.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "eventbrite.on_event": {
+    "displayName": "Eventbrite Webhook Event",
+    "description": "Triggers when selected Eventbrite order, attendee, or event webhook actions occur.",
+    "configInputs": {
+      "organizationId": "Eventbrite organization ID.",
+      "eventId": "Optional Eventbrite event ID filter.",
+      "actions": "Webhook action types to subscribe to."
+    },
+    "outputs": {
+      "action": "Event action name.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "apiUrl": "Eventbrite API URL for the event resource.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "trello.on_model_event": {
+    "displayName": "看板或卡片事件",
+    "description": "当 Trello 看板、列表或卡片发生变更时触发。",
+    "configInputs": {
+      "modelId": "ID of the Trello board, list, or card to watch.",
+      "actionTypes": "Optional Trello action types to filter events."
+    },
+    "outputs": {
+      "actionType": "Trello action type.",
+      "deliveryId": "Unique delivery ID for this event.",
+      "modelId": "ID of the Trello board, list, or card to watch.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}

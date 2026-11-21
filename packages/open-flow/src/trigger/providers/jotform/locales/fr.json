@@ -1,0 +1,14 @@
+{
+  "jotform.on_submission": {
+    "displayName": "Form Submission",
+    "description": "Triggers when a new submission is received for a Jotform form.",
+    "configInputs": {
+      "formId": "Jotform form ID to watch for submissions."
+    },
+    "outputs": {
+      "submissionId": "Unique Jotform submission ID.",
+      "formId": "Jotform form ID to watch for submissions.",
+      "body": "Original webhook or polled event payload."
+    }
+  }
+}
