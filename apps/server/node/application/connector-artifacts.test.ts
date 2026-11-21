@@ -76,6 +76,16 @@ async function bridgeWithArtifactSchema(artifactSchema: JsonValue) {
   return { events, output: output as Record<string, unknown> }
 }
 
+function transitDescriptor(id: string): Record<string, JsonValue> {
+  return {
+    fileId: id,
+    downloadUrl: `https://connector.example/api/files/${id}`,
+    sizeBytes: 3,
+    name: `${id}.txt`,
+    mimeType: 'text/plain',
+  }
+}
+
 describe('Connector Transit File <-> ArtifactRef bridge', () => {
   it('converts OpenConnector transit file outputs into ArtifactRef and emits node.artifact', async () => {
     const { artifacts } = createMemoryArtifactStore()
@@ -429,5 +439,80 @@ describe('Connector Transit File <-> ArtifactRef bridge', () => {
 
     expect(seenLimits).toEqual([10, 4])
     expect(events).toHaveLength(0)
+  })
+
+  it('stores transit files whose existing artifact field is not a reference without overwriting it', async () => {
+    const { artifacts } = createMemoryArtifactStore()
+    const events: ArtifactEvent[] = []
+    const connector = {
+      async downloadTransitFile() {
+        return { content: new TextEncoder().encode('abc'), mediaType: 'text/plain' }
+      },
+    } as unknown as ConnectorHost
+
+    const output = await bridgeConnectorOutputArtifacts(
+      { remote: { ...transitDescriptor('tf-remote'), artifact: 'remote-id' }, empty: { ...transitDescriptor('tf-null'), artifact: null } },
+      {
+        runId: 'run-existing',
+        nodeId: 'node-existing',
+        jobId: 'job-existing',
+        artifacts,
+        connector,
+        signal: new AbortController().signal,
+        emit: async (event) => {
+          events.push(event)
+        },
+      },
+    )
+
+    expect(events.map((event) => event.artifact.name)).toEqual(['tf-remote.txt', 'tf-null.txt'])
+    expect(output).toMatchObject({ remote: { artifact: 'remote-id' }, empty: { artifact: null } })
+  })
+
+  it('preserves own __proto__ keys when converting inputs and rewriting outputs', async () => {
+    const { artifacts } = createMemoryArtifactStore()
+    const ref = await artifacts.storeBytes(
+      'run-proto',
+      'node-0',
+      'job-0',
+      { name: 'proto.txt', mediaType: 'text/plain', content: new TextEncoder().encode('hi') },
+      async () => {},
+    )
+    const connector = {
+      async uploadTransitFile(file: { name: string; mediaType?: string; content: Uint8Array }) {
+        return { fileId: 'tf-proto', downloadUrl: 'https://connector.example/api/files/tf-proto', sizeBytes: 2, name: file.name, mimeType: 'text/plain' }
+      },
+      async downloadTransitFile() {
+        return { content: new TextEncoder().encode('hi'), mediaType: 'text/plain' }
+      },
+    } as unknown as ConnectorHost
+
+    const input = JSON.parse(`{"payload":{"__proto__":{"polluted":true},"file":${JSON.stringify(ref)}}}`) as Record<string, JsonValue>
+    const prepared = await prepareConnectorInputsWithArtifacts([{ handle: 'payload', jsonSchema: { type: 'object' } }], input, {
+      runId: 'run-proto',
+      artifacts,
+      connector,
+      signal: new AbortController().signal,
+    })
+    const payload = prepared.payload as Record<string, JsonValue>
+    expect(Object.hasOwn(payload, '__proto__')).toBe(true)
+    expect(Object.getPrototypeOf(payload)).toBe(Object.prototype)
+    expect(Object.keys(payload)).toEqual(['__proto__', 'file'])
+
+    const output = JSON.parse(
+      '{"__proto__":{"polluted":true},"file":{"fileId":"tf-proto","downloadUrl":"https://connector.example/api/files/tf-proto","sizeBytes":2,"name":"proto.txt","mimeType":"text/plain"}}',
+    ) as JsonValue
+    const bridged = (await bridgeConnectorOutputArtifacts(output, {
+      runId: 'run-proto',
+      nodeId: 'node-proto',
+      jobId: 'job-proto',
+      artifacts,
+      connector,
+      signal: new AbortController().signal,
+      emit: async () => {},
+    })) as Record<string, JsonValue>
+    expect(Object.hasOwn(bridged, '__proto__')).toBe(true)
+    expect(Object.getPrototypeOf(bridged)).toBe(Object.prototype)
+    expect((bridged.file as Record<string, JsonValue>).artifact).toMatchObject({ kind: 'artifact', name: 'proto.txt' })
   })
 })

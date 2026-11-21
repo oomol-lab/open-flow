@@ -24,6 +24,11 @@ interface TransitFileDescriptor {
   readonly mimeType?: string
 }
 
+/** Defines an own JSON property, so keys such as `__proto__` are copied instead of invoking the inherited setter. */
+function setOwn(target: Record<string, JsonValue>, key: string, value: JsonValue): void {
+  Object.defineProperty(target, key, { configurable: true, enumerable: true, value, writable: true })
+}
+
 function isPlainObject(value: unknown): value is Record<string, JsonValue> {
   return value != null && typeof value == 'object' && !Array.isArray(value)
 }
@@ -152,7 +157,7 @@ export async function prepareConnectorInputsWithArtifacts(
     if (isPlainObject(value)) {
       const out: Record<string, JsonValue> = {}
       for (const [k, v] of Object.entries(value)) {
-        out[k] = await convertValue(v, childPropertySchema(schema, k))
+        setOwn(out, k, await convertValue(v, childPropertySchema(schema, k)))
       }
       return out
     }
@@ -161,7 +166,7 @@ export async function prepareConnectorInputsWithArtifacts(
 
   for (const [handle, value] of Object.entries(inputs)) {
     const port = portByHandle.get(handle)
-    next[handle] = await convertValue(value, port?.jsonSchema)
+    setOwn(next, handle, await convertValue(value, port?.jsonSchema))
   }
   return changed ? next : inputs
 }
@@ -213,7 +218,8 @@ export async function bridgeConnectorOutputArtifacts(
     }
     if (!isPlainObject(value)) return
     const transit = extractTransitFile(value)
-    if (transit && value.artifact === undefined) {
+    // An existing ArtifactRef means the file was already bridged; any other existing value is preserved.
+    if (transit && !isArtifactRef(value.artifact)) {
       pending.push({ target: value, transit, artifactSchema: artifactSlotSchema(schema) })
       return
     }
@@ -257,7 +263,10 @@ export async function bridgeConnectorOutputArtifacts(
       context.emit,
     )
     const refValue = ref as unknown as JsonValue
-    refsByTarget.set(item.target, { ref: refValue, attach: acceptsArtifactRef(item.artifactSchema, refValue) })
+    refsByTarget.set(item.target, {
+      ref: refValue,
+      attach: item.target.artifact === undefined && acceptsArtifactRef(item.artifactSchema, refValue),
+    })
   }
 
   const rewrite = (value: JsonValue): JsonValue => {
@@ -270,7 +279,7 @@ export async function bridgeConnectorOutputArtifacts(
     for (const [k, v] of Object.entries(value)) {
       const nextValue = rewrite(v)
       if (nextValue !== v) mutated = true
-      copy[k] = nextValue
+      setOwn(copy, k, nextValue)
     }
     return mutated ? copy : value
   }
