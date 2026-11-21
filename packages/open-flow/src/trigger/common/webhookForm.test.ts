@@ -41,6 +41,17 @@ describe('webhookFormBody', () => {
     for (const value of ['false', '0']) expect(webhookFormBody(fields, entries(['agree', value]))).toEqual({ agree: false })
   })
 
+  it('keeps a field named __proto__ as an own property', () => {
+    const special: readonly WebhookBodyField[] = [
+      { handle: '__proto__', jsonSchema: { type: 'string' }, nullable: false },
+      { handle: 'name', jsonSchema: { type: 'string' }, nullable: false },
+    ]
+    const body = webhookFormBody(special, entries(['__proto__', 'Ada'], ['name', 'Grace']))
+    expect(Object.hasOwn(body, '__proto__')).toBe(true)
+    expect(Object.getPrototypeOf(body)).toBe(Object.prototype)
+    expect(JSON.parse(JSON.stringify(body))).toEqual(JSON.parse('{"__proto__":"Ada","name":"Grace"}'))
+  })
+
   it('rejects files, repeated fields and invalid numbers', () => {
     for (const submitted of [
       entries(['name', new File(['x'], 'name.txt')]),
@@ -60,6 +71,8 @@ describe('webhookFormControl', () => {
     expect(webhookFormControl(fields[3]!)).toMatchObject({ required: false })
     expect(webhookFormControl(fields[4]!)).toMatchObject({ defaultValue: 'free', options: ['free', 'pro'] })
     expect(webhookFormControl({ handle: 'tags', jsonSchema: { items: { type: 'string' }, type: 'array' }, nullable: true })).toBeUndefined()
+    // An empty choice is indistinguishable from the unselected placeholder.
+    expect(webhookFormControl({ handle: 'tier', jsonSchema: { enum: ['', 'pro'], type: 'string' }, nullable: false })).toBeUndefined()
   })
 })
 

@@ -185,8 +185,9 @@ earlier readers reject such content instead of dropping the policy.
 text is optional and `{}` uses the node name and localized defaults. A browser GET to the Webhook URL returns an HTML
 page with one control per `body` field: strings as text areas, `number`/`integer` as number inputs, `boolean` as a
 checkbox (unchecked is `false`) and a string `enum` as a choice. Form submissions are converted to these types, empty
-values are omitted, undeclared names are ignored, and files, repeated names or invalid numbers return 400. A form
-posted from the endpoint's own origin is accepted without listing it in `allowedOrigins`. The browser then sees a
+values are omitted, undeclared names are ignored, and files, repeated names or invalid numbers return 400. Form submissions
+are accepted only from the endpoint's own origin (or without an `Origin` header); `allowedOrigins`, even `"*"`,
+applies to API callers only. A form endpoint never stores `cookie` or `authorization` in the `headers` output. The browser then sees a
 result page that only reports whether the Run was admitted, instead of `responseData` or `responseStatusCode`; JSON requests to the same URL keep the ordinary contract. The form cannot be
 combined with other methods, `authentication`, `bodyMode: "any"` or `responseBody`, and other field types are not
 supported; `flow_check` reports `trigger.webhook-form-conflict` and `trigger.webhook-form-field-unsupported`. File

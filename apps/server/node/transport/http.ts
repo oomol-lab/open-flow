@@ -558,8 +558,9 @@ async function webhookRequest(
     origin = corsOrigin(requestOrigin, target.trigger.options?.allowedOrigins)
     const preflightResponse = preflight(request, configuredMethod, origin)
     if (preflightResponse != null) return preflightResponse
-    // A hosted form posts from the endpoint's own origin, which allowedOrigins does not need to list.
-    if (requestOrigin != null && origin == null && !(formSubmission && sameHost(requestOrigin, request))) return plain(403)
+    // A hosted form posts from the endpoint's own origin. allowedOrigins governs API callers only, so even "*" never
+    // admits an opaque (`null`) or foreign origin for a form submission.
+    if (formSubmission ? requestOrigin != null && !sameHost(requestOrigin, request) : requestOrigin != null && origin == null) return plain(403)
     const method = request.method
     if (method !== configuredMethod) return plain(405, { allow: configuredMethod }, origin)
     const authentication = target.trigger.options?.authentication

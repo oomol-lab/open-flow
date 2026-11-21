@@ -110,10 +110,18 @@ export async function verifyWebhookAuthentication(headers: Headers, authenticati
   return difference == 0
 }
 
-/** Request headers exposed to the Run. The authentication credential header is never stored with Run outputs. */
+/**
+ * Request headers exposed to the Run. The authentication credential header is never stored with Run outputs. A hosted
+ * form is posted by a browser from the endpoint's own origin, which attaches that origin's cookies and cached
+ * credentials, so a form endpoint never stores `cookie` or `authorization`.
+ */
 export function webhookOutputHeaders(headers: Headers, options: WebhookOptions | undefined): Readonly<Record<string, string>> {
   const values = Object.fromEntries(headers)
   if (options?.authentication != null) delete values[webhookAuthenticationHeader(options.authentication)]
+  if (options?.form != null) {
+    delete values.cookie
+    delete values.authorization
+  }
   return values
 }
 
@@ -563,6 +571,32 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
       equal(outputs.length, 1, 'One GET run')
       equal(Object.keys(outputs[0]!).toSorted(), ['headers', 'query', 'webhookUrl'], 'GET outputs omit body')
       await response(await call(harness, { method: 'HEAD' }), { body: '', headers: { allow: 'GET' }, status: 405 }, 'HEAD rejected')
+    },
+  },
+  {
+    fixture: { bodyFields: formInputs, method: 'POST', options: { allowedOrigins: ['*'], form: {} } },
+    name: 'admits hosted form submissions only from the endpoint origin and never stores browser credentials',
+    async verify(harness) {
+      const form = { 'content-type': 'application/x-www-form-urlencoded' }
+      const credentials = { authorization: 'Basic c2VjcmV0', cookie: 'open_flow_operator_session=secret' }
+      // allowedOrigins governs API callers; "*" must not admit an opaque or foreign origin for a form.
+      for (const origin of ['null', 'https://other.example'])
+        await response(await call(harness, { body: 'name=Ada', headers: { ...form, origin } }), { status: 403 }, `Form from ${origin}`)
+      equal(await harness.outputs(), [], 'Rejected form submissions admit no Run')
+      const own = new URL(harness.endpointUrl).origin
+      await response(await call(harness, { body: 'name=Ada', headers: { ...form, ...credentials, origin: own } }), { status: 200 }, 'Same-origin form')
+      await response(
+        await call(harness, {
+          body: JSON.stringify({ name: 'Json' }),
+          headers: { ...credentials, 'content-type': 'application/json', 'origin': 'https://api.example' },
+        }),
+        { headers: { 'access-control-allow-origin': '*' }, status: 200 },
+        'JSON caller allowed by "*"',
+      )
+      for (const outputs of await harness.outputs()) {
+        const headers = outputs.headers as Record<string, JsonValue>
+        equal([headers.cookie, headers.authorization], [undefined, undefined], 'Browser credentials removed from outputs')
+      }
     },
   },
   {

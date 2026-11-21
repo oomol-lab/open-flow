@@ -48,7 +48,8 @@ export function webhookFormControl(field: WebhookBodyField): WebhookFormControl 
     ...(Object.hasOwn(field, 'value') ? { defaultValue: field.value } : {}),
   }
   if (Array.isArray(schema.enum)) {
-    if ((type != null && type != 'string') || schema.enum.length == 0 || !schema.enum.every((item) => typeof item == 'string')) return
+    // An empty choice would submit the same value as the unselected placeholder, so it cannot be answered reliably.
+    if ((type != null && type != 'string') || schema.enum.length == 0 || !schema.enum.every((item) => typeof item == 'string' && item.length > 0)) return
     return { ...common, kind: 'select', options: schema.enum as readonly string[] }
   }
   switch (type) {
@@ -89,6 +90,11 @@ export function isWebhookFormContentType(contentType: string | null | undefined)
   return media == 'application/x-www-form-urlencoded' || media == 'multipart/form-data'
 }
 
+/** An own data property even for names such as `__proto__`, which plain assignment would route to the prototype. */
+function define(body: Record<string, JsonValue>, name: string, value: JsonValue): void {
+  Object.defineProperty(body, name, { configurable: true, enumerable: true, value, writable: true })
+}
+
 /**
  * Converts submitted entries to the declared body. Empty values are omitted so that defaults, null and required-field
  * validation apply as for JSON requests. Undeclared names are ignored. Files, repeated names and non-numeric numbers
@@ -111,7 +117,7 @@ export function webhookFormBody(
     if (item == null) throw new WebhookFormInvalid(`Field ${name} cannot be submitted from a form.`)
     const value = values.get(name)
     if (item.kind == 'checkbox') {
-      body[name] = value != null && value != 'false' && value != '0'
+      define(body, name, value != null && value != 'false' && value != '0')
       continue
     }
     if (value == null || value.length == 0) continue
@@ -119,10 +125,10 @@ export function webhookFormBody(
       const number = value.trim().length == 0 ? Number.NaN : Number(value)
       if (!Number.isFinite(number) || (item.kind == 'integer' && !Number.isInteger(number)))
         throw new WebhookFormInvalid(`Field ${name} is not a valid number.`)
-      body[name] = number
+      define(body, name, number)
       continue
     }
-    body[name] = value
+    define(body, name, value)
   }
   return body
 }

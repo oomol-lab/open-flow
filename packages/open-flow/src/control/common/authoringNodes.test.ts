@@ -343,6 +343,8 @@ describe('business configuration authoring contracts', () => {
     const keptNode = kept.content.document.graph.nodes[boundRef]
     if (keptNode?.kind != 'webhook-response') throw new Error('Expected Webhook Response')
     expect(keptNode.inputs.body).toMatchObject({ kind: 'sources' })
+  })
+
   it('configures a hosted Webhook form and reports settings it cannot serve', async () => {
     const created = await edit(empty, [
       {
