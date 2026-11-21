@@ -1,0 +1,14 @@
+{
+  "keap.on_event": {
+    "displayName": "CRM 事件",
+    "description": "當 Keap 發生選定的 REST Hook 事件時觸發。",
+    "configInputs": {
+      "eventKey": "Keap REST Hook 事件鍵。"
+    },
+    "outputs": {
+      "eventKey": "Keap REST Hook 事件鍵。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
+    }
+  }
+}

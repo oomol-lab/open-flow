@@ -1,0 +1,14 @@
+{
+  "helpscout.on_conversation_event": {
+    "displayName": "会话事件",
+    "description": "当 Help Scout 发生选定的会话或客户事件时触发。",
+    "configInputs": {
+      "events": "触发运行的 Webhook 事件。"
+    },
+    "outputs": {
+      "event": "触发本次运行的事件类型。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
+    }
+  }
+}

@@ -120,6 +120,57 @@ export class RunArtifacts {
     for (const [id, upload] of this.#uploads) if (upload.runId == runId && (jobId == null || upload.jobId == jobId)) this.#uploads.delete(id)
   }
 
+  /** Stores raw bytes produced by a managed task (e.g. Connector transit download) as a Run ArtifactRef. */
+  async storeBytes(
+    runId: string,
+    nodeId: string,
+    jobId: string,
+    input: { readonly name: string; readonly mediaType?: string; readonly content: Uint8Array },
+    emit: (event: ArtifactEvent) => Promise<void>,
+  ): Promise<StoredArtifact & { readonly kind: 'artifact' }> {
+    const name = input.name.trim().slice(0, 255) || 'artifact'
+    const mediaType = input.mediaType?.trim().slice(0, 255) || undefined
+    if (input.content.byteLength > this.#limits.maxArtifactBytes) {
+      throw new ArtifactHostError('runtime.limit-exceeded', 'Artifact exceeds the configured size limit.')
+    }
+    let pending = 0
+    for (const other of this.#uploads.values()) if (other.runId == runId) pending += other.bytes
+    if (this.#runs.artifactBytes(runId) + pending + input.content.byteLength > this.#limits.maxRunBytes) {
+      throw new ArtifactHostError('runtime.limit-exceeded', 'Run Artifacts exceed the configured size limit.')
+    }
+    const artifact: StoredArtifact = {
+      digest: `sha256:${createHash('sha256').update(input.content).digest('hex')}`,
+      id: randomUUID(),
+      ...(mediaType === undefined ? {} : { mediaType }),
+      name,
+      size: input.content.byteLength,
+    }
+    this.#runs.putArtifact(runId, artifact, input.content)
+    const ref = { kind: 'artifact' as const, ...artifact }
+    await emit({ artifact: ref, jobId, nodeId, runId, type: 'node.artifact' })
+    return ref
+  }
+
+  /** Reads the full bytes of a Run Artifact for managed task upload (e.g. Connector transit upload). */
+  readAllBytes(runId: string, artifactId: string): { readonly content: Uint8Array; readonly size: number } {
+    const first = this.#runs.readArtifact(runId, artifactId, 0, this.#limits.maxArtifactBytes)
+    if (first == null) throw new ArtifactHostError('capability.denied', 'The Artifact is not available in this Run.')
+    if (first.size > this.#limits.maxArtifactBytes) {
+      throw new ArtifactHostError('runtime.limit-exceeded', 'Artifact exceeds the configured size limit.')
+    }
+    if (first.content.byteLength >= first.size) return first
+    const result = new Uint8Array(first.size)
+    result.set(first.content, 0)
+    let offset = first.content.byteLength
+    while (offset < first.size) {
+      const next = this.#runs.readArtifact(runId, artifactId, offset, Math.min(chunkBytes, first.size - offset))
+      if (next == null || next.content.byteLength == 0) break
+      result.set(next.content, offset)
+      offset += next.content.byteLength
+    }
+    return { content: result, size: first.size }
+  }
+
   #upload(runId: string, call: RuntimeCapabilityCall, id: JsonValue | undefined): Upload & { readonly id: string } {
     if (id === undefined) {
       const created = { bytes: 0, invocationId: call.invocationId, jobId: call.jobId!, parts: [], runId }

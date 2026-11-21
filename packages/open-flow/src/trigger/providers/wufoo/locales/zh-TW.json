@@ -1,0 +1,14 @@
+{
+  "wufoo.on_form_entry": {
+    "displayName": "表單項目",
+    "description": "當 Wufoo 表單收到新提交項目時觸發。",
+    "configInputs": {
+      "formHash": "Wufoo 表單雜湊識別碼。"
+    },
+    "outputs": {
+      "entryId": "唯一的 Wufoo 表單項目 ID。",
+      "formHash": "Wufoo 表單雜湊識別碼。",
+      "body": "原始 Webhook 或輪詢事件資料。"
+    }
+  }
+}

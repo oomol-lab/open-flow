@@ -1,0 +1,12 @@
+{
+  "thehive.on_event": {
+    "displayName": "警示或案件事件",
+    "description": "輪詢 TheHive 中新增或更新的警示與案件。",
+    "configInputs": {
+      "resourceType": "要監控的資源類型。"
+    },
+    "outputs": {
+      "events": "本批次輪詢偵測到的 TheHive 警示或案件。"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "box.on_item_event": {
+    "displayName": "文件或文件夹事件",
+    "description": "当选定的 Box 文件或文件夹发生事件时触发。",
+    "configInputs": {
+      "targetType": "要监控的 Box 项目类型（文件或文件夹）。",
+      "targetId": "要监控的 Box 文件或文件夹 ID。",
+      "triggers": "要订阅的 Box Webhook 触发事件。"
+    },
+    "outputs": {
+      "event": "触发本次运行的事件类型。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "targetId": "发生事件的 Box 文件或文件夹 ID。",
+      "targetType": "发生事件的 Box 项目类型（文件或文件夹）。",
+      "body": "原始 Webhook 或轮询事件数据。"
+    }
+  }
+}

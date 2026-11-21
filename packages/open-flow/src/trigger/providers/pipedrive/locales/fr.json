@@ -1,7 +1,7 @@
 {
   "pipedrive.on_crm_event": {
-    "displayName": "Événement de transaction ou de contact",
-    "description": "Événement de transaction ou de contact.",
+    "displayName": "Événement CRM",
+    "description": "Reçoit les événements de création, mise à jour ou suppression de transactions, contacts ou organisations via Pipedrive Webhooks v2.",
     "configInputs": {
       "eventType": "Événement"
     },

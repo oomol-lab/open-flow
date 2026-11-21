@@ -8,6 +8,7 @@ import type {
   ConnectorProvider,
 } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { LookupAddress } from 'node:dns'
 import type { Logger } from 'pino'
 import type { ConnectorAccessContext, ConnectorHost } from './connector-contract.ts'
 import type { ResponseBudget, RuntimeAction } from './connector-response.ts'
@@ -15,6 +16,11 @@ import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-ac
 
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
+import { lookup as dnsLookup } from 'node:dns'
+import { request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
+import { BlockList, isIP } from 'node:net'
+import { Readable } from 'node:stream'
 import { silentLogger } from '../logger.ts'
 import { accessInvalid, assertConnectionNotDeferred, connectionRequired, ConnectorTaskError, unavailable } from './connector-contract.ts'
 import {
@@ -184,6 +190,7 @@ export class ConnectorClient implements ConnectorHost {
   readonly #logger: Logger
   readonly #origin: URL
   readonly #teamOrigin?: URL
+  readonly #timeoutMs: number
   readonly #transport: ConnectorTransport
   readonly #token: string
   readonly #teamAccess = new Map<string, { readonly expiresAt: number; readonly value: TeamAppAccess }>()
@@ -204,6 +211,7 @@ export class ConnectorClient implements ConnectorHost {
       this.#apiOrigin = new URL(`https://api.${domain}/`)
       this.#teamOrigin = new URL(`https://relation-control.${domain}/`)
     }
+    this.#timeoutMs = timeoutMs
     this.#transport = new ConnectorTransport(url, token, timeoutMs, this.#logger)
     this.#token = token
   }
@@ -854,6 +862,101 @@ export class ConnectorClient implements ConnectorHost {
     )
   }
 
+  async uploadTransitFile(
+    file: { readonly name: string; readonly mediaType?: string; readonly content: Uint8Array },
+    signal: AbortSignal,
+  ): Promise<{ readonly fileId: string; readonly downloadUrl: string; readonly sizeBytes: number; readonly name: string; readonly mimeType: string }> {
+    const url = new URL('api/files', this.#origin)
+    const form = new FormData()
+    const mimeType = file.mediaType ?? 'application/octet-stream'
+    form.append('file', new File([Uint8Array.from(file.content)], file.name, { type: mimeType }), file.name)
+    const headers: Record<string, string> = {}
+    if (this.#token.length > 0) headers.authorization = `Bearer ${this.#token}`
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(this.#timeoutMs)])
+    let response: Response
+    try {
+      response = await fetch(url, { method: 'POST', headers, body: form, redirect: 'error', signal: requestSignal })
+    } catch (error) {
+      if (signal.aborted) throw signal.reason
+      throw unavailable(error instanceof Error ? `Connector transit file upload failed: ${error.message}` : 'Connector transit file upload failed.')
+    }
+    if (!response.ok) throw unavailable(`Connector transit file upload failed with HTTP ${response.status}.`)
+    let body: unknown
+    try {
+      body = (await response.json()) as unknown
+    } catch {
+      throw unavailable('Connector transit file upload returned invalid JSON.')
+    }
+    const data = record(body) && record(body.data) ? body.data : record(body) ? body : undefined
+    if (
+      data == null ||
+      typeof data.fileId != 'string' ||
+      typeof data.downloadUrl != 'string' ||
+      typeof data.sizeBytes != 'number' ||
+      typeof data.name != 'string' ||
+      typeof data.mimeType != 'string'
+    ) {
+      throw unavailable('Connector transit file upload returned an invalid response.')
+    }
+    return {
+      fileId: data.fileId,
+      downloadUrl: data.downloadUrl,
+      sizeBytes: data.sizeBytes,
+      name: data.name,
+      mimeType: data.mimeType,
+    }
+  }
+
+  async downloadTransitFile(
+    downloadUrl: string,
+    signal: AbortSignal,
+    maxBytes = 10 * 1024 * 1024,
+  ): Promise<{ readonly content: Uint8Array; readonly mediaType?: string }> {
+    let target: URL
+    try {
+      target = new URL(downloadUrl, this.#origin)
+    } catch {
+      throw nonRetryableTransitError('Connector transit download URL is invalid.')
+    }
+    if (target.protocol != 'http:' && target.protocol != 'https:') {
+      throw nonRetryableTransitError('Connector transit download URL must use HTTP or HTTPS.')
+    }
+    const sameOrigin = target.origin === this.#origin.origin
+    if (!sameOrigin && isRestrictedTransitHost(target.hostname)) {
+      throw nonRetryableTransitError('Connector transit download URL targets a restricted host.')
+    }
+    const headers: Record<string, string> = {}
+    // Only send the Connector bearer token to the trusted Connector origin itself.
+    if (sameOrigin && this.#token.length > 0) {
+      headers.authorization = `Bearer ${this.#token}`
+    }
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(this.#timeoutMs)])
+    let response: Response
+    try {
+      response = sameOrigin
+        ? await fetch(target, { method: 'GET', headers, redirect: 'error', signal: requestSignal })
+        : await requestPublicTransitFile(target, requestSignal)
+    } catch (error) {
+      if (error instanceof ConnectorTaskError) throw error
+      if (signal.aborted) throw signal.reason
+      throw nonRetryableTransitError(
+        error instanceof Error ? `Connector transit file download failed: ${error.message}` : 'Connector transit file download failed.',
+      )
+    }
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined)
+      throw nonRetryableTransitError(`Connector transit file download failed with HTTP ${response.status}.`, response.status)
+    }
+    const contentLength = Number(response.headers.get('content-length'))
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      void response.body?.cancel().catch(() => undefined)
+      throw nonRetryableTransitError('Connector transit file exceeds the Run Artifact size limit.')
+    }
+    const buffer = await readBoundedBytes(response, maxBytes, signal, nonRetryableTransitError)
+    const mediaType = response.headers.get('content-type') ?? undefined
+    return { content: buffer, mediaType }
+  }
+
   async #connections(serviceId?: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {
     const path = serviceId == null ? 'v1/apps' : `v1/apps/services/${encodeURIComponent(serviceId)}`
     return this.#transport.get(
@@ -912,4 +1015,157 @@ function accessRequired(): ConnectorTaskError {
 
 function actionNotFound(): ConnectorTaskError {
   return new ConnectorTaskError('connector.action-not-found', 'The Connector Action was not found.')
+}
+
+function nonRetryableTransitError(message: string, status?: number): ConnectorTaskError {
+  return new ConnectorTaskError('connector.unavailable', message, status, { retryable: false })
+}
+
+const restrictedTransitAddresses = /*#__PURE__*/ (() => {
+  const list = new BlockList()
+  for (const [network, prefix] of [
+    ['0.0.0.0', 8],
+    ['10.0.0.0', 8],
+    ['100.64.0.0', 10],
+    ['127.0.0.0', 8],
+    ['169.254.0.0', 16],
+    ['172.16.0.0', 12],
+    ['192.168.0.0', 16],
+    ['198.18.0.0', 15],
+    ['224.0.0.0', 3],
+  ] as const) {
+    list.addSubnet(network, prefix, 'ipv4')
+  }
+  for (const [network, prefix] of [
+    ['::', 128],
+    ['::1', 128],
+    ['fc00::', 7],
+    ['fe80::', 10],
+    ['ff00::', 8],
+  ] as const) {
+    list.addSubnet(network, prefix, 'ipv6')
+  }
+  return list
+})()
+
+/** Rejects loopback, private, link-local, shared, benchmark, multicast, and IPv4-mapped IPv6 addresses. */
+function isRestrictedTransitAddress(address: string): boolean {
+  const family = isIP(address)
+  if (family === 0) return true
+  if (family === 6 && address.toLowerCase().startsWith('::ffff:')) return true
+  return restrictedTransitAddresses.check(address, family === 4 ? 'ipv4' : 'ipv6')
+}
+
+/** Early rejection for local host names and restricted IP literals; resolved names are checked at connect time. */
+function isRestrictedTransitHost(rawHostname: string): boolean {
+  const host = rawHostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host === 'metadata.google.internal') {
+    return true
+  }
+  return isIP(host) !== 0 && isRestrictedTransitAddress(host)
+}
+
+/**
+ * Resolves the host once and hands only validated addresses to the socket, so the checked address is the one
+ * connected to (no second resolution that DNS rebinding could change).
+ */
+const restrictedTransitLookup: NonNullable<Parameters<typeof httpRequest>[1]['lookup']> = (hostname, options, callback) => {
+  dnsLookup(hostname, { ...options, all: true, verbatim: true }, (error, addresses) => {
+    if (error) {
+      callback(nonRetryableTransitError('Connector transit download host could not be resolved.'), '', 0)
+      return
+    }
+    if (addresses.length === 0 || addresses.some((entry) => isRestrictedTransitAddress(entry.address))) {
+      callback(nonRetryableTransitError('Connector transit download URL resolved to a restricted address.'), '', 0)
+      return
+    }
+    if (options.all) {
+      ;(callback as unknown as (error: null, addresses: readonly LookupAddress[]) => void)(null, addresses)
+      return
+    }
+    callback(null, addresses[0]!.address, addresses[0]!.family)
+  })
+}
+
+/** Downloads an external transit file without following redirects, connecting only to validated public addresses. */
+function requestPublicTransitFile(target: URL, signal: AbortSignal): Promise<Response> {
+  const request = target.protocol === 'https:' ? httpsRequest : httpRequest
+  return new Promise((resolve, reject) => {
+    const outgoing = request(
+      target,
+      { method: 'GET', agent: false, headers: { 'accept-encoding': 'identity' }, lookup: restrictedTransitLookup, signal },
+      (incoming) => {
+        try {
+          const encoding = incoming.headers['content-encoding']?.trim().toLowerCase()
+          if (encoding && encoding !== 'identity') {
+            throw nonRetryableTransitError('Connector transit file uses an unsupported content encoding.')
+          }
+          const headers = new Headers()
+          for (const [name, value] of Object.entries(incoming.headers)) {
+            if (value === undefined) continue
+            for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item)
+          }
+          const status = incoming.statusCode ?? 502
+          const nullBody = status === 204 || status === 205 || status === 304
+          const body = nullBody ? null : (Readable.toWeb(incoming) as unknown as ReadableStream<Uint8Array>)
+          const response = new Response(body, { status, headers })
+          if (nullBody) incoming.resume()
+          resolve(response)
+        } catch (error) {
+          incoming.destroy()
+          reject(
+            error instanceof ConnectorTaskError
+              ? error
+              : nonRetryableTransitError(
+                  error instanceof Error ? `Connector transit file response is invalid: ${error.message}` : 'Connector transit file response is invalid.',
+                ),
+          )
+        }
+      },
+    )
+    // Node does not call the response callback for upgrades and closes the socket without a listener.
+    outgoing.on('upgrade', (_response, socket) => {
+      socket.destroy()
+      reject(nonRetryableTransitError('Connector transit file download does not support protocol upgrades.'))
+    })
+    outgoing.on('error', reject)
+    // Settles any path where the request closes before a response arrives; later calls are no-ops.
+    outgoing.on('close', () => reject(nonRetryableTransitError('Connector transit file download closed before a response was received.')))
+    outgoing.end()
+  })
+}
+
+async function readBoundedBytes(
+  response: Response,
+  maxBytes: number,
+  signal: AbortSignal,
+  createError: (message: string) => ConnectorTaskError,
+): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array()
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined)
+        throw createError('Connector transit file exceeds the Run Artifact size limit.')
+      }
+      chunks.push(value)
+    }
+  } catch (error) {
+    if (error instanceof ConnectorTaskError) throw error
+    if (signal.aborted) throw signal.reason
+    throw createError(error instanceof Error ? `Connector transit file read failed: ${error.message}` : 'Connector transit file read failed.')
+  }
+  const result = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return result
 }

@@ -1,0 +1,16 @@
+{
+  "mailchimp.on_audience_event": {
+    "displayName": "受眾事件",
+    "description": "當 Mailchimp 受眾發生訂閱或活動事件時觸發。",
+    "configInputs": {
+      "listId": "Mailchimp 受眾清單 ID。",
+      "events": "觸發執行的 Webhook 事件。"
+    },
+    "outputs": {
+      "event": "觸發本次執行的事件類型。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "listId": "Mailchimp 受眾清單 ID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
+    }
+  }
+}

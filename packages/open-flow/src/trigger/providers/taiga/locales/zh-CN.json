@@ -1,0 +1,17 @@
+{
+  "taiga.on_project_event": {
+    "displayName": "项目事件",
+    "description": "当 Taiga 项目发生选定的 Webhook 事件时触发。",
+    "configInputs": {
+      "projectId": "要监控的 Taiga 项目数字 ID。",
+      "types": "可选，要筛选的 Taiga 实体类型。",
+      "actions": "要订阅的 Webhook 动作类型。"
+    },
+    "outputs": {
+      "entityType": "Taiga 实体类型。",
+      "action": "事件动作名称。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
+    }
+  }
+}

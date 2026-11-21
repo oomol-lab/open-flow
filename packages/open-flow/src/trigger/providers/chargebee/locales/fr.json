@@ -1,0 +1,12 @@
+{
+  "chargebee.on_event": {
+    "displayName": "Billing Event",
+    "description": "Polls Chargebee events for customer, subscription, invoice, and payment changes.",
+    "configInputs": {
+      "eventTypes": "Optional event types to filter polled events."
+    },
+    "outputs": {
+      "events": "Chargebee events detected in this poll batch."
+    }
+  }
+}

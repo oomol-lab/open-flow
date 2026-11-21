@@ -1,0 +1,12 @@
+{
+  "thehive.on_event": {
+    "displayName": "Alert or Case Event",
+    "description": "Polls TheHive for new or updated alerts or cases.",
+    "configInputs": {
+      "resourceType": "Resource type to monitor."
+    },
+    "outputs": {
+      "events": "TheHive alerts or cases detected in this poll batch."
+    }
+  }
+}

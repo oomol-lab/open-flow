@@ -41,6 +41,11 @@ export interface ConnectorHost {
   ): Promise<unknown>
   ready(): Promise<boolean>
   searchActions(query: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorActionMetadata[]>
+  uploadTransitFile?(
+    file: { readonly name: string; readonly mediaType?: string; readonly content: Uint8Array },
+    signal: AbortSignal,
+  ): Promise<{ readonly fileId: string; readonly downloadUrl: string; readonly sizeBytes: number; readonly name: string; readonly mimeType: string }>
+  downloadTransitFile?(downloadUrl: string, signal: AbortSignal, maxBytes?: number): Promise<{ readonly content: Uint8Array; readonly mediaType?: string }>
 }
 
 interface ConnectorContext {

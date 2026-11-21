@@ -1,7 +1,7 @@
 {
   "pipedrive.on_crm_event": {
-    "displayName": "取引・連絡先イベント",
-    "description": "取引・連絡先イベントを受信します。",
+    "displayName": "CRM イベント",
+    "description": "Pipedrive Webhooks v2 を使用して取引・連絡先・組織の作成、更新、削除、および取引ステージ/ステータス変更イベントを受信します。",
     "configInputs": {
       "eventType": "イベント"
     },

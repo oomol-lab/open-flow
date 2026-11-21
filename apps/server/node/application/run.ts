@@ -32,6 +32,7 @@ import { executeOpenApi } from '../deployment/openapi.ts'
 import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { errorKind } from '../logger.ts'
 import { supportsIsolatedVmEngine, IsolatedVmError, IsolatedVmHost } from '../runtime/isolated-vm.ts'
+import { bridgeConnectorOutputArtifacts, prepareConnectorInputsWithArtifacts } from './connector-artifacts.ts'
 import { checkCodeActions, checkCodePermissions, checkConnectorProxies } from './connector-capabilities.ts'
 import { ExecutionSlots } from './execution-slots.ts'
 import { decodedRevision, preparedRevision } from './revision-cache.ts'
@@ -597,16 +598,35 @@ export class RunExecutor {
         )
       }
       case 'connector': {
-        const input = normalizeConnectorRuntimeInputs(
-          task.inputs.filter((port) => 'handle' in port),
-          invocation.input,
-        )
-        return connectors.execute(executor.action, executor.connectionId, input, {
+        const inputPorts = task.inputs.filter((port) => 'handle' in port)
+        const normalizedInput = normalizeConnectorRuntimeInputs(inputPorts, invocation.input)
+        const connector = this.#resolveConnector()
+        const input =
+          connector == null
+            ? normalizedInput
+            : await prepareConnectorInputsWithArtifacts(inputPorts, normalizedInput, {
+                runId: run.runId,
+                artifacts: this.#artifacts,
+                connector,
+                signal: invocation.signal,
+              })
+        const result = await connectors.execute(executor.action, executor.connectionId, input, {
           jobId: invocation.jobId,
           invocationId: invocation.invocationId,
           signal: invocation.signal,
           retryIntervalMs: node.retry?.intervalMs ?? 0,
           access: { ...access, scope: 'action', action: executor.action, connectionId: executor.connectionId },
+        })
+        if (connector == null) return result
+        return bridgeConnectorOutputArtifacts(result, {
+          runId: run.runId,
+          nodeId: invocation.nodeId,
+          jobId: invocation.jobId,
+          artifacts: this.#artifacts,
+          connector,
+          signal: invocation.signal,
+          outputPorts: task.outputs.filter((port) => 'handle' in port),
+          emit,
         })
       }
       case 'decision': {

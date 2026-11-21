@@ -1,0 +1,18 @@
+{
+  "box.on_item_event": {
+    "displayName": "檔案或資料夾事件",
+    "description": "當選定的 Box 檔案或資料夾發生事件時觸發。",
+    "configInputs": {
+      "targetType": "要監控的 Box 項目類型（檔案或資料夾）。",
+      "targetId": "要監控的 Box 檔案或資料夾 ID。",
+      "triggers": "要訂閱的 Box Webhook 觸發事件。"
+    },
+    "outputs": {
+      "event": "觸發本次執行的事件類型。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "targetId": "發生事件的 Box 檔案或資料夾 ID。",
+      "targetType": "發生事件的 Box 項目類型（檔案或資料夾）。",
+      "body": "原始 Webhook 或輪詢事件資料。"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "wise.on_event": {
+    "displayName": "转账或余额事件",
+    "description": "当 Wise 账户发生选定的转账或余额事件时触发。",
+    "configInputs": {
+      "profileId": "用于 Webhook 订阅的 Wise 资料 ID。",
+      "triggerOn": "要订阅的 Wise Webhook 事件类型。"
+    },
+    "outputs": {
+      "event": "触发本次运行的事件类型。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "body": "原始 Webhook 或轮询事件数据。"
+    }
+  }
+}

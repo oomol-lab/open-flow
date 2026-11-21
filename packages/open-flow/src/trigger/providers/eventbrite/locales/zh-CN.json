@@ -1,0 +1,17 @@
+{
+  "eventbrite.on_event": {
+    "displayName": "Eventbrite 事件",
+    "description": "当 Eventbrite 发生选定的订单、参会者或活动事件时触发。",
+    "configInputs": {
+      "organizationId": "Eventbrite 组织 ID。",
+      "eventId": "可选，用于筛选的 Eventbrite 活动 ID。",
+      "actions": "要订阅的 Webhook 动作类型。"
+    },
+    "outputs": {
+      "action": "事件动作名称。",
+      "deliveryId": "此事件的唯一投递 ID。",
+      "apiUrl": "事件资源对应的 Eventbrite API URL。",
+      "body": "原始 Webhook 或轮询事件数据。"
+    }
+  }
+}

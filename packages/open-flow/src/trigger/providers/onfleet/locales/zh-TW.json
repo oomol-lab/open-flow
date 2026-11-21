@@ -1,0 +1,15 @@
+{
+  "onfleet.on_task_event": {
+    "displayName": "任務或配送員事件",
+    "description": "當 Onfleet 發生選定的配送任務或人員事件時觸發。",
+    "configInputs": {
+      "trigger": "要訂閱的 Onfleet Webhook 觸發事件。"
+    },
+    "outputs": {
+      "triggerName": "Onfleet 觸發事件名稱。",
+      "deliveryId": "此事件的唯一投遞 ID。",
+      "taskId": "關聯的 Onfleet 任務 ID。",
+      "body": "原始 Webhook 或輪詢事件資料。"
+    }
+  }
+}
