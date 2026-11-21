@@ -16,7 +16,10 @@ export const artifactLimits: ArtifactLimits = {
 }
 
 const chunkBytes = 512 * 1024
-const base64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+// A single character class: a repeated group overflows V8's stack on large strings.
+function isBase64(value: string): boolean {
+  return value.length % 4 == 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value)
+}
 
 export class ArtifactHostError extends Error {
   readonly catchable = false
@@ -131,7 +134,7 @@ export class RunArtifacts {
   }
 
   #append(upload: Upload, data: JsonValue | undefined): void {
-    if (typeof data != 'string' || !base64.test(data)) throw new ArtifactHostError('capability.invalid', 'Artifact content must be base64.')
+    if (typeof data != 'string' || !isBase64(data)) throw new ArtifactHostError('capability.invalid', 'Artifact content must be base64.')
     const part = Buffer.from(data, 'base64')
     if (part.length > chunkBytes) throw new ArtifactHostError('capability.invalid', 'Artifact chunks must not exceed 512 KiB.')
     upload.bytes += part.length

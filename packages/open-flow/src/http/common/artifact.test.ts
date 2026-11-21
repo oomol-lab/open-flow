@@ -85,7 +85,12 @@ describe('Provider API Artifact responses', () => {
       mediaType: 'application/json',
     })
     expect(connectorProxyArtifactContent({ data: null, status: 204 }, '/')).toEqual({ bytes: new Uint8Array(0), name: 'response' })
-    for (const data of [{ bytes: [0] }, 'not base64!', null])
+    // 8 MiB is past the size at which a repeated-group base64 regex overflows V8's stack.
+    const groups = Math.ceil((8 * 1024 * 1024) / 3)
+    const decoded = connectorProxyArtifactContent({ data: 'BwcH'.repeat(groups), status: 200, bodyEncoding: 'base64' }, '/').bytes
+    expect(decoded.length).toBe(groups * 3)
+    expect(decoded.every((byte) => byte === 7)).toBe(true)
+    for (const data of [{ bytes: [0] }, 'not base64!', 'AA=A', 'A===', null])
       expect(() => connectorProxyArtifactContent({ data, status: 200, bodyEncoding: 'base64' }, '/')).toThrow(ConnectorProxyResponseInvalid)
   })
 })

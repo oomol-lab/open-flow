@@ -1482,7 +1482,8 @@ describe('Server Connector client', () => {
   })
 
   it('downloads a Provider file larger than the 1 MiB transport default and rejects envelopes above the proxy budget', async () => {
-    let data = encodedMegabytes(3)
+    // 8 MiB is past the size at which a repeated-group base64 regex overflows V8's stack.
+    let data = encodedMegabytes(8)
     const origin = await startConnector((request, response) => {
       if (request.url == '/v1/providers') return send(response, 200, success([{ service: 'public', displayName: 'Public', authTypes: ['no_auth'] }]))
       send(response, 200, success({ data, status: 200, bodyEncoding: 'base64', headers: { 'content-type': 'application/octet-stream' } }))
@@ -1491,7 +1492,7 @@ describe('Server Connector client', () => {
     const flow = proxyFlow({ providerId: 'public', connectionId: undefined, responseFormat: 'artifact' })
     const downloaded = await run(service, flow)
     expect(service.run(downloaded)).toMatchObject({ status: 'completed' })
-    expect(service.events(downloaded).find((event) => event.kind == 'node.artifact')).toMatchObject({ payload: { artifact: { size: 3 * 1024 * 1024 } } })
+    expect(service.events(downloaded).find((event) => event.kind == 'node.artifact')).toMatchObject({ payload: { artifact: { size: 8 * 1024 * 1024 } } })
 
     // 25 MiB encodes to more than the 32 MiB envelope budget and fails before any Artifact is stored.
     data = encodedMegabytes(25)

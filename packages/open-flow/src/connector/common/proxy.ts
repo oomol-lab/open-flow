@@ -134,9 +134,13 @@ export class ConnectorProxyResponseInvalid extends Error {}
 
 /** Declared base64 must be a well-formed string; anything else is a Connector protocol error, never substituted bytes. */
 function base64Bytes(data: unknown): Uint8Array {
-  if (typeof data !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(data))
+  // A single character class: a repeated group overflows V8's stack on multi-MiB bodies.
+  if (typeof data !== 'string' || data.length % 4 != 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data))
     throw new ConnectorProxyResponseInvalid('The Connector returned an invalid base64 response body.')
-  return Uint8Array.from(atob(data), (character) => character.charCodeAt(0))
+  const binary = atob(data)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+  return bytes
 }
 
 /**
