@@ -33,6 +33,91 @@ const operation = {
 afterEach(() => vi.useRealTimers())
 
 describe('PublicationStore', () => {
+  it('tracks an accepted publish and refreshes Live when browser storage is full', async () => {
+    const flowId = publication.flowId
+    const pending = { ...operation, publicationId: undefined, status: 'pending' }
+    let published = false
+    const live = () =>
+      published
+        ? { flowId, hasUnpublishedChanges: false, publication, revision: 1, status: 'runnable', version: 1 }
+        : { flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 }
+    const flow = {
+      createdAt: timestamp,
+      draftRevisionId: publication.revisionId,
+      flowId,
+      name: 'Main',
+      resourceReferences: {
+        draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+        sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+      },
+      status: 'active',
+      updatedAt: timestamp,
+      version: 1,
+    }
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [{ ...flow, referenceCount: 0 }], total: 1, version: 1 })
+      if (path == `/v1/flows/${flowId}/editor`) {
+        return Response.json({
+          draft: {
+            actorId: 'actor',
+            content: { document: { bindings: {}, graph: { edges: [], nodes: {} } }, modelVersion: currentFlowModelVersion, modules: {} },
+            createdAt: timestamp,
+            digest: publication.revisionDigest,
+            flowId,
+            modelVersion: currentFlowModelVersion,
+            parentRevisionId: null,
+            revisionId: publication.revisionId,
+            version: 1,
+          },
+          flow,
+          live: live(),
+          presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
+          version: 1,
+        })
+      }
+      if (path == `/v1/flows/${flowId}/revisions/${publication.revisionId}/publications`) return Response.json(pending, { status: 202 })
+      if (path == `/v1/flows/${flowId}/publish-operations/${operation.operationId}`) {
+        published = true
+        return Response.json(operation)
+      }
+      if (path == `/v1/flows/${flowId}/live`) return Response.json(live())
+      if (path.includes('/publications?')) return Response.json({ publications: published ? [publication] : [], total: published ? 1 : 0, version: 1 })
+      if (path.endsWith('/triggers')) return Response.json({ bindings: [], flowId, version: 1 })
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(request)
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const notice = vi.fn()
+    const preferences = {
+      getItem: () => {
+        throw new DOMException('Storage is unavailable', 'SecurityError')
+      },
+      setItem: vi.fn(() => {
+        throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+      }),
+    }
+    const store = new PublicationStore(client, workspace, notice, preferences)
+
+    try {
+      await workspace.start(flowId)
+      const succeeded = await store.publish()
+      expect(preferences.setItem).toHaveBeenCalledWith(`publish-operation:${flowId}`, operation.operationId)
+      expect(succeeded).toBe(true)
+      expect(store.$.operation.value).toEqual(operation)
+      expect(store.$.live.value?.publication).toEqual(publication)
+      expect(store.$.publications.value).toEqual([publication])
+      expect(notice.mock.calls).toEqual([[expect.objectContaining({ kind: 'success' })]])
+
+      store.reset()
+      await store.load(flowId)
+      expect(store.$.loadFailed.value).toBe(false)
+      expect(store.$.live.value?.publication).toEqual(publication)
+    } finally {
+      store.dispose()
+      workspace.dispose()
+    }
+  })
+
   it('reads a stored Publish operation before its Live and Publication snapshot', async () => {
     const requests: string[] = []
     const accepted = Promise.withResolvers<Response>()

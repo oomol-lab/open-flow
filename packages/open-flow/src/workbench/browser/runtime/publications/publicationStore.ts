@@ -321,7 +321,7 @@ export class PublicationStore {
     try {
       const operation = await this.#client.publishFlow(flow.flowId, draft.revisionId, expectedLivePublicationId, { idempotencyKey: attempt.key })
       if (!current()) return false
-      this.#preferences.setItem(this.#operationKey(target.flowId), operation.operationId)
+      this.#writeOperationId(target.flowId, operation.operationId)
       this.#set({ operation, publishing: operation.status == 'pending' })
       return await this.#observe(target, operation, current, flow.name)
     } catch (error) {
@@ -525,13 +525,18 @@ export class PublicationStore {
   }
 
   async #storedOperation(target: Target): Promise<PublishOperation | undefined> {
-    const operationId = this.#preferences.getItem(this.#operationKey(target.flowId))
+    let operationId: string | null
+    try {
+      operationId = this.#preferences.getItem(this.#operationKey(target.flowId))
+    } catch {
+      return
+    }
     if (operationId == null || operationId == '') return
     try {
       return await this.#client.getPublishOperation(target.flowId, operationId)
     } catch (error) {
       if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
-        this.#preferences.setItem(this.#operationKey(target.flowId), '')
+        this.#writeOperationId(target.flowId, '')
         return
       }
       throw error
@@ -594,7 +599,7 @@ export class PublicationStore {
         if ('error' in result) {
           const error = result.error
           if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
-            this.#preferences.setItem(this.#operationKey(target.flowId), '')
+            this.#writeOperationId(target.flowId, '')
             this.#setTarget(target, { operation: undefined, publishing: false })
             this.#setNotice(errorNotice(error, this.#i18n.t))
             return undefined
@@ -616,6 +621,14 @@ export class PublicationStore {
 
   #operationKey(flowId: string): string {
     return `publish-operation:${flowId}`
+  }
+
+  #writeOperationId(flowId: string, operationId: string): void {
+    try {
+      this.#preferences.setItem(this.#operationKey(flowId), operationId)
+    } catch {
+      // This reference is only needed to resume tracking after leaving the Flow.
+    }
   }
 
   #setTarget(target: Target, patch: Partial<PublicationState>): void {
