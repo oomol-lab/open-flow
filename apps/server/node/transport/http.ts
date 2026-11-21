@@ -10,8 +10,13 @@ import { controlRequests, waitActionBodySchema } from '@oomol-lab/open-flow/cont
 import { artifactContentDisposition, artifactMediaType } from '@oomol-lab/open-flow/http-request'
 import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
 import {
+  isWebhookFormContentType,
   maximumWebhookBodyBytes,
+  renderWebhookFormPage,
   verifyWebhookAuthentication,
+  WebhookFormInvalid,
+  webhookFormBody,
+  webhookFormPageHeaders,
   webhookEndpointId,
   webhookOutputHeaders,
   webhookOccurrenceId,
@@ -102,7 +107,8 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     context.header('x-request-id', requestId)
     context.header('cross-origin-opener-policy', 'same-origin')
     context.header('permissions-policy', 'camera=(), geolocation=(), microphone=()')
-    context.header('referrer-policy', 'no-referrer')
+    // A hosted Webhook form keeps its origin for its own POST; every other response sends no referrer.
+    if (!context.res.headers.has('referrer-policy')) context.header('referrer-policy', 'no-referrer')
     context.header('x-content-type-options', 'nosniff')
     context.header('x-frame-options', 'DENY')
     const fields = {
@@ -481,6 +487,10 @@ async function integration(
     : await handleIntegration(service, endpointId, request, logger, requestId, () => admitCallback(`integration:${endpointId}`))
 }
 
+/**
+ * A Webhook with a hosted form serves its page on GET and answers browser form submissions with a result page. All
+ * other requests, including JSON POSTs to the same endpoint, keep the ordinary Webhook contract.
+ */
 async function webhook(
   service: ServerService,
   request: Request,
@@ -488,6 +498,52 @@ async function webhook(
   requestId: string,
   admitCallback: (key: string) => number | undefined,
   shutdownSignal?: AbortSignal,
+): Promise<Response> {
+  const endpointId = webhookEndpointId(new URL(request.url))
+  let target: ReturnType<ServerService['webhookTarget']>
+  try {
+    target = endpointId == null ? undefined : service.webhookTarget(endpointId)
+  } catch {
+    // webhookRequest repeats the lookup and reports the failure as 503.
+    target = undefined
+  }
+  // Diagnostics reject a form on any other method, so a stale draft never turns a GET Webhook into a page.
+  const form = target?.trigger.method == 'POST' ? target.trigger.options?.form : undefined
+  if (target == null || form == null) return await webhookRequest(service, request, logger, requestId, admitCallback, shutdownSignal)
+  const page = (status?: number, retryAfter?: string | null) =>
+    new Response(
+      request.method == 'HEAD'
+        ? null
+        : renderWebhookFormPage({
+            form,
+            name: target.trigger.name,
+            bodyFields: target.trigger.bodyFields,
+            acceptLanguage: requestHeader(request, 'accept-language'),
+            ...(status == null ? {} : { result: { status } }),
+          }),
+      {
+        headers: { ...webhookFormPageHeaders, ...(retryAfter == null ? {} : { 'retry-after': retryAfter }) },
+        status: status == null || (status >= 200 && status < 300) ? 200 : status,
+      },
+    )
+  if (request.method == 'GET' || request.method == 'HEAD') {
+    const retryAfter = admitCallback(`webhook:${endpointId}`)
+    return retryAfter == null ? page() : page(429, String(retryAfter))
+  }
+  if (request.method != 'POST' || !isWebhookFormContentType(requestHeader(request, 'content-type')))
+    return await webhookRequest(service, request, logger, requestId, admitCallback, shutdownSignal)
+  const result = await webhookRequest(service, request, logger, requestId, admitCallback, shutdownSignal, true)
+  return page(result.status, result.headers.get('retry-after'))
+}
+
+async function webhookRequest(
+  service: ServerService,
+  request: Request,
+  logger: Logger,
+  requestId: string,
+  admitCallback: (key: string) => number | undefined,
+  shutdownSignal?: AbortSignal,
+  formSubmission = false,
 ): Promise<Response> {
   const endpointId = webhookEndpointId(new URL(request.url))
   if (endpointId == null) return plain(404)
@@ -502,7 +558,9 @@ async function webhook(
     origin = corsOrigin(requestOrigin, target.trigger.options?.allowedOrigins)
     const preflightResponse = preflight(request, configuredMethod, origin)
     if (preflightResponse != null) return preflightResponse
-    if (requestOrigin != null && origin == null) return plain(403)
+    // A hosted form posts from the endpoint's own origin. allowedOrigins governs API callers only, so even "*" never
+    // admits an opaque (`null`) or foreign origin for a form submission.
+    if (formSubmission ? requestOrigin != null && !sameHost(requestOrigin, request) : requestOrigin != null && origin == null) return plain(403)
     const method = request.method
     if (method !== configuredMethod) return plain(405, { allow: configuredMethod }, origin)
     const authentication = target.trigger.options?.authentication
@@ -516,7 +574,11 @@ async function webhook(
         return plain(401, authentication.type == 'bearer' ? { 'www-authenticate': 'Bearer' } : undefined, origin)
     }
 
-    const body = webhookSupportsBody(configuredMethod) ? await readWebhookBody(request) : undefined
+    const body = !webhookSupportsBody(configuredMethod)
+      ? undefined
+      : formSubmission
+        ? await readWebhookFormBody(request, target.trigger.bodyFields)
+        : await readWebhookBody(request)
     const url = new URL(request.url)
     const query = Object.fromEntries(
       [...new Set(url.searchParams.keys())].map((key) => {
@@ -538,6 +600,8 @@ async function webhook(
     if (accepted == null) return plain(404)
     if (accepted.kind == 'conflict') return plain(409, undefined, origin)
     if (accepted.kind == 'overloaded') return plain(429, undefined, origin)
+    // The result page reports admission; a configured response status or body belongs to API callers only.
+    if (formSubmission) return plain(200, undefined, origin)
     const source = target.trigger.options?.responseBody
     if (source != null) {
       const signal = shutdownSignal == null ? request.signal : AbortSignal.any([request.signal, shutdownSignal])
@@ -685,6 +749,32 @@ function withOrigin(headers: Headers, origin: string | undefined): void {
 
 function requestHeader(request: Request, name: string): string | undefined {
   return request.headers.get(name) ?? undefined
+}
+
+async function readWebhookFormBody(request: Request, fields: Parameters<typeof webhookFormBody>[0]): Promise<JsonValue> {
+  const bytes = await readBody(request, maximumWebhookBodyBytes, () => new WebhookBodyTooLarge())
+  let data: FormData
+  try {
+    data = await new Response(new Blob([bytes as Uint8Array<ArrayBuffer>]), {
+      headers: { 'content-type': requestHeader(request, 'content-type') ?? '' },
+    }).formData()
+  } catch {
+    throw new WebhookRequestInvalid()
+  }
+  try {
+    return webhookFormBody(fields, data.entries())
+  } catch (error) {
+    if (error instanceof WebhookFormInvalid) throw new WebhookRequestInvalid()
+    throw error
+  }
+}
+
+function sameHost(origin: string, request: Request): boolean {
+  try {
+    return new URL(origin).host == (requestHeader(request, 'host') ?? new URL(request.url).host)
+  } catch {
+    return false
+  }
 }
 
 async function readWebhookBody(request: Request): Promise<JsonValue> {

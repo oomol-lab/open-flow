@@ -8,6 +8,7 @@ import { assertHttpAuthBindings } from '../../http/common/authBindings.ts'
 import { isHttpHost, maxHttpHosts } from '../../http/common/hosts.ts'
 import { httpRequestExecutorSchema } from '../../http/common/httpRequest.ts'
 import { skipDuplicatesExecutorSchema } from '../../state/common/state.ts'
+import { webhookFormLimits } from '../../trigger/common/webhookForm.ts'
 import { declaredFlowFeatures, flowFeaturesModelVersion, isKnownFlowFeature, UnsupportedFlowFeaturesError } from './features.ts'
 import { checkJsonDepth } from './json.ts'
 import { retryConfigurationSchema } from './retry.ts'
@@ -198,6 +199,14 @@ const webhookOptions = z.object({
     ])
     .optional(),
   bodyMode: z.enum(['any', 'fields']).optional(),
+  form: z
+    .strictObject({
+      description: z.string().max(webhookFormLimits.description).optional(),
+      submitLabel: z.string().max(webhookFormLimits.label).optional(),
+      successMessage: z.string().max(webhookFormLimits.description).optional(),
+      title: z.string().max(webhookFormLimits.label).optional(),
+    })
+    .optional(),
   noResponseBody: z.never().optional(),
   responseBody: z
     .discriminatedUnion('kind', [

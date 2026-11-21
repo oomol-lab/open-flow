@@ -938,7 +938,9 @@
         "webhook-response-header-output-type": "Choisissez du texte, un nombre, un booléen ou un objet contenant uniquement ces valeurs.",
         "webhook-response-status-output-type": "Choisissez une sortie numérique du workflow pour le code de statut.",
         "webhook-authentication-header-name": "Utilisez un nom d’en-tête HTTP valide non réservé par le transport Webhook.",
-        "webhook-response-artifact-output": "Choisissez la sortie du workflow qui contient le fichier de réponse."
+        "webhook-response-artifact-output": "Choisissez la sortie du workflow qui contient le fichier de réponse.",
+        "webhook-form-conflict": "Un formulaire hébergé exige la méthode POST, des champs de corps déclarés et une réponse immédiate, sans authentification.",
+        "webhook-form-field-unsupported": "Le champ de corps « {{field}} » ne peut pas être affiché dans le formulaire. Utilisez du texte, un nombre, un entier, un booléen ou un choix de texte."
       },
       "leina": {
         "robot-required": "Sélectionnez un robot Leina ou liez son identifiant à une source d’entrée."
@@ -1208,7 +1210,19 @@
     "responseBodyData": "Données",
     "responseBodyFile": "Fichier",
     "responseBodyFileHint": "Envoie un fichier créé pendant cette exécution. Son nom et son type de média enregistrés définissent Content-Type et Content-Disposition.",
-    "responseBodyChooseOutput": "Choisir une sortie"
+    "responseBodyChooseOutput": "Choisir une sortie",
+    "webhookForm": "Formulaire hébergé",
+    "webhookFormOff": "Désactivé",
+    "webhookFormOn": "Activé",
+    "webhookFormHint": "Ouvrir l’URL du Webhook dans un navigateur affiche un formulaire créé à partir des champs du corps. Chaque envoi démarre une exécution comme une requête POST.",
+    "webhookFormTitle": "Titre du formulaire",
+    "webhookFormTitlePlaceholder": "Nom du nœud par défaut",
+    "webhookFormDescription": "Description du formulaire",
+    "webhookFormSubmitLabel": "Texte du bouton d’envoi",
+    "webhookFormSubmitPlaceholder": "Envoyer",
+    "webhookFormSuccessMessage": "Message de confirmation",
+    "webhookFormSuccessPlaceholder": "Merci. Votre réponse a été envoyée.",
+    "webhookFormTooLong": "Saisissez au plus {{limit}} caractères."
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",

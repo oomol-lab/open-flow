@@ -226,6 +226,15 @@ describe('Model v16 features', () => {
     expect(serializeRevisionContent(plain).features).toEqual([])
   })
 
+  it('declares a hosted Webhook form so earlier readers cannot strip it', () => {
+    const form = content({ hook: webhook({ form: { submitLabel: 'Send', title: 'Contact' } }) })
+    expect(serializeRevisionContent(form).features).toEqual(['webhook-form'])
+    expect(requiredEngineCapabilities(form)).toEqual([])
+    expect(decodeRevision(encodeRevision(form))).toEqual(form)
+    expect(() => decodeRevisionContent({ ...serializeRevisionContent(form), features: [] })).toThrow()
+    expect(serializeRevisionContent(content({ hook: webhook({ form: {} }) })).features).toEqual(['webhook-form'])
+  })
+
   it('rejects features this package does not know without offering repair', () => {
     const unknown = envelope({ pause: delay }, { features: ['future-feature'] })
     expect(() => decodeRevision(bytes(unknown))).toThrow(UnsupportedFlowFeaturesError)

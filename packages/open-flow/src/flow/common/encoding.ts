@@ -295,6 +295,16 @@ function canonicalWebhookOptions(value: WebhookOptions): JsonValue {
           },
         }),
     ...(value.bodyMode == null ? {} : { bodyMode: value.bodyMode }),
+    ...(value.form == null
+      ? {}
+      : {
+          form: {
+            ...(value.form.description == null ? {} : { description: value.form.description }),
+            ...(value.form.submitLabel == null ? {} : { submitLabel: value.form.submitLabel }),
+            ...(value.form.successMessage == null ? {} : { successMessage: value.form.successMessage }),
+            ...(value.form.title == null ? {} : { title: value.form.title }),
+          },
+        }),
     ...(value.responseBody == null
       ? {}
       : {

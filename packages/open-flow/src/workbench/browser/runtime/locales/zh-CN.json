@@ -938,7 +938,9 @@
         "webhook-response-header-output-type": "请选择文本、数值、布尔值，或仅包含这些值的对象。",
         "webhook-response-status-output-type": "请选择数字类型的工作流输出字段作为状态码。",
         "webhook-authentication-header-name": "请使用有效且未被 Webhook 传输层保留的 HTTP 请求头名称。",
-        "webhook-response-artifact-output": "请选择存放响应文件的工作流输出。"
+        "webhook-response-artifact-output": "请选择存放响应文件的工作流输出。",
+        "webhook-form-conflict": "托管表单要求使用 POST 方法、声明请求体字段并立即响应，且不能启用鉴权。",
+        "webhook-form-field-unsupported": "请求体字段“{{field}}”无法显示在表单中。请使用文本、数字、整数、布尔值或文本选项。"
       },
       "leina": {
         "robot-required": "请选择 Leina 机器人，或绑定机器人标识的数据来源。"
@@ -1208,7 +1210,19 @@
     "responseBodyData": "数据",
     "responseBodyFile": "文件",
     "responseBodyFileHint": "发送本次运行中生成的文件。Content-Type 和 Content-Disposition 取自文件存储的名称与媒体类型。",
-    "responseBodyChooseOutput": "选择输出"
+    "responseBodyChooseOutput": "选择输出",
+    "webhookForm": "托管表单",
+    "webhookFormOff": "关闭",
+    "webhookFormOn": "开启",
+    "webhookFormHint": "在浏览器中打开 Webhook URL 会显示根据请求体字段生成的表单。每次提交都会像 POST 请求一样启动一次运行。",
+    "webhookFormTitle": "表单标题",
+    "webhookFormTitlePlaceholder": "默认使用节点名称",
+    "webhookFormDescription": "表单说明",
+    "webhookFormSubmitLabel": "提交按钮文字",
+    "webhookFormSubmitPlaceholder": "提交",
+    "webhookFormSuccessMessage": "提交成功提示",
+    "webhookFormSuccessPlaceholder": "感谢填写，已成功提交。",
+    "webhookFormTooLong": "最多输入 {{limit}} 个字符。"
   },
   "conditionEditor": {
     "addCondition": "添加条件",

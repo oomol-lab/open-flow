@@ -19,6 +19,7 @@ import { artifactSchema } from '../../http/common/artifact.ts'
 import { httpHeaderNameIssue } from '../../http/common/headers.ts'
 import { missingTriggerConfig, resolveTriggerConfig, validateTemplateTriggerConfig } from '../../trigger/common/config.ts'
 import { triggerOutputDefinitions, triggerOutputPorts, webhookAuthenticationHeaderValid, webhookSupportsBody } from '../../trigger/common/contract.ts'
+import { webhookFormIssues } from '../../trigger/common/webhookForm.ts'
 import { isTriggerNode, portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
 import { delayDurationInput, delayDurationSchema } from './delay.ts'
@@ -74,8 +75,24 @@ export function webhookRequestDiagnostics(
   path = `/document/graph/nodes/${triggerId}`,
 ): readonly Diagnostic[] {
   const trigger = graph.nodes[triggerId]
-  const authentication = trigger?.kind == 'webhook' ? trigger.options?.authentication : undefined
-  if (authentication == null) return []
+  if (trigger?.kind != 'webhook') return []
+  const formDiagnostics = webhookFormIssues(trigger).map((issue) =>
+    issue.code == 'conflict'
+      ? graphDiagnostic(
+          'trigger.webhook-form-conflict',
+          `A hosted form cannot be combined with ${issue.setting == 'method' ? 'methods other than POST' : `options.${issue.setting}`}.`,
+          issue.setting == 'method' ? `${path}/method` : `${path}/options/${issue.setting}`,
+          { setting: issue.setting },
+        )
+      : graphDiagnostic(
+          'trigger.webhook-form-field-unsupported',
+          `Body field "${issue.field}" cannot be shown in a form. Use text, number, integer, boolean or a text choice.`,
+          `${path}/bodyFields/${trigger.bodyFields.findIndex((field) => field.handle == issue.field)}`,
+          { field: issue.field },
+        ),
+  )
+  const authentication = trigger.options?.authentication
+  if (authentication == null) return formDiagnostics
   const diagnostics: Diagnostic[] = []
   const location = `${path}/options/authentication`
   if (authentication.type == 'header' && !webhookAuthenticationHeaderValid(authentication.name))
@@ -83,7 +100,7 @@ export function webhookRequestDiagnostics(
       graphDiagnostic('trigger.webhook-authentication-header-name', 'Use a valid HTTP header name the Webhook transport does not reserve.', `${location}/name`),
     )
   checkSource(authentication.secret, graph, document, undefined, `${location}/secret`, diagnostics)
-  return diagnostics
+  return [...formDiagnostics, ...diagnostics]
 }
 
 export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path = `/document/graph/nodes/${triggerId}`): readonly Diagnostic[] {

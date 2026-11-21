@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 import type { WebhookOptions } from '../api.ts'
 
+import { act } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
-import { click, render } from '../../../../../test/support/render.tsx'
+import { click, input, render } from '../../../../../test/support/render.tsx'
 import { webhookResponseDiagnostics } from '../../../../flow/common/graph.ts'
 import { createI18n } from '../i18n.ts'
 import { WebhookEditor } from './webhookEditor.tsx'
@@ -131,6 +132,66 @@ describe('Webhook configuration', () => {
     )
     expect(markup).not.toContain('Request body fields')
     expect(markup).toContain('Declared fields are kept but not used.')
+  })
+
+  it('turns the hosted form on and off and saves trimmed-away texts as absent', async () => {
+    const onChange = vi.fn()
+    const off = render(<WebhookEditor bodyFields={[]} method="POST" options={{ bodyMode: 'fields' }} disabled={false} onChange={onChange} />)
+    expect(off.container.querySelector('[aria-label="Form title"]')).toBeNull()
+    await click(off.container.querySelector<HTMLButtonElement>('[aria-label="Hosted form"]')!)
+    await click([...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'On')!)
+    expect(onChange).toHaveBeenLastCalledWith({ bodyFields: [], method: 'POST', options: { bodyMode: 'fields', form: {} } })
+    off.unmount()
+
+    const on = render(<WebhookEditor bodyFields={[]} method="POST" options={{ form: { title: 'Old' } }} disabled={false} onChange={onChange} />)
+    const title = [...on.container.querySelectorAll<HTMLInputElement>('input')].find((element) => element.value === 'Old')!
+    await input(title, 'Contact us')
+    await act(async () => title.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+    expect(onChange).toHaveBeenLastCalledWith({ bodyFields: [], method: 'POST', options: { form: { title: 'Contact us' } } })
+    await input(title, '  ')
+    await act(async () => title.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+    expect(onChange).toHaveBeenLastCalledWith({ bodyFields: [], method: 'POST', options: { form: {} } })
+    await click(on.container.querySelector<HTMLButtonElement>('[aria-label="Hosted form"]')!)
+    await click([...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'Off')!)
+    expect(onChange).toHaveBeenLastCalledWith({ bodyFields: [], method: 'POST', options: {} })
+  })
+
+  it('shows hosted form conflicts once and hides the form setting for GET', () => {
+    const conflict = {
+      code: 'trigger.webhook-form-conflict',
+      message: '',
+      path: '/document/graph/nodes/hook/options/bodyMode',
+      severity: 'error',
+      line: 1,
+      column: 1,
+    } as const
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <WebhookEditor
+          bodyFields={[]}
+          method="POST"
+          options={{ bodyMode: 'any', form: {} }}
+          requestDiagnostics={[conflict, { ...conflict, path: '/document/graph/nodes/hook/options/authentication' }]}
+          disabled={false}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup.split('A hosted form needs the POST method').length).toBe(2)
+    expect(renderWebhook('GET')).not.toContain('Hosted form')
+    const stale = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <WebhookEditor
+          bodyFields={[]}
+          method="GET"
+          options={{ form: {} }}
+          requestDiagnostics={[{ ...conflict, path: '/document/graph/nodes/hook/method' }]}
+          disabled={false}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(stale).toContain('A hosted form needs the POST method')
   })
 
   it('saves authentication only after a secret Variable is chosen and clears it with None', async () => {

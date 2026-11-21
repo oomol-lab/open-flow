@@ -15,7 +15,7 @@ import { nodeWorkflowReferences } from './workflowReferences.ts'
 export type FlowFeature = EngineCapability | HostFeature
 
 /** Features the deployment host applies around execution, such as Webhook request admission or managed HTTP Tasks. They need no Engine support. */
-export type HostFeature = 'connector-proxy-artifacts' | 'http-request-artifacts' | 'webhook-any-body' | 'webhook-authentication'
+export type HostFeature = 'connector-proxy-artifacts' | 'http-request-artifacts' | 'webhook-any-body' | 'webhook-authentication' | 'webhook-form'
 
 /** The first Flow model whose serialized documents declare non-baseline features in `features`. */
 export const flowFeaturesModelVersion = 16
@@ -80,6 +80,7 @@ const flowFeatures: Readonly<Record<FlowFeature, FlowFeatureDefinition>> = {
       (node) => node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'connector-proxy' && node.task.executor.responseFormat != null,
     ),
   },
+  'webhook-form': { baseline: false, detect: someNode((node) => node.kind == 'webhook' && node.options?.form != null) },
 }
 
 const featureNames = (Object.keys(flowFeatures) as FlowFeature[]).toSorted()

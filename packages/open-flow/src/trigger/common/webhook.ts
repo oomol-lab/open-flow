@@ -11,6 +11,17 @@ export { webhookSupportsBody } from './contract.ts'
 export { webhookResponseAllowsBody, webhookResponseTimeout } from '../../flow/common/webhookResponse.ts'
 
 export type { WebhookResponseSnapshot } from '../../flow/common/webhookResponse.ts'
+export {
+  isWebhookFormContentType,
+  renderWebhookFormPage,
+  webhookFormBody,
+  webhookFormControl,
+  WebhookFormInvalid,
+  webhookFormIssues,
+  webhookFormLimits,
+  webhookFormPageHeaders,
+} from './webhookForm.ts'
+export type { WebhookFormControl, WebhookFormIssue } from './webhookForm.ts'
 
 export const maximumWebhookBodyBytes = 64 * 1024
 
@@ -99,10 +110,18 @@ export async function verifyWebhookAuthentication(headers: Headers, authenticati
   return difference == 0
 }
 
-/** Request headers exposed to the Run. The authentication credential header is never stored with Run outputs. */
+/**
+ * Request headers exposed to the Run. The authentication credential header is never stored with Run outputs. A hosted
+ * form is posted by a browser from the endpoint's own origin, which attaches that origin's cookies and cached
+ * credentials, so a form endpoint never stores `cookie` or `authorization`.
+ */
 export function webhookOutputHeaders(headers: Headers, options: WebhookOptions | undefined): Readonly<Record<string, string>> {
   const values = Object.fromEntries(headers)
   if (options?.authentication != null) delete values[webhookAuthenticationHeader(options.authentication)]
+  if (options?.form != null) {
+    delete values.cookie
+    delete values.authorization
+  }
   return values
 }
 
@@ -199,6 +218,12 @@ const messageInputs: readonly WebhookBodyField[] = [
 ]
 
 const messagePayload = { event: { message: 'hello' } } as const
+const formInputs: readonly WebhookBodyField[] = [
+  { handle: 'name', jsonSchema: { type: 'string' }, nullable: false },
+  { handle: 'count', jsonSchema: { type: 'integer' }, nullable: true },
+  { handle: 'subscribe', jsonSchema: { type: 'boolean' }, nullable: true },
+  { handle: 'plan', jsonSchema: { enum: ['free', 'pro'], type: 'string' }, nullable: true },
+]
 
 const secretBinding = { secret: { kind: 'variable', target: 'WEBHOOK_SECRET' } } as const
 const secretValue = 'conformance-secret-value'
@@ -546,6 +571,83 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
       equal(outputs.length, 1, 'One GET run')
       equal(Object.keys(outputs[0]!).toSorted(), ['headers', 'query', 'webhookUrl'], 'GET outputs omit body')
       await response(await call(harness, { method: 'HEAD' }), { body: '', headers: { allow: 'GET' }, status: 405 }, 'HEAD rejected')
+    },
+  },
+  {
+    fixture: { bodyFields: formInputs, method: 'POST', options: { allowedOrigins: ['*'], form: {} } },
+    name: 'admits hosted form submissions only from the endpoint origin and never stores browser credentials',
+    async verify(harness) {
+      const form = { 'content-type': 'application/x-www-form-urlencoded' }
+      const credentials = { authorization: 'Basic c2VjcmV0', cookie: 'open_flow_operator_session=secret' }
+      // allowedOrigins governs API callers; "*" must not admit an opaque or foreign origin for a form.
+      for (const origin of ['null', 'https://other.example'])
+        await response(await call(harness, { body: 'name=Ada', headers: { ...form, origin } }), { status: 403 }, `Form from ${origin}`)
+      equal(await harness.outputs(), [], 'Rejected form submissions admit no Run')
+      const own = new URL(harness.endpointUrl).origin
+      await response(await call(harness, { body: 'name=Ada', headers: { ...form, ...credentials, origin: own } }), { status: 200 }, 'Same-origin form')
+      await response(
+        await call(harness, {
+          body: JSON.stringify({ name: 'Json' }),
+          headers: { ...credentials, 'content-type': 'application/json', 'origin': 'https://api.example' },
+        }),
+        { headers: { 'access-control-allow-origin': '*' }, status: 200 },
+        'JSON caller allowed by "*"',
+      )
+      for (const outputs of await harness.outputs()) {
+        const headers = outputs.headers as Record<string, JsonValue>
+        equal([headers.cookie, headers.authorization], [undefined, undefined], 'Browser credentials removed from outputs')
+      }
+    },
+  },
+  {
+    fixture: {
+      bodyFields: formInputs,
+      method: 'POST',
+      options: { form: { description: 'Tell us <who> you are', title: 'Sign <up>' }, responseData: 'accepted', responseStatusCode: 201 },
+    },
+    name: 'serves an escaped hosted form and converts form submissions to typed body outputs',
+    async verify(harness) {
+      const page = await call(harness, { headers: { 'Accept-Language': 'en' }, method: 'GET' })
+      await response(
+        page,
+        { headers: { 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8', 'x-content-type-options': 'nosniff' }, status: 200 },
+        'Form page',
+      )
+      const html = await page.text()
+      for (const text of ['Sign &#60;up&#62;', 'Tell us &#60;who&#62; you are', 'name="name"', 'name="count"', 'name="subscribe"', 'name="plan"'])
+        if (!html.includes(text)) throw new Error(`Form page is missing ${text}.`)
+      if (html.includes('<up>')) throw new Error('Form page did not escape its title.')
+      equal(page.headers.get('content-security-policy')?.includes("form-action 'self'"), true, 'Form page CSP')
+      // Browsers send `Origin: null` for a POST from a no-referrer page, so the page must keep its origin.
+      equal(page.headers.get('referrer-policy'), 'same-origin', 'Form page referrer policy')
+      const form = { 'content-type': 'application/x-www-form-urlencoded' }
+      const origin = new URL(harness.endpointUrl).origin
+      const accepted = await call(harness, { body: 'name=Ada&count=3&subscribe=on&plan=pro&ignored=x', headers: { ...form, origin } })
+      equal(accepted.status, 200, 'Same-origin submission status ignores the API response status')
+      equal(accepted.headers.get('content-type'), 'text/html; charset=utf-8', 'Submission result is a page')
+      await response(await call(harness, { body: 'name=Grace', headers: form }), { status: 200 }, 'Absent checkbox')
+      await response(await call(harness, { body: 'name=Ada&count=many', headers: form }), { status: 400 }, 'Invalid integer')
+      await response(await call(harness, { body: 'count=1', headers: form }), { status: 400 }, 'Missing required field')
+      await response(await call(harness, { body: 'name=Ada&name=Grace', headers: form }), { status: 400 }, 'Repeated field')
+      const multipart = new FormData()
+      multipart.set('name', new Blob(['file']), 'name.txt')
+      await response(await harness.request(new Request(harness.endpointUrl, { body: multipart, method: 'POST' })), { status: 400 }, 'File part')
+      await response(
+        await call(harness, { body: 'name=Ada', headers: { ...form, origin: 'https://other.example' } }),
+        { status: 403 },
+        'Cross-origin submission',
+      )
+      await response(await call(harness, { body: 'name=Ada', headers: { ...form, origin: 'null' } }), { status: 403 }, 'Opaque-origin submission')
+      await response(
+        await call(harness, { body: JSON.stringify({ name: 'Json' }), headers: { 'content-type': 'application/json' } }),
+        { body: 'accepted', status: 201 },
+        'JSON request',
+      )
+      equal(
+        (await harness.outputs()).map((outputs) => outputs.body),
+        [{ count: 3, name: 'Ada', plan: 'pro', subscribe: true }, { name: 'Grace', subscribe: false }, { name: 'Json' }],
+        'Admitted form bodies',
+      )
     },
   },
 ]

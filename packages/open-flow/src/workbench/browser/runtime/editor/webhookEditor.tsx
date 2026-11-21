@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { WebhookForm } from '../../../../trigger/common/model.ts'
 import type { Diagnostic, InputPort, WebhookMethod, WebhookOptions } from '../api.ts'
 import type { WebhookAuthenticationChoice, WebhookSettings } from './flowChanges.ts'
 import type { PropertyDeletion } from './propertyDeletion.ts'
@@ -12,6 +13,7 @@ import { editorComponentIcons } from '../../../../form/browser/editorComponentIc
 import { ValueControl, ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
 import { webhookAuthenticationHeaderValid, webhookMethods, webhookSupportsBody } from '../../../../trigger/common/contract.ts'
+import { webhookFormLimits } from '../../../../trigger/common/webhookForm.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -297,6 +299,87 @@ function WebhookAuthenticationFields({
   )
 }
 
+function WebhookFormFields({
+  options,
+  diagnostics,
+  disabled,
+  readOnly,
+  onOptionsChange,
+}: {
+  readonly options: WebhookOptions
+  readonly diagnostics: readonly Diagnostic[]
+  readonly disabled: boolean
+  readonly readOnly?: boolean
+  readonly onOptionsChange: (options: WebhookOptions) => void
+}) {
+  const t = useTranslate()
+  const form = options.form
+  const locked = disabled || readOnly === true
+  const issues = [...new Set(diagnostics.filter((item) => item.code.startsWith('trigger.webhook-form-')).map((item) => diagnosticMessage(item, t)))]
+  const change = (key: keyof WebhookForm, value: string) => {
+    if (form == null) return
+    const next: Record<string, string> = { ...form }
+    if (value.trim() === '') delete next[key]
+    else next[key] = value
+    onOptionsChange({ ...options, form: next })
+  }
+  const text = (key: keyof WebhookForm, label: string, limit: number, multiline = false, placeholder?: string) => (
+    <DraftTextField
+      label={label}
+      value={form?.[key] ?? ''}
+      disabled={locked}
+      multiline={multiline}
+      placeholder={placeholder}
+      inspect={(value, signal) =>
+        deferInspection(() => ({ value, ...(value.length > limit ? { issue: t('webhookEditor.webhookFormTooLong', { limit }) } : {}) }), signal)
+      }
+      onSave={(value) => change(key, value)}
+    />
+  )
+  return (
+    <>
+      <Field data-invalid={issues.length > 0 || undefined}>
+        <FieldLabel>{t('webhookEditor.webhookForm')}</FieldLabel>
+        <FieldSelect
+          aria-label={t('webhookEditor.webhookForm')}
+          disabled={locked}
+          value={form == null ? 'off' : 'on'}
+          onChange={(value) => {
+            if ((value === 'on') === (form != null)) return
+            const next = { ...options }
+            if (value === 'on') next.form = {}
+            else delete next.form
+            onOptionsChange(next)
+          }}
+        >
+          <option value="off">{t('webhookEditor.webhookFormOff')}</option>
+          <option value="on">{t('webhookEditor.webhookFormOn')}</option>
+        </FieldSelect>
+        {form != null && <FieldDescription className="px-2 text-[11px] leading-4">{t('webhookEditor.webhookFormHint')}</FieldDescription>}
+        {issues.map((issue) => (
+          <p key={issue} role="alert" className="px-2 text-[11px] leading-4 text-destructive">
+            {issue}
+          </p>
+        ))}
+      </Field>
+      {form != null && (
+        <>
+          {text('title', t('webhookEditor.webhookFormTitle'), webhookFormLimits.label, false, t('webhookEditor.webhookFormTitlePlaceholder'))}
+          {text('description', t('webhookEditor.webhookFormDescription'), webhookFormLimits.description, true)}
+          {text('submitLabel', t('webhookEditor.webhookFormSubmitLabel'), webhookFormLimits.label, false, t('webhookEditor.webhookFormSubmitPlaceholder'))}
+          {text(
+            'successMessage',
+            t('webhookEditor.webhookFormSuccessMessage'),
+            webhookFormLimits.description,
+            true,
+            t('webhookEditor.webhookFormSuccessPlaceholder'),
+          )}
+        </>
+      )}
+    </>
+  )
+}
+
 export function WebhookEditor({
   bodyFields,
   method,
@@ -433,6 +516,15 @@ export function WebhookEditor({
             onChange={onAuthenticationChange}
             onOptionsChange={(next) => onChange({ bodyFields, method, options: next })}
           />
+          {(webhookSupportsBody(method) || options.form != null) && (
+            <WebhookFormFields
+              options={options}
+              diagnostics={requestDiagnostics}
+              disabled={disabled}
+              readOnly={readOnly}
+              onOptionsChange={(next) => onChange({ bodyFields, method, options: next })}
+            />
+          )}
         </FieldGroup>
       </InspectorSection>
       {outputSection}

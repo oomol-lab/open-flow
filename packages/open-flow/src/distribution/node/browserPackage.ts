@@ -140,6 +140,7 @@ const declarationOutputs: readonly (readonly [source: string, output: string])[]
   ['trigger/common/model', 'common/trigger-model'],
   ['trigger/common/poll', 'common/poll-trigger'],
   ['trigger/common/webhook', 'common/webhook-trigger'],
+  ['trigger/common/webhookForm', 'common/webhook-form'],
   ['trigger/providers/definitions', 'common/provider-triggers'],
   ['trigger/providers/localization', 'common/trigger-localization'],
   ['ui/browser/public', 'browser/ui'],
