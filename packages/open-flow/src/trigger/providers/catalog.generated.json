@@ -217,7 +217,7 @@
       "name": "on_repo_event",
       "displayName": "Repository Event",
       "description": "Triggers when selected Bitbucket Cloud webhook events occur in a repository.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -324,7 +324,7 @@
       "name": "on_item_event",
       "displayName": "File or Folder Event",
       "description": "Triggers when selected Box webhook events occur on a file or folder.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -530,7 +530,7 @@
       "name": "on_event",
       "displayName": "Billing Event",
       "description": "Polls Chargebee events for customer, subscription, invoice, and payment changes.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "poll",
       "configInputs": [
         {
@@ -686,7 +686,7 @@
       "name": "on_subscriber_event",
       "displayName": "Subscriber Event",
       "description": "Triggers when selected Kit (ConvertKit) subscriber webhook events occur.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -755,7 +755,7 @@
       "name": "on_crm_event",
       "displayName": "CRM Record Event",
       "description": "Triggers when selected Copper CRM records are created, updated, or deleted.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -832,7 +832,7 @@
       "name": "on_event",
       "displayName": "Eventbrite Webhook Event",
       "description": "Triggers when selected Eventbrite order, attendee, or event webhook actions occur.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -2556,7 +2556,7 @@
       "name": "on_conversation_event",
       "displayName": "Conversation Event",
       "description": "Triggers when selected Help Scout conversation or customer webhook events occur.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -3038,7 +3038,7 @@
       "name": "on_submission",
       "displayName": "Form Submission",
       "description": "Triggers when a new submission is received for a Jotform form.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -3096,7 +3096,7 @@
       "name": "on_event",
       "displayName": "CRM Event",
       "description": "Triggers when selected Keap REST hook events occur.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -3265,7 +3265,7 @@
       "name": "on_audience_event",
       "displayName": "Audience Event",
       "description": "Triggers when subscriber or campaign events occur in a Mailchimp audience.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["GET", "POST"],
@@ -3599,7 +3599,7 @@
       "name": "on_task_event",
       "displayName": "Task or Worker Event",
       "description": "Triggers when selected Onfleet delivery task or worker webhook events occur.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["GET", "POST"],
@@ -3905,7 +3905,7 @@
       "name": "on_event",
       "displayName": "PayPal Event",
       "description": "Triggers when selected PayPal webhook events occur.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -4082,7 +4082,7 @@
       "name": "on_email_event",
       "displayName": "Email Event",
       "description": "Triggers when selected Postmark email delivery or engagement events occur.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -5254,7 +5254,7 @@
       "name": "on_project_event",
       "displayName": "Project Event",
       "description": "Triggers when selected Taiga project webhook events occur.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -5563,7 +5563,7 @@
       "name": "on_event",
       "displayName": "Alert or Case Event",
       "description": "Polls TheHive for new or updated alerts or cases.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "poll",
       "configInputs": [
         {
@@ -5610,7 +5610,7 @@
       "name": "on_model_event",
       "displayName": "Board or Card Event",
       "description": "Triggers when actions occur on a Trello board, list, or card.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["HEAD", "POST"],
@@ -5866,7 +5866,7 @@
       "name": "on_event",
       "displayName": "Transfer or Balance Event",
       "description": "Triggers when selected Wise webhook subscription events occur for a profile.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
@@ -6061,7 +6061,7 @@
       "name": "on_form_entry",
       "displayName": "Form Entry",
       "description": "Triggers when a new entry is submitted to a Wufoo form.",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "type": "integration",
       "endpoint": {
         "methods": ["POST"],
