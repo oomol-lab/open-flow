@@ -6,6 +6,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { useCallback, useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { webhookRequestDiagnostics, webhookResponseDiagnostics } from '../../src/flow/common/graph.ts'
+import { ScrollArea } from '../../src/ui/browser/scroll-area.tsx'
 import { applyFlowChanges } from '../../src/workbench/browser/runtime/editor/flowChanges.ts'
 import { addNode } from '../../src/workbench/browser/runtime/editor/flowChanges.ts'
 import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
@@ -245,62 +246,74 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
   }
   return (
     <I18nProvider i18n={i18n}>
-      <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
-        <div className="context-panel editor-context-panel open-flow-property-panel" style={{ width: 420, maxWidth: '100%' }}>
-          <div className="inspector-content">
-            <WebhookEditor
-              {...webhook}
-              responseNodes={Object.entries(graph.nodes).flatMap(([id, node]) =>
-                node.kind === 'webhook-response' ? [{ id, name: node.name ?? id, reachable: outputState === 'ready' && id === 'reply' }] : [],
-              )}
-              onAddResponseNode={() => {
-                setOutputState('disconnected')
-                setWebhook((value) => ({ ...value, options: { ...value.options, responseBody: { kind: 'webhook-response', nodeId: 'reply' } } }))
-                log('Add Webhook Response')
-              }}
-              workflowOutputs={graph.nodes.outputs?.kind === 'outputs' ? graph.nodes.outputs : undefined}
-              responseDiagnostics={webhookResponseDiagnostics(graph, 'webhook')}
-              authenticationVariable={webhook.options.authentication == null ? undefined : secretVariable}
-              variables={storyVariables}
-              requestDiagnostics={webhookRequestDiagnostics(graph, { bindings: { secret: { kind: 'variable', target: secretVariable } }, graph }, 'webhook')}
-              onAuthenticationChange={(choice) => {
-                const options = { ...webhook.options }
-                if (choice == null) delete options.authentication
-                else {
-                  setSecretVariable(choice.variable)
-                  options.authentication =
-                    choice.type === 'bearer' ? { secret: secretSource, type: 'bearer' } : { name: choice.name, secret: secretSource, type: 'header' }
-                }
-                setWebhook({ ...webhook, options })
-                log('Save webhook authentication', choice)
-              }}
-              onAddWorkflowOutputs={() => {
-                const { draft } = triggerDraft({ kind: 'webhook', name: 'Webhook', ...webhook })
-                const current = { ...draft, content: { ...draft.content, document: { bindings: {}, graph } } }
-                const changes = addNode(revisionView(current), 'outputs', { kind: 'outputs', name: i18n.t('addNode.outputs') })
-                if (changes == null) return
-                const added = applyFlowChanges(current, changes).content.document.graph.nodes.outputs
-                if (added?.kind !== 'outputs') return
-                setCreatedOutputs(added)
-                setOutputState('disconnected')
-                log('Add workflow Outputs', added)
-              }}
-              disabled={disabled}
-              readOnly={disabled}
-              outputSection={
-                <TriggerSummary
-                  trigger={{ kind: 'webhook', method: webhook.method, name: 'Webhook', bodyFields: webhook.bodyFields, options: webhook.options }}
+      <div
+        className="open-flow-workbench open-flow-theme"
+        data-theme={dark ? 'dark' : 'light'}
+        style={{ display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}
+      >
+        <div className="context-panel editor-context-panel open-flow-property-panel" style={{ width: 420, maxWidth: '100%', height: '100%', minHeight: 0 }}>
+          <div className="context-panel-content">
+            <ScrollArea className="inspector-scroll" tabIndex={-1}>
+              <div className="inspector-content">
+                <WebhookEditor
+                  {...webhook}
+                  responseNodes={Object.entries(graph.nodes).flatMap(([id, node]) =>
+                    node.kind === 'webhook-response' ? [{ id, name: node.name ?? id, reachable: outputState === 'ready' && id === 'reply' }] : [],
+                  )}
+                  onAddResponseNode={() => {
+                    setOutputState('disconnected')
+                    setWebhook((value) => ({ ...value, options: { ...value.options, responseBody: { kind: 'webhook-response', nodeId: 'reply' } } }))
+                    log('Add Webhook Response')
+                  }}
+                  workflowOutputs={graph.nodes.outputs?.kind === 'outputs' ? graph.nodes.outputs : undefined}
+                  responseDiagnostics={webhookResponseDiagnostics(graph, 'webhook')}
+                  authenticationVariable={webhook.options.authentication == null ? undefined : secretVariable}
+                  variables={storyVariables}
+                  requestDiagnostics={webhookRequestDiagnostics(
+                    graph,
+                    { bindings: { secret: { kind: 'variable', target: secretVariable } }, graph },
+                    'webhook',
+                  )}
+                  onAuthenticationChange={(choice) => {
+                    const options = { ...webhook.options }
+                    if (choice == null) delete options.authentication
+                    else {
+                      setSecretVariable(choice.variable)
+                      options.authentication =
+                        choice.type === 'bearer' ? { secret: secretSource, type: 'bearer' } : { name: choice.name, secret: secretSource, type: 'header' }
+                    }
+                    setWebhook({ ...webhook, options })
+                    log('Save webhook authentication', choice)
+                  }}
+                  onAddWorkflowOutputs={() => {
+                    const { draft } = triggerDraft({ kind: 'webhook', name: 'Webhook', ...webhook })
+                    const current = { ...draft, content: { ...draft.content, document: { bindings: {}, graph } } }
+                    const changes = addNode(revisionView(current), 'outputs', { kind: 'outputs', name: i18n.t('addNode.outputs') })
+                    if (changes == null) return
+                    const added = applyFlowChanges(current, changes).content.document.graph.nodes.outputs
+                    if (added?.kind !== 'outputs') return
+                    setCreatedOutputs(added)
+                    setOutputState('disconnected')
+                    log('Add workflow Outputs', added)
+                  }}
+                  disabled={disabled}
+                  readOnly={disabled}
+                  outputSection={
+                    <TriggerSummary
+                      trigger={{ kind: 'webhook', method: webhook.method, name: 'Webhook', bodyFields: webhook.bodyFields, options: webhook.options }}
+                    />
+                  }
+                  onChange={(next) => {
+                    setWebhook(next)
+                    log('Save webhook', next)
+                  }}
                 />
-              }
-              onChange={(next) => {
-                setWebhook(next)
-                log('Save webhook', next)
-              }}
-            />
+                <output aria-label="Saved webhook" style={{ overflowWrap: 'anywhere', padding: '12px 16px' }}>
+                  {JSON.stringify(webhook)}
+                </output>
+              </div>
+            </ScrollArea>
           </div>
-          <output aria-label="Saved webhook" style={{ overflowWrap: 'anywhere', padding: '12px 16px', borderTop: '1px solid var(--ui-border)' }}>
-            {JSON.stringify(webhook)}
-          </output>
         </div>
       </div>
     </I18nProvider>
