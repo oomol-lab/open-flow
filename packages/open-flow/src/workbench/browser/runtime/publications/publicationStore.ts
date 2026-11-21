@@ -140,6 +140,7 @@ export class PublicationStore {
   readonly #bindingLoads = new Latest()
   readonly #loads = new Latest()
   readonly #operation = new Latest()
+  readonly #unsavedOperationIds = new Map<string, string>()
   readonly #preferences: WorkbenchPreferences
   readonly #triggerDetails = new Latest()
   readonly #triggerTest = new Latest()
@@ -525,12 +526,7 @@ export class PublicationStore {
   }
 
   async #storedOperation(target: Target): Promise<PublishOperation | undefined> {
-    let operationId: string | null
-    try {
-      operationId = this.#preferences.getItem(this.#operationKey(target.flowId))
-    } catch {
-      return
-    }
+    const operationId = this.#unsavedOperationIds.get(target.flowId) ?? this.#readSavedOperationId(this.#operationKey(target.flowId))
     if (operationId == null || operationId == '') return
     try {
       return await this.#client.getPublishOperation(target.flowId, operationId)
@@ -623,11 +619,30 @@ export class PublicationStore {
     return `publish-operation:${flowId}`
   }
 
-  #writeOperationId(flowId: string, operationId: string): void {
+  #readSavedOperationId(key: string): string | null {
     try {
-      this.#preferences.setItem(this.#operationKey(flowId), operationId)
+      return this.#preferences.getItem(key)
     } catch {
-      // This reference is only needed to resume tracking after leaving the Flow.
+      return null
+    }
+  }
+
+  #writeOperationId(flowId: string, operationId: string): void {
+    const key = this.#operationKey(flowId)
+    if (this.#trySaveOperationId(key, operationId)) {
+      this.#unsavedOperationIds.delete(flowId)
+      return
+    }
+    this.#unsavedOperationIds.set(flowId, operationId)
+    if (operationId != '' && this.#readSavedOperationId(key)) this.#trySaveOperationId(key, '')
+  }
+
+  #trySaveOperationId(key: string, operationId: string): boolean {
+    try {
+      this.#preferences.setItem(key, operationId)
+      return true
+    } catch {
+      return false
     }
   }
 
