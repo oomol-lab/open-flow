@@ -21,6 +21,10 @@ function entries(...pairs: readonly (readonly [string, FormDataEntryValue])[]): 
   return pairs.map(([name, value]) => [name, value])
 }
 
+function noteFormPage(value: string): string {
+  return renderWebhookFormPage({ bodyFields: [{ handle: 'note', jsonSchema: { type: 'string' }, nullable: true, value }], form: {}, name: 'Notes' })
+}
+
 function webhook(options: WebhookNode['options'], bodyFields: readonly WebhookBodyField[] = fields): WebhookNode {
   return { bodyFields, kind: 'webhook', method: 'POST', name: 'Signup', options }
 }
@@ -73,6 +77,9 @@ describe('webhookFormControl', () => {
     expect(webhookFormControl({ handle: 'tags', jsonSchema: { items: { type: 'string' }, type: 'array' }, nullable: true })).toBeUndefined()
     // An empty choice is indistinguishable from the unselected placeholder.
     expect(webhookFormControl({ handle: 'tier', jsonSchema: { enum: ['', 'pro'], type: 'string' }, nullable: false })).toBeUndefined()
+    // Browsers submit line breaks in a choice as CRLF, which no longer matches the declared value.
+    for (const choice of ['a\nb', 'a\rb'])
+      expect(webhookFormControl({ handle: 'tier', jsonSchema: { enum: [choice, 'pro'], type: 'string' }, nullable: false })).toBeUndefined()
   })
 })
 
@@ -132,6 +139,11 @@ describe('renderWebhookFormPage', () => {
     expect(html).not.toContain('<b>hi</b>')
     expect(html).not.toContain('<script>')
     for (const name of ['name', 'age', 'score', 'agree', 'plan']) expect(html).toContain(`name="${name}"`)
+  })
+
+  it('keeps a text default that starts with a newline after HTML parsing drops the first one', () => {
+    expect(noteFormPage('\nAda')).toContain('name="note">\n\nAda</textarea>')
+    expect(noteFormPage('Ada')).toContain('name="note">Ada</textarea>')
   })
 
   it('renders success and failure results', () => {

@@ -184,7 +184,8 @@ earlier readers reject such content instead of dropping the policy.
 `{ "form": { "title": "Contact us", "description": "…", "submitLabel": "Send", "successMessage": "Thanks!" } }`; every
 text is optional and `{}` uses the node name and localized defaults. A browser GET to the Webhook URL returns an HTML
 page with one control per `body` field: strings as text areas, `number`/`integer` as number inputs, `boolean` as a
-checkbox (unchecked is `false`) and a string `enum` as a choice. Form submissions are converted to these types, empty
+checkbox (unchecked is `false`) and a string `enum` as a choice (its values must be nonempty and contain no line
+breaks, which browsers would submit differently). Form submissions are converted to these types, empty
 values are omitted, undeclared names are ignored, and files, repeated names or invalid numbers return 400. Form submissions
 are accepted only from the endpoint's own origin (or without an `Origin` header); `allowedOrigins`, even `"*"`,
 applies to API callers only. A form endpoint never stores `cookie` or `authorization` in the `headers` output. The browser then sees a

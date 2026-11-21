@@ -48,8 +48,14 @@ export function webhookFormControl(field: WebhookBodyField): WebhookFormControl 
     ...(Object.hasOwn(field, 'value') ? { defaultValue: field.value } : {}),
   }
   if (Array.isArray(schema.enum)) {
-    // An empty choice would submit the same value as the unselected placeholder, so it cannot be answered reliably.
-    if ((type != null && type != 'string') || schema.enum.length == 0 || !schema.enum.every((item) => typeof item == 'string' && item.length > 0)) return
+    // An empty choice would submit the same value as the unselected placeholder, and browsers submit line breaks as
+    // CRLF, so neither kind of choice could be answered reliably.
+    if (
+      (type != null && type != 'string') ||
+      schema.enum.length == 0 ||
+      !schema.enum.every((item) => typeof item == 'string' && item.length > 0 && !/[\r\n]/.test(item))
+    )
+      return
     return { ...common, kind: 'select', options: schema.enum as readonly string[] }
   }
   switch (type) {
@@ -236,7 +242,8 @@ function control(item: WebhookFormControl, required: string): string {
         typeof fallback == 'number' ? ` value="${fallback}"` : ''
       } />${help}</div>`
     case 'text':
-      return `<div class="field">${label}<textarea rows="2" ${attributes}>${typeof fallback == 'string' ? escape(fallback) : ''}</textarea>${help}</div>`
+      // The HTML parser drops one newline right after <textarea>, so a default that starts with one needs another.
+      return `<div class="field">${label}<textarea rows="2" ${attributes}>${typeof fallback == 'string' ? `${fallback.startsWith('\n') ? '\n' : ''}${escape(fallback)}` : ''}</textarea>${help}</div>`
   }
 }
 
