@@ -138,8 +138,9 @@ describe('Webhook configuration', () => {
     const onChange = vi.fn()
     const off = render(<WebhookEditor bodyFields={[]} method="POST" options={{ bodyMode: 'fields' }} disabled={false} onChange={onChange} />)
     expect(off.container.querySelector('[aria-label="Form title"]')).toBeNull()
-    await click(off.container.querySelector<HTMLButtonElement>('[aria-label="Hosted form"]')!)
-    await click([...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'On')!)
+    const offSwitch = off.container.querySelector<HTMLElement>('[role="switch"][aria-label="Hosted form"]')!
+    expect(offSwitch.getAttribute('aria-checked')).toBe('false')
+    await click(offSwitch)
     expect(onChange).toHaveBeenLastCalledWith({ bodyFields: [], method: 'POST', options: { bodyMode: 'fields', form: {} } })
     off.unmount()
 
@@ -151,8 +152,9 @@ describe('Webhook configuration', () => {
     await input(title, '  ')
     await act(async () => title.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
     expect(onChange).toHaveBeenLastCalledWith({ bodyFields: [], method: 'POST', options: { form: {} } })
-    await click(on.container.querySelector<HTMLButtonElement>('[aria-label="Hosted form"]')!)
-    await click([...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === 'Off')!)
+    const onSwitch = on.container.querySelector<HTMLElement>('[role="switch"][aria-label="Hosted form"]')!
+    expect(onSwitch.getAttribute('aria-checked')).toBe('true')
+    await click(onSwitch)
     expect(onChange).toHaveBeenLastCalledWith({ bodyFields: [], method: 'POST', options: {} })
   })
 
@@ -265,13 +267,15 @@ describe('Webhook configuration', () => {
     expect(post.indexOf('Request body fields')).toBeLessThan(post.indexOf('The request body accepts an empty object.'))
   })
 
-  it('orders Request, Outputs, HTTP response, and collapsed Advanced settings', () => {
+  it('orders Request, Authentication, Hosted form, Outputs, HTTP response, and collapsed Advanced settings', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <WebhookEditor bodyFields={[]} method="POST" options={{}} disabled={false} outputSection={<section>Outputs marker</section>} onChange={vi.fn()} />
       </I18nProvider>,
     )
-    expect(markup.indexOf('Request method')).toBeLessThan(markup.indexOf('Outputs marker'))
+    expect(markup.indexOf('Request method')).toBeLessThan(markup.indexOf('Authentication'))
+    expect(markup.indexOf('Authentication')).toBeLessThan(markup.indexOf('Hosted form'))
+    expect(markup.indexOf('Hosted form')).toBeLessThan(markup.indexOf('Outputs marker'))
     expect(markup.indexOf('Outputs marker')).toBeLessThan(markup.indexOf('Advanced settings'))
     expect(markup.indexOf('Outputs marker')).toBeLessThan(markup.indexOf('HTTP response'))
     expect(markup.indexOf('HTTP response')).toBeLessThan(markup.indexOf('Advanced settings'))
