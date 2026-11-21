@@ -414,12 +414,7 @@ export const englishTriggerFieldDescriptions = {
   },
   'chargebee.on_event': {
     configInputs: { eventTypes: 'Optional event types to filter polled events.' },
-    outputs: {
-      eventType: 'eventType output.',
-      eventId: 'Optional Eventbrite event ID filter.',
-      occurredAt: 'Unix timestamp when the event occurred.',
-      body: 'Original webhook or polled event payload.',
-    },
+    outputs: { events: 'Chargebee events detected in this poll batch.' },
   },
   'convertkit.on_subscriber_event': {
     configInputs: { eventName: 'Kit (ConvertKit) subscriber event name.' },
@@ -522,11 +517,7 @@ export const englishTriggerFieldDescriptions = {
   },
   'thehive.on_event': {
     configInputs: { resourceType: 'Resource type to monitor.' },
-    outputs: {
-      resourceType: 'Provider resource type associated with the event.',
-      objectId: 'Unique object ID associated with the event.',
-      body: 'Original webhook or polled event payload.',
-    },
+    outputs: { events: 'TheHive alerts or cases detected in this poll batch.' },
   },
   'trello.on_model_event': {
     configInputs: { modelId: 'ID of the Trello board, list, or card to watch.', actionTypes: 'Optional Trello action types to filter events.' },

@@ -6,10 +6,7 @@
       "eventTypes": "Optional event types to filter polled events."
     },
     "outputs": {
-      "eventType": "eventType output.",
-      "eventId": "Optional Eventbrite event ID filter.",
-      "occurredAt": "Unix timestamp when the event occurred.",
-      "body": "Original webhook or polled event payload."
+      "events": "Chargebee events detected in this poll batch."
     }
   }
 }

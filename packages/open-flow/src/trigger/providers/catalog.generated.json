@@ -564,30 +564,28 @@
       ],
       "outputs": [
         {
-          "handle": "eventType",
+          "handle": "events",
           "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "eventId",
-          "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "occurredAt",
-          "jsonSchema": {
-            "type": "integer"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "body",
-          "jsonSchema": {
-            "type": "object"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "eventType": {
+                  "type": "string"
+                },
+                "eventId": {
+                  "type": "string"
+                },
+                "occurredAt": {
+                  "type": "integer"
+                },
+                "body": {
+                  "type": "object"
+                }
+              },
+              "additionalProperties": false,
+              "required": ["eventType", "eventId", "occurredAt", "body"]
+            }
           },
           "nullable": false
         }
@@ -3043,7 +3041,7 @@
       "endpoint": {
         "methods": ["POST"],
         "body": {
-          "formats": ["form", "json"],
+          "formats": ["multipart", "form", "json"],
           "allowArray": false,
           "allowEmpty": false
         },
@@ -5579,23 +5577,25 @@
       ],
       "outputs": [
         {
-          "handle": "resourceType",
+          "handle": "events",
           "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "objectId",
-          "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "body",
-          "jsonSchema": {
-            "type": "object"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resourceType": {
+                  "type": "string"
+                },
+                "objectId": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "object"
+                }
+              },
+              "additionalProperties": false,
+              "required": ["resourceType", "objectId", "body"]
+            }
           },
           "nullable": false
         }

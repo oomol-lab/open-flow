@@ -6,9 +6,7 @@
       "resourceType": "Resource type to monitor."
     },
     "outputs": {
-      "resourceType": "Provider resource type associated with the event.",
-      "objectId": "Unique object ID associated with the event.",
-      "body": "Original webhook or polled event payload."
+      "events": "TheHive alerts or cases detected in this poll batch."
     }
   }
 }
