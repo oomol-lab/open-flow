@@ -89,11 +89,35 @@ function childArrayItemSchema(schema: unknown): unknown {
   return schema.items
 }
 
+const artifactRefRequiredKeys = ['kind', 'id', 'name', 'mediaType', 'sizeBytes', 'sha256'] as const
+const defaultAggregateTransitBudgetBytes = 50 * 1024 * 1024
+const defaultPerFileTransitMaxBytes = 10 * 1024 * 1024
+
+function schemaAcceptsArtifactRef(schema: unknown): boolean {
+  if (schema === undefined || schema === true) return true
+  if (schema === false) return false
+  if (!isPlainObject(schema)) return false
+  if (schema.type !== undefined) {
+    if (typeof schema.type === 'string' && schema.type !== 'object') return false
+    if (Array.isArray(schema.type) && !schema.type.includes('object')) return false
+  }
+  if (schema.additionalProperties === false) {
+    const props = isPlainObject(schema.properties) ? schema.properties : undefined
+    if (!props) return false
+    return artifactRefRequiredKeys.every((key) => Object.hasOwn(props, key))
+  }
+  return true
+}
+
 function allowsArtifactAttachment(schema: unknown): boolean {
   if (!isPlainObject(schema)) return true
-  if (schema.additionalProperties === false) {
-    const properties = isPlainObject(schema.properties) ? schema.properties : undefined
-    return properties != null && Object.hasOwn(properties, 'artifact')
+  const properties = isPlainObject(schema.properties) ? schema.properties : undefined
+  if (properties && Object.hasOwn(properties, 'artifact')) {
+    return schemaAcceptsArtifactRef(properties.artifact)
+  }
+  if (schema.additionalProperties === false) return false
+  if (isPlainObject(schema.additionalProperties)) {
+    return schemaAcceptsArtifactRef(schema.additionalProperties)
   }
   return true
 }
@@ -175,6 +199,7 @@ export async function bridgeConnectorOutputArtifacts(
     readonly connector: ConnectorHost
     readonly signal: AbortSignal
     readonly outputPorts?: readonly ConnectorArtifactPort[]
+    readonly maxAggregateBytes?: number
     readonly emit: (event: ArtifactEvent) => Promise<void>
   },
 ): Promise<JsonValue> {
@@ -211,9 +236,21 @@ export async function bridgeConnectorOutputArtifacts(
   collect(output, rootSchema)
   if (pending.length === 0) return output
 
-  // Phase 1: download all bytes before persisting any Run Artifacts.
+  // Phase 1: download all bytes within aggregate budget before persisting any Run Artifacts.
+  const aggregateBudget = context.maxAggregateBytes ?? defaultAggregateTransitBudgetBytes
+  let downloadedBytes = 0
   for (const item of pending) {
-    item.downloaded = await context.connector.downloadTransitFile!(item.transit.downloadUrl, context.signal)
+    const remaining = aggregateBudget - downloadedBytes
+    if (remaining <= 0) {
+      throw new Error('Connector transit files exceed the aggregate Run Artifact download budget.')
+    }
+    const maxBytes = Math.min(defaultPerFileTransitMaxBytes, remaining)
+    const downloaded = await context.connector.downloadTransitFile!(item.transit.downloadUrl, context.signal, maxBytes)
+    if (downloaded.content.byteLength > remaining) {
+      throw new Error('Connector transit files exceed the aggregate Run Artifact download budget.')
+    }
+    downloadedBytes += downloaded.content.byteLength
+    item.downloaded = downloaded
   }
 
   // Phase 2: store all downloaded artifacts and map targets to refs.

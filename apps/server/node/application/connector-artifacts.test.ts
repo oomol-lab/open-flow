@@ -269,4 +269,88 @@ describe('Connector Transit File <-> ArtifactRef bridge', () => {
       retryable: false,
     })
   })
+
+  it('does not rewrite output when declared artifact property schema is incompatible with ArtifactRef', async () => {
+    const { artifacts } = createMemoryArtifactStore()
+    const events: ArtifactEvent[] = []
+    const connector = {
+      async downloadTransitFile() {
+        return { content: new TextEncoder().encode('abc'), mediaType: 'text/plain' }
+      },
+    } as unknown as ConnectorHost
+
+    const output = await bridgeConnectorOutputArtifacts(
+      {
+        fileId: 'tf-incompat',
+        downloadUrl: 'https://connector.example/api/files/tf-incompat',
+        sizeBytes: 3,
+        name: 'incompat.txt',
+        mimeType: 'text/plain',
+      },
+      {
+        runId: 'run-6',
+        nodeId: 'node-6',
+        jobId: 'job-6',
+        artifacts,
+        connector,
+        signal: new AbortController().signal,
+        outputPorts: [
+          {
+            handle: 'output',
+            jsonSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: { fileId: { type: 'string' }, artifact: { type: 'string' } },
+            },
+          },
+        ],
+        emit: async (event) => {
+          events.push(event)
+        },
+      },
+    )
+
+    expect(events).toHaveLength(1)
+    expect('artifact' in (output as Record<string, unknown>)).toBe(false)
+  })
+
+  it('enforces aggregate download budget across multiple transit files without persisting partial artifacts', async () => {
+    const { artifacts } = createMemoryArtifactStore()
+    const events: ArtifactEvent[] = []
+    const seenLimits: Array<number | undefined> = []
+    const connector = {
+      async downloadTransitFile(_url: string, _signal: AbortSignal, maxBytes?: number) {
+        seenLimits.push(maxBytes)
+        const bytes = new Uint8Array(6)
+        if (maxBytes != null && bytes.byteLength > maxBytes) {
+          throw new Error('exceeds limit')
+        }
+        return { content: bytes, mediaType: 'application/octet-stream' }
+      },
+    } as unknown as ConnectorHost
+
+    await expect(
+      bridgeConnectorOutputArtifacts(
+        [
+          { fileId: 'f1', downloadUrl: 'https://connector.example/f1', sizeBytes: 6, name: 'a.bin', mimeType: 'application/octet-stream' },
+          { fileId: 'f2', downloadUrl: 'https://connector.example/f2', sizeBytes: 6, name: 'b.bin', mimeType: 'application/octet-stream' },
+        ],
+        {
+          runId: 'run-7',
+          nodeId: 'node-7',
+          jobId: 'job-7',
+          artifacts,
+          connector,
+          signal: new AbortController().signal,
+          maxAggregateBytes: 10,
+          emit: async (event) => {
+            events.push(event)
+          },
+        },
+      ),
+    ).rejects.toThrow()
+
+    expect(seenLimits).toEqual([10, 4])
+    expect(events).toHaveLength(0)
+  })
 })

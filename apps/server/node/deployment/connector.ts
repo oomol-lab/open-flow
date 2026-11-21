@@ -15,6 +15,8 @@ import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-ac
 
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
+import { lookup } from 'node:dns/promises'
+import { isIP } from 'node:net'
 import { silentLogger } from '../logger.ts'
 import { accessInvalid, assertConnectionNotDeferred, connectionRequired, ConnectorTaskError, unavailable } from './connector-contract.ts'
 import {
@@ -916,8 +918,8 @@ export class ConnectorClient implements ConnectorHost {
       throw nonRetryableTransitError('Connector transit download URL must use HTTP or HTTPS.')
     }
     const sameOrigin = target.origin === this.#origin.origin
-    if (!sameOrigin && isRestrictedTransitHost(target.hostname)) {
-      throw nonRetryableTransitError('Connector transit download URL targets a restricted host.')
+    if (!sameOrigin) {
+      await assertPublicTransitHost(target.hostname)
     }
     const headers: Record<string, string> = {}
     // Only send the Connector bearer token to the trusted Connector origin itself.
@@ -1007,6 +1009,23 @@ function actionNotFound(): ConnectorTaskError {
 
 function nonRetryableTransitError(message: string, status?: number): ConnectorTaskError {
   return new ConnectorTaskError('connector.unavailable', message, status, { retryable: false })
+}
+
+async function assertPublicTransitHost(rawHostname: string): Promise<void> {
+  if (isRestrictedTransitHost(rawHostname)) {
+    throw nonRetryableTransitError('Connector transit download URL targets a restricted host.')
+  }
+  const host = rawHostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (isIP(host) !== 0) return
+  let resolved: ReadonlyArray<{ readonly address: string }>
+  try {
+    resolved = await lookup(host, { all: true, verbatim: true })
+  } catch {
+    throw nonRetryableTransitError('Connector transit download host could not be resolved.')
+  }
+  if (resolved.length === 0 || resolved.some((entry) => isRestrictedTransitHost(entry.address))) {
+    throw nonRetryableTransitError('Connector transit download URL resolved to a restricted address.')
+  }
 }
 
 function isRestrictedTransitHost(rawHostname: string): boolean {
