@@ -17,9 +17,7 @@
 
 **Build automation with your AI agent. See exactly what will run.**
 
-Open Flow is a source-available workflow platform for people who want the speed of AI-assisted building
-and the clarity of a visual workflow. Ask Codex, Claude Code, or another agent to build a Flow, open
-it in the Workbench, and keep refining the same workflow together.
+Open Flow is a source-available workflow automation platform for teams using coding agents. Build and edit workflows with Codex, Claude Code, or another coding agent through the CLI or MCP. Review and test the same workflows in Workbench before publishing.
 
 Combine JavaScript, connected apps, AI, branching, and human approval in one canvas. Inspect the
 inputs, follow the execution, and decide which version goes live. Run on OOMOL Hosted or on your
@@ -29,9 +27,6 @@ own infrastructure.
 [Self-host with Docker](#run-it-your-way)
 
 ![A vertical AI trend workflow in the Open Flow Workbench, with parallel X, GitHub, and Hugging Face sources and the Research & write node's prompt, tools, inputs, and output in the property panel](docs/assets/readme-workbench.png)
-
-> [!IMPORTANT]
-> Open Flow is in beta. The product and its versioned contracts are still evolving.
 
 ## Your agent builds. You stay in control.
 
@@ -133,7 +128,7 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000) and sign in with `OPEN_FLOW_
 history are stored in the Docker volume. The operator token also authenticates CLI and API access.
 
 Prefer a prebuilt image? Follow the [GHCR image guide](docs/server/docker-ghcr/README.md) and select
-an explicit release tag during beta. The `latest` tag is reserved for stable releases.
+an explicit release tag. The `latest` tag is reserved for stable releases.
 
 Connector actions and LLM Tasks need their corresponding services configured. The Server does not
 silently fall back to another provider. Before exposing a deployment publicly, follow the

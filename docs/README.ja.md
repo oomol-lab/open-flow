@@ -19,16 +19,13 @@
 
 **AI エージェントと自動化をつくる。実行する内容を、自分の目で確かめる。**
 
-Open Flow は、AI による構築の速さと、視覚的なワークフローのわかりやすさを両立するソースコードを公開しているワークフロープラットフォームです。Codex、Claude Code などのエージェントに Flow の作成を依頼し、Workbench で開いて、同じワークフローを一緒に改善できます。
+Open Flow は、コーディングエージェントを利用するチーム向けのワークフロー自動化プラットフォームです。ソースコードは Open Flow License に基づいて公開しています。Codex や Claude Code が CLI や MCP で作成したフローを、Workbench で確認してテストできます。
 
 JavaScript、アプリ連携、AI、条件分岐、人による承認を一つのキャンバスで組み合わせます。入力を確認し、実行を追跡し、どのバージョンを本番で動かすかを決められます。OOMOL Hosted でも、自分で管理するインフラでも実行できます。
 
 [インタラクティブデモを試す](https://openflow.run) · [OOMOL Hosted を使う](https://console.openflow.run) · [Docker でセルフホストする](#自分に合った実行環境を選ぶ)
 
 ![Open Flow Workbench の縦方向の AI トレンドワークフロー。X、GitHub、Hugging Face からの並列収集と、調査・執筆ノードのプロンプト、ツール、入出力を右側のプロパティパネルに表示](assets/readme-workbench.png)
-
-> [!IMPORTANT]
-> Open Flow はベータ版です。製品とバージョン管理された契約は、引き続き進化しています。
 
 ## エージェントが構築し、あなたが判断する
 
@@ -104,7 +101,7 @@ docker run --rm \
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000) を開き、`OPEN_FLOW_TOKEN` でサインインします。Flow と実行履歴は Docker ボリュームに保存されます。同じ管理者トークンを CLI と API の認証にも使います。
 
-ビルド済みイメージを使う場合は、[GHCR イメージガイド](server/docker-ghcr/README.ja.md)に従い、ベータ期間中は明示的なリリースタグを選んでください。`latest` タグは安定版用です。
+ビルド済みイメージを使う場合は、[GHCR イメージガイド](server/docker-ghcr/README.ja.md)に従い、明示的なリリースタグを選んでください。`latest` タグは安定版用です。
 
 Connector の操作や LLM Task には、対応するサービスの設定が必要です。Server が別のプロバイダーへ黙って切り替えることはありません。インターネットに公開する前に、[デプロイガイド](server/container-delivery.md)と[セキュリティ強化チェックリスト](../SECURITY.md#hardening-your-deployment)を確認してください。
 

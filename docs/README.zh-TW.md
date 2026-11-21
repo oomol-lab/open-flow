@@ -19,16 +19,13 @@
 
 **和 AI Agent 一起建立自動化，讓每一步執行清楚可見。**
 
-Open Flow 是一個原始碼可用的工作流程平台，結合 AI 輔助建構的速度與視覺化工作流程的清晰結構。讓 Codex、Claude Code 或其他 Agent 建立一個 Flow，在 Workbench 中開啟，再一起持續完善同一個工作流程。
+Open Flow 是為使用程式設計助手的團隊打造的工作流程自動化平台，原始碼依 Open Flow License 提供。請 Codex、Claude Code 等程式設計助手透過 CLI 或 MCP 建立及修改工作流程，再到 Workbench 檢查、測試及發布同一個流程。
 
 在一張畫布上組合 JavaScript、應用程式整合、AI、條件分支和人工核准。檢視輸入、追蹤執行，並決定哪個版本正式上線。可以使用 OOMOL Hosted，也可以部署到自己的基礎設施。
 
 [體驗互動示範](https://openflow.run) · [使用 OOMOL Hosted](https://console.openflow.run) · [用 Docker 自行部署](#選擇適合你的執行方式)
 
 ![Open Flow Workbench 中的直向 AI 趨勢工作流程，包含 X、GitHub 和 Hugging Face 平行蒐集，右側屬性面板展示研究寫作節點的提示詞、工具、輸入與輸出](assets/readme-workbench.png)
-
-> [!IMPORTANT]
-> Open Flow 目前處於 Beta 階段，產品及其版本化契約仍在持續演進。
 
 ## Agent 負責建構，由你掌控
 
@@ -104,7 +101,7 @@ docker run --rm \
 
 開啟 [http://127.0.0.1:3000](http://127.0.0.1:3000)，使用 `OPEN_FLOW_TOKEN` 登入。Flow 和執行歷史儲存在 Docker 磁碟區中。這個管理員權杖也用於 CLI 和 API 驗證。
 
-想使用預先建置的映像檔？請參閱 [GHCR 映像檔指南](server/docker-ghcr/README.zh-TW.md)，並在 Beta 階段選擇明確的發佈標籤。`latest` 標籤保留給穩定版本。
+想使用預先建置的映像檔？請參閱 [GHCR 映像檔指南](server/docker-ghcr/README.zh-TW.md)，並選擇明確的發佈標籤。`latest` 標籤保留給穩定版本。
 
 Connector 操作和 LLM Task 需要設定對應的服務。Server 不會暗中切換到其他服務供應商。將部署開放至公網前，請遵循[部署指南](server/container-delivery.md)和[強化安全清單](../SECURITY.md#hardening-your-deployment)。
 

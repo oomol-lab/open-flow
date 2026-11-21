@@ -19,16 +19,13 @@
 
 **AI 에이전트와 자동화를 만들고, 무엇이 실행될지 직접 확인하세요.**
 
-Open Flow는 AI로 빠르게 구축하면서도 시각적인 워크플로로 구조를 명확하게 파악할 수 있는 소스 공개 워크플로 플랫폼입니다. Codex, Claude Code 또는 다른 에이전트에게 Flow 생성을 요청하고, Workbench에서 열어 같은 워크플로를 함께 개선하세요.
+Open Flow는 코딩 에이전트를 사용하는 팀을 위한 소스 공개 워크플로 자동화 플랫폼입니다. Codex나 Claude Code가 CLI 또는 MCP로 작성한 워크플로를 Workbench에서 검토하고 테스트할 수 있습니다.
 
 하나의 캔버스에서 JavaScript, 앱 연동, AI, 조건 분기, 사람의 승인을 조합합니다. 입력을 확인하고 실행을 추적하며 어떤 버전을 실제로 운영할지 결정할 수 있습니다. OOMOL Hosted나 직접 관리하는 인프라에서 실행하세요.
 
 [인터랙티브 데모 체험](https://openflow.run) · [OOMOL Hosted 사용](https://console.openflow.run) · [Docker로 직접 호스팅](#원하는-환경에서-실행)
 
 ![Open Flow Workbench의 세로형 AI 트렌드 워크플로. X, GitHub, Hugging Face 병렬 수집과 조사·작성 노드의 프롬프트, 도구, 입력 및 출력을 오른쪽 속성 패널에 표시](assets/readme-workbench.png)
-
-> [!IMPORTANT]
-> Open Flow는 베타 단계입니다. 제품과 버전 관리되는 계약은 계속 발전하고 있습니다.
 
 ## 에이전트가 만들고, 결정은 내가
 
@@ -104,7 +101,7 @@ docker run --rm \
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000)을 열고 `OPEN_FLOW_TOKEN`으로 로그인하세요. Flow와 실행 기록은 Docker 볼륨에 저장됩니다. 같은 운영자 토큰을 CLI와 API 인증에도 사용합니다.
 
-미리 빌드된 이미지를 사용하려면 [GHCR 이미지 가이드](server/docker-ghcr/README.ko.md)를 따르고, 베타 기간에는 명시적인 릴리스 태그를 선택하세요. `latest` 태그는 안정 버전용입니다.
+미리 빌드된 이미지를 사용하려면 [GHCR 이미지 가이드](server/docker-ghcr/README.ko.md)를 따르고, 명시적인 릴리스 태그를 선택하세요. `latest` 태그는 안정 버전용입니다.
 
 Connector 작업과 LLM Task는 해당 서비스를 설정해야 사용할 수 있습니다. Server는 다른 제공자로 몰래 전환하지 않습니다. 외부에 공개하기 전에 [배포 가이드](server/container-delivery.md)와 [보안 강화 체크리스트](../SECURITY.md#hardening-your-deployment)를 따르세요.
 
