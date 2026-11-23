@@ -1,6 +1,6 @@
 {
   "name": "@oomol-lab/open-flow",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Portable contracts and shared browser runtime for Open Flow.",
   "keywords": [
     "ai",
