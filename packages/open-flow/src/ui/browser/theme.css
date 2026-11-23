@@ -98,10 +98,6 @@
   --ui-control-hover-background: color-mix(in srgb, var(--_open-flow-secondary) 25%, var(--ui-control-background));
   --ui-readonly-focus-outline: 1px solid color-mix(in srgb, var(--ui-ring) 40%, var(--ui-input));
 
-  :is(input, textarea):is([readonly], :disabled)::placeholder {
-    opacity: 0;
-  }
-
   :is(:disabled, [aria-disabled='true']) [data-slot='select-chevron'],
   [data-slot='native-select']:disabled ~ [data-slot='native-select-icon'] {
     opacity: 0.5;

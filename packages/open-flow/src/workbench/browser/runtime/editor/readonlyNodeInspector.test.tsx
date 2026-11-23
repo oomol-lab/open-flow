@@ -112,6 +112,7 @@ it('inspects saved values and definitions without exposing writable controls or 
       for (const input of html.matchAll(/<(?:input|textarea)\b[^>]*>/g)) expect(input[0]).toMatch(/readonly|disabled|type="hidden"/)
       expect(html).not.toMatch(/>Save<|>Add Action<|>Connect account</)
       expect(html).toContain('Purpose')
+      if (selection.id === 'wait') expect(html).toMatch(new RegExp(`<textarea\\b[^>]*placeholder="${i18n.t('addNode.waitDescription')}"`))
     }
   } finally {
     i18n.dispose()
