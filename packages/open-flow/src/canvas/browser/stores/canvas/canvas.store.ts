@@ -19,7 +19,7 @@ import type {
   ViewCallbacks,
 } from '../../graph/FlowCanvas/model.ts'
 import type { NodeEntry } from '../../graph/FlowCanvas/node.tsx'
-import type { EdgeStore } from '../edge/edge.store.ts'
+import type { EdgeId, EdgeStore } from '../edge/edge.store.ts'
 import type { RFCommand } from './rfCommand.ts'
 import type { FlowRunStatus } from './typings.ts'
 
@@ -67,6 +67,8 @@ export interface CanvasStore$$ {
   readonly interactiveMode: Val<InteractiveMode>
   readonly direction: Val<CanvasDirection>
   readonly changingDirection: Val<boolean>
+  readonly hoveredNodeId: Val<NodeId | undefined>
+  readonly hoveredEdgeId: Val<EdgeId | undefined>
 
   /** Semantic nodes in the current product model. */
   readonly nodes: ReactiveMap<NodeId, NodeStore>
@@ -87,6 +89,8 @@ export interface CanvasStore$ extends ToReadonly$Group<CanvasStore$$> {
   readonly rfEdges: ReadonlyVal<RFEdge[]>
 
   readonly runStatus: ReadonlyVal<FlowRunStatus>
+
+  readonly hasEdgeFocus: ReadonlyVal<boolean>
 
   readonly nodeMiniMapPhase: ReadonlyVal<NodeMiniMapPhase>
 }
@@ -182,7 +186,9 @@ export class CanvasStore {
     this.layoutComplete = true
     this.#runStatus = this.dispose.add(val<FlowRunStatus>(model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle))
     this.#connections = this.dispose.add(val<readonly FlowCanvasViewEdge[]>([]))
-    const edges = this.dispose.add(deriveEdges(this.#connections, nodes))
+    const hoveredNodeId = this.dispose.add(val<NodeId | undefined>(undefined))
+    const hoveredEdgeId = this.dispose.add(val<EdgeId | undefined>(undefined))
+    const edges = this.dispose.add(deriveEdges(this.#connections, nodes, { hoveredNodeId, hoveredEdgeId }))
     const rfEdges = this.dispose.add(compute((get) => coalesce(get(edges).map((edge) => get(edge.$.rfEdge)))))
     this.$$ = {
       initialized: this.dispose.add(val(false)),
@@ -192,6 +198,8 @@ export class CanvasStore {
       interactiveMode: options.interactiveMode$ ?? this.dispose.add(val<InteractiveMode>(options.defaultInteractiveMode ?? 'touchpad')),
       direction: this.dispose.add(val(canvasDirection(model.direction))),
       changingDirection: this.dispose.add(val(false)),
+      hoveredNodeId,
+      hoveredEdgeId,
       nodes,
       commentNodes,
     }
@@ -225,6 +233,23 @@ export class CanvasStore {
       ),
       rfNodes,
       rfEdges,
+      hasEdgeFocus: this.dispose.add(
+        compute((get) => {
+          const nodeMap = get(nodes.$)
+          for (const node of nodeMap.values()) {
+            if (get(node.$.selected)) return true
+          }
+          const edgeList = get(edges)
+          for (const edge of edgeList) {
+            if (get(edge.$.selected)) return true
+          }
+          const hn = get(hoveredNodeId)
+          if (hn != null && nodeMap.has(hn)) return true
+          const he = get(hoveredEdgeId)
+          if (he != null && edgeList.some((edge) => edge.edgeId === he)) return true
+          return false
+        }),
+      ),
       nodeMiniMapPhase: this.dispose.add(compute((get) => getNodeMinimap(get(nodes.$).size + get(commentNodes.$).size, get(viewport)?.zoom ?? 1))),
     }
     this.#syncModel(model)

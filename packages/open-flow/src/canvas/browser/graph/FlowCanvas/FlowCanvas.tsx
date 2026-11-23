@@ -115,6 +115,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
               connectionRoutes$={flowCanvasStore.exportRoutes}
               viewport$={flowCanvasStore.$$.viewport}
               onRequestAddNode={onRequestAddNode}
+              onNodeHoverChange={(id) => flowCanvasStore.$$.hoveredNodeId.set(id)}
+              onEdgeHoverChange={(id) => flowCanvasStore.$$.hoveredEdgeId.set(id)}
               addNodeRequest={addNodeRequest}
               addItemRequest={addItemRequest}
               onAddNode={flowCanvasStore.onAddNode}

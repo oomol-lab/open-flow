@@ -40,22 +40,29 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
 
   const selected = useVal(edgeStore?.$.selected)
   const nodeSelected = useVal(edgeStore?.$.nodeSelected)
+  const hovered = useVal(edgeStore?.$.hovered)
+  const hasEdgeFocus = useVal(canvasStore.$.hasEdgeFocus)
   const sourceGradientColor = useVal(edgeStore?.$.sourceGradientColor) || 'var(--edge-primitive)'
   const targetGradientColor = useVal(edgeStore?.$.targetGradientColor) || 'var(--edge-primitive)'
   const connectionMeta = useVal(edgeStore?.$.connectionMeta)
 
-  const emphasized = selected || nodeSelected
+  const emphasized = Boolean(selected || nodeSelected || hovered)
+  const dimmed = Boolean(hasEdgeFocus && !emphasized)
   const strokeWidth = emphasized ? 2.5 : 1.5
+  const opacity = dimmed ? (error ? 0.65 : connectionMeta?.muted ? 0.16 : 0.22) : connectionMeta?.muted ? 0.65 : 1
+  const hasErrorAccent = sourceGradientColor === 'var(--accent-red-1)' || targetGradientColor === 'var(--accent-red-1)'
+  const emphasizeSolid = emphasized && !hasErrorAccent && !connectionMeta?.muted
   const gradientId = `${arrowId}-gradient`
-  const stroke = selected ? 'var(--edge-selected)' : connectionMeta?.muted ? undefined : `url(#${gradientId})`
+  const stroke = emphasizeSolid ? 'var(--edge-selected)' : connectionMeta?.muted ? undefined : `url(#${gradientId})`
 
   const style = useMemo<React.CSSProperties>(
     () => ({
+      opacity,
       stroke,
       strokeDasharray: connectionMeta?.dashed ? '5,5' : undefined,
       strokeWidth,
     }),
-    [stroke, strokeWidth, connectionMeta?.dashed],
+    [opacity, stroke, strokeWidth, connectionMeta?.dashed],
   )
 
   const adjustedScale = scale > 2 ? scale * 0.8 : scale > 1 ? scale : 1
@@ -84,17 +91,30 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
           overflow="visible"
         >
           <path
+            className={styles.markerPath}
             d="M 1 1 L 9 5 L 1 9"
             fill="none"
-            stroke={selected ? 'var(--edge-selected)' : connectionMeta?.muted ? 'var(--edge-primitive)' : targetGradientColor}
+            opacity={opacity}
+            stroke={emphasizeSolid ? 'var(--edge-selected)' : connectionMeta?.muted ? 'var(--edge-primitive)' : targetGradientColor}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         </marker>
       </defs>
+      <path
+        className={styles.halo}
+        d={path}
+        fill="none"
+        stroke="var(--flow-bg)"
+        strokeWidth={strokeWidth + 4}
+        strokeLinecap="butt"
+        strokeLinejoin="round"
+        style={{ opacity: dimmed ? 0 : 1 }}
+      />
       <BaseEdge
         id={props.id}
+        className={styles.edgePath}
         path={path}
         style={style}
         markerEnd={props.markerEnd ?? `url(#${arrowId})`}

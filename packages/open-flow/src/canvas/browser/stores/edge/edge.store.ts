@@ -34,12 +34,15 @@ export interface EdgeStore$ extends ToReadonly$Group<EdgeStore$$> {
   readonly targetGradientColor: ReadonlyVal<string>
   readonly connectionMeta: ReadonlyVal<ConnectionMeta | undefined>
   readonly nodeSelected: ReadonlyVal<boolean>
+  readonly hovered: ReadonlyVal<boolean>
   readonly hasError: ReadonlyVal<boolean>
 }
 
 export interface EdgeStoreProps {
   readonly nodes: ReadonlyReactiveMap<NodeId, NodeStore>
   readonly connection: FlowCanvasViewEdge
+  readonly hoveredNodeId?: ReadonlyVal<NodeId | undefined>
+  readonly hoveredEdgeId?: ReadonlyVal<EdgeId | undefined>
 }
 
 export class EdgeStore {
@@ -52,7 +55,7 @@ export class EdgeStore {
   public readonly $$: EdgeStore$$
   public readonly $: EdgeStore$
 
-  public constructor(edgeId: EdgeId, { nodes: nodes$, connection }: EdgeStoreProps) {
+  public constructor(edgeId: EdgeId, { nodes: nodes$, connection, hoveredNodeId, hoveredEdgeId }: EdgeStoreProps) {
     this.connection = connection
     const rfConnection = toRFEdgeConnection(nodes$, connection)
     this.edgeId = edgeId
@@ -97,6 +100,13 @@ export class EdgeStore {
     )
 
     const nodeSelected$ = this.dispose.add(compute((get) => get(get(sourceNodeStore$)?.$.selected) || get(get(targetNodeStore$)?.$.selected) || false))
+    const hovered$ = this.dispose.add(
+      compute(
+        (get) =>
+          (hoveredEdgeId != null && get(hoveredEdgeId) === this.edgeId) ||
+          (hoveredNodeId != null && (get(hoveredNodeId) === connection.source || get(hoveredNodeId) === connection.target)),
+      ),
+    )
 
     const data = { store: this }
     const rfEdge$ = this.dispose.add(
@@ -106,7 +116,7 @@ export class EdgeStore {
           id: this.edgeId,
           data,
           selected: get(selected$),
-          zIndex: get(get(sourceNodeStore$)?.$.selected) && get(get(targetNodeStore$)?.$.selected) ? 1 : 0,
+          zIndex: get(selected$) ? 3 : get(hovered$) ? 2 : get(nodeSelected$) ? 1 : 0,
         } satisfies RFEdge
       }),
     )
@@ -122,6 +132,7 @@ export class EdgeStore {
       targetGradientColor: targetGradientColor$,
       connectionMeta: connectionMeta$,
       nodeSelected: nodeSelected$,
+      hovered: hovered$,
       rfEdge: rfEdge$,
       hasError: this.dispose.add(derive(error$, (error) => !!error)),
     }

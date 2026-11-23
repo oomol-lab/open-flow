@@ -1,9 +1,43 @@
+.halo {
+  pointer-events: none;
+  transition: opacity 150ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.edgePath {
+  transition:
+    opacity 150ms ease,
+    stroke-width 150ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.markerPath {
+  transition:
+    opacity 150ms ease,
+    stroke-width 150ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
 .label {
   position: absolute;
   border-radius: 50%;
   font-size: var(--base-font-size);
   background: var(--node-background-color);
   pointer-events: all;
+}
+
+:global(.open-flow-canvas-node-minimap1) .halo,
+:global(.open-flow-canvas-node-minimap2) .halo {
+  display: none;
 }
 
 :global(.open-flow-canvas-node-minimap1 .react-flow__edge-path.react-flow__edge-path) {

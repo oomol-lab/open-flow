@@ -35,6 +35,7 @@ import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleImpl } from '../../components/handle.tsx'
 import type { RFGraph } from '../../stores/canvas/canvas.store.ts'
+import type { EdgeId } from '../../stores/edge/edge.store.ts'
 import type { ConnectionRoutesProviderProps } from '../Edges/ConnectionRoutes.tsx'
 import type { FlowCanvasViewProps } from '../FlowCanvas/model.ts'
 import type { GetPopupContainer } from './useGetPopupContainer.ts'
@@ -159,6 +160,8 @@ export interface ReactFlowContainerProps {
   onMoveEnd?: OnMoveEnd
   onNodeDragStop?: OnNodeDrag<RFNode<any>>
   onSelectionChange?: OnSelectionChangeFunc<RFNode<any>, RFEdge<any>>
+  onNodeHoverChange?: (nodeId: NodeId | undefined) => void
+  onEdgeHoverChange?: (edgeId: EdgeId | undefined) => void
   isValidConnection?: IsValidConnection<RFEdge<any>>
   addNodeRequest?: {
     readonly onComplete?: () => void
@@ -213,6 +216,14 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
         data-surface="canvas"
         data-theme={props.dark ? 'dark' : 'light'}
         ref={wrapperRef}
+        onMouseLeave={
+          props.onNodeHoverChange || props.onEdgeHoverChange
+            ? () => {
+                props.onNodeHoverChange?.(undefined)
+                props.onEdgeHoverChange?.(undefined)
+              }
+            : undefined
+        }
       >
         <GetPopupContainerContext.Provider value={context}>
           <I18nProvider i18n={props.i18n}>
@@ -742,6 +753,10 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           onMove={props.onMove}
           onMoveEnd={props.onMoveEnd}
           onNodeDragStop={props.onNodeDragStop}
+          onNodeMouseEnter={props.onNodeHoverChange ? (_event, node) => props.onNodeHoverChange?.(node.data?.store?.nodeId) : undefined}
+          onNodeMouseLeave={props.onNodeHoverChange ? () => props.onNodeHoverChange?.(undefined) : undefined}
+          onEdgeMouseEnter={props.onEdgeHoverChange ? (_event, edge) => props.onEdgeHoverChange?.(edge.id as EdgeId) : undefined}
+          onEdgeMouseLeave={props.onEdgeHoverChange ? () => props.onEdgeHoverChange?.(undefined) : undefined}
           onSelectionChange={props.onSelectionChange}
           onSelectionStart={() => {
             selecting.current = true
