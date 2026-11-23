@@ -28,7 +28,12 @@ export interface GraphLayout {
 export function graphLayout(nodes: readonly GraphLayoutNode[], edges: readonly GraphLayoutEdge[], direction: CanvasDirection): GraphLayout {
   if (!nodes.length) return { nodes: [], edges: [] }
   const graph = new graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-  graph.setGraph({ rankdir: direction === 'vertical' ? 'TB' : 'LR', ranksep: direction === 'vertical' ? 48 : 80 })
+  graph.setGraph({
+    rankdir: direction === 'vertical' ? 'TB' : 'LR',
+    ranksep: direction === 'vertical' ? 48 : 80,
+    nodesep: direction === 'vertical' ? 56 : 50,
+    edgesep: 16,
+  })
   const singles = new Set(nodes.map((node) => node.id))
   for (const node of nodes) graph.setNode(node.id, { width: node.width, height: node.height })
   const connections = edges.filter((edge) => graph.hasNode(edge.source) && graph.hasNode(edge.target))

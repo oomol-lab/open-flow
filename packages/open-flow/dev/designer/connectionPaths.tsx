@@ -222,9 +222,45 @@ const backwardModel: FlowCanvasViewModel = {
   ],
 }
 
+const denseMultiLaneModel: FlowCanvasViewModel = {
+  direction: 'vertical',
+  viewport: { x: 60, y: 30, zoom: 0.55 },
+  nodes: [
+    { id: 'intake-a', title: 'Intake A', position: { x: 0, y: 0 } },
+    { id: 'intake-b', title: 'Intake B', position: { x: 400, y: 0 } },
+    { id: 'route-a', title: 'Route & normalize', position: { x: 180, y: 220 } },
+    { id: 'blocker', title: 'Policy guard', position: { x: 560, y: 220 } },
+    { id: 'enrich-a', title: 'Enrich left', position: { x: 0, y: 440 } },
+    { id: 'enrich-b', title: 'Enrich center', position: { x: 400, y: 440 } },
+    { id: 'audit', title: 'Audit log', position: { x: 780, y: 440 } },
+    { id: 'merge', title: 'Aggregate & output', position: { x: 380, y: 660 } },
+  ].map((node) => Object.assign(node, { kind: 'task' as const, reference: 'lab/task', inputs: [], outputs: [] })),
+  edges: [
+    ['intake-a', 'route-a'],
+    ['intake-b', 'route-a'],
+    ['intake-b', 'blocker'],
+    ['intake-a', 'enrich-a'],
+    ['intake-a', 'enrich-b'],
+    ['intake-b', 'audit'],
+    ['route-a', 'enrich-b'],
+    ['blocker', 'audit'],
+    ['enrich-a', 'merge'],
+    ['enrich-b', 'merge'],
+    ['audit', 'merge'],
+    ['merge', 'intake-b'],
+  ].map(([source, target], index) => ({
+    id: `dense-${index}-${source}-${target}`,
+    source: source!,
+    sourceHandle: '$out',
+    target: target!,
+    targetHandle: '$in',
+  })),
+}
+
 const connectionSamples = [
   { label: 'Shared input', model: sharedInputModel },
   { label: 'Forward connections', model: forwardModel },
+  { label: 'Dense multi-lane', model: denseMultiLaneModel },
   { label: 'Aligned returns', model: alignedModel },
   { label: 'Mixed rows', model: mixedRowsModel },
   { label: 'Same row', model: sameRowModel },

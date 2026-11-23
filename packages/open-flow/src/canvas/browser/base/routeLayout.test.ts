@@ -175,3 +175,67 @@ it('leaves blocked ports to standard edge rendering without losing clear routes'
   expect(routes.get('clear')![0]).toEqual({ x: 100, y: 650 })
   expect(routes.get('clear')!.at(-1)).toEqual({ x: 148, y: 650 })
 })
+
+it('separates shifted parallel forward edges across the same rank gap into distinct lanes', () => {
+  const nodes: LayoutNode[] = [
+    { id: 'a', column: 0, x: 0, y: 0, width: 100, height: 120 },
+    { id: 'b', column: 0, x: 0, y: 130, width: 100, height: 100 },
+    { id: 'c', column: 1, x: 180, y: 180, width: 100, height: 120 },
+    { id: 'd', column: 1, x: 180, y: 320, width: 100, height: 120 },
+  ]
+  const routes = routeLayout(nodes, [
+    { id: 'a-c', source: 'a', target: 'c' },
+    { id: 'b-d', source: 'b', target: 'd' },
+  ])
+  expect(routes.size).toBe(2)
+  expect(hasRouteCrossings(routes)).toBe(false)
+  const trunkA = routes.get('a-c')![1]!.x
+  const trunkB = routes.get('b-d')![1]!.x
+  expect(Math.abs(trunkA - trunkB)).toBeGreaterThanOrEqual(8)
+})
+
+it('assigns distinct trunks to crossing forward edges in the same rank gap', () => {
+  const nodes: LayoutNode[] = [
+    { id: 'a', column: 0, x: 0, y: 0, width: 100, height: 120 },
+    { id: 'b', column: 0, x: 0, y: 180, width: 100, height: 120 },
+    { id: 'c', column: 1, x: 180, y: 0, width: 100, height: 120 },
+    { id: 'd', column: 1, x: 180, y: 180, width: 100, height: 120 },
+  ]
+  const routes = routeLayout(nodes, [
+    { id: 'a-d', source: 'a', target: 'd' },
+    { id: 'b-c', source: 'b', target: 'c' },
+  ])
+  expect(routes.size).toBe(2)
+  const trunkAD = routes.get('a-d')![1]!.x
+  const trunkBC = routes.get('b-c')![1]!.x
+  expect(Math.abs(trunkAD - trunkBC)).toBeGreaterThanOrEqual(8)
+})
+
+it('separates multiple obstructed skip edges routing through the same corridor without crossing cards', () => {
+  const nodes: LayoutNode[] = [
+    { id: 's1', column: 0, x: 0, y: 0, width: 100, height: 120 },
+    { id: 's2', column: 0, x: 0, y: 200, width: 100, height: 120 },
+    { id: 'obs', column: 1, x: 180, y: -40, width: 100, height: 420 },
+    { id: 't1', column: 2, x: 360, y: 0, width: 100, height: 120 },
+    { id: 't2', column: 2, x: 360, y: 200, width: 100, height: 120 },
+  ]
+  const routes = routeLayout(nodes, [
+    { id: 'skip-1', source: 's1', target: 't1' },
+    { id: 'skip-2', source: 's2', target: 't2' },
+  ])
+  expect(routes.size).toBe(2)
+  expect(hasRouteCrossings(routes)).toBe(false)
+  for (const path of routes.values()) {
+    for (let index = 1; index < path.length; index++) {
+      const a = path[index - 1]!
+      const b = path[index]!
+      expect(a.x === b.x || a.y === b.y).toBe(true)
+      for (const node of nodes) {
+        const crosses =
+          Math.max(Math.min(a.x, b.x), node.x + 8) <= Math.min(Math.max(a.x, b.x), node.x + node.width - 8) &&
+          Math.max(Math.min(a.y, b.y), node.y + 8) <= Math.min(Math.max(a.y, b.y), node.y + node.height - 8)
+        expect(crosses, `route crosses ${node.id}`).toBe(false)
+      }
+    }
+  }
+})
