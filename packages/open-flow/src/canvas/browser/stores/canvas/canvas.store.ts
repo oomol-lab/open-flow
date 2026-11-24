@@ -188,7 +188,16 @@ export class CanvasStore {
     this.#connections = this.dispose.add(val<readonly FlowCanvasViewEdge[]>([]))
     const hoveredNodeId = this.dispose.add(val<NodeId | undefined>(undefined))
     const hoveredEdgeId = this.dispose.add(val<EdgeId | undefined>(undefined))
-    const edges = this.dispose.add(deriveEdges(this.#connections, nodes, { hoveredNodeId, hoveredEdgeId }))
+    const hasRun = this.dispose.add(
+      compute((get) => {
+        for (const node of get(nodes.$).values()) {
+          const status = get(node.content$).run?.status
+          if (status != null && status !== 'idle') return true
+        }
+        return false
+      }),
+    )
+    const edges = this.dispose.add(deriveEdges(this.#connections, nodes, { hoveredNodeId, hoveredEdgeId, hasRun }))
     const rfEdges = this.dispose.add(compute((get) => coalesce(get(edges).map((edge) => get(edge.$.rfEdge)))))
     this.$$ = {
       initialized: this.dispose.add(val(false)),

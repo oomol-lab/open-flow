@@ -6,6 +6,7 @@ import type { RFConnection, RFEdge } from '../../base/rfHelpers.ts'
 import type { ID } from '../../base/typing.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
 import type { FlowCanvasViewEdge } from '../../graph/FlowCanvas/model.ts'
+import type { NodeContent } from '../../graph/FlowCanvas/nodeContent.ts'
 import type { NodeStore } from '../node/node.store.ts'
 
 import { disposableStore } from '@wopjs/disposable'
@@ -18,8 +19,10 @@ export type EdgeId = ID<string, EdgeStore>
 
 export interface ConnectionMeta {
   readonly dashed?: boolean
+  readonly executed?: boolean
   readonly fromValueNode?: boolean
   readonly muted?: boolean
+  readonly runMuted?: boolean
 }
 
 export interface EdgeStore$$ {
@@ -43,6 +46,7 @@ export interface EdgeStoreProps {
   readonly connection: FlowCanvasViewEdge
   readonly hoveredNodeId?: ReadonlyVal<NodeId | undefined>
   readonly hoveredEdgeId?: ReadonlyVal<EdgeId | undefined>
+  readonly hasRun?: ReadonlyVal<boolean>
 }
 
 export class EdgeStore {
@@ -55,7 +59,7 @@ export class EdgeStore {
   public readonly $$: EdgeStore$$
   public readonly $: EdgeStore$
 
-  public constructor(edgeId: EdgeId, { nodes: nodes$, connection, hoveredNodeId, hoveredEdgeId }: EdgeStoreProps) {
+  public constructor(edgeId: EdgeId, { nodes: nodes$, connection, hoveredNodeId, hoveredEdgeId, hasRun }: EdgeStoreProps) {
     this.connection = connection
     const rfConnection = toRFEdgeConnection(nodes$, connection)
     this.edgeId = edgeId
@@ -65,16 +69,23 @@ export class EdgeStore {
 
     const sourceNodeStore$ = this.dispose.add(derive(nodes$.$, (nodes) => nodes.get(connection.source as NodeId)))
     const targetNodeStore$ = this.dispose.add(derive(nodes$.$, (nodes) => nodes.get(connection.target as NodeId)))
+    const executed$ = this.dispose.add(compute((get) => isEdgeExecuted(connection, get(get(sourceNodeStore$)?.content$), get(get(targetNodeStore$)?.content$))))
     const sourceGradientColor$ = this.dispose.add(
       compute((get) => {
-        const node = get(sourceNodeStore$)
-        return get(node?.$.executionPortColor) ?? 'var(--edge-primitive)'
+        const portColor = get(get(sourceNodeStore$)?.$.executionPortColor)
+        if (get(executed$)) {
+          return portColor === 'var(--accent-red-1)' || portColor === 'var(--_open-flow-error-stroke)' ? portColor : 'var(--edge-executed)'
+        }
+        return portColor == null || portColor === 'var(--edge-executed)' || portColor === 'var(--edge-executed-selected)' ? 'var(--edge-primitive)' : portColor
       }),
     )
     const targetGradientColor$ = this.dispose.add(
       compute((get) => {
-        const node = get(targetNodeStore$)
-        return get(node?.$.executionPortColor) ?? 'var(--edge-primitive)'
+        const portColor = get(get(targetNodeStore$)?.$.executionPortColor)
+        if (get(executed$)) {
+          return portColor === 'var(--accent-red-1)' || portColor === 'var(--_open-flow-error-stroke)' ? portColor : 'var(--edge-executed)'
+        }
+        return portColor == null || portColor === 'var(--edge-executed)' || portColor === 'var(--edge-executed-selected)' ? 'var(--edge-primitive)' : portColor
       }),
     )
 
@@ -82,17 +93,17 @@ export class EdgeStore {
       compute<ConnectionMeta | undefined>(
         (get) => {
           const node = get(sourceNodeStore$)
+          const executed = get(executed$)
           const isFromSkippedNode = get(node?.ignore)
           const isFromValueNode = node?.nodeType === NODE_TYPE.ValueNode
-          if (isFromValueNode) {
-            return {
-              dashed: true,
-              fromValueNode: true,
-              muted: hasNonValueNode(connection, targetNodeStore$, get) || isFromSkippedNode,
-            }
-          }
-          if (isFromSkippedNode) {
-            return { muted: true }
+          const muted = isFromValueNode ? hasNonValueNode(connection, targetNodeStore$, get) || isFromSkippedNode : isFromSkippedNode
+          const runMuted = !executed && !muted && Boolean(hasRun && get(hasRun))
+          if (!isFromValueNode && !muted && !runMuted && !executed) return undefined
+          return {
+            ...(isFromValueNode ? { dashed: true, fromValueNode: true } : {}),
+            ...(muted ? { muted: true } : {}),
+            ...(runMuted ? { runMuted: true } : {}),
+            ...(executed ? { executed: true } : {}),
           }
         },
         { equal: shallowPlainObjectEqual },
@@ -156,4 +167,24 @@ function hasNonValueNode(connection: FlowCanvasViewEdge, targetNodeStore$: Reado
   const node = get(get(targetNodeStore$)?.content$)
   const input = node?.inputs.find((candidate) => 'handle' in candidate && candidate.handle == connection.targetHandle)
   return input != null && 'sources' in input && (input.sources?.length ?? 0) > 1
+}
+
+const activeOrExecutedTargetStatuses = new Set(['running', 'waiting', 'success', 'handled', 'error'])
+
+export function isEdgeExecuted(connection: FlowCanvasViewEdge, sourceContent: NodeContent | undefined, targetContent: NodeContent | undefined): boolean {
+  const sourceStatus = sourceContent?.run?.status
+  const targetStatus = targetContent?.run?.status
+  if (targetStatus == null || !activeOrExecutedTargetStatuses.has(targetStatus)) return false
+  if (sourceStatus === 'waiting') return connection.sourceHandle === '$branch:pending'
+  if (sourceStatus !== 'success' && sourceStatus !== 'handled') return false
+  if (connection.sourceHandle.startsWith('$branch:')) {
+    const branch = connection.sourceHandle.slice('$branch:'.length)
+    const releasedHandles = sourceContent?.run?.releasedHandles
+    if (releasedHandles != null) return releasedHandles.includes(branch)
+    const outputs = sourceContent?.run?.outputs
+    if (outputs != null && typeof outputs === 'object' && !Array.isArray(outputs) && Object.keys(outputs).length > 0) {
+      return Object.hasOwn(outputs, branch)
+    }
+  }
+  return true
 }

@@ -779,18 +779,22 @@ export function decodeRunEvent(value: unknown) {
             },
           } as const
         }
-        case 'node.completed':
+        case 'node.completed': {
+          if (payload.releasedHandles !== undefined && !Array.isArray(payload.releasedHandles)) return invalidResponse()
+          const releasedHandles = payload.releasedHandles?.map((handle) => string(handle))
           return {
             ...base,
             kind,
             payload: {
               ...node,
+              ...(releasedHandles === undefined ? {} : { releasedHandles }),
               ...(payload.systemOutputs === undefined
                 ? {}
                 : { systemOutputs: Object.fromEntries(Object.entries(record(payload.systemOutputs)).map(([key, item]) => [key, jsonValue(item)])) }),
               outputs: Object.fromEntries(Object.entries(record(payload.outputs)).map(([key, item]) => [key, jsonValue(item)])),
             },
           } as const
+        }
         case 'node.failed': {
           const error = record(payload.error)
           return {

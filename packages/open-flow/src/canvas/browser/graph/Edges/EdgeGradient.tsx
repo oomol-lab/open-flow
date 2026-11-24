@@ -1,3 +1,5 @@
+import styles from './BasicEdge.module.scss'
+
 interface EdgeGradientProps {
   id: string
   sourceX: number
@@ -12,8 +14,8 @@ export function EdgeGradient({ id, sourceX, sourceY, targetX, targetY, sourceCol
   return (
     <defs>
       <linearGradient id={id} gradientUnits="userSpaceOnUse" x1={sourceX} y1={sourceY} x2={targetX} y2={targetY}>
-        <stop offset="0%" stopColor={sourceColor} />
-        <stop offset="100%" stopColor={targetColor} />
+        <stop offset="0%" className={styles.gradientStop} style={{ stopColor: sourceColor }} />
+        <stop offset="100%" className={styles.gradientStop} style={{ stopColor: targetColor }} />
       </linearGradient>
     </defs>
   )

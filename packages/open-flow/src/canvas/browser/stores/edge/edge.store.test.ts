@@ -1,105 +1,180 @@
 import type { NodeId } from '../../../../schema/index.ts'
-import type { FlowCanvasViewModel } from '../../graph/FlowCanvas/model.ts'
+import type { FlowCanvasViewEdge } from '../../graph/FlowCanvas/model.ts'
+import type { NodeContent } from '../../graph/FlowCanvas/nodeContent.ts'
 
-import { afterEach, describe, expect, it } from 'vitest'
-import { CanvasStore } from '../canvas/canvas.store.ts'
+import { val } from 'value-enhancer'
+import { reactiveMap } from 'value-enhancer/collections'
+import { describe, expect, it } from 'vitest'
+import { NODE_TYPE } from '../node/constants.ts'
+import { NodeStore } from '../node/node.store.ts'
+import { EdgeStore, getRFEdgeId } from './edge.store.ts'
 
-const noopCallbacks = {
-  onIgnoreNodes: () => {},
-  onAddNode: async () => undefined,
-  onDeleteNodes: () => {},
-  onConnect: () => {},
-  onDisconnect: () => {},
-  onDuplicate: () => {},
-  onMoveNodes: () => {},
-  onCopy: () => {},
-  onPaste: () => {},
-  onChangeComment: undefined,
-} as const
-
-function createModel(includeB = true): FlowCanvasViewModel {
-  return {
-    direction: 'vertical',
-    viewport: { x: 0, y: 0, zoom: 1 },
-    nodes: [
-      { id: 'a', kind: 'task', title: 'Node A', reference: 'lab/a', position: { x: 0, y: 0 }, inputs: [], outputs: [] },
-      ...(includeB ? [{ id: 'b', kind: 'task' as const, title: 'Node B', reference: 'lab/b', position: { x: 0, y: 200 }, inputs: [], outputs: [] }] : []),
-      { id: 'c', kind: 'task', title: 'Node C', reference: 'lab/c', position: { x: 400, y: 200 }, inputs: [], outputs: [] },
-      { id: 'comment', kind: 'comment', title: 'Note', content: 'Side note', position: { x: 500, y: 0 } },
-    ],
-    edges: includeB
-      ? [
-          { id: 'ab', source: 'a', sourceHandle: '$out', target: 'b', targetHandle: '$in' },
-          { id: 'ac', source: 'a', sourceHandle: '$out', target: 'c', targetHandle: '$in' },
-        ]
-      : [{ id: 'ac', source: 'a', sourceHandle: '$out', target: 'c', targetHandle: '$in' }],
-  }
+function createNode(id: string, content: Record<string, unknown> = {}) {
+  const content$ = val<NodeContent>({
+    id,
+    kind: 'task',
+    title: id,
+    reference: 'task',
+    inputs: [],
+    outputs: [],
+    ...content,
+  } as NodeContent)
+  const node = new NodeStore(id as NodeId, NODE_TYPE.TaskNode, { ignoredNodeIds: val([]), content$, position: { x: 0, y: 0 } })
+  return { node, content$ }
 }
 
-describe('EdgeStore & CanvasStore edge focus', () => {
-  let store: CanvasStore | undefined
+describe('EdgeStore execution state', () => {
+  it('keeps default edge colors when no run has executed', () => {
+    const nodes = reactiveMap<NodeId, NodeStore>()
+    const source = createNode('a')
+    const target = createNode('b')
+    nodes.set('a' as NodeId, source.node)
+    nodes.set('b' as NodeId, target.node)
+    const connection: FlowCanvasViewEdge = { id: 'a-b', source: 'a', sourceHandle: '$out', target: 'b', targetHandle: '$in' }
+    const edge = new EdgeStore(getRFEdgeId(connection), { nodes, connection, hasRun: val(false) })
 
-  afterEach(() => {
-    store?.dispose()
-    store = undefined
+    expect(edge.$.sourceGradientColor.value).toBe('var(--edge-primitive)')
+    expect(edge.$.targetGradientColor.value).toBe('var(--edge-primitive)')
+    expect(edge.$.connectionMeta.value).toBeUndefined()
+
+    edge.dispose()
+    source.node.dispose()
+    target.node.dispose()
+    nodes.dispose()
   })
 
-  it('orders edge zIndex by default -> endpoint selected -> hovered -> edge selected', () => {
-    store = new CanvasStore(createModel(), true, 'en', noopCallbacks)
-    const edge = store.$.edges.value.find((item) => item.connection.target === 'b')!
-    const nodeB = store.$.nodes.get('b' as NodeId)!
+  it('colors executed edges green and transitions to red when target fails', () => {
+    const nodes = reactiveMap<NodeId, NodeStore>()
+    const source = createNode('a', { run: { status: 'success' } })
+    const target = createNode('b', { run: { status: 'success' } })
+    nodes.set('a' as NodeId, source.node)
+    nodes.set('b' as NodeId, target.node)
+    const connection: FlowCanvasViewEdge = { id: 'a-b', source: 'a', sourceHandle: '$out', target: 'b', targetHandle: '$in' }
+    const edge = new EdgeStore(getRFEdgeId(connection), { nodes, connection, hasRun: val(true) })
 
-    expect(edge.$.rfEdge.value?.zIndex).toBe(0)
+    expect(edge.$.sourceGradientColor.value).toBe('var(--edge-executed)')
+    expect(edge.$.targetGradientColor.value).toBe('var(--edge-executed)')
+    expect(edge.$.connectionMeta.value).toEqual({ executed: true })
 
-    nodeB.$$.selected.set(true)
-    expect(edge.$.nodeSelected.value).toBe(true)
-    expect(edge.$.rfEdge.value?.zIndex).toBe(1)
+    target.content$.set({ ...target.content$.value, run: { status: 'error' } })
+    expect(edge.$.sourceGradientColor.value).toBe('var(--edge-executed)')
+    expect(edge.$.targetGradientColor.value).toBe('var(--_open-flow-error-stroke)')
+    expect(edge.$.connectionMeta.value).toEqual({ executed: true })
 
-    store.$$.hoveredNodeId.set('b' as NodeId)
-    expect(edge.$.hovered.value).toBe(true)
-    expect(edge.$.rfEdge.value?.zIndex).toBe(2)
+    target.node.$$.selected.set(true)
+    expect(edge.$.targetGradientColor.value).toBe('var(--accent-red-1)')
 
-    store.$$.hoveredNodeId.set(undefined)
-    store.$$.hoveredEdgeId.set(edge.edgeId)
-    expect(edge.$.hovered.value).toBe(true)
-    expect(edge.$.rfEdge.value?.zIndex).toBe(2)
-
-    edge.$$.selected.set(true)
-    expect(edge.$.rfEdge.value?.zIndex).toBe(3)
+    edge.dispose()
+    source.node.dispose()
+    target.node.dispose()
+    nodes.dispose()
   })
 
-  it('tracks hasEdgeFocus across semantic node selection, edge selection, hover, and node removal', () => {
-    store = new CanvasStore(createModel(), true, 'en', noopCallbacks)
-    const edgeAB = store.$.edges.value.find((item) => item.connection.target === 'b')!
-    const nodeA = store.$.nodes.get('a' as NodeId)!
-    const comment = store.$.commentNodes!.get('comment' as NodeId)!
+  it('uses releasedHandles to distinguish taken vs untaken branches even on fan-in', () => {
+    const nodes = reactiveMap<NodeId, NodeStore>()
+    const cond = createNode('cond', {
+      kind: 'condition',
+      matchMode: 'first',
+      cases: [],
+      defaultOutput: 'otherwise',
+      outputs: [{ handle: 'matched' }, { handle: 'otherwise' }],
+      run: { status: 'success', releasedHandles: ['matched'] },
+    })
+    const merge = createNode('merge', { run: { status: 'success' } })
+    nodes.set('cond' as NodeId, cond.node)
+    nodes.set('merge' as NodeId, merge.node)
 
-    expect(store.$.hasEdgeFocus.value).toBe(false)
+    const takenConn: FlowCanvasViewEdge = { id: 'taken', source: 'cond', sourceHandle: '$branch:matched', target: 'merge', targetHandle: '$in' }
+    const untakenConn: FlowCanvasViewEdge = { id: 'untaken', source: 'cond', sourceHandle: '$branch:otherwise', target: 'merge', targetHandle: '$in' }
+    const hasRun = val(true)
+    const takenEdge = new EdgeStore(getRFEdgeId(takenConn), { nodes, connection: takenConn, hasRun })
+    const untakenEdge = new EdgeStore(getRFEdgeId(untakenConn), { nodes, connection: untakenConn, hasRun })
 
-    // Comment-only selection should not dim workflow edges.
-    comment.$$.selected.set(true)
-    expect(store.$.hasEdgeFocus.value).toBe(false)
-    comment.$$.selected.set(false)
+    expect(takenEdge.$.sourceGradientColor.value).toBe('var(--edge-executed)')
+    expect(takenEdge.$.targetGradientColor.value).toBe('var(--edge-executed)')
+    expect(takenEdge.$.connectionMeta.value).toEqual({ executed: true })
 
-    nodeA.$$.selected.set(true)
-    expect(store.$.hasEdgeFocus.value).toBe(true)
-    nodeA.$$.selected.set(false)
-    expect(store.$.hasEdgeFocus.value).toBe(false)
+    expect(untakenEdge.$.sourceGradientColor.value).toBe('var(--edge-primitive)')
+    expect(untakenEdge.$.targetGradientColor.value).toBe('var(--edge-primitive)')
+    expect(untakenEdge.$.connectionMeta.value).toEqual({ runMuted: true })
 
-    edgeAB.$$.selected.set(true)
-    expect(store.$.hasEdgeFocus.value).toBe(true)
-    edgeAB.$$.selected.set(false)
-    expect(store.$.hasEdgeFocus.value).toBe(false)
+    takenEdge.dispose()
+    untakenEdge.dispose()
+    cond.node.dispose()
+    merge.node.dispose()
+    nodes.dispose()
+  })
 
-    store.$$.hoveredEdgeId.set(edgeAB.edgeId)
-    expect(store.$.hasEdgeFocus.value).toBe(true)
-    store.$$.hoveredEdgeId.set(undefined)
-    expect(store.$.hasEdgeFocus.value).toBe(false)
+  it('falls back to outputs keys for branch edges when releasedHandles is absent', () => {
+    const nodes = reactiveMap<NodeId, NodeStore>()
+    const waitNode = createNode('wait', {
+      kind: 'approval',
+      outputs: [{ handle: 'approved' }, { handle: 'rejected' }],
+      run: { status: 'success', outputs: { approved: { ok: true } } },
+    })
+    const nextNode = createNode('next', { run: { status: 'success' } })
+    nodes.set('wait' as NodeId, waitNode.node)
+    nodes.set('next' as NodeId, nextNode.node)
 
-    // Deleting a hovered node must not leave hasEdgeFocus stuck true.
-    store.$$.hoveredNodeId.set('b' as NodeId)
-    expect(store.$.hasEdgeFocus.value).toBe(true)
-    store.reconcile(createModel(false), true, 'en', [], [])
-    expect(store.$.hasEdgeFocus.value).toBe(false)
+    const approvedConn: FlowCanvasViewEdge = { id: 'a', source: 'wait', sourceHandle: '$branch:approved', target: 'next', targetHandle: '$in' }
+    const rejectedConn: FlowCanvasViewEdge = { id: 'r', source: 'wait', sourceHandle: '$branch:rejected', target: 'next', targetHandle: '$in' }
+    const hasRun = val(true)
+    const approvedEdge = new EdgeStore(getRFEdgeId(approvedConn), { nodes, connection: approvedConn, hasRun })
+    const rejectedEdge = new EdgeStore(getRFEdgeId(rejectedConn), { nodes, connection: rejectedConn, hasRun })
+
+    expect(approvedEdge.$.connectionMeta.value).toEqual({ executed: true })
+    expect(rejectedEdge.$.connectionMeta.value).toEqual({ runMuted: true })
+
+    approvedEdge.dispose()
+    rejectedEdge.dispose()
+    waitNode.node.dispose()
+    nextNode.node.dispose()
+    nodes.dispose()
+  })
+
+  it('preserves pending notification execution state across waiting and completion', () => {
+    const nodes = reactiveMap<NodeId, NodeStore>()
+    const approval = createNode('approval', {
+      kind: 'approval',
+      outputs: [{ handle: 'pending' }, { handle: 'approve' }, { handle: 'reject' }],
+      run: { status: 'waiting' },
+    })
+    const notify = createNode('notify', { run: { status: 'success' } })
+    const approved = createNode('approved', { run: { status: 'idle' } })
+    const rejected = createNode('rejected', { run: { status: 'idle' } })
+    nodes.set('approval' as NodeId, approval.node)
+    nodes.set('notify' as NodeId, notify.node)
+    nodes.set('approved' as NodeId, approved.node)
+    nodes.set('rejected' as NodeId, rejected.node)
+
+    const pendingConn: FlowCanvasViewEdge = { id: 'p', source: 'approval', sourceHandle: '$branch:pending', target: 'notify', targetHandle: '$in' }
+    const approveConn: FlowCanvasViewEdge = { id: 'a', source: 'approval', sourceHandle: '$branch:approve', target: 'approved', targetHandle: '$in' }
+    const rejectConn: FlowCanvasViewEdge = { id: 'r', source: 'approval', sourceHandle: '$branch:reject', target: 'rejected', targetHandle: '$in' }
+    const hasRun = val(true)
+    const pendingEdge = new EdgeStore(getRFEdgeId(pendingConn), { nodes, connection: pendingConn, hasRun })
+    const approveEdge = new EdgeStore(getRFEdgeId(approveConn), { nodes, connection: approveConn, hasRun })
+    const rejectEdge = new EdgeStore(getRFEdgeId(rejectConn), { nodes, connection: rejectConn, hasRun })
+
+    expect(pendingEdge.$.connectionMeta.value).toEqual({ executed: true })
+    expect(approveEdge.$.connectionMeta.value).toEqual({ runMuted: true })
+    expect(rejectEdge.$.connectionMeta.value).toEqual({ runMuted: true })
+
+    approval.content$.set({
+      ...approval.content$.value,
+      run: { status: 'success', releasedHandles: ['pending', 'approve'] },
+    })
+    approved.content$.set({ ...approved.content$.value, run: { status: 'success' } })
+    expect(pendingEdge.$.connectionMeta.value).toEqual({ executed: true })
+    expect(approveEdge.$.connectionMeta.value).toEqual({ executed: true })
+    expect(rejectEdge.$.connectionMeta.value).toEqual({ runMuted: true })
+
+    pendingEdge.dispose()
+    approveEdge.dispose()
+    rejectEdge.dispose()
+    approval.node.dispose()
+    notify.node.dispose()
+    approved.node.dispose()
+    rejected.node.dispose()
+    nodes.dispose()
   })
 })

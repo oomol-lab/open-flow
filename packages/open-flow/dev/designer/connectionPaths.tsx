@@ -257,7 +257,95 @@ const denseMultiLaneModel: FlowCanvasViewModel = {
   })),
 }
 
+const executedPathModel: FlowCanvasViewModel = {
+  direction: 'vertical',
+  viewport: { x: 80, y: 30, zoom: 0.78 },
+  nodes: [
+    {
+      id: 'trigger',
+      kind: 'trigger',
+      title: 'Manual trigger',
+      position: { x: 240, y: 0 },
+      inputs: [],
+      outputs: [{ handle: 'input' }],
+      presentation: { kind: 'manual', schedules: [] },
+      run: { runId: 'run-demo', startedAt: '2026-11-24T06:00:00Z', status: 'success' },
+    },
+    {
+      id: 'fetch',
+      kind: 'task',
+      reference: 'lab/fetch',
+      title: 'Fetch records',
+      position: { x: 240, y: 180 },
+      inputs: [{ handle: 'input' }],
+      outputs: [{ handle: 'records' }],
+      run: {
+        runId: 'run-demo',
+        startedAt: '2026-11-24T06:00:01Z',
+        finishedAt: '2026-11-24T06:00:02Z',
+        status: 'success',
+        outputs: { records: 12 },
+      },
+    },
+    {
+      id: 'branch',
+      kind: 'condition',
+      title: 'Check records',
+      position: { x: 240, y: 370 },
+      matchMode: 'first',
+      defaultOutput: 'otherwise',
+      cases: [
+        {
+          output: 'matched',
+          groups: [{ expressions: [{ left: { kind: 'node', label: 'Fetch records' }, operator: 'is not empty' }] }],
+        },
+      ],
+      inputs: [{ handle: 'records' }],
+      outputs: [{ handle: 'matched' }, { handle: 'otherwise' }],
+      run: {
+        runId: 'run-demo',
+        startedAt: '2026-11-24T06:00:02Z',
+        finishedAt: '2026-11-24T06:00:02.100Z',
+        status: 'success',
+        releasedHandles: ['matched'],
+      },
+    },
+    {
+      id: 'deliver',
+      kind: 'task',
+      reference: 'lab/deliver',
+      title: 'Deliver payload',
+      position: { x: 40, y: 600 },
+      inputs: [{ handle: 'payload' }],
+      outputs: [],
+      run: {
+        runId: 'run-demo',
+        startedAt: '2026-11-24T06:00:03Z',
+        finishedAt: '2026-11-24T06:00:04Z',
+        status: 'error',
+        error: { message: 'Upstream rejected the request.' },
+      },
+    },
+    {
+      id: 'fallback',
+      kind: 'task',
+      reference: 'lab/fallback',
+      title: 'Fallback notify',
+      position: { x: 440, y: 600 },
+      inputs: [{ handle: 'reason' }],
+      outputs: [],
+    },
+  ],
+  edges: [
+    { id: 'e-trigger-fetch', source: 'trigger', sourceHandle: '$out', target: 'fetch', targetHandle: '$in' },
+    { id: 'e-fetch-branch', source: 'fetch', sourceHandle: '$out', target: 'branch', targetHandle: '$in' },
+    { id: 'e-branch-deliver', source: 'branch', sourceHandle: '$branch:matched', target: 'deliver', targetHandle: '$in' },
+    { id: 'e-branch-fallback', source: 'branch', sourceHandle: '$branch:otherwise', target: 'fallback', targetHandle: '$in' },
+  ],
+}
+
 const connectionSamples = [
+  { label: 'Executed path', model: executedPathModel },
   { label: 'Shared input', model: sharedInputModel },
   { label: 'Forward connections', model: forwardModel },
   { label: 'Dense multi-lane', model: denseMultiLaneModel },

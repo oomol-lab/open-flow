@@ -20,7 +20,16 @@
 .markerPath {
   transition:
     opacity 150ms ease,
+    stroke 150ms ease,
     stroke-width 150ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.gradientStop {
+  transition: stop-color 150ms ease;
 
   @media (prefers-reduced-motion: reduce) {
     transition: none;

@@ -799,7 +799,7 @@ describe('Canvas run records', () => {
       sequence: 4,
       kind: 'node.completed',
       createdAt: '2026-09-05T01:00:03Z',
-      payload: { flowId: 'flow', scopeId: 'root', executionId: 'task-job', nodeId: 'task', outputs: { result: 42 } },
+      payload: { flowId: 'flow', scopeId: 'root', executionId: 'task-job', nodeId: 'task', outputs: { result: 42 }, releasedHandles: ['result'] },
     },
     {
       sequence: 5,
@@ -814,6 +814,7 @@ describe('Canvas run records', () => {
         runId: 'run',
         status: 'success',
         outputs: { result: 42 },
+        releasedHandles: ['result'],
         startedAt: events[1]?.createdAt,
         finishedAt: events[3]?.createdAt,
         logs: [{ level: 'info', message: 'Ready.' }],
@@ -856,6 +857,45 @@ describe('Canvas run records', () => {
   it('does not attach historical results to a changed draft', () => {
     const node = designerGraph({ ...draft, revisionId: 'changed' }, {}, [], {}, {}, undefined, run, events).nodes[0]
     expect(node).not.toHaveProperty('run')
+  })
+  it('marks the trigger node as succeeded when RunDetails includes triggerNodeId', () => {
+    const withTrigger: Draft = {
+      ...draft,
+      content: {
+        ...draft.content,
+        document: {
+          ...draft.content.document,
+          graph: {
+            edges: [],
+            nodes: {
+              start: { kind: 'manual', name: 'Start' },
+              ...draft.content.document.graph.nodes,
+            },
+          },
+        },
+      },
+    }
+    const triggerRun = {
+      ...run,
+      closureDigest: 'c',
+      engineContract: 'v12',
+      engineDigest: 'e',
+      modelVersion: 16,
+      revisionDigest: 'r',
+      sharedAccessDigest: 's',
+      triggerNodeId: 'start',
+      waits: [],
+    }
+    const startNode = designerGraph(withTrigger, {}, [], {}, {}, undefined, triggerRun, events).nodes.find((node) => node.id === 'start')
+    expect(startNode).toMatchObject({ kind: 'trigger', run: { runId: 'run', status: 'success' } })
+
+    const canceledBeforeStart = {
+      ...triggerRun,
+      startedAt: undefined,
+      status: 'canceled' as const,
+    }
+    const canceledStartNode = designerGraph(withTrigger, {}, [], {}, {}, undefined, canceledBeforeStart, []).nodes.find((node) => node.id === 'start')
+    expect(canceledStartNode).not.toHaveProperty('run')
   })
 })
 

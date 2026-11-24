@@ -89,6 +89,7 @@ export type SchedulerEvent =
       readonly jobId: string
       readonly nodeId: string
       readonly outputs: Readonly<Record<string, JsonValue>>
+      readonly releasedHandles?: readonly string[]
       readonly runId: string
       readonly systemOutputs?: Readonly<Record<string, JsonValue>>
       readonly response?: WebhookResponseSnapshot
@@ -341,9 +342,15 @@ function runGraph(
                   }
             const system = systemOutputs == null ? {} : { systemOutputs }
             const handled = failure == null ? {} : { handled: true as const }
+            const branchHandles =
+              node.kind == 'condition'
+                ? { releasedHandles }
+                : node.kind == 'approval' || node.kind == 'wait'
+                  ? { releasedHandles: [...new Set([...(Object.hasOwn(outputs, 'pending') ? ['pending'] : []), ...releasedHandles])] }
+                  : {}
             yield* context.emit(
               failure == null
-                ? { jobId, nodeId, outputs, runId, ...system, ...(response == null ? {} : { response }), type: 'node.completed' }
+                ? { jobId, nodeId, outputs, ...branchHandles, runId, ...system, ...(response == null ? {} : { response }), type: 'node.completed' }
                 : { ...failure, jobId, nodeId, runId, ...system, handled: true, type: 'node.failed' },
             )
             completed.set(nodeId, { jobId, outputs, ...system, ...handled })

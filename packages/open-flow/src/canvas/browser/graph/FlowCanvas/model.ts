@@ -77,6 +77,7 @@ export interface FlowCanvasViewNodeRun {
   readonly startedAt?: string
   readonly finishedAt?: string
   readonly outputs?: unknown
+  readonly releasedHandles?: readonly string[]
   readonly error?: unknown
   readonly logs?: readonly { readonly message: string; readonly level: string; readonly time: string }[]
   readonly artifacts?: readonly unknown[]

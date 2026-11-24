@@ -836,7 +836,7 @@ describe('Run event contract', () => {
     ['run.events-truncated', {}],
     ['node.started', { ...node, nodeKind: 'javascript', nodeTitle: 'Task' }],
     ['node.started', { ...node, nodeKind: 'delay', nodeTitle: 'Delay' }],
-    ['node.completed', { ...node, outputs: { nested: [null, { value: true }] } }],
+    ['node.completed', { ...node, outputs: { nested: [null, { value: true }] }, releasedHandles: ['matched'] }],
     ['node.failed', { ...node, error: { code: 'node.failed', message: 'Failed.' } }],
     ['node.log', { ...node, level: 'info', message: 'Message.' }],
     ['node.progress', { ...node, progress: 100 }],
@@ -849,7 +849,7 @@ describe('Run event contract', () => {
     const client = new ControlClient(async () => Response.json({ done: false, events, historyComplete: true, nextAfter: 1, runId: 'run', version: 1 }))
     expect((await client.getRunEvents('run')).events).toEqual([event])
     for (const key of Object.keys(payload)) {
-      if (key == 'nodeTitle' || key == 'nodeKind') continue
+      if (key == 'nodeTitle' || key == 'nodeKind' || key == 'releasedHandles') continue
       events = [{ ...event, payload: Object.fromEntries(Object.entries(payload).filter(([name]) => name != key)) }]
       await expect(client.getRunEvents('run')).rejects.toMatchObject({ code: 'response.invalid' })
     }
