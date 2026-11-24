@@ -7,11 +7,18 @@
   position: relative;
   width: 100%;
   padding: 8px;
-  border: 1px solid var(--card-stroke);
+  border: 2px solid var(--card-stroke);
   border-radius: var(--card-radius);
   background: var(--_open-flow-node-surface);
   color: var(--text-4);
   box-shadow: var(--card-shadow);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 .value {
@@ -34,15 +41,39 @@
   border-color: color-mix(in srgb, var(--comment-border) 45%, transparent);
 }
 
+.runSuccess {
+  --card-stroke: var(--edge-executed);
+  --card-selection-stroke: var(--edge-executed-selected);
+  background: var(--_open-flow-node-surface-success);
+}
+
+.runError {
+  background: var(--_open-flow-node-surface-error);
+}
+
+.problem {
+  --card-stroke: var(--_open-flow-error-stroke);
+  --card-selection-stroke: var(--accent-red-1);
+}
+
+.dimmed.runSuccess {
+  --card-stroke: color-mix(in srgb, var(--edge-executed) 32%, var(--node-border-color));
+}
+
+.dimmed.problem {
+  --card-stroke: color-mix(in srgb, var(--_open-flow-error-stroke) 32%, var(--node-border-color));
+}
+
+:global(.react-flow__node:hover) .card,
+.card:hover {
+  --card-stroke: var(--card-selection-stroke);
+}
+
 .selected {
   --card-stroke: var(--card-selection-stroke);
   box-shadow:
     0 0 0 1px var(--card-stroke),
     var(--card-shadow);
-}
-
-.problem {
-  --card-stroke: var(--accent-red-1);
 }
 
 .runningBeam {

@@ -296,6 +296,13 @@ function runProjection(
     return { nodes: new Map() }
   const active = run.status == 'queued' || run.status == 'starting' || run.status == 'running' || run.status == 'waiting'
   const nodes = new Map<string, FlowCanvasViewNodeRun>()
+  if ('triggerNodeId' in run && run.triggerNodeId != null && run.status !== 'queued' && revision.graph().nodes[run.triggerNodeId] != null) {
+    nodes.set(run.triggerNodeId, {
+      runId: run.runId,
+      ...(run.startedAt == null ? {} : { startedAt: run.startedAt }),
+      status: 'success',
+    })
+  }
   if ('waits' in run) for (const wait of run.waits) nodes.set(wait.nodeId, { runId: run.runId, status: 'waiting' })
   const rootScopeId = events.find((event) => event.kind == 'run.started' && event.payload.flowId == revision.revision.flowId)?.payload.scopeId
   if (typeof rootScopeId != 'string') return { nodes, status: active ? 'running' : 'idle' }
@@ -315,18 +322,24 @@ function runProjection(
         nodes.set(nodeId, { ...current, progress, status: current?.status ?? 'running' })
         break
       }
-      case 'node.completed':
+      case 'node.completed': {
         running.delete(event.payload.executionId)
+        const releasedHandles =
+          event.payload.releasedHandles == null
+            ? current?.releasedHandles
+            : [...new Set([...(current?.releasedHandles ?? []), ...event.payload.releasedHandles])]
         nodes.set(nodeId, {
           ...current,
           runId: run.runId,
           finishedAt: event.createdAt,
           outputs: event.payload.outputs,
+          ...(releasedHandles == null ? {} : { releasedHandles }),
           progress: 100,
           status: 'success',
           successCount: (current?.successCount ?? 0) + 1,
         })
         break
+      }
       case 'node.failed':
         running.delete(event.payload.executionId)
         nodes.set(nodeId, {
@@ -546,6 +559,7 @@ function triggerDesignerNode(
   position: Point,
   diagnostics: readonly Diagnostic[],
   providers: Readonly<Record<string, ConnectorProvider>>,
+  run?: FlowCanvasViewNodeRun,
 ): DesignerNode {
   const problems = triggerDiagnostics(triggerId, diagnostics)
   const connectionRequired = problems.some((problem) => problem.code == 'trigger.connection-missing' || problem.code == 'trigger.connection-invalid')
@@ -588,6 +602,7 @@ function triggerDesignerNode(
     outputs: Object.entries(triggerOutputPorts(trigger)).map(([handle, port]) => Object.assign({ handle }, port)),
     presentation,
     position,
+    ...(run == null ? {} : { run }),
     title: trigger.name,
   }
 }
@@ -770,7 +785,7 @@ export function designerGraph(
     const resolved = definitions.get(nodeId)!
     if (resolved.kind == 'trigger') {
       nodes.push({
-        ...triggerDesignerNode(nodeId, resolved.trigger, position, diagnostics, providers),
+        ...triggerDesignerNode(nodeId, resolved.trigger, position, diagnostics, providers, context.runNodes.get(nodeId)),
         contentHidden: hiddenNodeContent?.[nodeId] === true,
       })
       continue

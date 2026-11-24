@@ -181,7 +181,7 @@
   }
 
   .branchRow > .executionHandle {
-    bottom: -9px;
+    bottom: -10px;
   }
 }
 
@@ -211,7 +211,7 @@
 }
 
 :global(.react-flow__node.selected) .vertical .branchRow > .executionHandle {
-  bottom: -10px;
+  bottom: -11px;
 }
 
 .branchRule,
@@ -287,11 +287,11 @@
 
 .cardContainer:not(.vertical) .branchRow > .executionHandle {
   top: calc(50% - 8px);
-  right: -17px;
+  right: -18px;
 }
 
 :global(.react-flow__node.selected) .cardContainer:not(.vertical) .branchRow > .executionHandle {
-  right: -18px;
+  right: -19px;
 }
 
 .cardContainer .executionHandle.connected,

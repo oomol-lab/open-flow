@@ -12,6 +12,14 @@
   --_open-flow-foreground: var(--open-flow-foreground, light-dark(#242424, #eeeeee));
   --_open-flow-card: var(--open-flow-card, light-dark(#fefefe, #242424));
   --_open-flow-node-surface: var(--open-flow-node-surface, light-dark(#f6f6f6, #2b2b2b));
+  --_open-flow-node-surface-success: light-dark(
+    color-mix(in oklch, oklch(0.95 0.09 154) 3%, var(--_open-flow-node-surface)),
+    color-mix(in srgb, #4ca87a 6%, var(--_open-flow-node-surface))
+  );
+  --_open-flow-node-surface-error: light-dark(
+    color-mix(in oklch, oklch(0.95 0.09 22) 3%, var(--_open-flow-node-surface)),
+    color-mix(in srgb, var(--accent-red-1) 6%, var(--_open-flow-node-surface))
+  );
   --_open-flow-node-content: var(--open-flow-node-content, light-dark(#ffffff, #242424));
   --_open-flow-node-running-beam: var(--open-flow-node-running-beam, oklch(72.3% 0.219 149.579));
   --_open-flow-comment-surface: var(--open-flow-comment-surface, light-dark(#f3eddc, #403727));
@@ -243,7 +251,7 @@
   --brand-hover-color: color-mix(in srgb, var(--brand-highlight-color) 20%, transparent);
 
   --node-background-color: var(--_open-flow-node-content);
-  --node-border-color: var(--border-1);
+  --node-border-color: color-mix(in srgb, var(--border-1) 70%, var(--_open-flow-node-surface));
   --node-selected-border-color: var(--brand-highlight-color);
   --node-head-background-color: var(--fill-3);
   --node-head-background-highlight-color: var(--fill-4);
@@ -315,6 +323,9 @@
   --edge-string: #f9ae58;
   --edge-json: #9ca0df;
   --edge-primitive: #a8a8a8;
+  --edge-executed: light-dark(#66b28c, #3b7c5b);
+  --edge-executed-selected: light-dark(#2e9b66, #4ca87a);
+  --_open-flow-error-stroke: light-dark(#e07b7b, #9e4444);
   --edge-selected: var(--text-2);
   --edge-bin: #00d6b9;
   --edge-error: var(--seti-red);

@@ -95,8 +95,14 @@ export class NodeStore {
       executionPortColor: this.dispose.add(
         compute((get) => {
           const content = get(this.content$)
-          if ((content.diagnostics ?? 0) > 0 || content.run?.status === 'error') return 'var(--accent-red-1)'
-          return get(interaction.selected) ? 'var(--node-selected-border-color)' : 'var(--edge-primitive)'
+          const selected = get(interaction.selected)
+          if ((content.diagnostics ?? 0) > 0 || content.run?.status === 'error') {
+            return selected ? 'var(--accent-red-1)' : 'var(--_open-flow-error-stroke)'
+          }
+          if (content.run?.status === 'success' || content.run?.status === 'handled') {
+            return selected ? 'var(--edge-executed-selected)' : 'var(--edge-executed)'
+          }
+          return selected ? 'var(--node-selected-border-color)' : 'var(--edge-primitive)'
         }),
       ),
       hasError: this.dispose.add(derive(this.content$, (content) => (content.diagnostics ?? 0) > 0)),

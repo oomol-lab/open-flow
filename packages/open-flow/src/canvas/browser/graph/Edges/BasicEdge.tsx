@@ -48,12 +48,32 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
 
   const emphasized = Boolean(selected || nodeSelected || hovered)
   const dimmed = Boolean(hasEdgeFocus && !emphasized)
-  const strokeWidth = emphasized ? 3.25 : 2.5
-  const opacity = dimmed ? (error ? 0.65 : connectionMeta?.muted ? 0.16 : 0.22) : connectionMeta?.muted ? 0.65 : 1
-  const hasErrorAccent = sourceGradientColor === 'var(--accent-red-1)' || targetGradientColor === 'var(--accent-red-1)'
-  const emphasizeSolid = emphasized && !hasErrorAccent && !connectionMeta?.muted
+  const strokeWidth = selected ? 3.25 : 2.5
+  const softMuted = connectionMeta?.muted || (!emphasized && connectionMeta?.runMuted)
+  const opacity = dimmed ? (error ? 0.65 : softMuted ? 0.16 : 0.22) : softMuted ? 0.65 : 1
+  const promoteAccent = (color: string): string => {
+    if (!emphasized) return color
+    if (color === 'var(--edge-executed)') return 'var(--edge-executed-selected)'
+    if (color === 'var(--_open-flow-error-stroke)') return 'var(--accent-red-1)'
+    return color
+  }
+  const sourceColor = promoteAccent(sourceGradientColor)
+  const targetColor = promoteAccent(targetGradientColor)
+  const hasErrorAccent =
+    sourceGradientColor === 'var(--accent-red-1)' ||
+    targetGradientColor === 'var(--accent-red-1)' ||
+    sourceGradientColor === 'var(--_open-flow-error-stroke)' ||
+    targetGradientColor === 'var(--_open-flow-error-stroke)'
+  const hasRunAccent =
+    sourceGradientColor === 'var(--edge-executed)' ||
+    targetGradientColor === 'var(--edge-executed)' ||
+    sourceGradientColor === 'var(--edge-executed-selected)' ||
+    targetGradientColor === 'var(--edge-executed-selected)'
+  const emphasizeSolid = emphasized && !hasErrorAccent && !hasRunAccent && !connectionMeta?.muted
+  const effectiveSourceColor = emphasizeSolid ? 'var(--edge-selected)' : softMuted ? 'var(--edge-primitive)' : sourceColor
+  const effectiveTargetColor = emphasizeSolid ? 'var(--edge-selected)' : softMuted ? 'var(--edge-primitive)' : targetColor
   const gradientId = `${arrowId}-gradient`
-  const stroke = emphasizeSolid ? 'var(--edge-selected)' : connectionMeta?.muted ? undefined : `url(#${gradientId})`
+  const stroke = `url(#${gradientId})`
 
   const style = useMemo<React.CSSProperties>(
     () => ({
@@ -75,8 +95,8 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
         sourceY={props.sourceY}
         targetX={targetX}
         targetY={targetY}
-        sourceColor={sourceGradientColor}
-        targetColor={targetGradientColor}
+        sourceColor={effectiveSourceColor}
+        targetColor={effectiveTargetColor}
       />
       <defs>
         <marker
@@ -94,8 +114,7 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
             className={styles.markerPath}
             d="M 1 1 L 9 5 L 1 9"
             fill="none"
-            opacity={opacity}
-            stroke={emphasizeSolid ? 'var(--edge-selected)' : connectionMeta?.muted ? 'var(--edge-primitive)' : targetGradientColor}
+            stroke={effectiveTargetColor}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"

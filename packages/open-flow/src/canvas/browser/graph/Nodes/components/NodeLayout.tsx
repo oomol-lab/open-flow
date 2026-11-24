@@ -130,7 +130,27 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const initialized = useVal(canvasStore.$.initialized)
   const animateEntry = useRef(initialized).current
 
-  const executionPortColor = useVal(cardStore?.$.executionPortColor)
+  const hasEdgeFocus = useVal(canvasStore.$.hasEdgeFocus)
+  const nodeHovered = useVal(canvasStore.$.hoveredNodeId) === nodeStore.nodeId
+  const nodeFocused = Boolean(selected || hovered || nodeHovered)
+  const dimmed = hasEdgeFocus && !nodeFocused
+  const rawExecutionPortColor = useVal(cardStore?.$.executionPortColor)
+  const executionPortColor =
+    nodeFocused && !selected
+      ? rawExecutionPortColor === 'var(--edge-executed)'
+        ? 'var(--edge-executed-selected)'
+        : rawExecutionPortColor === 'var(--_open-flow-error-stroke)'
+          ? 'var(--accent-red-1)'
+          : rawExecutionPortColor === 'var(--edge-primitive)'
+            ? 'var(--node-selected-border-color)'
+            : rawExecutionPortColor
+      : dimmed
+        ? rawExecutionPortColor === 'var(--edge-executed)'
+          ? 'color-mix(in srgb, var(--edge-executed) 32%, var(--edge-primitive))'
+          : rawExecutionPortColor === 'var(--_open-flow-error-stroke)'
+            ? 'color-mix(in srgb, var(--_open-flow-error-stroke) 32%, var(--edge-primitive))'
+            : rawExecutionPortColor
+        : rawExecutionPortColor
   const hasError = showError || modelNode?.run?.status === 'error'
   const errorColor = hasError ? 'var(--accent-red-1)' : undefined
   const conditionNode = modelNode?.kind == 'condition' ? modelNode : undefined
@@ -150,6 +170,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const card = cardStore ? (
     <CanvasNode
       nodeStore={cardStore}
+      dimmed={dimmed}
       compact={canvasMiniMapPhase !== NodeMiniMapPhase.None}
       compactContent={compactContent}
       diagnostic={diagnostic}

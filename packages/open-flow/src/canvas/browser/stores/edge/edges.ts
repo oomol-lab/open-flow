@@ -11,6 +11,7 @@ import { EdgeStore, getRFEdgeId } from './edge.store.ts'
 export interface EdgeHoverState {
   readonly hoveredNodeId?: ReadonlyVal<NodeId | undefined>
   readonly hoveredEdgeId?: ReadonlyVal<EdgeId | undefined>
+  readonly hasRun?: ReadonlyVal<boolean>
 }
 
 export function deriveEdges(

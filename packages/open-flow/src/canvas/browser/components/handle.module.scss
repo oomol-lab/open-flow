@@ -30,6 +30,13 @@
     border-radius: 0.5px;
     background: var(--execution-port-color, var(--edge-primitive));
     opacity: var(--execution-port-opacity, 1);
+    transition:
+      background-color 150ms ease,
+      opacity 150ms ease;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
   }
 
   &::after {

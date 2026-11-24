@@ -47,6 +47,7 @@ export function CanvasCard({
   diagnostic,
   run,
   selected,
+  dimmed = false,
   running = run?.status === 'running',
   fill = false,
   compact = false,
@@ -70,6 +71,7 @@ export function CanvasCard({
   readonly diagnostic?: CanvasCardDiagnostic
   readonly run?: FlowCanvasViewNodeRun
   readonly selected?: boolean
+  readonly dimmed?: boolean
   readonly running?: boolean
 }) {
   const hasContent = Children.toArray(children).some((child) => typeof child != 'string' || child.trim().length > 0)
@@ -77,6 +79,8 @@ export function CanvasCard({
   const runControls = hasRunRecords(run) ? <RunChips run={run} /> : undefined
   const hasBody = (!contentHidden && (hasContent || !isEmptyReactNode(preview))) || hasBranches
   const hasError = run?.status === 'error' || (diagnostic != null && diagnostic.tone !== 'warning')
+  const runSuccess = !hasError && run?.status === 'success'
+  const runError = run?.status === 'error'
   const diagnosticIndicator = diagnostic && (
     <CanvasTooltip title={diagnostic.message} placement="top">
       <span
@@ -97,6 +101,9 @@ export function CanvasCard({
         compact && styles.compact,
         compactContent && styles.compactContent,
         tone && styles[tone],
+        runSuccess && styles.runSuccess,
+        runError && styles.runError,
+        dimmed && styles.dimmed,
         selected && styles.selected,
         hasError && styles.problem,
       )}

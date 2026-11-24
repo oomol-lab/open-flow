@@ -21,12 +21,14 @@ export function CanvasNode({
   nodeStore,
   diagnostic,
   branches,
+  dimmed = false,
   compact = false,
   compactContent = false,
 }: {
   readonly nodeStore: NodeStore
   readonly diagnostic?: string
   readonly branches?: ReactNode
+  readonly dimmed?: boolean
   readonly compact?: boolean
   readonly compactContent?: boolean
 }) {
@@ -85,6 +87,7 @@ export function CanvasNode({
           ) : undefined
         }
         selected={selected}
+        dimmed={dimmed}
         diagnostic={cardDiagnostic}
         run={node.run}
         branches={branches}

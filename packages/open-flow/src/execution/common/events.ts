@@ -48,6 +48,12 @@ function optionalString(value: unknown, description: string): string | undefined
   return value === undefined ? undefined : string(value, description)
 }
 
+function optionalStringArray(value: unknown, description: string): readonly string[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) throw new TypeError(`${description} must be an array.`)
+  return value.map((item) => string(item, `${description} item`))
+}
+
 function nodeKind(
   value: unknown,
 ):
@@ -287,13 +293,15 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
         ...(event.handled === true ? { handled: true } : {}),
       }
       switch (type) {
-        case 'node.completed':
+        case 'node.completed': {
+          const releasedHandles = optionalStringArray(event.releasedHandles, 'Runtime node.completed releasedHandles')
           return {
             kind: type,
-            payload,
+            payload: releasedHandles === undefined ? payload : { ...payload, releasedHandles },
             value: object(event.outputs, 'Runtime node.completed outputs'),
             ...(event.response == null || context.rawRunId !== platformRunId ? {} : { response: responseSnapshot(event.response) }),
           }
+        }
         case 'node.started': {
           jobs.set(JSON.stringify([context.rawRunId, event.jobId]), context.nodeId)
           const kind = nodeKind(event.nodeKind)
