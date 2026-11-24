@@ -888,6 +888,14 @@ describe('Canvas run records', () => {
     }
     const startNode = designerGraph(withTrigger, {}, [], {}, {}, undefined, triggerRun, events).nodes.find((node) => node.id === 'start')
     expect(startNode).toMatchObject({ kind: 'trigger', run: { runId: 'run', status: 'success' } })
+
+    const canceledBeforeStart = {
+      ...triggerRun,
+      startedAt: undefined,
+      status: 'canceled' as const,
+    }
+    const canceledStartNode = designerGraph(withTrigger, {}, [], {}, {}, undefined, canceledBeforeStart, []).nodes.find((node) => node.id === 'start')
+    expect(canceledStartNode).not.toHaveProperty('run')
   })
 })
 

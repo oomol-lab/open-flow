@@ -131,4 +131,50 @@ describe('EdgeStore execution state', () => {
     nextNode.node.dispose()
     nodes.dispose()
   })
+
+  it('preserves pending notification execution state across waiting and completion', () => {
+    const nodes = reactiveMap<NodeId, NodeStore>()
+    const approval = createNode('approval', {
+      kind: 'approval',
+      outputs: [{ handle: 'pending' }, { handle: 'approve' }, { handle: 'reject' }],
+      run: { status: 'waiting' },
+    })
+    const notify = createNode('notify', { run: { status: 'success' } })
+    const approved = createNode('approved', { run: { status: 'idle' } })
+    const rejected = createNode('rejected', { run: { status: 'idle' } })
+    nodes.set('approval' as NodeId, approval.node)
+    nodes.set('notify' as NodeId, notify.node)
+    nodes.set('approved' as NodeId, approved.node)
+    nodes.set('rejected' as NodeId, rejected.node)
+
+    const pendingConn: FlowCanvasViewEdge = { id: 'p', source: 'approval', sourceHandle: '$branch:pending', target: 'notify', targetHandle: '$in' }
+    const approveConn: FlowCanvasViewEdge = { id: 'a', source: 'approval', sourceHandle: '$branch:approve', target: 'approved', targetHandle: '$in' }
+    const rejectConn: FlowCanvasViewEdge = { id: 'r', source: 'approval', sourceHandle: '$branch:reject', target: 'rejected', targetHandle: '$in' }
+    const hasRun = val(true)
+    const pendingEdge = new EdgeStore(getRFEdgeId(pendingConn), { nodes, connection: pendingConn, hasRun })
+    const approveEdge = new EdgeStore(getRFEdgeId(approveConn), { nodes, connection: approveConn, hasRun })
+    const rejectEdge = new EdgeStore(getRFEdgeId(rejectConn), { nodes, connection: rejectConn, hasRun })
+
+    expect(pendingEdge.$.connectionMeta.value).toEqual({ executed: true })
+    expect(approveEdge.$.connectionMeta.value).toEqual({ runMuted: true })
+    expect(rejectEdge.$.connectionMeta.value).toEqual({ runMuted: true })
+
+    approval.content$.set({
+      ...approval.content$.value,
+      run: { status: 'success', releasedHandles: ['pending', 'approve'] },
+    })
+    approved.content$.set({ ...approved.content$.value, run: { status: 'success' } })
+    expect(pendingEdge.$.connectionMeta.value).toEqual({ executed: true })
+    expect(approveEdge.$.connectionMeta.value).toEqual({ executed: true })
+    expect(rejectEdge.$.connectionMeta.value).toEqual({ runMuted: true })
+
+    pendingEdge.dispose()
+    approveEdge.dispose()
+    rejectEdge.dispose()
+    approval.node.dispose()
+    notify.node.dispose()
+    approved.node.dispose()
+    rejected.node.dispose()
+    nodes.dispose()
+  })
 })

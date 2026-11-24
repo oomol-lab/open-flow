@@ -342,7 +342,12 @@ function runGraph(
                   }
             const system = systemOutputs == null ? {} : { systemOutputs }
             const handled = failure == null ? {} : { handled: true as const }
-            const branchHandles = node.kind == 'condition' || node.kind == 'approval' || node.kind == 'wait' ? { releasedHandles } : {}
+            const branchHandles =
+              node.kind == 'condition'
+                ? { releasedHandles }
+                : node.kind == 'approval' || node.kind == 'wait'
+                  ? { releasedHandles: [...new Set([...(Object.hasOwn(outputs, 'pending') ? ['pending'] : []), ...releasedHandles])] }
+                  : {}
             yield* context.emit(
               failure == null
                 ? { jobId, nodeId, outputs, ...branchHandles, runId, ...system, ...(response == null ? {} : { response }), type: 'node.completed' }

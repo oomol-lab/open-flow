@@ -174,8 +174,9 @@ const activeOrExecutedTargetStatuses = new Set(['running', 'waiting', 'success',
 export function isEdgeExecuted(connection: FlowCanvasViewEdge, sourceContent: NodeContent | undefined, targetContent: NodeContent | undefined): boolean {
   const sourceStatus = sourceContent?.run?.status
   const targetStatus = targetContent?.run?.status
-  if (sourceStatus !== 'success' && sourceStatus !== 'handled') return false
   if (targetStatus == null || !activeOrExecutedTargetStatuses.has(targetStatus)) return false
+  if (sourceStatus === 'waiting') return connection.sourceHandle === '$branch:pending'
+  if (sourceStatus !== 'success' && sourceStatus !== 'handled') return false
   if (connection.sourceHandle.startsWith('$branch:')) {
     const branch = connection.sourceHandle.slice('$branch:'.length)
     const releasedHandles = sourceContent?.run?.releasedHandles

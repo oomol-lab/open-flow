@@ -296,7 +296,9 @@ function runProjection(
     return { nodes: new Map() }
   const active = run.status == 'queued' || run.status == 'starting' || run.status == 'running' || run.status == 'waiting'
   const nodes = new Map<string, FlowCanvasViewNodeRun>()
-  if ('triggerNodeId' in run && run.triggerNodeId != null && run.status !== 'queued' && revision.graph().nodes[run.triggerNodeId] != null) {
+  const rootScopeId = events.find((event) => event.kind == 'run.started' && event.payload.flowId == revision.revision.flowId)?.payload.scopeId
+  const triggerExecuted = run.status !== 'queued' && (run.status !== 'canceled' || run.startedAt != null || typeof rootScopeId == 'string')
+  if ('triggerNodeId' in run && run.triggerNodeId != null && triggerExecuted && revision.graph().nodes[run.triggerNodeId] != null) {
     nodes.set(run.triggerNodeId, {
       runId: run.runId,
       ...(run.startedAt == null ? {} : { startedAt: run.startedAt }),
@@ -304,7 +306,6 @@ function runProjection(
     })
   }
   if ('waits' in run) for (const wait of run.waits) nodes.set(wait.nodeId, { runId: run.runId, status: 'waiting' })
-  const rootScopeId = events.find((event) => event.kind == 'run.started' && event.payload.flowId == revision.revision.flowId)?.payload.scopeId
   if (typeof rootScopeId != 'string') return { nodes, status: active ? 'running' : 'idle' }
   const running = new Map<string, string>()
   for (const event of events) {
