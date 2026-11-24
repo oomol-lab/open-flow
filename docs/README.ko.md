@@ -25,7 +25,7 @@ Open Flow는 코딩 에이전트를 사용하는 팀을 위한 소스 공개 워
 
 [인터랙티브 데모 체험](https://openflow.run) · [OOMOL Hosted 사용](https://console.openflow.run) · [Docker로 직접 호스팅](#원하는-환경에서-실행)
 
-![Open Flow Workbench의 세로형 AI 트렌드 워크플로. X, GitHub, Hugging Face 병렬 수집과 조사·작성 노드의 프롬프트, 도구, 입력 및 출력을 오른쪽 속성 패널에 표시](assets/readme-workbench.png)
+[![Open Flow Workbench의 세로형 AI 트렌드 워크플로. X, GitHub, Hugging Face 병렬 수집과 조사·작성 노드의 프롬프트, 도구, 입력 및 출력을 오른쪽 속성 패널에 표시](assets/readme-workbench-video.png)](https://www.youtube.com/watch?v=V4K4KoLRIUo)
 
 ## 에이전트가 만들고, 결정은 내가
 

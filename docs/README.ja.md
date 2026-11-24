@@ -25,7 +25,7 @@ JavaScript、アプリ連携、AI、条件分岐、人による承認を一つ�
 
 [インタラクティブデモを試す](https://openflow.run) · [OOMOL Hosted を使う](https://console.openflow.run) · [Docker でセルフホストする](#自分に合った実行環境を選ぶ)
 
-![Open Flow Workbench の縦方向の AI トレンドワークフロー。X、GitHub、Hugging Face からの並列収集と、調査・執筆ノードのプロンプト、ツール、入出力を右側のプロパティパネルに表示](assets/readme-workbench.png)
+[![Open Flow Workbench の縦方向の AI トレンドワークフロー。X、GitHub、Hugging Face からの並列収集と、調査・執筆ノードのプロンプト、ツール、入出力を右側のプロパティパネルに表示](assets/readme-workbench-video.png)](https://www.youtube.com/watch?v=V4K4KoLRIUo)
 
 ## エージェントが構築し、あなたが判断する
 

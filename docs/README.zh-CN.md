@@ -25,7 +25,7 @@ Open Flow 是为使用编程助手的团队打造的工作流自动化平台，�
 
 [体验交互演示](https://openflow.run) · [使用 OOMOL Hosted](https://console.openflow.run) · [用 Docker 自部署](#选择适合你的运行方式)
 
-![Open Flow Workbench 中的竖向 AI 趋势工作流，包含 X、GitHub 和 Hugging Face 并行采集，右侧属性面板展示研究写作节点的提示词、工具、输入与输出](assets/readme-workbench.png)
+[![Open Flow Workbench 中的竖向 AI 趋势工作流，包含 X、GitHub 和 Hugging Face 并行采集，右侧属性面板展示研究写作节点的提示词、工具、输入与输出](assets/readme-workbench-video.png)](https://www.youtube.com/watch?v=V4K4KoLRIUo)
 
 ## Agent 负责搭建，你来掌控
 

@@ -25,7 +25,7 @@ Open Flow — платформа автоматизации рабочих пр�
 
 [Открыть интерактивную демонстрацию](https://openflow.run) · [Использовать OOMOL Hosted](https://console.openflow.run) · [Развернуть через Docker](#выберите-среду-запуска)
 
-![Вертикальный процесс отслеживания трендов ИИ в Open Flow Workbench: параллельный сбор из X, GitHub и Hugging Face, промпт, инструменты, входы и выход узла исследования и написания статьи на панели свойств справа](assets/readme-workbench.png)
+[![Вертикальный процесс отслеживания трендов ИИ в Open Flow Workbench: параллельный сбор из X, GitHub и Hugging Face, промпт, инструменты, входы и выход узла исследования и написания статьи на панели свойств справа](assets/readme-workbench-video.png)](https://www.youtube.com/watch?v=V4K4KoLRIUo)
 
 ## Агент создаёт. Вы управляете.
 
