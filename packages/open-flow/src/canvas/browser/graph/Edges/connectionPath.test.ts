@@ -385,3 +385,21 @@ it('aligns folded waypoints with actual ports in both directions', () => {
     expect(path).not.toMatch(/NaN|Infinity/)
   }
 })
+
+it('preserves rounded corners when port coordinates differ slightly from routed waypoints', () => {
+  const [path] = getConnectionPath({
+    sourceX: 720.5,
+    sourceY: 100,
+    targetX: 400.25,
+    targetY: 200,
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+    waypoints: [
+      { x: 720, y: 100 },
+      { x: 720, y: 150 },
+      { x: 400, y: 150 },
+      { x: 400, y: 200 },
+    ],
+  })
+  expect(path).toBe('M 720.5 100 L 720.5 134 Q 720.5 150 704.5 150 L 416.25 150 Q 400.25 150 400.25 166 L 400.25 200')
+})

@@ -51,7 +51,7 @@ export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
         sourceColor={fromColor ?? toColor ?? 'var(--edge-primitive)'}
         targetColor={toColor ?? fromColor ?? 'var(--edge-primitive)'}
       />
-      <path style={connectionLineStyle} fill="none" opacity={0.75} stroke={`url(#${gradientId})`} strokeWidth={2} d={edgePath} />
+      <path style={connectionLineStyle} fill="none" opacity={0.75} stroke={`url(#${gradientId})`} strokeWidth={2.5} d={edgePath} />
     </>
   )
 }

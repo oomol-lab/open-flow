@@ -314,7 +314,7 @@
 
   --edge-string: #f9ae58;
   --edge-json: #9ca0df;
-  --edge-primitive: #a3a3a3;
+  --edge-primitive: #a8a8a8;
   --edge-selected: var(--text-2);
   --edge-bin: #00d6b9;
   --edge-error: var(--seti-red);
@@ -390,7 +390,7 @@
 
   --edge-color: #696e77;
 
-  --edge-primitive: #737373;
+  --edge-primitive: #808080;
 
   --contextmenu-shadow: #0000005c;
 

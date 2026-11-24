@@ -48,7 +48,7 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
 
   const emphasized = Boolean(selected || nodeSelected || hovered)
   const dimmed = Boolean(hasEdgeFocus && !emphasized)
-  const strokeWidth = emphasized ? 2.5 : 1.5
+  const strokeWidth = emphasized ? 3.25 : 2.5
   const opacity = dimmed ? (error ? 0.65 : connectionMeta?.muted ? 0.16 : 0.22) : connectionMeta?.muted ? 0.65 : 1
   const hasErrorAccent = sourceGradientColor === 'var(--accent-red-1)' || targetGradientColor === 'var(--accent-red-1)'
   const emphasizeSolid = emphasized && !hasErrorAccent && !connectionMeta?.muted
@@ -84,8 +84,8 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
           viewBox="0 0 10 10"
           refX="9"
           refY="5"
-          markerWidth="10.5"
-          markerHeight="10.5"
+          markerWidth="11.5"
+          markerHeight="11.5"
           markerUnits="userSpaceOnUse"
           orient="auto-start-reverse"
           overflow="visible"

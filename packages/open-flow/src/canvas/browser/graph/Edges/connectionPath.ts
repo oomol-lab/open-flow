@@ -94,7 +94,7 @@ export function getConnectionPath({ sourceBounds, targetBounds, waypoints, ...pa
 }
 
 function roundedConnectionPath(input: readonly LayoutPoint[]): string {
-  const points = input.filter((point, index) => index === 0 || point.x !== input[index - 1]!.x || point.y !== input[index - 1]!.y)
+  const points = simplifyConnectionPoints(input)
   const radius = 16
   let path = `M ${points[0]!.x} ${points[0]!.y}`
   for (let i = 1; i < points.length - 1; i++) {
@@ -109,4 +109,28 @@ function roundedConnectionPath(input: readonly LayoutPoint[]): string {
   }
   const end = points.at(-1)!
   return `${path} L ${end.x} ${end.y}`
+}
+
+function simplifyConnectionPoints(input: readonly LayoutPoint[]): LayoutPoint[] {
+  const points: LayoutPoint[] = []
+  for (const point of input) {
+    const previous = points.at(-1)
+    if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 1e-6) continue
+    points.push(point)
+    while (points.length >= 3) {
+      const a = points[points.length - 3]!
+      const b = points[points.length - 2]!
+      const c = points[points.length - 1]!
+      const abx = b.x - a.x
+      const aby = b.y - a.y
+      const bcx = c.x - b.x
+      const bcy = c.y - b.y
+      const cross = Math.abs(abx * bcy - aby * bcx)
+      const scale = Math.hypot(abx, aby) * Math.hypot(bcx, bcy)
+      if (cross > 1e-6 * scale) break
+      points.splice(points.length - 2, 1)
+      if (Math.hypot(c.x - a.x, c.y - a.y) < 1e-6) points.pop()
+    }
+  }
+  return points
 }
