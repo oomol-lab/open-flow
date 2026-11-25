@@ -27,10 +27,10 @@ export const mcpInstructions =
   'Retry flow_edit with identical arguments and the same requestId. Retry flow_create, flow_import, flow_publish and flow_run only with identical arguments and the same idempotencyKey; a new key can execute the Flow again. Canvas commands are transient broadcasts without execution confirmation; never automatically retry flow_canvas because pan is relative. Other mutations use the same resource identity and arguments when retrying. Cancel a Run explicitly with run_cancel. ' +
   'Use nextCursor and nextAfter to read subsequent pages. Connector-backed deployments may require a Team; inspect connector_teams before creating a Flow.'
 
-function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: boolean, idempotent = true) {
+function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: boolean, idempotent = true, openWorld = true) {
   return {
     description,
-    annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: idempotent, openWorldHint: true },
+    annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: idempotent, openWorldHint: openWorld },
     inputSchema: {
       '~standard': {
         version: 1 as const,
@@ -51,6 +51,7 @@ function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: bool
 }
 
 export const mcpTools = {
+  whoami: tool('Check MCP connectivity and return the authenticated account identity and Server information.', z.strictObject({}), true, true, false),
   flow_state: tool(
     'Inspect Flow state usage, business key metadata and deduplication spaces. Never returns values. Scope is required.',
     stateQuerySchema.extend({ flowId: flow }),
@@ -108,7 +109,7 @@ export const mcpTools = {
     true,
   ),
   flow_import: tool(
-    'Import workflow JSON or a bundle as new unpublished drafts. tagIds apply to every imported workflow. External references are cleared and must be configured again. Keep identical arguments and idempotencyKey when retrying.',
+    'Import workflow JSON or a bundle as new unpublished drafts. tagIds apply to every imported workflow. External references are cleared and must be configured again. Returns static validation diagnostics and unboundProviderIds for immediate setup (for bundles, validations keyed by flowId). Keep identical arguments and idempotencyKey when retrying.',
     z.strictObject({ file: json, name: id.optional(), teamId: id.optional(), tagIds: z.array(id).optional(), idempotencyKey: mutationKey }),
     false,
   ),

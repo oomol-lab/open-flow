@@ -7,7 +7,8 @@ import { applyFlowChanges, currentFlowModelVersion } from '../../flow/common/cha
 import { connect } from '../../flow/common/edgeChanges.ts'
 import { checkInputSource } from '../../flow/common/graph.ts'
 import { inverseFlowChanges } from '../../flow/common/inverseChanges.ts'
-import { authoringDiagnostics, compileAuthoring, readAuthoring, searchAuthoring } from './authoring.ts'
+import { currentEngineContract, findEngineContract } from '../../runtime/common/engineContract.ts'
+import { authoringDiagnostics, compileAuthoring, importValidation, readAuthoring, searchAuthoring, unboundProviderIds } from './authoring.ts'
 const empty: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
@@ -703,4 +704,62 @@ it('rejects error handling on unsupported nodes instead of accepting an ignored 
   await expect(edit(empty, [{ op: 'node.add', type: 'value', as: 'value', name: 'Value', onError: 'error' }])).rejects.toThrow(
     'This node does not support this error handling setting.',
   )
+})
+
+it('collects unbound provider IDs and static diagnostics for imported workflows', async () => {
+  const created = await edit(empty, [
+    { op: 'node.add', type: 'start', as: 'start', name: 'Start' },
+    {
+      op: 'node.add',
+      type: 'connector',
+      as: 'unbound',
+      name: 'Unbound',
+      config: { action: 'github.create_issue' },
+    },
+    {
+      op: 'node.add',
+      type: 'connector',
+      as: 'unauthenticated',
+      name: 'Unauth',
+      config: { action: 'http.get', connectionId: '' },
+    },
+    {
+      op: 'node.add',
+      type: 'connector',
+      as: 'bound',
+      name: 'Bound',
+      config: { action: 'slack.post_message', connectionId: 'conn-1' },
+    },
+    { op: 'node.add', type: 'code', as: 'code', name: 'Script', code: 'const x = 1' },
+    { op: 'edge.connect', source: '$start', target: '$code' },
+  ])
+  const codeId = created.nodes.code!
+  const codeNode = created.content.document.graph.nodes[codeId]!
+  const withCodeHint: RevisionContent = {
+    ...created.content,
+    document: {
+      ...created.content.document,
+      graph: {
+        ...created.content.document.graph,
+        nodes: {
+          ...created.content.document.graph.nodes,
+          [codeId]:
+            codeNode.kind == 'task' && 'moduleId' in codeNode.task
+              ? {
+                  ...codeNode,
+                  task: {
+                    ...codeNode.task,
+                    capabilities: [{ kind: 'connector', actionHints: ['notion.create_page'] }],
+                  },
+                }
+              : codeNode,
+        },
+      },
+    },
+  }
+  expect(unboundProviderIds(withCodeHint)).toEqual(['github', 'notion'])
+  const checked = await importValidation(withCodeHint, findEngineContract(currentEngineContract)!)
+  expect(checked.status).toBe('invalid')
+  expect(checked.unboundProviderIds).toEqual(['github', 'notion'])
+  expect(checked.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ nodes: [codeId], code: 'task.missing-entry' })]))
 })

@@ -55,9 +55,20 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
       const args = { file: exported.structuredContent, name: 'Imported template', idempotencyKey: crypto.randomUUID() }
       const imported = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: args })
       assert(imported.isError != true, 'MCP import failed.')
-      const flow = imported.structuredContent as { flowId: string; draftRevisionId: string }
+      const flow = imported.structuredContent as {
+        flowId: string
+        draftRevisionId: string
+        validation?: { status?: unknown; diagnostics?: unknown; unboundProviderIds?: unknown }
+      }
       assert(flow.flowId != original.flowId && flow.draftRevisionId != original.draftRevisionId, 'Import reused resource identities.')
       assert((await client.getEditor(flow.flowId)).live.publication == null, 'Import published the Flow.')
+      assert(
+        flow.validation != null &&
+          (flow.validation.status == 'valid' || flow.validation.status == 'invalid') &&
+          Array.isArray(flow.validation.diagnostics) &&
+          Array.isArray(flow.validation.unboundProviderIds),
+        'MCP import must return static validation and unboundProviderIds.',
+      )
       const retry = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: args })
       assert(dequal(retry.structuredContent, imported.structuredContent), 'Import retry created another Flow.')
       const conflict = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: { ...args, name: 'Changed import' } })
@@ -80,6 +91,19 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
         const { $schema: __, ...received } = actual.inputSchema
         assert(dequal(received, schema), `${name} input schema differs.`)
       }
+      const identity = await rpc(harness, 'tools/call', { name: 'whoami', arguments: {} })
+      assert(identity.isError != true, 'MCP whoami failed.')
+      const info = identity.structuredContent as {
+        user?: { userId?: unknown; kind?: unknown; email?: unknown; role?: unknown }
+        server?: { name?: unknown; version?: unknown; origin?: unknown }
+      }
+      assert(typeof info?.user?.userId == 'string' && info.user.userId.length > 0, 'MCP whoami must return user.userId.')
+      assert(info.user.kind == 'operator' || info.user.kind == 'user', 'MCP whoami must return user.kind.')
+      assert(info.user.email === null || typeof info.user.email == 'string', 'MCP whoami must return user.email.')
+      assert(info.user.role == 'admin' || info.user.role == 'user', 'MCP whoami must return user.role.')
+      assert(typeof info?.server?.name == 'string' && info.server.name.length > 0, 'MCP whoami must return server.name.')
+      assert(typeof info?.server?.version == 'string' && info.server.version.length > 0, 'MCP whoami must return server.version.')
+      assert(typeof info?.server?.origin == 'string' && info.server.origin.length > 0, 'MCP whoami must return server.origin.')
     },
   },
   {

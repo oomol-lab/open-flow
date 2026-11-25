@@ -46,11 +46,17 @@ it('shares workflow bundles through MCP and applies selected tags to every impor
   const tag = await control.createTag('Imported bundle')
   const result = (await call('flow_import', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })) as {
     flows: { flowId: string; tagIds: string[] }[]
+    validations: Record<string, { status: string; diagnostics: unknown[]; unboundProviderIds: string[] }>
   }
   expect(result.flows).toHaveLength(2)
   for (const flow of result.flows) {
     expect(flow.tagIds).toEqual([tag.tagId])
     expect([root.flowId, child.flowId]).not.toContain(flow.flowId)
+    expect(result.validations[flow.flowId]).toMatchObject({
+      status: expect.stringMatching(/^(valid|invalid)$/),
+      diagnostics: expect.any(Array),
+      unboundProviderIds: expect.any(Array),
+    })
   }
   expect(await call('flow_import', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })).toEqual(result)
 })
@@ -352,7 +358,7 @@ async function fixture(options: Parameters<typeof openService>[1] = {}) {
   const file = path.join(directory, 'flow.sqlite')
   const service = await openService(file, options)
   const database = Database.open(file)
-  const operator = new OperatorSession(new OperatorStore(database), token, false)
+  const operator = new OperatorSession(new OperatorStore(database), token, false, undefined, Date.now, service.control.users)
   const shutdown = new AbortController()
   const app = createServerApp(service, { operator, shutdownSignal: shutdown.signal })
   const http = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0, overrideGlobalObjects: false })
@@ -387,7 +393,7 @@ async function fixture(options: Parameters<typeof openService>[1] = {}) {
     headers.set('authorization', `Bearer ${token}`)
     return fetch(new URL(url, origin), { ...init, headers })
   })
-  return { app, call, client, connect, control, endpoint, file, origin, service, shutdown }
+  return { app, call, client, connect, control, endpoint, file, operator, origin, service, shutdown }
 }
 
 it('serves discovery and an atomic authoring, validation and execution workflow over HTTP', async () => {
@@ -1062,4 +1068,59 @@ it('uses the same scoped State service through MCP and rejects omitted scope', a
   expect((await client.callTool({ name: 'flow_state', arguments: { flowId: flow.flowId, scope: 'draft', values: true } })).isError).toBe(true)
   expect(await call('flow_state_clear', { flowId: flow.flowId, scope: 'live' })).toEqual({ version: 1, cleared: true })
   expect(await call('flow_dedupe_clear', { flowId: flow.flowId, scope: 'draft', space: 'node:removed' })).toEqual({ version: 1, cleared: true })
+})
+
+it('returns authenticated account identity and server metadata from whoami', async () => {
+  const { call, client, connect, operator, origin, service } = await fixture()
+  expect(await call('whoami')).toEqual({
+    user: { userId: 'operator', kind: 'operator', email: null, role: 'admin' },
+    server: { name: 'open-flow', version: expect.any(String), origin },
+  })
+  const created = await service.control.users.create('agent@example.com', 'user')
+  const personal = operator.createToken(created.user.userId, 'mcp')
+  const userClient = await connect(personal.token)
+  const userWhoami = await userClient.callTool({ name: 'whoami', arguments: {} })
+  expect(userWhoami.isError).not.toBe(true)
+  expect(userWhoami.structuredContent).toEqual({
+    user: { userId: created.user.userId, kind: 'user', email: 'agent@example.com', role: 'user' },
+    server: { name: 'open-flow', version: expect.any(String), origin },
+  })
+  expect((await client.callTool({ name: 'whoami', arguments: { extra: 1 } })).isError).toBe(true)
+})
+
+it('returns static validation and unboundProviderIds from single-workflow flow_import', async () => {
+  const { call, control } = await fixture()
+  const source = await control.createFlow('Template')
+  await seedDraft(control, {
+    flowId: source.flowId,
+    expectedRevisionId: source.draftRevisionId,
+    idempotencyKey: 'seed-template',
+    operations: [
+      start,
+      {
+        kind: 'graph.node.create',
+        nodeId: 'github',
+        node: {
+          kind: 'task',
+          name: 'Create issue',
+          inputs: { title: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'missing', output: 'out' }] } },
+          task: {
+            name: 'Create issue',
+            inputs: [{ handle: 'title', jsonSchema: { type: 'string' }, nullable: false }],
+            outputs: [],
+            executor: { kind: 'connector', action: 'github.create_issue', connectionId: 'conn-1' },
+          },
+        },
+      },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'github' } },
+    ],
+  })
+  const exported = await call('flow_export', { flowId: source.flowId })
+  const imported = await call('flow_import', { file: exported, idempotencyKey: 'mcp-single-import-validation' })
+  expect(imported.validation).toMatchObject({
+    status: 'invalid',
+    unboundProviderIds: ['github'],
+    diagnostics: expect.arrayContaining([expect.objectContaining({ nodes: ['github'], field: 'inputs.title' })]),
+  })
+  expect(await call('flow_import', { file: exported, idempotencyKey: 'mcp-single-import-validation' })).toEqual(imported)
 })
