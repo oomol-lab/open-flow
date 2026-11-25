@@ -450,13 +450,13 @@ metadata and Trigger identities, so Run entry selection does not require the cli
 newer node configurations. Ordinary response objects tolerate additional fields while known
 types, required fields, versions, identity checks, and execution contracts remain enforced.
 
-`@oomol-lab/open-flow/mcp` provides tool parameters, descriptions, annotations, protocol versions, and service instructions. Deployments register `mcpTools` through Standard Schema and implement only operation invocation, identity, and error mapping. A deployment must not add parameter defaults, change the definition of a tool with the same name, or weaken request validation. Business errors retain Control error codes. For an unconfirmed write outcome, require a retry with the original arguments and idempotency key.
+`@oomol-lab/open-flow/mcp` provides tool parameters, titles, descriptions, annotations, output schemas, toolsets, prompts, protocol versions, and service instructions. Deployments register `mcpTools` and `mcpPrompts` through Standard Schema and implement only operation invocation, identity, and error mapping. A deployment must not add parameter defaults, change the definition of a tool with the same name, or weaken request validation. Business errors retain Control error codes (omitting `structuredContent` when `isError: true`). For an unconfirmed write outcome, require a retry with the original arguments and idempotency key.
 
 ## Conformance verification
 
 - Control API base cases cover concurrent creation, CAS editing, replay with the same key, and retries after a lost response. Creation replay pins Flow identity but may return current metadata. Draft change replay pins the committed Revision.
 - `controlRecoveryConformanceCases` also requires a `restart()` driver. Close the deployment service, discard in-memory state, preserve storage, and reopen the service. Flow identity, Draft head, and change receipts must survive. This does not test recovery from unknown execution after a killed process; that requires deployment runtime fault injection.
-- `mcpConformanceCases` sends real `/v1/mcp` requests to check discovery, structure, and annotations. It verifies consistency between MCP writes, retries, errors, and REST reads.
+- `mcpConformanceCases` sends real `/v1/mcp` requests to check discovery, titles, prompts, structure, annotations, and dual-era stateless compatibility. It verifies consistency between MCP writes, retries, errors, and REST reads.
 - `verifyWorkbenchHost` uses deployment-provided connection, fault, notification, and time drivers. It verifies that initial failure cannot block loading indefinitely, recovery triggers a reread, a normal first connection only completes ready, no events arrive after stop, and repeated stop is supported.
 
 A deployment may claim a package profile only after all applicable cases pass. Unrun tests, missing test doubles, or a skipped recovery driver do not verify those guarantees. Deployment integration tests still own identity isolation, remote gateways, and recovery on real infrastructure.

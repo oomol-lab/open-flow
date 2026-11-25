@@ -13,7 +13,7 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   if (id == 'webhook-live') return referenceLive(call, flowId)
   if (id == 'fulfillment-ops') return referenceFulfillment(call, flowId, stage)
   async function find(name: string) {
-    const result = await call('flow_search', { flowId, query: name })
+    const result = await call('flow_read', { flowId, query: name })
     const matches = (result.data as { matches: { node: string; field: string; excerpt: string }[] }).matches.filter(
       (m) => m.field == 'name' && m.excerpt == name,
     )
@@ -32,10 +32,10 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
   if (id === 'connector-proxy') {
-    await call('connector_providers', { flowId })
+    await call('catalog_get', { resource: 'providers', flowId })
     await call('flow_schema', { type: 'connector-proxy' })
-    const connections = await call('connector_connections', { flowId, serviceId: 'lab-data' })
-    const archive = await call('connector_connections', { flowId, serviceId: 'lab-archive' })
+    const connections = await call('catalog_get', { resource: 'connections', flowId, serviceId: 'lab-data' })
+    const archive = await call('catalog_get', { resource: 'connections', flowId, serviceId: 'lab-archive' })
     const before = await read()
     const created = await submit(before.revision, [
       {
@@ -112,7 +112,7 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
       { op: 'input.set', node: refs.proxy!, input: 'query', source: { kind: 'output', node: refs.start!, port: 'query' } },
     ])
     await read([refs.proxy!])
-    await call('flow_search', { flowId, query: 'Provider request updated' })
+    await call('flow_read', { flowId, query: 'Provider request updated' })
     await call('flow_check', { flowId, revisionId: savedRevision })
     return
   }
@@ -555,9 +555,9 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   }
   if (id == 'start-parameters') {
     await call('flow_schema', { type: 'start' })
-    const catalog = await call('connector_search', { flowId, query: 'Archive order' })
+    const catalog = await call('catalog_get', { resource: 'actions', flowId, query: 'Archive order' })
     const archive = (catalog.actions as { actionId: string; serviceId: string }[])[0]!
-    const accounts = await call('connector_connections', { flowId, serviceId: archive.serviceId })
+    const accounts = await call('catalog_get', { resource: 'connections', flowId, serviceId: archive.serviceId })
     await call('flow_schema', { flowId, action: archive.actionId })
     const before = await read()
     await submit(before.revision, [
@@ -603,14 +603,14 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
       { op: 'node.update', node: await find('Start'), set: { config: { inputDefs: { amount: { description: 'Invoice total' } } } } },
     ])
   } else if (id == 'connector-responses') {
-    const catalog = await call('connector_search', { flowId, query: 'Read' })
+    const catalog = await call('catalog_get', { resource: 'actions', flowId, query: 'Read' })
     const available = catalog.actions as { actionId: string; name: string; serviceId: string }[]
     const dynamic = available.find((action) => action.name == 'Read dynamic response')!
     const cells = available.find((action) => action.name == 'Read spreadsheet cells')!
-    const archiveCatalog = await call('connector_search', { flowId, query: 'Archive order' })
+    const archiveCatalog = await call('catalog_get', { resource: 'actions', flowId, query: 'Archive order' })
     const archive = (archiveCatalog.actions as typeof available)[0]!
-    const dataAccounts = await call('connector_connections', { flowId, serviceId: dynamic.serviceId })
-    const archiveAccounts = await call('connector_connections', { flowId, serviceId: archive.serviceId })
+    const dataAccounts = await call('catalog_get', { resource: 'connections', flowId, serviceId: dynamic.serviceId })
+    const archiveAccounts = await call('catalog_get', { resource: 'connections', flowId, serviceId: archive.serviceId })
     for (const action of [dynamic, cells, archive]) await call('flow_schema', { flowId, action: action.actionId })
     const before = await read()
     await submit(before.revision, [
@@ -659,12 +659,12 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
     if (!checked.valid) throw new Error('Explicitly deferred accounts must pass readiness checks.')
     await submit(deferred.revision, [{ op: 'node.update', node: dynamicNode, set: { config: { connectionId: account(dataAccounts, 'Data test account') } } }])
   } else if (id == 'order-alert') {
-    const catalog = await call('connector_search', { flowId, query: 'orders' }),
-      notifyCatalog = await call('connector_search', { flowId, query: 'Send notification' })
+    const catalog = await call('catalog_get', { resource: 'actions', flowId, query: 'orders' }),
+      notifyCatalog = await call('catalog_get', { resource: 'actions', flowId, query: 'Send notification' })
     const orderAction = (catalog.actions as { actionId: string; name: string; serviceId: string }[]).find((a) => a.name == 'List orders')!
     const notification = (notifyCatalog.actions as { actionId: string; name: string; serviceId: string }[]).find((a) => a.name == 'Send notification')!
-    const ordersAccounts = await call('connector_connections', { flowId, serviceId: orderAction.serviceId }),
-      notifyAccounts = await call('connector_connections', { flowId, serviceId: notification.serviceId })
+    const ordersAccounts = await call('catalog_get', { resource: 'connections', flowId, serviceId: orderAction.serviceId }),
+      notifyAccounts = await call('catalog_get', { resource: 'connections', flowId, serviceId: notification.serviceId })
     await call('flow_schema', { flowId, action: orderAction.actionId })
     await call('flow_schema', { flowId, action: notification.actionId })
     for (const type of ['start', 'code', 'condition']) await call('flow_schema', { type })
@@ -749,7 +749,7 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
     const runs = await call('run_list', { flowId }),
       run = (runs.runs as { runId: string; status: string }[]).find((r) => r.status == 'failed')!
     if (run == null) throw new Error('Expected a failed run to inspect.')
-    const evidence = await call('run_events', { runId: run.runId })
+    const evidence = await call('run_get', { runId: run.runId, view: 'events' })
     const formatter = (evidence.events as { kind: string; payload: { nodeId?: string } }[]).find((event) => event.kind == 'node.failed')?.payload.nodeId
     if (formatter == null) throw new Error('Failed Run must identify a node.')
     const before = await read([formatter])

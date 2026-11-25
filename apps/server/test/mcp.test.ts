@@ -25,6 +25,14 @@ const token = 'mcp-test-operator-token-000000000001'
 const version = '2026-07-28'
 const start = { kind: 'graph.node.create', nodeId: 'start', node: { inputDefs: [], kind: 'start', name: 'Start' } }
 
+function parseError(reply: { isError?: boolean; structuredContent?: unknown; content: unknown[] }) {
+  expect(reply.isError).toBe(true)
+  expect(reply.structuredContent).toBeUndefined()
+  const first = reply.content[0] as { type: string; text: string } | undefined
+  expect(first?.type).toBe('text')
+  return JSON.parse(first!.text) as { error: { code: string; message: string; hint?: string; idempotencyKey?: string } }
+}
+
 it('shares workflow bundles through MCP and applies selected tags to every imported member', async () => {
   const { call, control, service } = await fixture()
   const child = await control.createFlow('Child')
@@ -41,10 +49,10 @@ it('shares workflow bundles through MCP and applies selected tags to every impor
       },
     },
   ])
-  const bundle = await call('flow_export', { flowId: root.flowId, includeDependencies: true })
+  const bundle = await call('flow_read', { flowId: root.flowId, export: 'bundle' })
   expect(bundle).toMatchObject({ kind: 'open-flow-workflow-bundle', entryFlowId: root.flowId, workflows: expect.any(Array) })
   const tag = await control.createTag('Imported bundle')
-  const result = (await call('flow_import', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })) as {
+  const result = (await call('flow_create', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })) as {
     flows: { flowId: string; tagIds: string[] }[]
     validations: Record<string, { status: string; diagnostics: unknown[]; unboundProviderIds: string[] }>
   }
@@ -58,7 +66,7 @@ it('shares workflow bundles through MCP and applies selected tags to every impor
       unboundProviderIds: expect.any(Array),
     })
   }
-  expect(await call('flow_import', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })).toEqual(result)
+  expect(await call('flow_create', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })).toEqual(result)
 })
 
 it('broadcasts REST and MCP canvas commands to every subscriber of only the authorized Flow', async () => {
@@ -77,7 +85,7 @@ it('broadcasts REST and MCP canvas commands to every subscriber of only the auth
   const expected = { version: 1, flowId: flow.flowId, broadcast: true }
   for (const command of [{ type: 'focus', nodeId: 'node' }, { type: 'zoom', zoom: 0.8 }, { type: 'pan', dx: -200, dy: 100 }, { type: 'fit' }] as const) {
     expect(await control.broadcastCanvas(flow.flowId, command)).toEqual(expected)
-    expect(await call('flow_canvas', { flowId: flow.flowId, command })).toEqual(expected)
+    expect(await call('flow_canvas_control', { flowId: flow.flowId, command })).toEqual(expected)
     expect(first).toHaveBeenLastCalledWith({ version: 1, flowId: flow.flowId, kind: 'canvas.command', command })
     expect(second.mock.calls).toEqual(first.mock.calls)
   }
@@ -86,7 +94,7 @@ it('broadcasts REST and MCP canvas commands to every subscriber of only the auth
   expect(await control.getPresentation(flow.flowId)).toEqual(presentation)
   expect((await control.getFlow(flow.flowId)).draftRevisionId).toBe(flow.draftRevisionId)
   const catalog = await client.listTools()
-  expect(catalog.tools.find((tool) => tool.name == 'flow_canvas')?.annotations?.idempotentHint).toBe(false)
+  expect(catalog.tools.find((tool) => tool.name == 'flow_canvas_control')?.annotations?.idempotentHint).toBe(false)
   for (const command of [
     { type: 'zoom', zoom: 4 },
     { type: 'pan', dx: 1 },
@@ -98,7 +106,7 @@ it('broadcasts REST and MCP canvas commands to every subscriber of only the auth
       body: JSON.stringify({ version: 1, command }),
     })
     expect(response.status).toBe(400)
-    expect((await client.callTool({ name: 'flow_canvas', arguments: { flowId: flow.flowId, command } })).isError).toBe(true)
+    expect((await client.callTool({ name: 'flow_canvas_control', arguments: { flowId: flow.flowId, command } })).isError).toBe(true)
   }
   const denied = createServerApp(service, { resolveControlActor: () => 'someone-else' })
   expect(
@@ -112,7 +120,7 @@ it('broadcasts REST and MCP canvas commands to every subscriber of only the auth
   ).toBe(404)
   expect(first).toHaveBeenCalledTimes(8)
   stops.forEach((stop) => stop())
-  expect(await call('flow_canvas', { flowId: flow.flowId, command: { type: 'fit' } })).toEqual(expected)
+  expect(await call('flow_canvas_control', { flowId: flow.flowId, command: { type: 'fit' } })).toEqual(expected)
   const reconnected = vi.fn()
   service.subscribeFlow('operator', flow.flowId, reconnected)()
   expect(reconnected).not.toHaveBeenCalled()
@@ -159,7 +167,7 @@ it('shares current online details between REST and MCP without exposing historic
   const flowId = flow.flowId
   const empty = await control.getLiveDetails(flowId)
   expect(empty).toMatchObject({ publication: null, status: 'not-published', entries: [] })
-  expect(await call('flow_live', { flowId })).toEqual(empty)
+  expect(await call('flow_live_get', { flowId })).toEqual(empty)
   const created = await control.changeDraft(
     flowId,
     flow.draftRevisionId,
@@ -183,9 +191,9 @@ it('shares current online details between REST and MCP without exposing historic
   const hook = initial.entries.find((entry) => entry.type == 'webhook')!
   if (hook.type != 'webhook') throw new Error('Missing Webhook')
   expect(hook.binding.endpointUrl).toMatch(new RegExp(`^${origin}/v1/webhooks/`))
-  expect(await call('flow_live', { flowId })).toEqual(initial)
+  expect(await call('flow_live_get', { flowId })).toEqual(initial)
   await control.setFlowEnabled(flowId, first.publicationId, false)
-  expect(await call('flow_live', { flowId })).toMatchObject({ enabled: false, status: 'suspended' })
+  expect(await call('flow_live_get', { flowId })).toMatchObject({ enabled: false, status: 'suspended' })
   const changed = await control.editAuthoring(flowId, {
     baseRevision: created.revision.revisionId,
     requestId: 'replace-entries',
@@ -203,17 +211,17 @@ it('shares current online details between REST and MCP without exposing historic
   expect(current.entries.map((entry) => entry.nodeId)).toEqual(['hook', 'start'])
   expect(current.entries[0]).toMatchObject({ name: 'Replacement', config: { method: 'GET' }, binding: { currentPublicationId: second.publicationId } })
   const rolledBack = await control.rollbackFlow(flowId, first.publicationId, second.publicationId)
-  expect(await call('flow_live', { flowId })).toMatchObject({
+  expect(await call('flow_live_get', { flowId })).toMatchObject({
     publication: { publicationId: rolledBack.publicationId },
     entries: expect.arrayContaining([expect.objectContaining({ name: 'Incoming' }), expect.objectContaining({ nodeId: 'schedule' })]),
   })
   const tools = await client.listTools()
-  expect(tools.tools.map((tool) => tool.name)).toContain('flow_live')
+  expect(tools.tools.map((tool) => tool.name)).toContain('flow_live_get')
   expect(tools.tools.map((tool) => tool.name)).not.toContain('flow_resources')
   expect(tools.tools.map((tool) => tool.name)).not.toContain('flow_resource_get')
   const headers = { authorization: `Bearer ${token}` }
   expect((await app.request(`/v1/flows/${flowId}/live/details?publicationId=${first.publicationId}`, { headers })).status).toBe(400)
-  expect((await client.callTool({ name: 'flow_live', arguments: { flowId, publicationId: first.publicationId } })).isError).toBe(true)
+  expect((await client.callTool({ name: 'flow_live_get', arguments: { flowId, publicationId: first.publicationId } })).isError).toBe(true)
   for (const suffix of ['/resources', '/resources/hook']) expect((await app.request(`/v1/flows/${flowId}${suffix}`, { headers })).status).toBe(404)
 })
 
@@ -235,7 +243,11 @@ it('discovers independent Feishu event sources without exposing secrets', async 
   const { call, control } = await fixture({
     capabilities: { connector: () => connector, integration: () => ({ callbackKey: 'key', publicOrigin: 'https://flow.example' }) },
   })
-  expect(await call('event_source_list')).toMatchObject({ version: 1, sources: [], guidance: expect.stringContaining('Workbench') })
+  expect(await call('catalog_get', { resource: 'event_sources' })).toMatchObject({
+    version: 1,
+    sources: [],
+    guidance: expect.stringContaining('Workbench'),
+  })
   const source = await control.createEventSource({
     version: 1,
     name: 'Feishu app',
@@ -246,7 +258,7 @@ it('discovers independent Feishu event sources without exposing secrets', async 
     eventTypes: ['im.message.receive_v1'],
     manageSubscriptions: false,
   })
-  const listed = await call('event_source_list')
+  const listed = await call('catalog_get', { resource: 'event_sources' })
   expect(listed).toMatchObject({ version: 1, sources: [{ sourceId: source.sourceId, teamId: null, connectionId: 'connection-1', verifiedAt: null }] })
   expect(listed).not.toHaveProperty('guidance')
   expect(JSON.stringify(listed)).not.toContain('verification-secret')
@@ -279,9 +291,10 @@ it('shares semantic authoring between MCP and REST and replays before catalog lo
   expect(await control.editAuthoring(flow.flowId, request as Parameters<ControlClient['editAuthoring']>[1])).toEqual(changed)
   expect(lookup).not.toHaveBeenCalled()
   expect(
-    (await client.callTool({ name: 'flow_edit', arguments: { ...args, edits: [{ op: 'node.add', as: 'other', type: 'start', name: 'Other' }] } }))
-      .structuredContent,
-  ).toMatchObject({ error: { code: 'flow.conflict' } })
+    parseError(await client.callTool({ name: 'flow_edit', arguments: { ...args, edits: [{ op: 'node.add', as: 'other', type: 'start', name: 'Other' }] } })),
+  ).toMatchObject({
+    error: { code: 'flow.conflict' },
+  })
 })
 
 it('does not commit partial compact trigger batches or accept unknown keys', async () => {
@@ -334,15 +347,17 @@ it('preserves default accounts for CLI and MCP while browser metadata stays inde
   expect((await control.getConnectorAction('mail.send')).defaultConnection?.connectionId).toBe('before')
   expect((await control.listConnectorActions('mail'))[0]?.defaultConnection?.connectionId).toBe('before')
   expect((await control.searchConnectorActions('send'))[0]?.defaultConnection?.connectionId).toBe('before')
-  expect(await call('connector_get', { actionId: 'mail.send' })).toMatchObject({ defaultConnection: { connectionId: 'before' } })
-  expect(await call('connector_search', { query: 'send' })).toMatchObject({ actions: [{ defaultConnection: { connectionId: 'before' } }] })
-  const search = await call('connector_search', { query: 'send' })
+  expect(await call('catalog_get', { resource: 'action', actionId: 'mail.send' })).toMatchObject({ defaultConnection: { connectionId: 'before' } })
+  expect(await call('catalog_get', { resource: 'actions', query: 'send' })).toMatchObject({
+    actions: [{ defaultConnection: { connectionId: 'before' } }],
+  })
+  const search = await call('catalog_get', { resource: 'actions', query: 'send' })
   expect(search).toMatchObject({ actions: [{ actionId: 'mail.send', authenticated: true }] })
   expect(search).not.toHaveProperty('actions.0.inputs')
   expect(search).not.toHaveProperty('actions.0.outputs')
-  expect(await call('connector_get', { actionId: 'mail.send' })).toHaveProperty('inputs')
+  expect(await call('catalog_get', { resource: 'action', actionId: 'mail.send' })).toHaveProperty('inputs')
   accountId = 'after'
-  expect(await call('connector_get', { actionId: 'mail.send' })).toMatchObject({ defaultConnection: { connectionId: 'after' } })
+  expect(await call('catalog_get', { resource: 'action', actionId: 'mail.send' })).toMatchObject({ defaultConnection: { connectionId: 'after' } })
   const before = connections.mock.calls.length
   connections.mockRejectedValue(new Error('Connections unavailable'))
   const next = await app.request('/v1/connector/action-metadata?service=mail&locale=en', {
@@ -430,16 +445,16 @@ it('serves discovery and an atomic authoring, validation and execution workflow 
   expect((await control.getDraft(flowId)).revisionId).toBe(revisionId)
   expect(await call('flow_check', { flowId, revisionId })).toMatchObject({ valid: true, revisionId })
   const runArgs = { source: 'draft', flowId, revisionId, trigger: { nodeId: startId, outputs: {} }, idempotencyKey: 'run' }
-  const run = await call('flow_run', runArgs)
+  const run = await call('run_start', runArgs)
   expect(run.initiator).toEqual({ actorId: 'operator', channel: 'mcp' })
   const runId = z.string().parse(run.runId)
-  expect(await call('flow_run', runArgs)).toEqual(run)
+  expect(await call('run_start', runArgs)).toEqual(run)
   await startService(service)
   await expect.poll(async () => (await call('run_get', { runId })).status).toBe('completed')
-  expect(await call('run_result', { runId })).toMatchObject({ status: 'completed' })
-  const page = await call('run_events', { runId, limit: 1 })
+  expect(await call('run_get', { runId, view: 'result' })).toMatchObject({ status: 'completed' })
+  const page = await call('run_get', { runId, view: 'events', limit: 1 })
   expect(page.events).toHaveLength(1)
-  const rest = await call('run_events', { runId, after: page.nextAfter })
+  const rest = await call('run_get', { runId, view: 'events', after: page.nextAfter })
   expect(JSON.stringify(rest.events)).toContain('42')
   expect(await call('flow_read', { flowId })).toMatchObject({ revision: revisionId })
 })
@@ -515,7 +530,13 @@ it('shares business node configuration across MCP and REST and executes only the
 
   await startService(service)
   const run = async (revisionId: string, idempotencyKey: string) => {
-    const accepted = await call('flow_run', { source: 'draft', flowId: flow.flowId, revisionId, trigger: { nodeId: refs.start!, outputs: {} }, idempotencyKey })
+    const accepted = await call('run_start', {
+      source: 'draft',
+      flowId: flow.flowId,
+      revisionId,
+      trigger: { nodeId: refs.start!, outputs: {} },
+      idempotencyKey,
+    })
     const runId = z.string().parse(accepted.runId)
     await expect.poll(async () => (await control.getRun(runId)).status, { timeout: 15_000 }).toBe('completed')
     return runId
@@ -539,8 +560,8 @@ it('shares business node configuration across MCP and REST and executes only the
       order: { id: 'A-1', total: 142 },
     },
   ])
-  expect(await call('run_result', { runId })).toMatchObject({ status: 'completed' })
-  const events = await call('run_events', { runId })
+  expect(await call('run_get', { runId, view: 'result' })).toMatchObject({ status: 'completed' })
+  const events = await call('run_get', { runId, view: 'events' })
   expect(JSON.stringify(events.events)).toContain('Order A-1 needs review.')
   expect((await control.listRuns(flow.flowId)).runs).toHaveLength(2)
 })
@@ -555,9 +576,11 @@ it('rejects stale concurrent edits and mismatched idempotent requests without lo
     other.callTool({ name: 'flow_edit', arguments: { ...args, requestId: 'second' } }),
   ])
   expect(replies.filter((reply) => reply.isError)).toHaveLength(1)
-  expect(replies.find((reply) => reply.isError)?.structuredContent).toMatchObject({ error: { code: 'flow.revision-conflict' } })
+  expect(parseError(replies.find((reply) => reply.isError)!)).toMatchObject({
+    error: { code: 'flow.revision-conflict', hint: expect.stringContaining('flow_read') },
+  })
   const conflict = await client.callTool({ name: 'flow_create', arguments: { name: 'Different', idempotencyKey: 'conflict-create' } })
-  expect(conflict.structuredContent).toMatchObject({ error: { code: 'flow.conflict' } })
+  expect(parseError(conflict)).toMatchObject({ error: { code: 'flow.conflict' } })
   const draft = await control.getDraft(z.string().parse(flow.flowId))
   expect(Object.values(draft.content.document.graph.nodes)).toEqual([expect.objectContaining({ kind: 'start' })])
 })
@@ -571,15 +594,17 @@ it('shares pagination cursors with the Control API and preserves invalid input a
   expect(next.flows).toHaveLength(1)
   expect(next.flows[0]?.flowId).not.toBe(z.array(z.object({ flowId: z.string() })).parse(first.flows)[0]?.flowId)
   const invalid = await client.callTool({ name: 'flow_list', arguments: { cursor: 'invalid' } })
-  expect(invalid.structuredContent).toMatchObject({ error: { code: 'page.invalid-cursor' } })
+  expect(parseError(invalid)).toMatchObject({ error: { code: 'page.invalid-cursor' } })
   for (const args of [
     { name: ' ', idempotencyKey: 'invalid' },
     { name: 'Valid', idempotencyKey: 'invalid', unexpected: true },
   ]) {
     expect((await client.callTool({ name: 'flow_create', arguments: args })).isError).toBe(true)
   }
-  expect((await client.callTool({ name: 'run_get', arguments: { runId: 'missing' } })).structuredContent).toMatchObject({ error: { code: 'run.not-found' } })
-  expect((await client.callTool({ name: 'connector_providers', arguments: {} })).structuredContent).toMatchObject({ error: { code: 'connector.unconfigured' } })
+  expect(parseError(await client.callTool({ name: 'run_get', arguments: { runId: 'missing' } }))).toMatchObject({ error: { code: 'run.not-found' } })
+  expect(parseError(await client.callTool({ name: 'catalog_get', arguments: { resource: 'providers' } }))).toMatchObject({
+    error: { code: 'connector.unconfigured' },
+  })
 })
 
 it('keeps admitted Runs across client disconnects and exposes Wait and cancellation state', async () => {
@@ -612,10 +637,10 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
     trigger: { nodeId: 'start', outputs: {} },
     idempotencyKey: 'wait-run',
   }
-  const run = await call('flow_run', args)
+  const run = await call('run_start', args)
   await client.close()
   const other = await connect()
-  const replay = await other.callTool({ name: 'flow_run', arguments: args })
+  const replay = await other.callTool({ name: 'run_start', arguments: args })
   expect(replay.structuredContent).toMatchObject({ runId: run.runId })
   await startService(service)
   await expect
@@ -624,11 +649,11 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
       status: 'waiting',
       waits: [{ actions: ['approve', 'reject'] }],
     })
-  expect((await other.callTool({ name: 'run_result', arguments: { runId: run.runId } })).structuredContent).toMatchObject({
-    error: { code: 'run.not-terminal' },
+  expect(parseError(await other.callTool({ name: 'run_get', arguments: { runId: run.runId, view: 'result' } }))).toMatchObject({
+    error: { code: 'run.not-terminal', hint: expect.stringContaining('run_get') },
   })
   await other.callTool({ name: 'run_cancel', arguments: { runId: run.runId } })
-  expect((await other.callTool({ name: 'run_result', arguments: { runId: run.runId } })).structuredContent).toMatchObject({ status: 'canceled' })
+  expect((await other.callTool({ name: 'run_get', arguments: { runId: run.runId, view: 'result' } })).structuredContent).toMatchObject({ status: 'canceled' })
 })
 
 it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait with %s and preserves its first decision', async (action) => {
@@ -654,7 +679,7 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
       { kind: 'graph.edge.connect', edge: { source: 'start', target: 'wait' } },
     ],
   })
-  const run = await call('flow_run', {
+  const run = await call('run_start', {
     source: 'draft',
     flowId: flow.flowId,
     revisionId: z.object({ revisionId: z.string() }).parse(changed.revision).revisionId,
@@ -667,7 +692,7 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
   const waiting = (await control.getRun(runId)).waits[0]!
   const args = { runId, waitId: waiting.waitId, action, comment: '  Reviewed through MCP  ' }
   const invalid = await client.callTool({ name: 'run_resolve_wait', arguments: { ...args, action: action == 'continue' ? 'approve' : 'continue' } })
-  expect(invalid.structuredContent).toMatchObject({ error: { code: 'run.invalid' } })
+  expect(parseError(invalid)).toMatchObject({ error: { code: 'run.invalid' } })
   await expect.poll(async () => (await control.getRun(runId)).status).toBe('waiting')
   const decision = await call('run_resolve_wait', args)
   expect(decision).toMatchObject({ action, comment: 'Reviewed through MCP', resolutionAccepted: true, runId, waitId: waiting.waitId })
@@ -703,7 +728,7 @@ it('pages stored tool results through MCP and REST and isolates results by Run',
     revisionId: z.object({ revisionId: z.string() }).parse(changed.revision).revisionId,
     trigger: { nodeId: 'start', outputs: {} },
   }
-  const runId = z.string().parse((await call('flow_run', { ...args, idempotencyKey: 'results-run' })).runId)
+  const runId = z.string().parse((await call('run_start', { ...args, idempotencyKey: 'results-run' })).runId)
   const opened = Database.open(file)
   const store = new Store(opened, runEnvironment(isolatedVmEngineDigest))
   let resultId: string
@@ -715,28 +740,30 @@ it('pages stored tool results through MCP and REST and isolates results by Run',
   } finally {
     opened.close()
   }
-  const first = await call('run_results', { runId })
+  const first = await call('run_get', { runId, view: 'tool_results' })
   expect(first.results).toHaveLength(50)
   expect(first).toEqual(await control.listRunResults(runId))
   const after = z.string().parse(first.nextAfter)
-  expect(await call('run_results', { runId, after })).toEqual(await control.listRunResults(runId, after))
-  expect((await call('run_results', { runId, after })).results).toHaveLength(1)
+  expect(await call('run_get', { runId, view: 'tool_results', after })).toEqual(await control.listRunResults(runId, after))
+  expect((await call('run_get', { runId, view: 'tool_results', after })).results).toHaveLength(1)
   const query = { pointer: '/rows', limit: 1, maxBytes: 1000 }
-  const page = await call('run_result_read', { runId, resultId, ...query })
+  const page = await call('run_get', { runId, view: 'tool_results', resultId, ...query })
   expect(page).toEqual(await control.readRunResult(runId, resultId, query))
   expect(page.page).toMatchObject({ nextOffset: 1, entries: [{ value: 10 }] })
-  expect(await call('run_result_read', { runId, resultId, ...query, offset: 1 })).toMatchObject({ page: { nextOffset: 2, entries: [{ value: 20 }] } })
-  expect(await call('run_result_read', { runId, resultId, pointer: '/rows/2' })).toMatchObject({ page: { complete: true, value: 30 } })
+  expect(await call('run_get', { runId, view: 'tool_results', resultId, ...query, offset: 1 })).toMatchObject({
+    page: { nextOffset: 2, entries: [{ value: 20 }] },
+  })
+  expect(await call('run_get', { runId, view: 'tool_results', resultId, pointer: '/rows/2' })).toMatchObject({ page: { complete: true, value: 30 } })
   for (const invalidQuery of [{ pointer: '/missing' }, { pointer: '/~2' }, { offset: -1 }, { limit: 101 }, { maxBytes: 1048577 }]) {
-    expect((await client.callTool({ name: 'run_result_read', arguments: { runId, resultId, ...invalidQuery } })).isError).toBe(true)
+    expect((await client.callTool({ name: 'run_get', arguments: { runId, view: 'tool_results', resultId, ...invalidQuery } })).isError).toBe(true)
   }
-  const other = await call('flow_run', { ...args, idempotencyKey: 'other-results-run' })
-  expect(await call('run_results', { runId: other.runId })).toMatchObject({ results: [] })
-  expect((await client.callTool({ name: 'run_result_read', arguments: { runId: other.runId, resultId } })).structuredContent).toMatchObject({
+  const other = await call('run_start', { ...args, idempotencyKey: 'other-results-run' })
+  expect(await call('run_get', { runId: other.runId, view: 'tool_results' })).toMatchObject({ results: [] })
+  expect(parseError(await client.callTool({ name: 'run_get', arguments: { runId: other.runId, view: 'tool_results', resultId } }))).toMatchObject({
     error: { code: 'flow.not-found' },
   })
   await call('run_cancel', { runId })
-  expect(await call('run_result_read', { runId, resultId, pointer: '/rows/0' })).toMatchObject({ page: { value: 10 } })
+  expect(await call('run_get', { runId, view: 'tool_results', resultId, pointer: '/rows/0' })).toMatchObject({ page: { value: 10 } })
 })
 
 it('enforces authentication, Origin, request limits and the modern HTTP protocol', async () => {
@@ -760,14 +787,15 @@ it('enforces authentication, Origin, request limits and the modern HTTP protocol
     'mcp-method': 'tools/list',
   }
   const request = (extra: Record<string, string> = {}, source = body) => fetch(endpoint, { method: 'POST', headers: { ...headers, ...extra }, body: source })
-  expect((await request({ authorization: 'Bearer invalid' })).status).toBe(401)
+  const unauth = await request({ authorization: 'Bearer invalid' })
+  expect(unauth.status).toBe(401)
+  expect(unauth.headers.get('www-authenticate')).toBe('Bearer realm="open-flow"')
   expect((await request({ authorization: '' })).status).toBe(401)
   expect((await request({ origin: 'https://evil.example' })).status).toBe(403)
   expect((await request({ origin })).status).toBe(200)
   expect((await request({ 'content-type': 'text/plain' })).status).toBe(415)
   expect((await request({}, '{')).status).toBe(400)
   expect((await request({ 'mcp-method': 'tools/call' })).status).toBe(400)
-  expect((await request({ 'mcp-protocol-version': '2025-11-25' })).status).toBe(400)
   expect((await request({}, ' '.repeat(5 * 1024 * 1024 + 1))).status).toBe(413)
   for (const method of ['GET', 'DELETE']) expect((await fetch(endpoint, { method, headers })).status).toBe(405)
   const response = await request()
@@ -790,12 +818,12 @@ it('cancels Connector requests on HTTP disconnect and Server shutdown', async ()
   })
   const { client, shutdown } = await fixture({ capabilities: { connector: () => connector } })
   const cancel = new AbortController()
-  const pending = client.callTool({ name: 'connector_providers', arguments: {} }, { signal: cancel.signal }).catch((error: unknown) => error)
+  const pending = client.callTool({ name: 'catalog_get', arguments: { resource: 'providers' } }, { signal: cancel.signal }).catch((error: unknown) => error)
   await expect.poll(() => signals.length).toBe(1)
   cancel.abort()
   await expect.poll(() => signals[0]?.aborted).toBe(true)
   expect(await pending).toBeInstanceOf(Error)
-  const stopping = client.callTool({ name: 'connector_providers', arguments: {} }).catch((error: unknown) => error)
+  const stopping = client.callTool({ name: 'catalog_get', arguments: { resource: 'providers' } }).catch((error: unknown) => error)
   await expect.poll(() => signals.length).toBe(2)
   shutdown.abort()
   await expect.poll(() => signals[1]?.aborted).toBe(true)
@@ -832,23 +860,23 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
   const operation = await call('flow_publish', publishArgs)
   expect(await call('flow_publish', publishArgs)).toEqual(operation)
   await service.tickMaintenance()
-  const publication = await call('flow_publish_status', { flowId, operationId: operation.operationId })
+  const publication = await call('flow_live_get', { flowId, operationId: operation.operationId })
   expect(publication).toEqual(await control.getPublishOperation(flowId, z.string().parse(operation.operationId)))
   if (publication.status != 'succeeded') throw new Error('Publication did not succeed.')
   expect(await call('flow_publish', publishArgs)).toEqual(publication)
-  expect(await call('flow_set_enabled', { flowId, expectedPublicationId: publication.publicationId, enabled: false })).toMatchObject({
+  expect(await call('flow_live_set', { flowId, expectedPublicationId: publication.publicationId, enabled: false })).toMatchObject({
     live: { hasStart: true, enabled: false },
   })
   expect((await control.getLive(flowId)).status).toBe('suspended')
-  expect(await call('flow_set_enabled', { flowId, expectedPublicationId: publication.publicationId, enabled: true })).toMatchObject({
+  expect(await call('flow_live_set', { flowId, expectedPublicationId: publication.publicationId, enabled: true })).toMatchObject({
     live: { hasStart: true, enabled: true },
   })
   const args = { source: 'live', publicationId: publication.publicationId, trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'live-run' }
-  const run = await call('flow_run', args)
+  const run = await call('run_start', args)
   await startService(service)
   await service.waitForIdle()
   expect((await call('run_get', { runId: run.runId })).status).toBe('completed')
-  expect(JSON.stringify(await call('run_result', { runId: run.runId }))).toContain('42')
+  expect(JSON.stringify(await call('run_get', { runId: run.runId, view: 'result' }))).toContain('42')
   const changed = await seedDraft(control, {
     flowId,
     expectedRevisionId: revisionId,
@@ -865,7 +893,7 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
     ],
   })
   const nextRevisionId = z.object({ revisionId: z.string() }).parse(changed.revision).revisionId
-  expect((await client.callTool({ name: 'flow_publish', arguments: { ...publishArgs, revisionId: nextRevisionId } })).structuredContent).toMatchObject({
+  expect(parseError(await client.callTool({ name: 'flow_publish', arguments: { ...publishArgs, revisionId: nextRevisionId } }))).toMatchObject({
     error: { code: 'publication.conflict' },
   })
   const second = await call('flow_publish', {
@@ -875,20 +903,19 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
     idempotencyKey: 'second-publish',
   })
   await service.tickMaintenance()
-  const published = await call('flow_publish_status', { flowId, operationId: second.operationId })
+  const published = await call('flow_live_get', { flowId, operationId: second.operationId })
   if (published.status != 'succeeded') throw new Error('Second publication did not succeed.')
   expect(
-    (await client.callTool({ name: 'flow_set_enabled', arguments: { flowId, expectedPublicationId: publication.publicationId, enabled: false } }))
-      .structuredContent,
+    parseError(await client.callTool({ name: 'flow_live_set', arguments: { flowId, expectedPublicationId: publication.publicationId, enabled: false } })),
   ).toMatchObject({ error: { code: 'flow.conflict' } })
   expect((await control.getLive(flowId)).status).toBe('runnable')
-  expect(await call('flow_run', args)).toMatchObject({ runId: run.runId, status: 'completed' })
-  const stale = await client.callTool({ name: 'flow_run', arguments: { ...args, idempotencyKey: 'stale-run' } })
-  expect(stale.structuredContent).toMatchObject({ error: { code: 'live.conflict' } })
-  const failed = await call('flow_run', { ...args, publicationId: published.publicationId, idempotencyKey: 'failed-run' })
+  expect(await call('run_start', args)).toMatchObject({ runId: run.runId, status: 'completed' })
+  const stale = await client.callTool({ name: 'run_start', arguments: { ...args, idempotencyKey: 'stale-run' } })
+  expect(parseError(stale)).toMatchObject({ error: { code: 'live.conflict' } })
+  const failed = await call('run_start', { ...args, publicationId: published.publicationId, idempotencyKey: 'failed-run' })
   await service.waitForIdle()
   expect((await call('run_get', { runId: failed.runId })).status).toBe('failed')
-  expect(await call('run_result', { runId: failed.runId })).toMatchObject({ status: 'failed', error: expect.any(Object) })
+  expect(await call('run_get', { runId: failed.runId, view: 'result' })).toMatchObject({ status: 'failed', error: expect.any(Object) })
 })
 
 it('reports uncertain mutation outcomes and recovers the accepted resource with the original key', async () => {
@@ -901,8 +928,7 @@ it('reports uncertain mutation outcomes and recovers the accepted resource with 
   onTestFinished(() => fault.mockRestore())
   const args = { name: 'Recover', idempotencyKey: 'uncertain-create' }
   const response = await client.callTool({ name: 'flow_create', arguments: args })
-  expect(response.isError).toBe(true)
-  expect(response.structuredContent).toMatchObject({ error: { code: 'flow.mutation-outcome-unknown', idempotencyKey: args.idempotencyKey } })
+  expect(parseError(response)).toMatchObject({ error: { code: 'flow.mutation-outcome-unknown', idempotencyKey: args.idempotencyKey } })
   expect(JSON.stringify(response)).not.toContain('Simulated failure')
   const accepted = await call('flow_create', args)
   const page = await call('flow_list')
@@ -997,10 +1023,10 @@ it('reads code from fixed revisions and rejects obsolete Subflow parameters', as
 
 it('discovers Trigger definitions separately from Flow instances and rejects contradictory Run identities', async () => {
   const { call, client, service } = await fixture()
-  expect(await call('connector_teams')).toEqual({ enabled: false, teams: [], version: 1 })
-  const all = await call('trigger_search')
+  expect(await call('catalog_get', { resource: 'teams' })).toEqual({ enabled: false, teams: [], version: 1 })
+  const all = await call('catalog_get', { resource: 'triggers' })
   expect(all).toEqual({ keys: service.control.drafts.listTriggerKeys() })
-  const filtered = await call('trigger_search', { query: 'GMAIL' })
+  const filtered = await call('catalog_get', { resource: 'triggers', query: 'GMAIL' })
   expect(filtered).toEqual({
     keys: service.control.drafts
       .listTriggerKeys()
@@ -1008,10 +1034,10 @@ it('discovers Trigger definitions separately from Flow instances and rejects con
         [item.description, item.displayName, item.key, item.name, item.provider, item.type].some((value) => value.toLowerCase().includes('gmail')),
       ),
   })
-  expect(await call('trigger_search', { query: 'no-matching-trigger' })).toEqual({ keys: [] })
+  expect(await call('catalog_get', { resource: 'triggers', query: 'no-matching-trigger' })).toEqual({ keys: [] })
   const admit = vi.spyOn(service.control.runs, 'createDraftRun')
   const invalid = await client.callTool({
-    name: 'flow_run',
+    name: 'run_start',
     arguments: {
       source: 'draft',
       flowId: 'flow',
@@ -1028,17 +1054,18 @@ it('discovers Trigger definitions separately from Flow instances and rejects con
 it('shares Draft account usage removal with REST and preserves its idempotent result', async () => {
   const { call, control } = await fixture()
   const flow = await control.createFlow('Connection usage')
-  const access = await call('flow_code_connections', { flowId: flow.flowId })
+  const access = await call('flow_connections_get', { flowId: flow.flowId })
   expect(access).toMatchObject({ mode: 'implicit', bindings: [], accessRevision: 0 })
   const args = {
     flowId: flow.flowId,
+    action: 'remove_usage',
     connectionId: 'account',
     expectedRevisionId: flow.draftRevisionId,
     expectedAccessRevision: 0,
     idempotencyKey: 'remove-usage',
   }
-  const removed = await call('flow_connection_usage_remove', args)
-  expect(await call('flow_connection_usage_remove', args)).toEqual(removed)
+  const removed = await call('flow_connections_edit', args)
+  expect(await call('flow_connections_edit', args)).toEqual(removed)
   expect(await control.removeConnectionUsage(flow.flowId, 'account', flow.draftRevisionId, 0, 'remove-usage')).toEqual(removed)
   expect((await control.getDraft(flow.flowId)).revisionId).not.toBe(flow.draftRevisionId)
 })
@@ -1056,36 +1083,111 @@ it('uses the same scoped State service through MCP and rejects omitted scope', a
   const { call, client, control, service } = await fixture()
   const flow = await control.createFlow('State')
   service.control.state.store.set(flow.flowId, 'draft', 'seed', 'counter', 0)
-  expect(await call('flow_state', { flowId: flow.flowId, scope: 'draft' })).toEqual(await control.getFlowState(flow.flowId, 'draft'))
-  expect(await call('flow_state_read', { flowId: flow.flowId, scope: 'draft', keys: ['missing', 'counter'] })).toEqual(
+  expect(await call('flow_state_get', { flowId: flow.flowId, scope: 'draft' })).toEqual(await control.getFlowState(flow.flowId, 'draft'))
+  expect(await call('flow_state_get', { flowId: flow.flowId, scope: 'draft', keys: ['missing', 'counter'] })).toEqual(
     await control.getFlowStateValues(flow.flowId, 'draft', ['missing', 'counter']),
   )
-  for (const name of ['flow_state', 'flow_state_read', 'flow_state_clear', 'flow_dedupe_clear']) {
+  for (const name of ['flow_state_get', 'flow_state_clear']) {
     expect((await client.callTool({ name, arguments: { flowId: flow.flowId, space: 'flow' } })).isError).toBe(true)
   }
   for (const keys of [[], ['counter', 'counter'], Array.from({ length: 17 }, (_, index) => String(index))])
-    expect((await client.callTool({ name: 'flow_state_read', arguments: { flowId: flow.flowId, scope: 'draft', keys } })).isError).toBe(true)
-  expect((await client.callTool({ name: 'flow_state', arguments: { flowId: flow.flowId, scope: 'draft', values: true } })).isError).toBe(true)
-  expect(await call('flow_state_clear', { flowId: flow.flowId, scope: 'live' })).toEqual({ version: 1, cleared: true })
-  expect(await call('flow_dedupe_clear', { flowId: flow.flowId, scope: 'draft', space: 'node:removed' })).toEqual({ version: 1, cleared: true })
+    expect((await client.callTool({ name: 'flow_state_get', arguments: { flowId: flow.flowId, scope: 'draft', keys } })).isError).toBe(true)
+  expect((await client.callTool({ name: 'flow_state_get', arguments: { flowId: flow.flowId, scope: 'draft', values: true } })).isError).toBe(true)
+  expect(await call('flow_state_clear', { flowId: flow.flowId, scope: 'live', target: 'state' })).toEqual({ version: 1, cleared: true })
+  expect(await call('flow_state_clear', { flowId: flow.flowId, scope: 'draft', target: 'dedupe', space: 'node:removed' })).toEqual({
+    version: 1,
+    cleared: true,
+  })
 })
 
-it('returns authenticated account identity and server metadata from whoami', async () => {
+it('returns authenticated account identity and server metadata from server_whoami', async () => {
   const { call, client, connect, operator, origin, service } = await fixture()
-  expect(await call('whoami')).toEqual({
+  expect(await call('server_whoami')).toEqual({
     user: { userId: 'operator', kind: 'operator', email: null, role: 'admin' },
     server: { name: 'open-flow', version: expect.any(String), origin },
   })
   const created = await service.control.users.create('agent@example.com', 'user')
   const personal = operator.createToken(created.user.userId, 'mcp')
   const userClient = await connect(personal.token)
-  const userWhoami = await userClient.callTool({ name: 'whoami', arguments: {} })
+  const userWhoami = await userClient.callTool({ name: 'server_whoami', arguments: {} })
   expect(userWhoami.isError).not.toBe(true)
   expect(userWhoami.structuredContent).toEqual({
     user: { userId: created.user.userId, kind: 'user', email: 'agent@example.com', role: 'user' },
     server: { name: 'open-flow', version: expect.any(String), origin },
   })
-  expect((await client.callTool({ name: 'whoami', arguments: { extra: 1 } })).isError).toBe(true)
+  expect((await client.callTool({ name: 'server_whoami', arguments: { extra: 1 } })).isError).toBe(true)
+})
+
+it('supports stateless legacy MCP clients, toolset filtering, prompts, and waitSeconds long-polling', async () => {
+  const { call, client, control, endpoint, service } = await fixture()
+
+  // 1. Default legacy @modelcontextprotocol/client (stateless initialize handshake)
+  const legacyClient = new Client({ name: 'legacy-client', version: '1.0.0' })
+  onTestFinished(() => legacyClient.close())
+  await legacyClient.connect(new StreamableHTTPClientTransport(endpoint, { requestInit: { headers: { authorization: `Bearer ${token}` } } }))
+  const legacyWhoami = await legacyClient.callTool({ name: 'server_whoami', arguments: {} })
+  expect(legacyWhoami.isError).not.toBe(true)
+  expect(legacyWhoami.structuredContent).toMatchObject({ user: { userId: 'operator' } })
+
+  // 2. ?toolsets= filtering (including default & all presets) & invalid toolset rejection
+  const filteredClient = new Client({ name: 'filtered-client', version: '1.0.0' }, { versionNegotiation: { mode: { pin: version } } })
+  onTestFinished(() => filteredClient.close())
+  await filteredClient.connect(
+    new StreamableHTTPClientTransport(new URL('/v1/mcp?toolsets=core,runs', endpoint), {
+      requestInit: { headers: { authorization: `Bearer ${token}` } },
+    }),
+  )
+  const filteredTools = (await filteredClient.listTools()).tools.map((tool) => tool.name)
+  expect(filteredTools).toEqual(expect.arrayContaining(['server_whoami', 'flow_list', 'run_start', 'run_get', 'run_cancel']))
+  expect(filteredTools).not.toContain('flow_edit')
+  expect(filteredTools).not.toContain('flow_canvas_control')
+
+  const defaultClient = new Client({ name: 'default-toolsets-client', version: '1.0.0' }, { versionNegotiation: { mode: { pin: version } } })
+  onTestFinished(() => defaultClient.close())
+  await defaultClient.connect(
+    new StreamableHTTPClientTransport(new URL('/v1/mcp?toolsets=default', endpoint), {
+      requestInit: { headers: { authorization: `Bearer ${token}` } },
+    }),
+  )
+  const defaultTools = (await defaultClient.listTools()).tools.map((tool) => tool.name)
+  expect(defaultTools).toHaveLength(16)
+  expect(defaultTools).toContain('flow_edit')
+  expect(defaultTools).toContain('catalog_get')
+  expect(defaultTools).not.toContain('flow_state_get')
+  expect(defaultTools).not.toContain('flow_canvas_control')
+
+  const invalidToolset = await fetch(new URL('/v1/mcp?toolsets=unknown', endpoint), {
+    method: 'POST',
+    headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  })
+  expect(invalidToolset.status).toBe(400)
+
+  // 3. Prompts list & get
+  const prompts = await client.listPrompts()
+  expect(prompts.prompts.map((p) => p.name)).toEqual(['author_flow', 'publish_and_run_flow', 'debug_run'])
+  const prompt = await client.getPrompt({ name: 'author_flow', arguments: { goal: 'Send digest' } })
+  expect(prompt.messages[0]?.content).toMatchObject({ type: 'text', text: expect.stringContaining('Send digest') })
+
+  // 4. waitSeconds on run_get wakes early upon completion
+  const flow = await control.createFlow('Wait seconds')
+  const changed = await seedDraft(control, {
+    flowId: flow.flowId,
+    expectedRevisionId: flow.draftRevisionId,
+    idempotencyKey: 'wait-seconds-edit',
+    operations: [start],
+  })
+  const revisionId = z.object({ revisionId: z.string() }).parse(changed.revision).revisionId
+  await startService(service)
+  const started = await call('run_start', {
+    source: 'draft',
+    flowId: flow.flowId,
+    revisionId,
+    trigger: { nodeId: 'start', outputs: {} },
+    idempotencyKey: 'wait-seconds-run',
+    waitSeconds: 5,
+  })
+  expect(started.status).toBe('completed')
 })
 
 it('returns static validation and unboundProviderIds from single-workflow flow_import', async () => {
@@ -1115,12 +1217,12 @@ it('returns static validation and unboundProviderIds from single-workflow flow_i
       { kind: 'graph.edge.connect', edge: { source: 'start', target: 'github' } },
     ],
   })
-  const exported = await call('flow_export', { flowId: source.flowId })
-  const imported = await call('flow_import', { file: exported, idempotencyKey: 'mcp-single-import-validation' })
+  const exported = await call('flow_read', { flowId: source.flowId, export: 'workflow' })
+  const imported = await call('flow_create', { file: exported, idempotencyKey: 'mcp-single-import-validation' })
   expect(imported.validation).toMatchObject({
     status: 'invalid',
     unboundProviderIds: ['github'],
     diagnostics: expect.arrayContaining([expect.objectContaining({ nodes: ['github'], field: 'inputs.title' })]),
   })
-  expect(await call('flow_import', { file: exported, idempotencyKey: 'mcp-single-import-validation' })).toEqual(imported)
+  expect(await call('flow_create', { file: exported, idempotencyKey: 'mcp-single-import-validation' })).toEqual(imported)
 })

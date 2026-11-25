@@ -28,7 +28,7 @@ import { eventSourceDefinition, sourceReady, sourceResultSchema, preparedSourceS
 import { encodeWorkflowFile, decodeWorkflowFile, cleanWorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '@oomol-lab/open-flow/flow-semantics'
 import { resolveUiLanguage } from '@oomol-lab/open-flow/localization'
-import { mcpTools } from '@oomol-lab/open-flow/mcp'
+import { mcpTools, mcpPrompts, mcpToolsets, mcpDefaultToolsets, type McpToolset } from '@oomol-lab/open-flow/mcp'
 import { OpenFlowPreview } from '@oomol-lab/open-flow/preview'
 import { transitionRun } from '@oomol-lab/open-flow/run-lifecycle'
 import {

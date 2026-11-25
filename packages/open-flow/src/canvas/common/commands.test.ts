@@ -7,8 +7,8 @@ it.each([{ type: 'focus', nodeId: 'node' }, { type: 'zoom', zoom: 0.1 }, { type:
   'shares canvas validation between REST and MCP: %j',
   (command) => {
     expect(controlRequests.canvas({ version: 1, command }).command).toEqual(command)
-    expect(mcpTools.flow_canvas.inputSchema['~standard'].validate({ flowId: 'flow', command })).toEqual({ value: { flowId: 'flow', command } })
-    expect(mcpTools.flow_canvas.annotations.idempotentHint).toBe(false)
+    expect(mcpTools.flow_canvas_control.inputSchema['~standard'].validate({ flowId: 'flow', command })).toEqual({ value: { flowId: 'flow', command } })
+    expect(mcpTools.flow_canvas_control.annotations.idempotentHint).toBe(false)
   },
 )
 
@@ -25,5 +25,5 @@ it.each([
 ])('rejects invalid canvas commands at every boundary: %j', (command) => {
   expect(canvasCommandSchema.safeParse(command).success).toBe(false)
   expect(() => controlRequests.canvas({ version: 1, command })).toThrow()
-  expect(mcpTools.flow_canvas.inputSchema['~standard'].validate({ flowId: 'flow', command })).toHaveProperty('issues')
+  expect(mcpTools.flow_canvas_control.inputSchema['~standard'].validate({ flowId: 'flow', command })).toHaveProperty('issues')
 })

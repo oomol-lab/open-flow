@@ -63,10 +63,9 @@ const samples = {
 
 describe('Control request boundaries', () => {
   it('publishes the read modes and defaults consistently in HTTP and MCP schemas', () => {
-    const validators = [
-      new Validator(controlRequestSchema('authoringRead') as object),
-      new Validator(mcpTools.flow_read.inputSchema['~standard'].jsonSchema.input()),
-    ]
+    const restValidator = new Validator(controlRequestSchema('authoringRead') as object)
+    const mcpSchema = mcpTools.flow_read.inputSchema['~standard'].jsonSchema.input()
+    expect(mcpSchema).not.toHaveProperty('not')
     for (const [input, valid] of [
       [{}, true],
       [{ nodes: ['node'] }, true],
@@ -75,8 +74,10 @@ describe('Control request boundaries', () => {
       [{ text: { node: 'node', field: 'prompt', start: 0 } }, false],
       [{ text: { node: 'node', field: 'prompt', lines: 201 } }, false],
     ] as const) {
-      expect(validators[0]!.validate(input).valid).toBe(valid)
-      expect(validators[1]!.validate({ ...input, flowId: 'flow' }).valid).toBe(valid)
+      expect(restValidator.validate(input).valid).toBe(valid)
+      const mcpValidated = mcpTools.flow_read.inputSchema['~standard'].validate({ ...input, flowId: 'flow' })
+      if (valid) expect(mcpValidated).toHaveProperty('value')
+      else expect(mcpValidated).toHaveProperty('issues')
       if (valid) expect(() => controlRequests.authoringRead(input)).not.toThrow()
       else expect(() => controlRequests.authoringRead(input)).toThrow()
     }
@@ -102,13 +103,26 @@ describe('Control request boundaries', () => {
 })
 
 it('validates MCP defaults without accepting extra arguments', () => {
-  expect(mcpTools.whoami.inputSchema['~standard'].validate({})).toEqual({ value: {} })
-  expect(mcpTools.whoami.inputSchema['~standard'].validate({ extra: true })).toHaveProperty('issues')
-  expect(mcpTools.whoami.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false })
+  expect(mcpTools.server_whoami.inputSchema['~standard'].validate({})).toEqual({ value: {} })
+  expect(mcpTools.server_whoami.inputSchema['~standard'].validate({ extra: true })).toHaveProperty('issues')
+  expect(mcpTools.server_whoami.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false })
   expect(mcpTools.flow_list.inputSchema['~standard'].validate({})).toEqual({ value: { limit: 50 } })
-  expect(mcpTools.run_events.inputSchema['~standard'].validate({ runId: 'r1' })).toEqual({ value: { runId: 'r1', after: 0, limit: 50 } })
+  expect(mcpTools.run_get.inputSchema['~standard'].validate({ runId: 'r1' })).toEqual({ value: { runId: 'r1', view: 'status' } })
+  expect(mcpTools.run_get.inputSchema['~standard'].validate({ runId: 'r1', view: 'events', after: 'cursor' })).toHaveProperty('issues')
   expect(mcpTools.flow_read.inputSchema['~standard'].validate({ flowId: 'f1', tenant: 'other' })).toHaveProperty('issues')
+  expect(mcpTools.flow_read.inputSchema['~standard'].validate({ flowId: 'f1', export: 'workflow', revision: 'r1' })).toHaveProperty('issues')
   expect(mcpTools.flow_create.inputSchema['~standard'].validate({ name: 'Flow', idempotencyKey: '' })).toHaveProperty('issues')
+  expect(mcpTools.flow_create.inputSchema['~standard'].validate({ idempotencyKey: 'k1' })).toHaveProperty('issues')
+  expect(mcpTools.flow_create.inputSchema['~standard'].validate({ name: 'Flow', tagIds: ['t1'], idempotencyKey: 'k1' })).toHaveProperty('issues')
+  expect(mcpTools.catalog_get.inputSchema['~standard'].validate({ resource: 'triggers', query: 'gmail' })).toHaveProperty('value')
+  expect(mcpTools.catalog_get.inputSchema['~standard'].validate({ resource: 'trigger' })).toHaveProperty('issues')
+  expect(mcpTools.flow_create.annotations).toEqual({ readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false })
+  expect(mcpTools.flow_state_clear.annotations).toEqual({ readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false })
+  expect(mcpTools.flow_edit.inputSchema['~standard'].jsonSchema.input()).toBe(mcpTools.flow_edit.inputSchema['~standard'].jsonSchema.input())
+  const flowEditDefs = (mcpTools.flow_edit.inputSchema['~standard'].jsonSchema.input() as { $defs?: Record<string, unknown> }).$defs ?? {}
+  expect(Object.values(flowEditDefs).some((def) => Array.isArray((def as { anyOf?: unknown }).anyOf) && (def as { anyOf: unknown[] }).anyOf.length == 6)).toBe(
+    false,
+  )
 })
 
 it('requires the versioned explicit output map for Run creation', () => {
@@ -124,9 +138,9 @@ it('requires the versioned explicit output map for Run creation', () => {
   expect(() => controlRequests.createDraftRun({ ...run, trigger: { nodeId: 'hook', outputs: [] } })).toThrow()
 })
 
-it('expresses mutually exclusive Draft and Live run identities in the MCP schema and validator', () => {
+it('expresses mutually exclusive Draft and Live run identities in the flat MCP schema and validator', () => {
   const common = { trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'run' }
-  const validate = mcpTools.flow_run.inputSchema['~standard'].validate
+  const validate = mcpTools.run_start.inputSchema['~standard'].validate
   expect(validate({ ...common, source: 'draft', flowId: 'flow', revisionId: 'r1' })).toHaveProperty('value.inputs', {})
   expect(validate({ ...common, source: 'live', publicationId: 'p1' })).toHaveProperty('value.inputs', {})
   for (const identity of [
@@ -136,12 +150,11 @@ it('expresses mutually exclusive Draft and Live run identities in the MCP schema
     { source: 'live', publicationId: 'p1', flowId: 'flow' },
   ])
     expect(validate({ ...common, ...identity })).toHaveProperty('issues')
-  const schema = mcpTools.flow_run.inputSchema['~standard'].jsonSchema.input()
+  const schema = mcpTools.run_start.inputSchema['~standard'].jsonSchema.input()
   expect(schema).toMatchObject({
     type: 'object',
-    oneOf: [
-      { properties: { source: { const: 'draft' } }, required: expect.arrayContaining(['flowId', 'revisionId']), additionalProperties: false },
-      { properties: { source: { const: 'live' } }, required: expect.arrayContaining(['publicationId']), additionalProperties: false },
-    ],
+    additionalProperties: false,
   })
+  expect(schema).not.toHaveProperty('oneOf')
+  expect(JSON.stringify(schema)).not.toContain('__schema0')
 })

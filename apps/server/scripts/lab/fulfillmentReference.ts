@@ -20,7 +20,7 @@ export default function ({orders, batchName}) {
 /** A public-tool-only solution. Stages discover and read the persisted previous result. */
 export async function referenceFulfillment(call: ToolCall, flowId: string, stage: number) {
   async function find(name: string) {
-    const result = await call('flow_search', { flowId, query: name })
+    const result = await call('flow_read', { flowId, query: name })
     const matches = (result.data as { matches: { node: string; field: string; excerpt: string }[] }).matches.filter(
       (match) => match.field == 'name' && match.excerpt == name,
     )
@@ -28,10 +28,10 @@ export async function referenceFulfillment(call: ToolCall, flowId: string, stage
     return matches[0]!.node
   }
   async function action(name: string, account: string) {
-    const result = await call('connector_search', { flowId, query: name })
+    const result = await call('catalog_get', { resource: 'actions', flowId, query: name })
     const selected = (result.actions as { name: string; actionId: string; serviceId: string }[]).find((item) => item.name == name)
     if (selected == null) throw new Error(`Action not found: ${name}`)
-    const accounts = await call('connector_connections', { flowId, serviceId: selected.serviceId })
+    const accounts = await call('catalog_get', { resource: 'connections', flowId, serviceId: selected.serviceId })
     const connection = (accounts.connections as { displayName: string; connectionId: string }[]).find((item) => item.displayName == account)
     if (connection == null) throw new Error(`Account not found: ${account}`)
     await call('flow_schema', { flowId, action: selected.actionId })

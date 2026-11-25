@@ -58,6 +58,10 @@ import { WebhookTargets } from './webhook-targets.ts'
 
 export type { ServerCapabilities, ServerRuntime, ServerServiceOptions } from './service-options.ts'
 
+function isRunSettled(status: string): boolean {
+  return status == 'waiting' || status == 'completed' || status == 'failed' || status == 'canceled' || status == 'indeterminate'
+}
+
 interface PollOccurrenceInput {
   readonly bindingId: string
   readonly occurredAt: string
@@ -494,6 +498,77 @@ export class ServerService {
       signal,
       nodeId == null ? undefined : () => this.#store.runViews.webhookResponse(runId, nodeId),
     )
+  }
+
+  async waitForRunTransition(actorId: string, runId: string, timeoutMs: number, signal: AbortSignal): Promise<void> {
+    const initial = this.control.runs.getRun(actorId, runId)
+    if (timeoutMs <= 0 || signal.aborted || isRunSettled(initial.status)) return
+    await new Promise<void>((resolve) => {
+      let done = false
+      let unsubscribe: (() => void) | undefined
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const finish = () => {
+        if (done) return
+        done = true
+        unsubscribe?.()
+        clearTimeout(timer)
+        signal.removeEventListener('abort', finish)
+        resolve()
+      }
+      const inspect = () => {
+        try {
+          if (isRunSettled(this.control.runs.getRun(actorId, runId).status)) finish()
+        } catch {
+          finish()
+        }
+      }
+      unsubscribe = this.#watchFlow(initial.flowId, (event) => {
+        if (event.kind == 'run.changed' && event.runId == runId) inspect()
+      })
+      if (done) unsubscribe()
+      else {
+        timer = setTimeout(finish, timeoutMs)
+        signal.addEventListener('abort', finish, { once: true })
+        if (signal.aborted) finish()
+        else inspect()
+      }
+    })
+  }
+
+  async waitForPublishOperation(actorId: string, flowId: string, operationId: string, timeoutMs: number, signal: AbortSignal): Promise<void> {
+    const initial = this.control.publications.getPublishOperation(actorId, flowId, operationId)
+    if (timeoutMs <= 0 || signal.aborted || initial.status != 'pending') return
+    await new Promise<void>((resolve) => {
+      let done = false
+      let unsubscribe: (() => void) | undefined
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let poll: ReturnType<typeof setInterval> | undefined
+      const finish = () => {
+        if (done) return
+        done = true
+        unsubscribe?.()
+        clearTimeout(timer)
+        clearInterval(poll)
+        signal.removeEventListener('abort', finish)
+        resolve()
+      }
+      const inspect = () => {
+        try {
+          if (this.control.publications.getPublishOperation(actorId, flowId, operationId).status != 'pending') finish()
+        } catch {
+          finish()
+        }
+      }
+      unsubscribe = this.#watchFlow(flowId, inspect)
+      if (done) unsubscribe()
+      else {
+        timer = setTimeout(finish, timeoutMs)
+        poll = setInterval(inspect, 100)
+        signal.addEventListener('abort', finish, { once: true })
+        if (signal.aborted) finish()
+        else inspect()
+      }
+    })
   }
 
   start(): Effect.Effect<void, never, Scope.Scope> {
