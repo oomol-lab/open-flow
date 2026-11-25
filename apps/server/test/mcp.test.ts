@@ -1155,6 +1155,16 @@ it('supports stateless legacy MCP clients, toolset filtering, prompts, and waitS
   expect(defaultTools).toContain('catalog_get')
   expect(defaultTools).not.toContain('flow_state_get')
   expect(defaultTools).not.toContain('flow_canvas_control')
+  expect((await defaultClient.listPrompts()).prompts.map((p) => p.name)).toEqual(['author_flow', 'publish_and_run_flow', 'debug_run'])
+
+  const coreClient = new Client({ name: 'core-toolsets-client', version: '1.0.0' }, { versionNegotiation: { mode: { pin: version } } })
+  onTestFinished(() => coreClient.close())
+  await coreClient.connect(
+    new StreamableHTTPClientTransport(new URL('/v1/mcp?toolsets=core', endpoint), {
+      requestInit: { headers: { authorization: `Bearer ${token}` } },
+    }),
+  )
+  expect((await coreClient.listPrompts()).prompts).toEqual([])
 
   const invalidToolset = await fetch(new URL('/v1/mcp?toolsets=unknown', endpoint), {
     method: 'POST',

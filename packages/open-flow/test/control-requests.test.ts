@@ -113,6 +113,7 @@ it('validates MCP defaults without accepting extra arguments', () => {
   expect(mcpTools.flow_read.inputSchema['~standard'].validate({ flowId: 'f1', export: 'workflow', revision: 'r1' })).toHaveProperty('issues')
   expect(mcpTools.flow_create.inputSchema['~standard'].validate({ name: 'Flow', idempotencyKey: '' })).toHaveProperty('issues')
   expect(mcpTools.flow_create.inputSchema['~standard'].validate({ idempotencyKey: 'k1' })).toHaveProperty('issues')
+  expect(mcpTools.flow_create.inputSchema['~standard'].validate({ name: 'Flow', file: null, idempotencyKey: 'k1' })).toHaveProperty('issues')
   expect(mcpTools.flow_create.inputSchema['~standard'].validate({ name: 'Flow', tagIds: ['t1'], idempotencyKey: 'k1' })).toHaveProperty('issues')
   expect(mcpTools.catalog_get.inputSchema['~standard'].validate({ resource: 'triggers', query: 'gmail' })).toHaveProperty('value')
   expect(mcpTools.catalog_get.inputSchema['~standard'].validate({ resource: 'trigger' })).toHaveProperty('issues')

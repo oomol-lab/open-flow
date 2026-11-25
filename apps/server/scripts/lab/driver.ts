@@ -60,7 +60,10 @@ export function driver(lab: LabSession, transport: 'cli' | 'mcp'): ToolCall {
             }
             break
           case 'flow_live_get':
-            argv = ['live', String(args.flowId), '--json']
+            argv =
+              args.operationId != null
+                ? ['publications', 'operation', String(args.flowId), String(args.operationId), '--json']
+                : ['live', String(args.flowId), '--json']
             break
           case 'flow_publish':
             argv = [
@@ -141,7 +144,20 @@ export function driver(lab: LabSession, transport: 'cli' | 'mcp'): ToolCall {
             ?.filter((item: { type: string }) => item.type == 'text')
             .map((item: { text: string }) => item.text)
             .join('\n')
-          value = failed ? { error: { message: text || 'The MCP request failed.' } } : JSON.parse(text ?? '{}')
+          if (failed) {
+            let parsedError: Record<string, unknown> | undefined
+            try {
+              const candidate = JSON.parse(text ?? '') as unknown
+              if (candidate != null && typeof candidate == 'object' && !Array.isArray(candidate) && 'error' in candidate) {
+                parsedError = candidate as Record<string, unknown>
+              }
+            } catch {
+              // Fall back to plain-text error wrapper below.
+            }
+            value = parsedError ?? { error: { message: text || 'The MCP request failed.' } }
+          } else {
+            value = JSON.parse(text ?? '{}')
+          }
         }
         if (failed) stderr = JSON.stringify(value)
         else stdout = JSON.stringify(value)

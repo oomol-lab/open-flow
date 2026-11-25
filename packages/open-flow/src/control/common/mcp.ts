@@ -146,7 +146,11 @@ const flowCreateInputSchema = z
     idempotencyKey: mutationKey,
   })
   .superRefine((value, ctx) => {
-    if (value.file == null) {
+    if (value.file === null) {
+      ctx.addIssue({ code: 'custom', path: ['file'], message: 'file cannot be null; omit file to create an empty Flow.' })
+      return
+    }
+    if (value.file === undefined) {
       if (value.name == null) ctx.addIssue({ code: 'custom', path: ['name'], message: 'name is required when file is omitted.' })
       if (value.tagIds != null) ctx.addIssue({ code: 'custom', path: ['tagIds'], message: 'tagIds is only valid when importing file.' })
     }
@@ -576,6 +580,7 @@ export const mcpTools = {
 export interface McpPromptDefinition<Args> {
   readonly title: string
   readonly description: string
+  readonly requiredToolsets: readonly McpToolset[]
   readonly argsSchema: ReturnType<typeof wrapSchema<Args>>
   render(args: Args): { messages: { role: 'user'; content: { type: 'text'; text: string } }[] }
 }
@@ -598,6 +603,7 @@ export const mcpPrompts = {
   author_flow: {
     title: 'Author or Edit Flow',
     description: 'Step-by-step workflow for inspecting, authoring, and validating an Open Flow draft.',
+    requiredToolsets: ['authoring'],
     argsSchema: wrapSchema(authorFlowArgs),
     render: ({ flowId, goal }) => ({
       messages: [
@@ -622,6 +628,7 @@ export const mcpPrompts = {
   publish_and_run_flow: {
     title: 'Publish and Run Flow',
     description: 'Validate a draft revision, publish it safely, and start a Run with waitSeconds.',
+    requiredToolsets: ['authoring', 'publish', 'runs'],
     argsSchema: wrapSchema(publishAndRunArgs),
     render: ({ flowId, revisionId }) => ({
       messages: [
@@ -631,12 +638,12 @@ export const mcpPrompts = {
             type: 'text',
             text: [
               revisionId == null
-                ? `1. Read the Flow with flow_read(flowId="${flowId}") to get revisionId and Start/Trigger nodeId + inputDefs.`
-                : `1. Validate the revision with flow_check(flowId="${flowId}", revisionId="${revisionId}").`,
+                ? `1. Read the Flow with flow_read(flowId="${flowId}") to get revisionId and Start/Trigger nodeId + inputDefs, then validate with flow_check(flowId="${flowId}", revisionId). Proceed only if valid is true.`
+                : `1. Validate the revision with flow_check(flowId="${flowId}", revisionId="${revisionId}"). Proceed only if valid is true.`,
               `2. Call flow_live_get(flowId="${flowId}") to obtain the current expectedLivePublicationId (or null if unpublished).`,
-              `3. Call flow_publish(flowId="${flowId}", revisionId, expectedLivePublicationId, idempotencyKey, waitSeconds=20). If still pending, poll flow_live_get(flowId="${flowId}", operationId, waitSeconds=20).`,
-              '4. Call run_start(source="live", publicationId, trigger={nodeId, outputs}, idempotencyKey, waitSeconds=20).',
-              '5. If not terminal, poll run_get(runId, view="status", waitSeconds=20), then fetch run_get(runId, view="result").',
+              `3. Call flow_publish(flowId="${flowId}", revisionId, expectedLivePublicationId, idempotencyKey, waitSeconds=20). While status === "pending", poll flow_live_get(flowId="${flowId}", operationId, waitSeconds=20).`,
+              '4. Proceed only when publication status === "succeeded"; use the newly returned publicationId (not the prior expectedLivePublicationId) to call run_start(source="live", publicationId, trigger={nodeId, outputs}, idempotencyKey, waitSeconds=20).',
+              '5. Poll run_get(runId, view="status", waitSeconds=20) while queued/starting/running. If status === "waiting", stop polling, inspect waits, and ask the user before calling run_resolve_wait, then resume polling. Fetch run_get(runId, view="result") only after reaching a terminal status (completed, failed, canceled, or indeterminate).',
             ].join('\n'),
           },
         },
@@ -646,6 +653,7 @@ export const mcpPrompts = {
   debug_run: {
     title: 'Debug Failed or Waiting Run',
     description: 'Inspect Run status, events, stored Agent tool results, and terminal errors.',
+    requiredToolsets: ['runs'],
     argsSchema: wrapSchema(debugRunArgs),
     render: ({ runId }) => ({
       messages: [

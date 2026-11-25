@@ -216,6 +216,7 @@ function createServer(
   }
 
   for (const [name, prompt] of Object.entries(mcpPrompts)) {
+    if (allowedToolsets != null && !prompt.requiredToolsets.every((toolset) => allowedToolsets.has(toolset))) continue
     server.registerPrompt(
       name,
       {

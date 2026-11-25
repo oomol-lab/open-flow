@@ -617,3 +617,7 @@ validation blocks publication and Live Runs until corrected. A Draft Run is bloc
 invalid Wait belongs to the selected Trigger's reachable execution path or its dependencies;
 invalid Waits on unrelated branches do not block that Draft Run. Public authoring inputs still
 require valid timing. This draft editing refinement also reuses the pending Engine v7 revision.
+
+## Unreleased MCP catalog redesign
+
+This unreleased revision consolidates the `@oomol-lab/open-flow/mcp` catalog from 40 to 21 tools with uniform `<domain>_<action>` naming, adds `title`, `outputSchema`, `mcpToolsets`/`mcpDefaultToolsets`, and `mcpPrompts`, and removes legacy tool names (`whoami`, `flow_search`, `flow_export`, `flow_import`, `flow_canvas`, `flow_live`, `flow_publish_status`, `flow_set_enabled`, `flow_run`, `run_events`, `run_result`, `run_results`, `run_result_read`, `flow_state`, `flow_dedupe_clear`, `flow_code_connections`, `flow_connection_candidates`, `flow_code_connection_set`, `flow_connection_usage_remove`, `connector_*`, `trigger_*`, `event_source_list`). `run_start` replaces top-level `oneOf` with a flat object schema, `flow_read` omits top-level `not` from its exported JSON Schema while retaining runtime validation, and business errors (`isError: true`) return JSON in `content[0].text` without `structuredContent`. Server `/v1/mcp` also enables stateless legacy `initialize` compatibility alongside `2026-07-28`, optional `?toolsets=` filtering, and `waitSeconds` long-polling. See [MCP integration reference](../../server/mcp.md).

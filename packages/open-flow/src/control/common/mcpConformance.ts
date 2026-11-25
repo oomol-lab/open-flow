@@ -135,6 +135,19 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
       )
       assert(response.ok, `Legacy initialize returned HTTP ${response.status}.`)
       assert(response.headers.get('mcp-session-id') == null, 'Legacy stateless mode must not create a session.')
+      const source = await response.text()
+      const body = response.headers.get('content-type')?.includes('text/event-stream')
+        ? JSON.parse(
+            source
+              .split('\n')
+              .findLast((line) => line.startsWith('data:'))
+              ?.slice(5) ?? 'null',
+          )
+        : JSON.parse(source)
+      assert(body != null && body.error == null, `Legacy initialize returned JSON-RPC error: ${JSON.stringify(body)}.`)
+      const result = body.result as { protocolVersion?: unknown; serverInfo?: { name?: unknown } } | undefined
+      assert(typeof result?.protocolVersion == 'string' && result.protocolVersion.length > 0, 'Legacy initialize result must include protocolVersion.')
+      assert(typeof result?.serverInfo?.name == 'string' && result.serverInfo.name.length > 0, 'Legacy initialize result must include serverInfo.name.')
     },
   },
   {
