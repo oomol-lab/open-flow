@@ -26,7 +26,7 @@ own infrastructure.
 [Explore the interactive demo](https://openflow.run) · [Use OOMOL Hosted](https://console.openflow.run) ·
 [Self-host with Docker](#run-it-your-way)
 
-[![A vertical AI trend workflow in the Open Flow Workbench, with parallel X, GitHub, and Hugging Face sources and the Research & write node's prompt, tools, inputs, and output in the property panel](docs/assets/readme-workbench-video.png)](https://www.youtube.com/watch?v=V4K4KoLRIUo)
+[![A vertical AI trend workflow in the Open Flow Workbench, with parallel X, GitHub, and Hugging Face sources and the Research & write node's prompt, tools, inputs, and output in the property panel](docs/assets/readme-workbench.png)](https://openflow.run)
 
 ## Your agent builds. You stay in control.
 
