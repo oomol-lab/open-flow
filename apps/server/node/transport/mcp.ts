@@ -155,9 +155,15 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
   register('flow_import', mcpTools.flow_import, async ({ file, name, teamId, idempotencyKey, tagIds }) => {
     if (file != null && typeof file == 'object' && 'kind' in file && file.kind == 'open-flow-workflow-bundle') {
       const { created: _created, ...imported } = await control.flows.importBundle(actorId, file, idempotencyKey, name, teamId, defaultImportName, tagIds)
-      return imported
+      const validations = Object.fromEntries(
+        await Promise.all(
+          imported.flows.map(async (item) => [item.flowId, await control.drafts.staticImportValidation(actorId, item.flowId, item.draftRevisionId)] as const),
+        ),
+      )
+      return { ...imported, validations }
     }
-    return (await control.flows.importFlow(actorId, file, idempotencyKey, name, teamId, defaultImportName, tagIds)).flow
+    const imported = (await control.flows.importFlow(actorId, file, idempotencyKey, name, teamId, defaultImportName, tagIds)).flow
+    return { ...imported, validation: await control.drafts.staticImportValidation(actorId, imported.flowId, imported.draftRevisionId) }
   })
   register('flow_edit', mcpTools.flow_edit, ({ flowId, ...request }) => control.drafts.editAuthoring(actorId, flowId, request))
   register('flow_check', mcpTools.flow_check, ({ flowId, revisionId }) => control.drafts.checkAuthoring(actorId, flowId, revisionId))

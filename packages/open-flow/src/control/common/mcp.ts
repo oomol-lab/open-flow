@@ -51,13 +51,7 @@ function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: bool
 }
 
 export const mcpTools = {
-  whoami: tool(
-    'Check MCP connectivity and return the authenticated account identity and Server information.',
-    z.strictObject({}),
-    true,
-    true,
-    false,
-  ),
+  whoami: tool('Check MCP connectivity and return the authenticated account identity and Server information.', z.strictObject({}), true, true, false),
   flow_state: tool(
     'Inspect Flow state usage, business key metadata and deduplication spaces. Never returns values. Scope is required.',
     stateQuerySchema.extend({ flowId: flow }),
@@ -115,7 +109,7 @@ export const mcpTools = {
     true,
   ),
   flow_import: tool(
-    'Import workflow JSON or a bundle as new unpublished drafts. tagIds apply to every imported workflow. External references are cleared and must be configured again. Keep identical arguments and idempotencyKey when retrying.',
+    'Import workflow JSON or a bundle as new unpublished drafts. tagIds apply to every imported workflow. External references are cleared and must be configured again. Returns static validation diagnostics and unboundProviderIds for immediate setup (for bundles, validations keyed by flowId). Keep identical arguments and idempotencyKey when retrying.',
     z.strictObject({ file: json, name: id.optional(), teamId: id.optional(), tagIds: z.array(id).optional(), idempotencyKey: mutationKey }),
     false,
   ),

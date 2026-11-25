@@ -46,11 +46,17 @@ it('shares workflow bundles through MCP and applies selected tags to every impor
   const tag = await control.createTag('Imported bundle')
   const result = (await call('flow_import', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })) as {
     flows: { flowId: string; tagIds: string[] }[]
+    validations: Record<string, { status: string; diagnostics: unknown[]; unboundProviderIds: string[] }>
   }
   expect(result.flows).toHaveLength(2)
   for (const flow of result.flows) {
     expect(flow.tagIds).toEqual([tag.tagId])
     expect([root.flowId, child.flowId]).not.toContain(flow.flowId)
+    expect(result.validations[flow.flowId]).toMatchObject({
+      status: expect.stringMatching(/^(valid|invalid)$/),
+      diagnostics: expect.any(Array),
+      unboundProviderIds: expect.any(Array),
+    })
   }
   expect(await call('flow_import', { file: bundle, tagIds: [tag.tagId], idempotencyKey: 'mcp-bundle' })).toEqual(result)
 })
@@ -1080,4 +1086,41 @@ it('returns authenticated account identity and server metadata from whoami', asy
     server: { name: 'open-flow', version: expect.any(String), origin },
   })
   expect((await client.callTool({ name: 'whoami', arguments: { extra: 1 } })).isError).toBe(true)
+})
+
+it('returns static validation and unboundProviderIds from single-workflow flow_import', async () => {
+  const { call, control } = await fixture()
+  const source = await control.createFlow('Template')
+  await seedDraft(control, {
+    flowId: source.flowId,
+    expectedRevisionId: source.draftRevisionId,
+    idempotencyKey: 'seed-template',
+    operations: [
+      start,
+      {
+        kind: 'graph.node.create',
+        nodeId: 'github',
+        node: {
+          kind: 'task',
+          name: 'Create issue',
+          inputs: { title: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'missing', output: 'out' }] } },
+          task: {
+            name: 'Create issue',
+            inputs: [{ handle: 'title', jsonSchema: { type: 'string' }, nullable: false }],
+            outputs: [],
+            executor: { kind: 'connector', action: 'github.create_issue', connectionId: 'conn-1' },
+          },
+        },
+      },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'github' } },
+    ],
+  })
+  const exported = await call('flow_export', { flowId: source.flowId })
+  const imported = await call('flow_import', { file: exported, idempotencyKey: 'mcp-single-import-validation' })
+  expect(imported.validation).toMatchObject({
+    status: 'invalid',
+    unboundProviderIds: ['github'],
+    diagnostics: expect.arrayContaining([expect.objectContaining({ nodes: ['github'], field: 'inputs.title' })]),
+  })
+  expect(await call('flow_import', { file: exported, idempotencyKey: 'mcp-single-import-validation' })).toEqual(imported)
 })

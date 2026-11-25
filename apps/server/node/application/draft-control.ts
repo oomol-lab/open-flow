@@ -13,6 +13,7 @@ import {
   authoringDiagnostics,
   authoringSchema,
   compileAuthoring,
+  importValidation,
   readAuthoring,
   resolveDraftOperations,
   searchAuthoring,
@@ -270,6 +271,11 @@ export class DraftControl {
     const check = await this.checkFlow(actorId, flowId, revisionId, currentEngineContract)
     const revision = this.getRevision(actorId, flowId, revisionId)
     return { flowId, revisionId, valid: check.valid, diagnostics: authoringDiagnostics(revision.content, check.diagnostics), version: 1 as const }
+  }
+
+  async staticImportValidation(actorId: string, flowId: string, revisionId: string) {
+    const revision = this.getRevision(actorId, flowId, revisionId)
+    return await importValidation(revision.content, findEngineContract(currentEngineContract)!)
   }
 
   private authoringError(error: unknown): never {

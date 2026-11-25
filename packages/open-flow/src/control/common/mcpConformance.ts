@@ -55,9 +55,20 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
       const args = { file: exported.structuredContent, name: 'Imported template', idempotencyKey: crypto.randomUUID() }
       const imported = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: args })
       assert(imported.isError != true, 'MCP import failed.')
-      const flow = imported.structuredContent as { flowId: string; draftRevisionId: string }
+      const flow = imported.structuredContent as {
+        flowId: string
+        draftRevisionId: string
+        validation?: { status?: unknown; diagnostics?: unknown; unboundProviderIds?: unknown }
+      }
       assert(flow.flowId != original.flowId && flow.draftRevisionId != original.draftRevisionId, 'Import reused resource identities.')
       assert((await client.getEditor(flow.flowId)).live.publication == null, 'Import published the Flow.')
+      assert(
+        flow.validation != null &&
+          (flow.validation.status == 'valid' || flow.validation.status == 'invalid') &&
+          Array.isArray(flow.validation.diagnostics) &&
+          Array.isArray(flow.validation.unboundProviderIds),
+        'MCP import must return static validation and unboundProviderIds.',
+      )
       const retry = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: args })
       assert(dequal(retry.structuredContent, imported.structuredContent), 'Import retry created another Flow.')
       const conflict = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: { ...args, name: 'Changed import' } })

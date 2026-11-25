@@ -73,8 +73,11 @@ Reverse proxies should preserve `/v1/mcp`, Authorization, Accept, Content-Type, 
 `flow_export` accepts optional `includeDependencies: true` to return a workflow bundle containing
 all referenced drafts. `flow_import` accepts either a single workflow or bundle in `file` and
 optional `tagIds` applied to every imported member. Bundle import returns `{ version: 1, flow,
-flows }`; single import retains its Flow result. Imported calls require interface refresh after
-their new dependencies are configured and published. See [workflow bundles](../control/contracts/control-api.md#workflow-bundles).
+flows, validations }` with `validations` keyed by each imported `flowId`; single import returns
+the Flow result with `validation`. Each validation entry contains static `status`, `diagnostics`,
+and `unboundProviderIds` computed locally without external Connector calls. Imported calls require
+interface refresh after their new dependencies are configured and published. See
+[workflow bundles](../control/contracts/control-api.md#workflow-bundles).
 
 | Tool                           | Main inputs                                                                                | Result                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |

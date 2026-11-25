@@ -8,6 +8,7 @@ import type {
   RevisionContent,
   TriggerKeySnapshot,
 } from '../../flow/common/change.ts'
+import type { EngineContract } from '../../runtime/common/engineContract.ts'
 import type { WorkflowContract, WorkflowCandidate } from '../../workflow/common/workflow.ts'
 import type { ConnectorAction, Diagnostic } from './api.ts'
 import type { AuthoringConditionConfiguration, AuthoringConditionSource } from './authoringCondition.ts'
@@ -20,6 +21,7 @@ import { connectorProxyConfigSchema, connectorProxyInputs, connectorProxyTask } 
 import { decisionTask } from '../../decision/common/decision.ts'
 import { supportsNodeRetry, isTriggerNode, applyFlowChanges, decodeChangeOperations, upgradeRevisionContent } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
+import { connectionUsage } from '../../flow/common/connectionUsage.ts'
 import { connect, disconnect } from '../../flow/common/edgeChanges.ts'
 import { nodeSystemOutputPorts, supportsNodeErrorHandling } from '../../flow/common/errorHandling.ts'
 import { nodeInputPorts, nodeOutputPorts } from '../../flow/common/graph.ts'
@@ -44,6 +46,7 @@ import {
   setInputMappings,
 } from '../../flow/common/nodeChanges.ts'
 import { retryConfigurationSchema } from '../../flow/common/retry.ts'
+import { validateFlow } from '../../flow/common/semantics.ts'
 import { httpRequestTask, httpRequestConfigSchema, httpRequestInputs } from '../../http/common/httpRequest.ts'
 import { skipDuplicatesConfigSchema, skipDuplicatesTask } from '../../state/common/state.ts'
 import { withWorkflowTask, workflowTask, workflowSelectionTask, workflowCapability, workflowAgentTool } from '../../workflow/common/workflow.ts'
@@ -985,4 +988,35 @@ export function authoringDiagnostics(content: RevisionContent, diagnostics: read
       ...(diagnostic.line ? { line: diagnostic.line, column: diagnostic.column } : {}),
     }
   })
+}
+
+export function unboundProviderIds(content: RevisionContent): readonly string[] {
+  const providers = new Set<string>()
+  const addProvider = (providerId: string | undefined) => {
+    if (providerId != null && providerId.length > 0) providers.add(providerId)
+  }
+  for (const usage of connectionUsage(content.document)) {
+    if (usage.connectionId == null) addProvider(usage.providerId)
+  }
+  for (const node of Object.values(content.document.graph.nodes)) {
+    if (node.kind != 'task' || !('moduleId' in node.task)) continue
+    for (const capability of node.task.capabilities ?? []) {
+      if (capability.kind == 'workflow' || capability.kind == 'http' || 'mode' in capability) continue
+      if ('action' in capability) {
+        if (capability.connectionId == null && capability.connections.length == 0) addProvider(capability.action.split('.')[0])
+      } else {
+        for (const hint of capability.actionHints ?? []) addProvider(hint.split('.')[0])
+      }
+    }
+  }
+  return [...providers].toSorted()
+}
+
+export async function importValidation(content: RevisionContent, engine: EngineContract) {
+  const checked = await validateFlow(content, engine)
+  return {
+    status: checked.valid ? ('valid' as const) : ('invalid' as const),
+    diagnostics: authoringDiagnostics(content, checked.diagnostics),
+    unboundProviderIds: unboundProviderIds(content),
+  }
 }
