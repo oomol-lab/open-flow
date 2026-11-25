@@ -78,6 +78,7 @@ their new dependencies are configured and published. See [workflow bundles](../c
 
 | Tool                           | Main inputs                                                                                | Result                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `whoami`                       | None                                                                                       | Authenticated account identity and Server information.                  |
 | `flow_list`                    | `cursor?`, `limit?`                                                                        | Flows and `nextCursor?`.                                                |
 | `flow_read`                    | `flowId`, `revision?`, `nodes?` or `text?`                                                 | Pinned revision summary, node details, or text fragments.               |
 | `flow_search`                  | `flowId`, `query`, `type?`, `revision?`, `offset?`, `limit?`                               | References and bounded context.                                         |

@@ -114,6 +114,16 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
     })
   }
 
+  register('whoami', mcpTools.whoami, () => {
+    const user = actorId == 'operator' ? undefined : control.users.get(actorId)
+    return {
+      user:
+        actorId == 'operator'
+          ? { userId: 'operator', kind: 'operator', email: null, role: 'admin' }
+          : { userId: user?.userId ?? actorId, kind: 'user', email: user?.email ?? null, role: user?.role ?? 'user' },
+      server: { name: 'open-flow', version: manifest.version, origin: endpointOrigin },
+    }
+  })
   register('flow_state', mcpTools.flow_state, ({ flowId, ...query }) => control.state.read(actorId, flowId, query))
   register('flow_state_read', mcpTools.flow_state_read, ({ flowId, ...input }) => control.state.readValues(actorId, flowId, input))
   register('flow_state_clear', mcpTools.flow_state_clear, ({ flowId, ...query }) => control.state.clear(actorId, flowId, query))

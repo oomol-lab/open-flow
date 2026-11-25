@@ -102,6 +102,9 @@ describe('Control request boundaries', () => {
 })
 
 it('validates MCP defaults without accepting extra arguments', () => {
+  expect(mcpTools.whoami.inputSchema['~standard'].validate({})).toEqual({ value: {} })
+  expect(mcpTools.whoami.inputSchema['~standard'].validate({ extra: true })).toHaveProperty('issues')
+  expect(mcpTools.whoami.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false })
   expect(mcpTools.flow_list.inputSchema['~standard'].validate({})).toEqual({ value: { limit: 50 } })
   expect(mcpTools.run_events.inputSchema['~standard'].validate({ runId: 'r1' })).toEqual({ value: { runId: 'r1', after: 0, limit: 50 } })
   expect(mcpTools.flow_read.inputSchema['~standard'].validate({ flowId: 'f1', tenant: 'other' })).toHaveProperty('issues')

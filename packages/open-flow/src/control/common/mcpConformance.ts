@@ -80,6 +80,19 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
         const { $schema: __, ...received } = actual.inputSchema
         assert(dequal(received, schema), `${name} input schema differs.`)
       }
+      const identity = await rpc(harness, 'tools/call', { name: 'whoami', arguments: {} })
+      assert(identity.isError != true, 'MCP whoami failed.')
+      const info = identity.structuredContent as {
+        user?: { userId?: unknown; kind?: unknown; email?: unknown; role?: unknown }
+        server?: { name?: unknown; version?: unknown; origin?: unknown }
+      }
+      assert(typeof info?.user?.userId == 'string' && info.user.userId.length > 0, 'MCP whoami must return user.userId.')
+      assert(info.user.kind == 'operator' || info.user.kind == 'user', 'MCP whoami must return user.kind.')
+      assert(info.user.email === null || typeof info.user.email == 'string', 'MCP whoami must return user.email.')
+      assert(info.user.role == 'admin' || info.user.role == 'user', 'MCP whoami must return user.role.')
+      assert(typeof info?.server?.name == 'string' && info.server.name.length > 0, 'MCP whoami must return server.name.')
+      assert(typeof info?.server?.version == 'string' && info.server.version.length > 0, 'MCP whoami must return server.version.')
+      assert(typeof info?.server?.origin == 'string' && info.server.origin.length > 0, 'MCP whoami must return server.origin.')
     },
   },
   {
