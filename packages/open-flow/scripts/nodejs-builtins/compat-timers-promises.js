@@ -71,7 +71,10 @@ export async function* setInterval(delay = 1, value = undefined, options = {}) {
     ticks++
     wake?.()
   }, delay)
-  const abort = () => wake?.()
+  const abort = () => {
+    globalThis.clearInterval(id)
+    wake?.()
+  }
   signal?.addEventListener('abort', abort, { once: true })
   try {
     while (true) {
