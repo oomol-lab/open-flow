@@ -3,10 +3,17 @@ import type { ControlApiConformanceCase, ControlApiConformanceHarness } from './
 import { dequal } from 'dequal/lite'
 import { serializeWorkflowFile } from '../../flow/common/workflowFile.ts'
 import { ControlClient } from './api.ts'
-import { mcpProtocolVersion, mcpTools } from './mcp.ts'
+import { mcpProtocolVersion, mcpPrompts, mcpTools } from './mcp.ts'
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message)
+}
+
+function parseErrorPayload(reply: Record<string, unknown>): { error: { code: string; message: string; hint?: string } } {
+  const content = reply.content as { type: string; text: string }[] | undefined
+  assert(Array.isArray(content) && typeof content[0]?.text == 'string', 'Error response must include text content.')
+  assert(reply.structuredContent == null, 'Error response must not include structuredContent.')
+  return JSON.parse(content[0].text) as { error: { code: string; message: string; hint?: string } }
 }
 
 async function rpc(harness: ControlApiConformanceHarness, method: string, params?: Record<string, unknown>) {
@@ -49,11 +56,11 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
     async verify(harness) {
       const client = new ControlClient((url, init) => harness.request(new Request(new URL(url, harness.origin), init)))
       const original = await client.createFlow('Template source')
-      const exported = await rpc(harness, 'tools/call', { name: 'flow_export', arguments: { flowId: original.flowId } })
+      const exported = await rpc(harness, 'tools/call', { name: 'flow_read', arguments: { flowId: original.flowId, export: 'workflow' } })
       assert(exported.isError != true, 'MCP export failed.')
       assert(dequal(exported.structuredContent, serializeWorkflowFile(await client.exportFlow(original.flowId))), 'MCP and REST exports differ.')
       const args = { file: exported.structuredContent, name: 'Imported template', idempotencyKey: crypto.randomUUID() }
-      const imported = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: args })
+      const imported = await rpc(harness, 'tools/call', { name: 'flow_create', arguments: args })
       assert(imported.isError != true, 'MCP import failed.')
       const flow = imported.structuredContent as {
         flowId: string
@@ -69,14 +76,15 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
           Array.isArray(flow.validation.unboundProviderIds),
         'MCP import must return static validation and unboundProviderIds.',
       )
-      const retry = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: args })
+      const retry = await rpc(harness, 'tools/call', { name: 'flow_create', arguments: args })
       assert(dequal(retry.structuredContent, imported.structuredContent), 'Import retry created another Flow.')
-      const conflict = await rpc(harness, 'tools/call', { name: 'flow_import', arguments: { ...args, name: 'Changed import' } })
+      const conflict = await rpc(harness, 'tools/call', { name: 'flow_create', arguments: { ...args, name: 'Changed import' } })
       assert(conflict.isError == true, 'Changed import must conflict.')
+      assert(parseErrorPayload(conflict).error.code == 'flow.conflict', 'Changed import must preserve error code.')
     },
   },
   {
-    name: 'publishes the public MCP catalog, input schemas and annotations',
+    name: 'publishes the public MCP catalog, input schemas, annotations and prompts',
     async verify(harness) {
       const result = await rpc(harness, 'tools/list')
       assert(Array.isArray(result.tools), 'MCP tools must be an array.')
@@ -84,6 +92,7 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
       for (const [name, definition] of Object.entries(mcpTools)) {
         const actual = result.tools.find((candidate) => candidate.name == name)
         assert(actual != null, `Missing MCP tool ${name}.`)
+        assert(actual.title == definition.title, `${name} title differs.`)
         assert(actual.description == definition.description, `${name} description differs.`)
         assert(dequal(actual.annotations, definition.annotations), `${name} annotations differ.`)
         const expected = definition.inputSchema['~standard'].jsonSchema.input()
@@ -91,19 +100,54 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
         const { $schema: __, ...received } = actual.inputSchema
         assert(dequal(received, schema), `${name} input schema differs.`)
       }
-      const identity = await rpc(harness, 'tools/call', { name: 'whoami', arguments: {} })
-      assert(identity.isError != true, 'MCP whoami failed.')
+      const promptsResult = await rpc(harness, 'prompts/list')
+      assert(Array.isArray(promptsResult.prompts), 'MCP prompts must be an array.')
+      assert(promptsResult.prompts.length == Object.keys(mcpPrompts).length, 'MCP prompt count differs from the public contract.')
+      const identity = await rpc(harness, 'tools/call', { name: 'server_whoami', arguments: {} })
+      assert(identity.isError != true, 'MCP server_whoami failed.')
       const info = identity.structuredContent as {
         user?: { userId?: unknown; kind?: unknown; email?: unknown; role?: unknown }
         server?: { name?: unknown; version?: unknown; origin?: unknown }
       }
-      assert(typeof info?.user?.userId == 'string' && info.user.userId.length > 0, 'MCP whoami must return user.userId.')
-      assert(info.user.kind == 'operator' || info.user.kind == 'user', 'MCP whoami must return user.kind.')
-      assert(info.user.email === null || typeof info.user.email == 'string', 'MCP whoami must return user.email.')
-      assert(info.user.role == 'admin' || info.user.role == 'user', 'MCP whoami must return user.role.')
-      assert(typeof info?.server?.name == 'string' && info.server.name.length > 0, 'MCP whoami must return server.name.')
-      assert(typeof info?.server?.version == 'string' && info.server.version.length > 0, 'MCP whoami must return server.version.')
-      assert(typeof info?.server?.origin == 'string' && info.server.origin.length > 0, 'MCP whoami must return server.origin.')
+      assert(typeof info?.user?.userId == 'string' && info.user.userId.length > 0, 'MCP server_whoami must return user.userId.')
+      assert(info.user.kind == 'operator' || info.user.kind == 'user', 'MCP server_whoami must return user.kind.')
+      assert(info.user.email === null || typeof info.user.email == 'string', 'MCP server_whoami must return user.email.')
+      assert(info.user.role == 'admin' || info.user.role == 'user', 'MCP server_whoami must return user.role.')
+      assert(typeof info?.server?.name == 'string' && info.server.name.length > 0, 'MCP server_whoami must return server.name.')
+      assert(typeof info?.server?.version == 'string' && info.server.version.length > 0, 'MCP server_whoami must return server.version.')
+      assert(typeof info?.server?.origin == 'string' && info.server.origin.length > 0, 'MCP server_whoami must return server.origin.')
+    },
+  },
+  {
+    name: 'supports stateless legacy initialize alongside modern 2026-07-28 requests',
+    async verify(harness) {
+      const response = await harness.request(
+        new Request(new URL('/v1/mcp', harness.origin), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'initialize',
+            params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'legacy-conformance', version: '1.0.0' } },
+          }),
+        }),
+      )
+      assert(response.ok, `Legacy initialize returned HTTP ${response.status}.`)
+      assert(response.headers.get('mcp-session-id') == null, 'Legacy stateless mode must not create a session.')
+      const source = await response.text()
+      const body = response.headers.get('content-type')?.includes('text/event-stream')
+        ? JSON.parse(
+            source
+              .split('\n')
+              .findLast((line) => line.startsWith('data:'))
+              ?.slice(5) ?? 'null',
+          )
+        : JSON.parse(source)
+      assert(body != null && body.error == null, `Legacy initialize returned JSON-RPC error: ${JSON.stringify(body)}.`)
+      const result = body.result as { protocolVersion?: unknown; serverInfo?: { name?: unknown } } | undefined
+      assert(typeof result?.protocolVersion == 'string' && result.protocolVersion.length > 0, 'Legacy initialize result must include protocolVersion.')
+      assert(typeof result?.serverInfo?.name == 'string' && result.serverInfo.name.length > 0, 'Legacy initialize result must include serverInfo.name.')
     },
   },
   {
@@ -122,7 +166,7 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
       }
       const runs: string[] = []
       for (let index = 0; index < 2; index++) {
-        const accepted = await rpc(harness, 'tools/call', { name: 'flow_run', arguments: { ...args, idempotencyKey: crypto.randomUUID() } })
+        const accepted = await rpc(harness, 'tools/call', { name: 'run_start', arguments: { ...args, idempotencyKey: crypto.randomUUID() } })
         const run = accepted.structuredContent as Record<string, unknown>
         assert(typeof run.runId == 'string', 'MCP must return an accepted Run ID.')
         runs.push(run.runId)
@@ -141,7 +185,7 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
       const other = await client.createFlow('Other Run scope')
       const invalid = await rpc(harness, 'tools/call', { name: 'run_list', arguments: { flowId: other.flowId, cursor: page.nextCursor } })
       assert(invalid.isError == true, 'Run cursors must reject a different Flow scope.')
-      assert((invalid.structuredContent as { error: { code: string } }).error.code == 'page.invalid-cursor', 'Run cursor error must match REST.')
+      assert(parseErrorPayload(invalid).error.code == 'page.invalid-cursor', 'Run cursor error must match REST.')
     },
   },
   {
@@ -161,7 +205,7 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
       assert(draft.revisionId == flow.draftRevisionId, 'MCP and REST disagree on the Draft head.')
       const conflict = await rpc(harness, 'tools/call', { name: 'flow_create', arguments: { ...args, name: 'Changed retry' } })
       assert(conflict.isError == true, 'MCP must reject a changed idempotent replay.')
-      assert((conflict.structuredContent as { error: { code: string } }).error.code == 'flow.conflict', 'MCP must preserve the Control error code.')
+      assert(parseErrorPayload(conflict).error.code == 'flow.conflict', 'MCP must preserve the Control error code.')
     },
   },
 ]

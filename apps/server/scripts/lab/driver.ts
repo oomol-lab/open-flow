@@ -26,9 +26,14 @@ export function driver(lab: LabSession, transport: 'cli' | 'mcp'): ToolCall {
             argv = ['list', '--json']
             break
           case 'flow_read':
-          case 'flow_search':
+            if (args.query != null) {
+              argv = ['search', String(args.flowId), '--input', JSON.stringify(query), '--json']
+            } else {
+              argv = ['read', String(args.flowId), '--input', JSON.stringify(query), '--json']
+            }
+            break
           case 'flow_edit':
-            argv = [name.slice(5), String(args.flowId), '--input', JSON.stringify(query), '--json']
+            argv = ['edit', String(args.flowId), '--input', JSON.stringify(query), '--json']
             break
           case 'flow_schema':
             argv = [
@@ -39,17 +44,26 @@ export function driver(lab: LabSession, transport: 'cli' | 'mcp'): ToolCall {
               '--json',
             ]
             break
-          case 'connector_search':
-            argv = ['connector', 'search', String(args.query), '--flow', String(args.flowId), '--json']
+          case 'catalog_get':
+            switch (args.resource) {
+              case 'actions':
+                argv = ['connector', 'search', String(args.query), '--flow', String(args.flowId), '--json']
+                break
+              case 'providers':
+                argv = ['connector', 'providers', '--flow', String(args.flowId), '--json']
+                break
+              case 'connections':
+                argv = ['connector', 'connections', String(args.serviceId), '--flow', String(args.flowId), '--json']
+                break
+              default:
+                throw new Error(`Unsupported Lab driver catalog_get resource ${String(args.resource)}`)
+            }
             break
-          case 'connector_providers':
-            argv = ['connector', 'providers', '--flow', String(args.flowId), '--json']
-            break
-          case 'connector_connections':
-            argv = ['connector', 'connections', String(args.serviceId), '--flow', String(args.flowId), '--json']
-            break
-          case 'flow_live':
-            argv = ['live', String(args.flowId), '--json']
+          case 'flow_live_get':
+            argv =
+              args.operationId != null
+                ? ['publications', 'operation', String(args.flowId), String(args.operationId), '--json']
+                : ['live', String(args.flowId), '--json']
             break
           case 'flow_publish':
             argv = [
@@ -70,8 +84,12 @@ export function driver(lab: LabSession, transport: 'cli' | 'mcp'): ToolCall {
           case 'run_list':
             argv = ['runs', 'list', '--flow', String(args.flowId), '--json']
             break
-          case 'run_events':
-            argv = ['runs', 'events', String(args.runId), '--json']
+          case 'run_get':
+            if (args.view == 'events') {
+              argv = ['runs', 'events', String(args.runId), '--json']
+            } else {
+              throw new Error(`Unsupported Lab driver run_get view ${String(args.view)}`)
+            }
             break
           default:
             throw new Error(`Unsupported Lab driver tool ${name}`)
@@ -126,7 +144,20 @@ export function driver(lab: LabSession, transport: 'cli' | 'mcp'): ToolCall {
             ?.filter((item: { type: string }) => item.type == 'text')
             .map((item: { text: string }) => item.text)
             .join('\n')
-          value = failed ? { error: { message: text || 'The MCP request failed.' } } : JSON.parse(text ?? '{}')
+          if (failed) {
+            let parsedError: Record<string, unknown> | undefined
+            try {
+              const candidate = JSON.parse(text ?? '') as unknown
+              if (candidate != null && typeof candidate == 'object' && !Array.isArray(candidate) && 'error' in candidate) {
+                parsedError = candidate as Record<string, unknown>
+              }
+            } catch {
+              // Fall back to plain-text error wrapper below.
+            }
+            value = parsedError ?? { error: { message: text || 'The MCP request failed.' } }
+          } else {
+            value = JSON.parse(text ?? '{}')
+          }
         }
         if (failed) stderr = JSON.stringify(value)
         else stdout = JSON.stringify(value)

@@ -160,12 +160,12 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
     const deadline = Date.now() + 10000
     while (operation.status === 'pending' && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 30))
-      operation = await call('flow_publish_status', { flowId, operationId: published.operationId })
+      operation = await call('flow_live_get', { flowId, operationId: published.operationId })
     }
     if (operation.status !== 'succeeded') throw new Error(`Publication did not succeed: ${JSON.stringify(operation)}`)
   }
   async function readLive() {
-    const result = await call('flow_live', { flowId })
+    const result = await call('flow_live_get', { flowId })
     return (result.live ?? result) as LiveDetails
   }
   const live = published.live == null ? await readLive() : (published.live as LiveDetails)
@@ -249,7 +249,7 @@ export async function referenceEarlyResponse(call: ToolCall, flowId: string) {
   await call('flow_read', { flowId, nodes: Object.values(saved.nodes as Record<string, string>) })
   await call('flow_check', { flowId, revisionId: saved.revision })
   const published = await call('flow_publish', { flowId, revisionId: saved.revision, expectedLivePublicationId: null, idempotencyKey: randomUUID() })
-  const result = published.live == null ? await call('flow_live', { flowId }) : published
+  const result = published.live == null ? await call('flow_live_get', { flowId }) : published
   const live = (result.live ?? result) as unknown as LiveDetails
   if (!live.entries.some((entry) => entry.type === 'webhook')) throw new Error('Published response entry is missing.')
 }
