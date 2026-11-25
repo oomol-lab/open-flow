@@ -136,6 +136,8 @@ export class LabSession {
         if (
           context.res.status < 400 &&
           args != null &&
+          args.query == null &&
+          args.export == null &&
           !(await context.res.clone().text()).includes('"isError":true') &&
           (Array.isArray(args.nodes) ? args.nodes.includes('notify') : args.text == null || (args.text as { node?: string }).node == 'notify')
         ) {
