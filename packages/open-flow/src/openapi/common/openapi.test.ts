@@ -129,6 +129,27 @@ describe('OpenAPI fixed operations', () => {
   })
 })
 
+it.each([
+  ['minimum', { minimum: 5, exclusiveMinimum: true }, 6],
+  ['maximum', { maximum: 5, exclusiveMaximum: true }, 4],
+])('enforces an exclusive %s in a nullable OpenAPI 3.0 request body', (_, bounds, valid) => {
+  const documentValue = {
+    openapi: '3.0.3',
+    paths: {
+      '/items': {
+        post: {
+          requestBody: { content: { 'application/json': { schema: { type: 'integer', nullable: true, ...bounds } } } },
+          responses: { '204': { description: 'empty' } },
+        },
+      },
+    },
+  }
+  const selected = selectOperation(documentValue, 'https://service.example/spec', '/items', 'post')
+  expect(buildRequest(selected, { body: null }).init.body).toBe('null')
+  expect(buildRequest(selected, { body: valid }).init.body).toBe(String(valid))
+  expect(() => buildRequest(selected, { body: 5 })).toThrow('A request input does not match its schema.')
+})
+
 it('supports boolean schemas, vendor JSON media and schema defaults behind references', () => {
   const documentValue = {
     openapi: '3.1.0',

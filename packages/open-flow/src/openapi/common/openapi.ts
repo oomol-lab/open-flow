@@ -203,7 +203,6 @@ function schema(doc: ObjectValue, schemaValue: JsonValue): JsonValue {
         result[key] = convert(child)
       else result[key] = child
     }
-    if (source.nullable === true) return { anyOf: [result, { type: 'null' }] }
     for (const key of ['minimum', 'maximum']) {
       const exclusive = key == 'minimum' ? 'exclusiveMinimum' : 'exclusiveMaximum'
       if (typeof result[exclusive] == 'boolean') {
@@ -213,6 +212,7 @@ function schema(doc: ObjectValue, schemaValue: JsonValue): JsonValue {
         } else delete result[exclusive]
       }
     }
+    if (source.nullable === true) return { anyOf: [result, { type: 'null' }] }
     return result
   }
   let converted = convert(schemaValue)
