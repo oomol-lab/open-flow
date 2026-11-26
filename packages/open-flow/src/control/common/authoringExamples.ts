@@ -32,7 +32,7 @@ const descriptions = {
     'A Provider API request through Connector Proxy. Select a Provider and account, then bind endpoint. Outputs preserve body, statusCode, headers and bodyEncoding.',
   'openapi': 'A fixed JSON API operation. Replace the example document and URL before running.',
   'connector':
-    'A Connector Task and its node. Replace ACTION_ID, CONNECTION_ID and port definitions using connector_get / connector show. Set connectionId to an empty string to defer account configuration; execution will require an account.',
+    'A Connector Task and its node. Replace ACTION_ID, CONNECTION_ID and port definitions using catalog_get (resource "action") / connector show. Set connectionId to an empty string to defer account configuration; execution will require an account.',
   'code': 'A JavaScript module and its node. Use Code for custom computation; use Connector Tasks for existing actions.',
   'condition': 'A condition with true and false execution branches.',
   'value': 'A fixed value node.',

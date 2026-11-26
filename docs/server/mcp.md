@@ -127,7 +127,7 @@ All tools reject undeclared top-level parameters. Flow, Run, and event lists acc
 
 Business failures return `isError: true` with JSON in `content[0].text` (and no `structuredContent`). Structured errors include `error.code`, `message`, an applicable HTTP `status`, and an optional `hint` for recoverable conflicts or states (such as `flow.revision-conflict`, `live.conflict`, `run.not-terminal`, `page.invalid-cursor`, `connector.unconfigured`, `flow.not-found`, `run.not-found`). Unknown internal errors do not expose exception stacks.
 
-`flow_create`, `flow_import`, `flow_publish`, `run_start`, and `flow_connections_edit` (`action: "remove_usage"`) require an explicit, nonempty `idempotencyKey` of at most 256 characters. `flow_edit` uses `requestId` with the same length limit and pins `baseRevision`. Retries of a mutation must retain its identity and arguments.
+`flow_create` (including imports), `flow_publish`, `run_start`, and `flow_connections_edit` (`action: "remove_usage"`) require an explicit, nonempty `idempotencyKey` of at most 256 characters. `flow_edit` uses `requestId` with the same length limit and pins `baseRevision`. Retries of a mutation must retain its identity and arguments.
 
 Request cancellation propagates to Connector queries and `waitSeconds` waits in that request. Server shutdown aborts active MCP requests. Accepted Runs continue independently of MCP connections. Use `run_cancel` for explicit cancellation.
 

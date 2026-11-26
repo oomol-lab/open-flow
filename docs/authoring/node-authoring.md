@@ -76,13 +76,13 @@ Clients handle only transport, arguments, and file adaptation. They must not mai
 
 For each node change, consider these interfaces together.
 
-| Interface     | Development requirement                                                                                                                                          |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `flow_schema` | Return business configuration, supported sources, required constraints, and minimal runnable examples. Explain node differences so callers do not have to guess. |
-| `flow_read`   | Keep outlines short. Combine actual business configuration and input sources in details. Read long text on demand and hide internal definition identities.       |
-| `flow_edit`   | Convert public configuration into low-level changes. Modify only the target node. Copy shared code modules when necessary and preserve node and edge identities. |
-| `flow_search` | Locate objects by public fields and source text. Return references for further reads and bounded context.                                                        |
-| `flow_check`  | Map internal diagnostics to public nodes, fields, ports, and code locations. Return errors that callers can use to correct a request.                            |
+| Interface             | Development requirement                                                                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flow_schema`         | Return business configuration, supported sources, required constraints, and minimal runnable examples. Explain node differences so callers do not have to guess. |
+| `flow_read`           | Keep outlines short. Combine actual business configuration and input sources in details. Read long text on demand and hide internal definition identities.       |
+| `flow_edit`           | Convert public configuration into low-level changes. Modify only the target node. Copy shared code modules when necessary and preserve node and edge identities. |
+| `flow_read` (`query`) | Locate objects by public fields and source text. Return references for further reads and bounded context.                                                        |
+| `flow_check`          | Map internal diagnostics to public nodes, fields, ports, and code locations. Return errors that callers can use to correct a request.                            |
 
 Callers must be able to use configuration from a detail response to update a node of the same type without adding hidden fields.
 Each execution node stores its own `node.task`. Nodes do not share Task definitions, even when their configuration is identical or they were copied.
