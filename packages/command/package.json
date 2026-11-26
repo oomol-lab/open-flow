@@ -1,6 +1,6 @@
 {
   "name": "@oomol-lab/open-flow-command",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Open Flow command runtime and npm entry builder.",
   "license": "SEE LICENSE IN ../../LICENSE",
   "type": "module",
