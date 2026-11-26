@@ -31,8 +31,9 @@ supplies the edit operations. Use these when a configuration is unfamiliar.
 
 Export writes only JSON to stdout. Import also accepts `--file -` for stdin and creates
 a new unpublished Draft; it never overwrites the source Flow. Keep the same file, name,
-and idempotency key when retrying an uncertain import. MCP equivalents are `flow_export`
-with `flowId`, and `flow_import` with the JSON `file`, `idempotencyKey`, optional `name`
+and idempotency key when retrying an uncertain import. MCP equivalents are `flow_read`
+with `flowId` and `export: "workflow"` (or `"bundle"` to include dependencies), and
+`flow_create` with the JSON `file`, `idempotencyKey`, optional `name`, optional `tagIds`
 and optional target `teamId`.
 
 Both operations clear structured accounts, Variables, error-source workflows and
@@ -332,7 +333,7 @@ The Start node is selected automatically even when other Triggers exist; use `--
 overrides; command help gives their shape. Live Runs use `--source live` and
 `--expected-publication` instead of `--expected-revision`.
 
-Declare parameters on Start: `{"op":"node.add","as":"start","type":"start","name":"Start","config":{"inputDefs":{"message":{"schema":{"type":"string"},"nullable":false},"note":{"schema":{"type":"string"},"nullable":true}}}}`. Read definitions in Start node details at `config.inputDefs`; `flow_live.inputDefs` remains a derived view of the published Start. Update with `node.update set.config.inputDefs`, and clear node-relative paths such as `["config","inputDefs","message","description"]`. Downstream nodes bind `{ "kind": "output", "node": "$start", "port": "message" }` with separate execution edges. Call with `--outputs '{"message":"Hello"}'`; note becomes null. REST and MCP use `trigger.outputs`. Deleting Start removes its configuration; undo restores it, while a new Start has empty definitions.
+Declare parameters on Start: `{"op":"node.add","as":"start","type":"start","name":"Start","config":{"inputDefs":{"message":{"schema":{"type":"string"},"nullable":false},"note":{"schema":{"type":"string"},"nullable":true}}}}`. Read definitions in Start node details at `config.inputDefs`; `inputDefs` in Live details (`live`, MCP `flow_live_get`) remain a derived view of the published Start. Update with `node.update set.config.inputDefs`, and clear node-relative paths such as `["config","inputDefs","message","description"]`. Downstream nodes bind `{ "kind": "output", "node": "$start", "port": "message" }` with separate execution edges. Call with `--outputs '{"message":"Hello"}'`; note becomes null. REST and MCP use `trigger.outputs`. Deleting Start removes its configuration; undo restores it, while a new Start has empty definitions.
 
 ### Inspect or continue an existing Run
 
@@ -386,7 +387,7 @@ Triggers together. Individual Triggers have no pause/resume operation. Disabling
 a Flow blocks new production admission without cancelling already accepted Runs.
 Use the observed Live publication ID for `--expected-publication`; if it changed,
 read the current state before deciding whether to apply the switch to that version.
-The MCP equivalent is `flow_set_enabled({ flowId, expectedPublicationId, enabled })`.
+The MCP equivalent is `flow_live_set({ flowId, expectedPublicationId, enabled })`.
 
 Successful `publish` includes the same `live` details as `live FLOW_ID --json`;
 use that result without immediately querying again. Query `live` after waiting
@@ -408,7 +409,7 @@ edit does not require a page reload.
 
 `live` includes Start and legacy Manual entry nodes without a runtime binding. `trigger search`
 and `trigger show` discover provider definitions; `live` inspects the Flow's
-current online entries. The MCP equivalent is `flow_live({ flowId })`.
+current online entries. The MCP equivalent is `flow_live_get({ flowId })`.
 
 ## Recover without losing another change or repeating an effect
 

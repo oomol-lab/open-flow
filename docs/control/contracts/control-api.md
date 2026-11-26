@@ -257,7 +257,7 @@ exporting the selected Flow; a save failure stops the download.
 
 `flow export <flow>` writes only file JSON to stdout. `flow import --file <path|->`
 accepts a path or stdin, plus `--name`, `--idempotency-key` and `--json`.
-MCP exposes `flow_export` and `flow_import` with the same service and retry semantics.
+MCP exposes `flow_read` with `export` and `flow_create` with `file` with the same service and retry semantics.
 
 Cleanup does not inspect or rewrite strings in code, prompts or arbitrary business JSON.
 Files can still contain literal sensitive information; review them before sharing.
@@ -301,8 +301,8 @@ bundles. The callback must forward the selected destination scope and tags and r
 
 CLI `flow export FLOW --include-dependencies` emits bundle JSON. Import detects either format from
 a file or stdin and accepts repeatable `--tag TAG_ID` options. Bundle JSON output retains
-`kind: 'flow.import'` and includes `flow` and `flows`. MCP `flow_export` accepts
-`includeDependencies`; `flow_import` detects bundles and accepts `tagIds` for either format.
+`kind: 'flow.import'` and includes `flow` and `flows`. MCP `flow_read` accepts
+`export: "bundle"`; `flow_create` with `file` detects bundles and accepts `tagIds` for either format.
 
 Flow is a top-level resource:
 
@@ -1109,7 +1109,7 @@ Both grant collections are required: one serves shared Code, the other consumers
 
 `POST /v1/flows/:flowId/connection-usage/remove` accepts `{ version: 1, connectionId, expectedRevisionId, expectedAccessRevision }`, pins identity through standard `Idempotency-Key`, and returns `DraftChange`. One transaction checks both revisions and clears all node selections and shared Code usage for that account. Nodes, code, inputs, and edges remain, as do upstream authorization, Publications, and accepted Runs. Any conflict fails the whole operation. Success emits `draft.changed` and `access.changed`. Identical retries return the original result; different requests must not reuse the key. Drafts may remain unconfigured after removal. Default Connections must not automatically restore usage.
 
-MCP exposes `flow_code_connections`, `flow_connection_candidates`, `flow_code_connection_set`, and `flow_connection_usage_remove` through the same operations. CLI equivalents are `oo flow connector code-access <flow> [--publication <publicationId>]`, `candidates <flow> <provider> [provider ...]`, `code-allow|code-remove <flow> <provider> <binding> <access-revision>`, and `remove-usage <flow> <connection> <access-revision>` with existing edit Revision/idempotency arguments. All writes affect only Draft.
+MCP exposes `flow_connections_get` (shared Code connections, or candidates with `providerIds`) and `flow_connections_edit` (`action: "set_code_binding"` or `"remove_usage"`) through the same operations. CLI equivalents are `oo flow connector code-access <flow> [--publication <publicationId>]`, `candidates <flow> <provider> [provider ...]`, `code-allow|code-remove <flow> <provider> <binding> <access-revision>`, and `remove-usage <flow> <connection> <access-revision>` with existing edit Revision/idempotency arguments. All writes affect only Draft.
 
 Candidate queries batch nonempty, unique `providerIds` on demand. Each ID permits at most 256 characters. Responses are `{ results, version: 1 }`, with exactly one item per requested Provider: `{ candidates, mode, providerId, version: 1 }` on success or `{ providerId, error: { code, message } }` on failure. Shared Team identity, account catalog, or policy read failures fail the whole request under normal error rules.
 
@@ -2096,9 +2096,9 @@ oo flow state clear FLOW --scope draft --key cursor --yes
 oo flow dedupe clear FLOW --scope live --space node:filter --yes
 ```
 
-CLI clearing requires `--yes`; `state show --full` is rejected. MCP tools are `flow_state`,
-`flow_state_read`, `flow_state_clear`, and `flow_dedupe_clear`; each requires an explicit `scope`.
-`flow_state_read` requires the same bounded keys and shares the HTTP read budget.
+CLI clearing requires `--yes`; `state show --full` is rejected. MCP tools are `flow_state_get`
+(metadata, or values with `keys`) and `flow_state_clear` (`target: "state"` or `"dedupe"`); each requires an explicit `scope`.
+`flow_state_get` with `keys` requires the same bounded keys and shares the HTTP read budget.
 Workbench defaults to Draft, displays aggregate usage and source history, and asks
 for separate confirmation before clearing Live. Live clearing immediately affects future
 membership checks and may cause items to be processed again.
