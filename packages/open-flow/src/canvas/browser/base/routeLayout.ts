@@ -336,12 +336,46 @@ export function routeLayout(nodes: readonly LayoutNode[], edges: readonly GraphL
     }
   }
 
+  const crossesForwardEdges = (x: number, fromY: number, toY: number, component: number | undefined): number => {
+    const low = Math.min(fromY, toY) + 1e-6
+    const high = Math.max(fromY, toY) - 1e-6
+    if (low >= high) return 0
+    let count = 0
+    for (const other of uniqueConnections) {
+      if (other.feedback || other.component !== component) continue
+      if (other.source.x >= x - 1e-6 || other.target.x <= x + 1e-6) continue
+      const midX = (other.start.x + other.end.x) / 2
+      const otherY = x <= midX ? other.source.y : other.target.y
+      if (otherY > low && otherY < high) count += 1
+    }
+    return count
+  }
+
   // Shorter loops use the inner lanes so nested returns do not cross.
   const feedback = uniqueConnections.filter((edge) => edge.feedback).toSorted((a, b) => a.source.x - a.target.x - (b.source.x - b.target.x))
   for (const [index, edge] of feedback.entries()) {
-    const side = edge.source.y <= edge.target.y ? -1 : 1
     const span = obstacles.filter((rect) => rect.component === edge.component && rect.right >= edge.end.x && rect.left <= edge.start.x)
-    let lane = side < 0 ? Math.min(...span.map((rect) => rect.top)) : Math.max(...span.map((rect) => rect.bottom))
+    const leftBound = Math.min(...span.map((rect) => rect.top))
+    const rightBound = Math.max(...span.map((rect) => rect.bottom))
+    const leftCrossings =
+      crossesForwardEdges(edge.start.x, edge.source.y, leftBound, edge.component) + crossesForwardEdges(edge.end.x, edge.target.y, leftBound, edge.component)
+    const rightCrossings =
+      crossesForwardEdges(edge.start.x, edge.source.y, rightBound, edge.component) + crossesForwardEdges(edge.end.x, edge.target.y, rightBound, edge.component)
+    const leftCost = Math.abs(edge.source.y - leftBound) + Math.abs(edge.target.y - leftBound)
+    const rightCost = Math.abs(edge.source.y - rightBound) + Math.abs(edge.target.y - rightBound)
+    const side =
+      leftCrossings !== rightCrossings
+        ? leftCrossings < rightCrossings
+          ? -1
+          : 1
+        : Math.abs(leftCost - rightCost) > 1e-6
+          ? leftCost < rightCost
+            ? -1
+            : 1
+          : edge.source.y <= edge.target.y
+            ? -1
+            : 1
+    let lane = side < 0 ? leftBound : rightBound
     let previousLane: number
     do {
       previousLane = lane

@@ -239,3 +239,54 @@ it('separates multiple obstructed skip edges routing through the same corridor w
     }
   }
 })
+
+it('routes a feedback edge around the shorter exterior side even when source.y <= target.y', () => {
+  const nodes: LayoutNode[] = [
+    { id: 'choose', column: 0, x: 0, y: 400, width: 92, height: 336 },
+    { id: 'meeting', column: 1, x: 140, y: 200, width: 158, height: 336 },
+    { id: 'checkEmail', column: 2, x: 340, y: 40, width: 92, height: 336 },
+    { id: 'checkLater', column: 3, x: 480, y: 40, width: 92, height: 336 },
+    { id: 'noLaterEmail', column: 4, x: 620, y: 280, width: 158, height: 336 },
+    { id: 'findCalendar', column: 5, x: 820, y: 280, width: 92, height: 336 },
+  ]
+  const routes = routeLayout(nodes, [
+    { id: 'f1', source: 'choose', target: 'meeting' },
+    { id: 'f2', source: 'meeting', target: 'checkEmail' },
+    { id: 'f3', source: 'checkEmail', target: 'checkLater' },
+    { id: 'f4', source: 'checkLater', target: 'noLaterEmail' },
+    { id: 'yes', source: 'noLaterEmail', target: 'findCalendar', sourceOffset: { x: 158, y: 84 }, targetOffset: { x: 0, y: 168 } },
+    // Right-hand default port (y = 280 + 252 = 532) is still <= choose center (y = 400 + 168 = 568).
+    { id: 'feedback', source: 'noLaterEmail', target: 'choose', sourceOffset: { x: 158, y: 252 }, targetOffset: { x: 0, y: 168 } },
+  ])
+  const route = routes.get('feedback')!
+  const choose = nodes[0]!
+  const noLaterEmail = nodes[4]!
+  expect(Math.max(...route.map((point) => point.y))).toBeGreaterThan(choose.y + choose.height)
+  expect(Math.min(...route.map((point) => point.y))).toBeGreaterThanOrEqual(noLaterEmail.y)
+  expect(hasRouteCrossings(routes)).toBe(false)
+  for (const point of route.slice(1, -1)) {
+    for (const node of nodes) {
+      const inside = point.x > node.x && point.x < node.x + node.width && point.y > node.y && point.y < node.y + node.height
+      expect(inside, `waypoint inside ${node.id}`).toBe(false)
+    }
+  }
+})
+
+it('avoids crossing forward edges when choosing the feedback exterior side', () => {
+  const nodes: LayoutNode[] = [
+    // Tall target card makes the right bound (200 + 600 + 16 = 816) much farther than the left bound (184),
+    // so raw distance favors left, while going left from the right port (452) crosses branch-next (288).
+    { id: 'top', column: 0, x: 0, y: 200, width: 92, height: 600 },
+    { id: 'branch', column: 1, x: 140, y: 200, width: 158, height: 336 },
+    { id: 'next', column: 2, x: 340, y: 120, width: 92, height: 336 },
+  ]
+  const routes = routeLayout(nodes, [
+    { id: 'top-branch', source: 'top', target: 'branch', sourceOffset: { x: 92, y: 168 }, targetOffset: { x: 0, y: 168 } },
+    { id: 'branch-next', source: 'branch', target: 'next', sourceOffset: { x: 158, y: 84 }, targetOffset: { x: 0, y: 168 } },
+    { id: 'feedback', source: 'branch', target: 'top', sourceOffset: { x: 158, y: 252 }, targetOffset: { x: 0, y: 168 } },
+  ])
+  const route = routes.get('feedback')!
+  const top = nodes[0]!
+  expect(Math.max(...route.map((point) => point.y))).toBeGreaterThan(top.y + top.height)
+  expect(hasRouteCrossings(routes)).toBe(false)
+})
